@@ -603,7 +603,7 @@ function App() {
       <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300">
 
         {/* Top Header */}
-        <Header setActivePage={setActivePage} />
+        <Header setActivePage={setActivePage} onLogout={handleLogout} />
 
         {/* Scrollable Page Content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-50">
