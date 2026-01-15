@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Building2, MapPin, Globe, CreditCard, LayoutGrid, Star, Clock, Moon, Monitor, User, Edit2 } from 'lucide-react';
+import { X, Building2, MapPin, Globe, CreditCard, Star, Clock, Moon, Monitor, User, Edit2 } from 'lucide-react';
 
 interface PropertyDetailsModalProps {
     isOpen: boolean;
