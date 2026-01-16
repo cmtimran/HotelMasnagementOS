@@ -4,9 +4,10 @@ import { UtensilsCrossed, ClipboardList, User, Building2, LogOut } from 'lucide-
 interface HeaderProps {
     setActivePage: (page: string) => void;
     onLogout: () => void;
+    user: any;
 }
 
-const Header: React.FC<HeaderProps> = ({ setActivePage, onLogout }) => {
+const Header: React.FC<HeaderProps> = ({ setActivePage, onLogout, user }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -60,13 +61,13 @@ const Header: React.FC<HeaderProps> = ({ setActivePage, onLogout }) => {
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     >
                         <div className="text-right hidden sm:block">
-                            <p className="text-xs font-bold text-gray-800 leading-tight">John Smith</p>
-                            <p className="text-[10px] text-gray-500 font-medium">Admin</p>
-                            <p className="text-[10px] text-blue-800 font-medium">Hotel Sarena</p>
+                            <p className="text-xs font-bold text-gray-800 leading-tight">{user?.name || 'Guest User'}</p>
+                            <p className="text-[10px] text-gray-500 font-medium">{user?.role || 'Guest'}</p>
+                            <p className="text-[10px] text-blue-800 font-medium">{user?.property || 'No Property'}</p>
                         </div>
                         <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-200">
                             <img
-                                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+                                src={user?.image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}
                                 alt="User"
                                 className="w-full h-full object-cover"
                             />

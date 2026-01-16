@@ -12,18 +12,47 @@ import Header from './components/Header';
 import Login from './components/Login';
 import PropertyDetailsModal from './components/PropertyDetailsModal';
 import AddProperty from './components/AddProperty';
+import HotelInfoView from './components/HotelInfoView';
+import FrontDesk from './components/FrontDesk';
+import BuildingManagement from './components/BuildingManagement';
+import RoomTypeManagement from './components/RoomTypeManagement';
+import ConnectingRoomManagement from './components/ConnectingRoomManagement';
+import RoomManagement from './components/RoomManagement';
+import RatePlanManagement from './components/RatePlanManagement';
+import MealPlanManagement from './components/MealPlanManagement';
+import Reports from './components/Reports';
+
+interface UserData {
+  name: string;
+  role: string;
+  property: string;
+  image?: string;
+  email?: string;
+}
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [viewingProperty, setViewingProperty] = useState<any>(null);
 
   // Session Management: Check localStorage on mount
   useEffect(() => {
+    // Check for Deep Link (e.g. ?page=reports)
+    const params = new URLSearchParams(window.location.search);
+    const pageParam = params.get('page');
+    if (pageParam) {
+      setActivePage(pageParam);
+    }
+
     const storedAuth = localStorage.getItem('auth_token');
+    const storedUser = localStorage.getItem('user_data');
     if (storedAuth) {
       setIsAuthenticated(true);
+      if (storedUser) {
+        setCurrentUser(JSON.parse(storedUser));
+      }
     }
   }, []);
 
@@ -66,14 +95,6 @@ function App() {
   const closeModal = () => {
     setModalConfig({ ...modalConfig, isOpen: false });
   };
-
-  // ... (Mock Data and Section Configurations - omitted for brevity in replace content, assuming they persist if I don't touch them? No, replace_file_content replaces the chunk. I need to be careful. The chunk StartLine 1 to 343 covers almost everything. I should only replace the top part or I need to provide the full file content if I select a large range.)
-  // Wait, replace_file_content replaces a CONTIGUOUS block. If I want to wrap the whole return, I need to touch the return statement.
-  // If I want to add imports and state, I touch the top.
-  // Best to use multi_replace for this to avoid re-pasting the huge data arrays.
-
-  // Let's use multi_replace_file_content in the next step instead.
-  // I will cancel this and use multi_replace.
 
 
   // Mock Data
@@ -331,6 +352,14 @@ function App() {
     }
   ];
 
+  // Handle Property Management
+  const [editingProperty, setEditingProperty] = useState<any>(null);
+
+  const handleManageProperty = (property: any) => {
+    setEditingProperty(property);
+    setActivePage('edit-property');
+  };
+
   const renderContent = () => {
     switch (activePage) {
       case 'dashboard':
@@ -341,6 +370,22 @@ function App() {
         return <ManagerDashboard />;
       case 'property-create':
         return <AddProperty onBack={() => setActivePage('properties')} />;
+      case 'hotel-info':
+        // Find current property (mock: first one)
+        const currentProperty = propertiesData[0];
+        return <HotelInfoView property={currentProperty} currentUser={currentUser} onManageProperty={() => handleManageProperty(currentProperty)} />;
+      case 'front-desk':
+        return <FrontDesk />;
+      case 'add-property':
+        return <AddProperty onBack={() => setActivePage('dashboard')} />;
+      case 'edit-property':
+        return <AddProperty onBack={() => setActivePage('hotel-info')} initialData={editingProperty} />;
+      case 'building-floor':
+        return <BuildingManagement />;
+      case 'manage-room-type':
+        return <RoomTypeManagement />;
+      case 'joint-room':
+        return <ConnectingRoomManagement />;
       case 'properties':
         return (
           <>
@@ -568,6 +613,20 @@ function App() {
             onAdd={() => openModal('Add New Waiter', 'Register staff members', waiterSections)}
           />
         );
+      case 'building-floor':
+        return <BuildingManagement />;
+      case 'manage-room-type':
+        return <RoomTypeManagement />;
+      case 'manage-room':
+        return <RoomManagement onBack={() => setActivePage('dashboard')} />;
+      case 'joint-room':
+        return <ConnectingRoomManagement />;
+      case 'rate-plans':
+        return <RatePlanManagement />;
+      case 'meal-plans':
+        return <MealPlanManagement />;
+      case 'reports':
+        return <Reports />;
       default:
         return null;
     }
@@ -577,14 +636,18 @@ function App() {
 
   // ... (existing code)
 
-  const handleLogin = () => {
+  const handleLogin = (user: UserData) => {
     setIsAuthenticated(true);
+    setCurrentUser(user);
     localStorage.setItem('auth_token', 'valid_token_placeholder');
+    localStorage.setItem('user_data', JSON.stringify(user));
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
     setActivePage('dashboard');
   };
 
@@ -594,16 +657,20 @@ function App() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans text-gray-900">
-      <Sidebar
-        activePage={activePage}
-        setActivePage={setActivePage}
-        isCollapsed={isSidebarCollapsed}
-        toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-      />
+      {activePage !== 'reports' && (
+        <Sidebar
+          activePage={activePage}
+          setActivePage={setActivePage}
+          isCollapsed={isSidebarCollapsed}
+          toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
+      )}
       <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300">
 
         {/* Top Header */}
-        <Header setActivePage={setActivePage} onLogout={handleLogout} />
+        {activePage !== 'reports' && (
+          <Header setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
+        )}
 
         {/* Scrollable Page Content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-50">

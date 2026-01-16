@@ -28,7 +28,8 @@ import {
     Info,
     FileText,
     Briefcase,
-    Circle
+    Circle,
+    Utensils
 } from 'lucide-react';
 
 interface MenuItem {
@@ -37,6 +38,7 @@ interface MenuItem {
     label: string;
     icon?: React.ReactNode;
     items?: MenuItem[];
+    newTab?: boolean;
 }
 
 interface SidebarProps {
@@ -58,6 +60,7 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
         userKey: false,
         settingsKey: false,
         financeKey: false,
+        reportsKey: false,
     });
 
     const toggleMenu = (key: string) => {
@@ -90,6 +93,7 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                     items: [
                         { id: 'tables', label: 'Tables', icon: <Grid3X3 size={16} /> },
                         { id: 'floor', label: 'Floor Plan', icon: <Map size={16} /> },
+                        { id: 'front-desk', label: 'Front Desk', icon: <Monitor size={16} /> },
                         { id: 'counters', label: 'Counters', icon: <Monitor size={16} /> },
                         { id: 'kitchens', label: 'Kitchens', icon: <ChefHat size={16} /> },
                     ]
@@ -120,7 +124,10 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             label: 'Room Management',
             icon: <BedDouble size={20} />,
             items: [
-                { id: 'room-list', label: 'Room List', icon: <ListOrdered size={16} /> },
+                { id: 'building-floor', label: 'Floors & Buildings', icon: <Building2 size={16} /> },
+                { id: 'manage-room-type', label: 'Room Types', icon: <Tags size={16} /> },
+                { id: 'manage-room', label: 'Rooms', icon: <BedDouble size={16} /> },
+                { id: 'joint-room', label: 'Connecting Rooms', icon: <Layers size={16} /> },
             ]
         },
         {
@@ -129,6 +136,7 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             icon: <Percent size={20} />,
             items: [
                 { id: 'rate-plans', label: 'Rate Plans', icon: <Tags size={16} /> },
+                { id: 'meal-plans', label: 'Meal Plans', icon: <Utensils size={16} /> },
             ]
         },
         {
@@ -153,6 +161,14 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             icon: <BadgeDollarSign size={20} />,
             items: [
                 { id: 'finance-overview', label: 'Overview', icon: <FileText size={16} /> },
+            ]
+        },
+        {
+            key: 'reportsKey',
+            label: 'Reports',
+            icon: <FileText size={20} />,
+            items: [
+                { id: 'reports', label: 'All Reports', icon: <ListOrdered size={16} />, newTab: true },
             ]
         }
     ];
@@ -210,7 +226,15 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
         return (
             <div
                 key={item.id}
-                onClick={() => item.id && setActivePage(item.id)}
+                onClick={() => {
+                    if (item.id) {
+                        if (item.newTab) {
+                            window.open(`?page=${item.id}`, '_blank');
+                        } else {
+                            setActivePage(item.id);
+                        }
+                    }
+                }}
                 className={`
                     flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-lg cursor-pointer transition-all
                     ${isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}
@@ -221,6 +245,7 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             >
                 <div className="flex-shrink-0">{item.icon || <Circle size={6} />}</div>
                 {!isCollapsed && <span>{item.label}</span>}
+                {item.newTab && !isCollapsed && <span className="ml-auto text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">New Tab</span>}
             </div>
         );
     };

@@ -6,34 +6,85 @@ import {
 
 interface AddPropertyProps {
     onBack: () => void;
+    initialData?: any;
 }
 
-const AddProperty = ({ onBack }: AddPropertyProps) => {
+interface PosConfig {
+    id: number;
+    type: string;
+    count: number;
+}
+
+interface BankAccount {
+    id: number;
+    bankName: string;
+    accountName: string;
+    accountNum: string;
+    swift: string;
+}
+
+interface Poc {
+    id: number;
+    role: string;
+    name: string;
+    phone: string;
+    email: string;
+}
+
+const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
     const [activeTab, setActiveTab] = useState('identity');
-    const [posConfigs, setPosConfigs] = useState([{ id: 1, type: 'Restaurant', count: 1 }]);
-    const [bankAccounts, setBankAccounts] = useState([{ id: 1, bankName: '', accountName: '', accountNum: '', swift: '' }]);
-    const [pocs, setPocs] = useState([{ id: 1, role: 'General Manager', name: '', phone: '', email: '' }]);
+    const [posConfigs, setPosConfigs] = useState<PosConfig[]>([{ id: 1, type: 'Restaurant', count: 1 }]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(initialData?.finance?.bankAccounts || [{ id: 1, bankName: '', accountName: '', accountNum: '', swift: '' }]);
+    const [pocs, setPocs] = useState<Poc[]>(initialData?.pocs || [{ id: 1, role: 'General Manager', name: '', phone: '', email: '' }]);
     const [activeModules, setActiveModules] = useState<string[]>(['Front Office', 'Housekeeping']);
-    const [weekends, setWeekends] = useState<string[]>(['Fri', 'Sat']);
+    const [weekends, setWeekends] = useState<string[]>(initialData?.operations?.weekends || ['Fri', 'Sat']);
+
+    // --- New State Variables for Added Fields ---
+    const [defaultNationality, setDefaultNationality] = useState('Bangladeshi');
+    const [mapCoordinates, setMapCoordinates] = useState({ lat: '', lng: '' });
+    const [stateCaption, setStateCaption] = useState('State');
+    const [zipCaption, setZipCaption] = useState('Zip Code');
+
+    // Operations
+    const [timeFormat, setTimeFormat] = useState('24h');
+    const [dateFormat, setDateFormat] = useState('DD-MM-YYYY');
+    const [defaultSalutation, setDefaultSalutation] = useState('Mr.');
+    const [defaultIdentity, setDefaultIdentity] = useState('NID');
+    const [defaultBillTo, setDefaultBillTo] = useState('Guest');
+    const [cancellationPolicyText, setCancellationPolicyText] = useState('');
+
+    // Finance
+    const [isTaxInclusive, setIsTaxInclusive] = useState(false);
+    const [roundOffType, setRoundOffType] = useState('Nearest');
+    const [roundOffLimit, setRoundOffLimit] = useState(1.00);
+    const [addRoundOffToRate, setAddRoundOffToRate] = useState(false);
+    const [serviceCharge, setServiceCharge] = useState(10);
+    const [creditCardGateway, setCreditCardGateway] = useState('Stripe');
+
+    // System
+    const [webRateMode, setWebRateMode] = useState('Regular');
+    const [webInventoryMode, setWebInventoryMode] = useState('Regular (Live)');
+    const [autoEmailFolio, setAutoEmailFolio] = useState(true);
+    const [posConfigType, setPosConfigType] = useState('Integrated POS'); // vs Third-party
 
     // POS Handlers
     const addPosConfig = () => setPosConfigs([...posConfigs, { id: Date.now(), type: 'Restaurant', count: 1 }]);
     const removePosConfig = (id: number) => setPosConfigs(posConfigs.filter(cfg => cfg.id !== id));
-    const updatePosConfig = (id: number, field: 'type' | 'count', value: string | number) => {
+    const updatePosConfig = (id: number, field: keyof PosConfig, value: string | number) => {
         setPosConfigs(posConfigs.map(cfg => cfg.id === id ? { ...cfg, [field]: value } : cfg));
     };
 
     // Bank Handlers
     const addBank = () => setBankAccounts([...bankAccounts, { id: Date.now(), bankName: '', accountName: '', accountNum: '', swift: '' }]);
     const removeBank = (id: number) => setBankAccounts(bankAccounts.filter(b => b.id !== id));
-    const updateBank = (id: number, field: keyof typeof bankAccounts[0], value: string) => {
+    const updateBank = (id: number, field: keyof BankAccount, value: string) => {
         setBankAccounts(bankAccounts.map(b => b.id === id ? { ...b, [field]: value } : b));
     };
 
     // POC Handlers
     const addPoc = () => setPocs([...pocs, { id: Date.now(), role: 'General Manager', name: '', phone: '', email: '' }]);
     const removePoc = (id: number) => setPocs(pocs.filter(p => p.id !== id));
-    const updatePoc = (id: number, field: keyof typeof pocs[0], value: string) => {
+    const updatePoc = (id: number, field: keyof Poc, value: string) => {
         setPocs(pocs.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
@@ -43,14 +94,36 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
     };
 
     // Policy State
-    const [cancellationPolicy, setCancellationPolicy] = useState('Flexible');
+    const [cancellationPolicy, setCancellationPolicy] = useState(initialData?.operations?.cancellation || 'Flexible');
     const [noShowPolicy, setNoShowPolicy] = useState('Charge 1st Night');
-    const [smokingPolicy, setSmokingPolicy] = useState('Non-Smoking Property');
+    const [smokingPolicy, setSmokingPolicy] = useState(initialData?.operations?.smoking || 'Non-Smoking Property');
     const [petPolicy, setPetPolicy] = useState('Not Allowed');
     const [visitorPolicy, setVisitorPolicy] = useState('Not Allowed in Room');
+    const [regCardTerms, setRegCardTerms] = useState(initialData?.operations?.regCardTerms || '');
+
+    // Finance State
+    const [invoiceTerms, setInvoiceTerms] = useState(initialData?.finance?.invoiceTerms || '');
+
+    // Identity State
+    const [selectedAmenities, setSelectedAmenities] = useState<string[]>(initialData?.amenities || ['WiFi', 'Parking']);
+    const toggleAmenity = (item: string) => setSelectedAmenities(prev => prev.includes(item) ? prev.filter(a => a !== item) : [...prev, item]);
+
+    // Automation State (Restored)
+    const [auditTime, setAuditTime] = useState(initialData?.automation?.auditTime || "02:00");
+    const [emailReports, setEmailReports] = useState(initialData?.automation?.email || "");
+    const [autoRun, setAutoRun] = useState(initialData?.automation?.autoRun || false);
+    const [autoPostRent, setAutoPostRent] = useState(initialData?.automation?.autoPostRent || true);
+    const [forceClosePos, setForceClosePos] = useState(initialData?.automation?.forceClosePos || true);
+    const [blockLogin, setBlockLogin] = useState(initialData?.automation?.blockLogin || false);
+    const [autoBackup, setAutoBackup] = useState(initialData?.automation?.autoBackup || true);
+    const [selectedReports, setSelectedReports] = useState<string[]>(initialData?.automation?.reports || ['Daily Revenue', 'Occupancy Report']);
+
+    const toggleReport = (report: string) => {
+        setSelectedReports(prev => prev.includes(report) ? prev.filter(r => r !== report) : [...prev, report]);
+    };
 
     // Policy Descriptions
-    const policyDescriptions: any = {
+    const policyDescriptions: { [key: string]: { [key: string]: string } } = {
         cancellation: {
             'Flexible': 'Free cancellation up to 24h before check-in',
             'Moderate': 'Charge 1st night if cancelled within 48h',
@@ -94,7 +167,7 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800">Add New Property</h1>
+                        <h1 className="text-xl font-bold text-gray-800">{initialData ? 'Edit Property' : 'Add New Property'}</h1>
                         <p className="text-xs text-gray-500">Configure your hotel settings and details</p>
                     </div>
                 </div>
@@ -110,7 +183,7 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
             <main className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
                 <div className="flex flex-col md:flex-row gap-6">
                     {/* Tabs Sidebar */}
-                    <div className="w-full md:w-40 flex-shrink-0 space-y-3">
+                    <div className="w-full md:w-56 flex-shrink-0 space-y-3">
                         <nav className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col sticky top-24 overflow-hidden">
                             {tabs.map((tab) => (
                                 <button
@@ -126,6 +199,10 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                 </button>
                             ))}
                         </nav>
+
+                        <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100 text-xs text-blue-800">
+                            <strong>Tip:</strong> You can save as "Draft" at any time and resume later.
+                        </div>
                     </div>
 
                     {/* Form Content */}
@@ -140,35 +217,43 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-1 col-span-2">
                                             <label className="text-sm font-medium text-gray-700">Hotel Name <span className="text-red-500">*</span></label>
-                                            <input type="text" placeholder="Official Property Name" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                            <input type="text" defaultValue={initialData?.name} placeholder="Official Property Name" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Property Code</label>
-                                            <input type="text" placeholder="e.g. HTL-01" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                            <label className="text-sm font-medium text-gray-700">Property Code <span className="text-red-500">*</span></label>
+                                            <input type="text" defaultValue={initialData?.id ? `HTL-${initialData.id.toString().padStart(2, '0')}` : ''} placeholder="e.g. HTL-DHK-01" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                                         </div>
+
                                         <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Type</label>
-                                            <select className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>Hotel</option><option>Resort</option><option>Guest House</option>
+                                            <label className="text-sm font-medium text-gray-700">Property Type</label>
+                                            <select defaultValue="Hotel" className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
+                                                <option>Hotel</option><option>Resort</option><option>Guest House</option><option>Motel</option><option>Apartment</option>
                                             </select>
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Grade</label>
-                                            <select className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>5 Star</option><option>4 Star</option><option>3 Star</option>
+                                            <label className="text-sm font-medium text-gray-700">Grade / Star Rating</label>
+                                            <select defaultValue={initialData?.grade || '5 Star'} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
+                                                <option>5 Star</option><option>4 Star</option><option>3 Star</option><option>2 Star</option><option>1 Star</option><option>Luxury</option>
                                             </select>
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Total Rooms</label>
-                                            <input type="number" className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                            <label className="text-sm font-medium text-gray-700">Total Rooms Count <span className="text-red-500">*</span></label>
+                                            <input type="number" defaultValue={initialData?.rooms} className="w-full px-3 py-2 border rounded-lg outline-none" />
                                         </div>
+
                                         <div className="space-y-1">
                                             <label className="text-sm font-medium text-gray-700">Established Year</label>
-                                            <input type="number" placeholder="YYYY" className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                            <input type="number" defaultValue={initialData?.established} placeholder="YYYY" className="w-full px-3 py-2 border rounded-lg outline-none" />
                                         </div>
                                         <div className="space-y-1 col-span-2">
                                             <label className="text-sm font-medium text-gray-700">Website</label>
-                                            <input type="text" placeholder="https://" className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                            <input type="text" defaultValue={initialData?.website} placeholder="https://" className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium text-gray-700">Default Nationality</label>
+                                            <select value={defaultNationality} onChange={(e) => setDefaultNationality(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
+                                                <option>Bangladeshi</option><option>Malaysian</option><option>Indian</option><option>American</option><option>British</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -178,25 +263,51 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                     <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><MapPin size={20} className="text-gray-400" /> Location & Contact</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="col-span-2 space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Address</label>
-                                            <textarea rows={2} className="w-full px-3 py-2 border rounded-lg outline-none"></textarea>
+                                            <label className="text-sm font-medium text-gray-700">Address <span className="text-red-500">*</span></label>
+                                            <textarea rows={2} defaultValue={initialData?.address} className="w-full px-3 py-2 border rounded-lg outline-none"></textarea>
                                         </div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">City</label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Dhaka</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Country</label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Bangladesh</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Postal Code</label><input type="text" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Timezone</label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>GMT+6</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Phone</label><input type="text" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Email</label><input type="email" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">City</label><select defaultValue={initialData?.city} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Dhaka</option><option>Miami</option><option>London</option></select></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Country <span className="text-red-500">*</span></label><select defaultValue={initialData?.country} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Bangladesh</option><option>Malaysia</option><option>USA</option><option>UK</option></select></div>
+
+                                        {/* Dynamic Captions */}
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-gray-500 flex justify-between"><span>Region Caption</span> <input type="text" value={stateCaption} onChange={(e) => setStateCaption(e.target.value)} className="w-20 text-right border-b outline-none text-[10px]" /></label>
+                                            <input type="text" placeholder={stateCaption} className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-gray-500 flex justify-between"><span>Zip Caption</span> <input type="text" value={zipCaption} onChange={(e) => setZipCaption(e.target.value)} className="w-20 text-right border-b outline-none text-[10px]" /></label>
+                                            <input type="text" placeholder={zipCaption} className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                        </div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Map Latitude</label><input type="text" value={mapCoordinates.lat} onChange={(e) => setMapCoordinates({ ...mapCoordinates, lat: e.target.value })} placeholder="e.g. 23.8103" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Map Longitude</label><input type="text" value={mapCoordinates.lng} onChange={(e) => setMapCoordinates({ ...mapCoordinates, lng: e.target.value })} placeholder="e.g. 90.4125" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Timezone <span className="text-red-500">*</span></label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>GMT+6 (Asia/Dhaka)</option></select></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Phone</label><input type="text" defaultValue={initialData?.phone} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Email</label><input type="email" defaultValue={initialData?.email} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+
+                                        <div className="col-span-1 md:col-span-2 mt-4 pt-4 border-t">
+                                            <h3 className="text-sm font-bold text-gray-900 mb-4">Property Amenities</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                {['WiFi', 'Parking', 'Swimming Pool', 'Gym', 'Spa', 'Restaurant', 'Bar', 'Room Service', 'Conference Room', 'Airport Shuttle', 'Wheelchair Accessible', 'Elevator'].map(item => (
+                                                    <label key={item} className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors ${selectedAmenities.includes(item) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'hover:bg-gray-50'}`}>
+                                                        <input type="checkbox" checked={selectedAmenities.includes(item)} onChange={() => toggleAmenity(item)} className="rounded text-blue-600" />
+                                                        <span className="text-sm font-medium">{item}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
 
                                         <div className="col-span-1 md:col-span-2 mt-4 pt-4 border-t">
                                             <h3 className="text-sm font-bold text-gray-900 mb-4">Corporate Office</h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="col-span-2 space-y-1">
                                                     <label className="text-sm font-medium text-gray-700">Corporate Address</label>
-                                                    <textarea rows={2} placeholder="Office address..." className="w-full px-3 py-2 border rounded-lg outline-none"></textarea>
+                                                    <textarea rows={2} defaultValue={initialData?.corporate?.address} placeholder="Office address..." className="w-full px-3 py-2 border rounded-lg outline-none"></textarea>
                                                 </div>
-                                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Corporate Phone</label><input type="text" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Corporate Email</label><input type="email" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Corporate Phone</label><input type="text" defaultValue={initialData?.corporate?.phone} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Corporate Email</label><input type="email" defaultValue={initialData?.corporate?.email} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
                                             </div>
                                         </div>
                                     </div>
@@ -210,11 +321,19 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
 
                                 {/* 1. Timing & Schedules */}
                                 <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Clock size={20} className="text-gray-400" /> 1. Timing & Schedules</h2>
+                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Clock size={20} className="text-gray-400" /> 1. Operations & Defaults</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Standard Check-in Time <span className="text-red-500">*</span></label><input type="time" defaultValue="14:00" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Standard Check-out Time <span className="text-red-500">*</span></label><input type="time" defaultValue="12:00" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Breakfast Timing</label><div className="flex gap-2 items-center"><input type="time" defaultValue="07:00" className="w-full px-2 py-2 border rounded-lg outline-none text-xs" /><span className="text-gray-400">-</span><input type="time" defaultValue="10:30" className="w-full px-2 py-2 border rounded-lg outline-none text-xs" /></div></div>
+
+                                        {/* Formats */}
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Time Format</label><select value={timeFormat} onChange={(e) => setTimeFormat(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>24 Hours (14:00)</option><option>12 Hours (02:00 PM)</option></select></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Date Format</label><select value={dateFormat} onChange={(e) => setDateFormat(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>DD-MM-YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Check-in Time</label><input type="time" defaultValue={initialData?.operations?.checkIn || "14:00"} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Check-out Time</label><input type="time" defaultValue={initialData?.operations?.checkOut || "12:00"} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Default Salutation</label><select value={defaultSalutation} onChange={(e) => setDefaultSalutation(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Mr.</option><option>Ms.</option><option>Mrs.</option><option>Dr.</option></select></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Default Identity</label><select value={defaultIdentity} onChange={(e) => setDefaultIdentity(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>NID</option><option>Passport</option><option>Driving License</option></select></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Default Bill To</label><select value={defaultBillTo} onChange={(e) => setDefaultBillTo(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Guest</option><option>Company</option></select></div>
 
                                         <div className="col-span-1 md:col-span-2 lg:col-span-4 space-y-1">
                                             <label className="text-sm font-medium text-gray-700 block mb-2">Weekend Selection (for special pricing)</label>
@@ -231,108 +350,10 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                     </div>
                                 </div>
 
-                                {/* 2. Early Check-in & Late Check-out Policy */}
+                                {/* 2. Policies */}
                                 <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Clock size={20} className="text-gray-400" /> 2. Early Check-in & Late Check-out</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-4 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-sm font-bold text-gray-800">Early Check-in Allowed?</label>
-                                                <input type="checkbox" className="toggle toggle-sm text-blue-600" defaultChecked />
-                                            </div>
-                                            <div className="space-y-3">
-                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider border-b pb-1">Charge Logic</p>
-
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <span className="w-20 text-gray-600 text-xs">Before</span>
-                                                    <input type="time" defaultValue="06:00" className="w-24 px-2 py-1 border rounded text-xs bg-white" />
-                                                    <select className="flex-1 px-2 py-1 border rounded text-xs bg-white outline-none">
-                                                        <option>Full Day Charge</option>
-                                                        <option>Half Day Charge</option>
-                                                        <option>Flat Rate</option>
-                                                    </select>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <span className="w-20 text-gray-600 text-xs">06:00 - 10:00</span>
-                                                    <div className="flex-1 flex gap-2">
-                                                        <select className="w-full px-2 py-1 border rounded text-xs bg-white outline-none">
-                                                            <option>Half Day Charge</option>
-                                                            <option>Full Day Charge</option>
-                                                            <option>Flat Rate</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <span className="w-20 text-gray-600 text-xs">10:00 - 13:00</span>
-                                                    <div className="flex-1 flex gap-2">
-                                                        <select className="w-full px-2 py-1 border rounded text-xs bg-white outline-none">
-                                                            <option>Free of Charge</option>
-                                                            <option>Flat Rate</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4 p-4 bg-orange-50/50 rounded-lg border border-orange-100">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-sm font-bold text-gray-800">Late Check-out Allowed?</label>
-                                                <input type="checkbox" className="toggle toggle-sm text-blue-600" defaultChecked />
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Grace Period (Mins)</label>
-                                                <input type="number" defaultValue="30" className="w-20 px-2 py-1 border rounded text-sm bg-white" />
-                                            </div>
-                                            <div className="space-y-3">
-                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider border-b pb-1">Charge Logic</p>
-
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <span className="w-20 text-gray-600 text-xs">Up to</span>
-                                                    <input type="time" defaultValue="16:00" className="w-24 px-2 py-1 border rounded text-xs bg-white" />
-                                                    <select className="flex-1 px-2 py-1 border rounded text-xs bg-white outline-none">
-                                                        <option>Half Day Charge</option>
-                                                        <option>Full Day Charge</option>
-                                                        <option>Flat Rate</option>
-                                                    </select>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <span className="w-20 text-gray-600 text-xs">After</span>
-                                                    <input type="time" defaultValue="16:00" className="w-24 px-2 py-1 border rounded text-xs bg-white" />
-                                                    <select className="flex-1 px-2 py-1 border rounded text-xs bg-white outline-none">
-                                                        <option>Full Day Charge</option>
-                                                        <option>Half Day Charge</option>
-                                                        <option>Flat Rate</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 3. Child & Extra Bed Policy */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><User size={20} className="text-gray-400" /> 3. Child & Extra Bed Policy</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Infant Age Limit (Free)</label><input type="number" placeholder="2" className="w-full px-3 py-2 border rounded-lg outline-none" /><span className="text-xs text-gray-500">Years (0 to X)</span></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Child Age Limit</label><input type="number" placeholder="12" className="w-full px-3 py-2 border rounded-lg outline-none" /><span className="text-xs text-gray-500">Years (X to Y)</span></div>
-
-                                        <div className="flex items-center gap-3 md:pt-6">
-                                            <input type="checkbox" className="w-4 h-4 text-blue-600" id="childFree" />
-                                            <label htmlFor="childFree" className="text-sm font-medium text-gray-700 cursor-pointer">Child Stay Free (Existing Bed)?</label>
-                                        </div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Extra Bed Charge</label><input type="number" placeholder="1500" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Max Extra Beds</label><input type="number" placeholder="1" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                    </div>
-                                </div>
-
-                                {/* 4. Booking & Cancellation */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><CreditCard size={20} className="text-gray-400" /> 4. Booking & Cancellation</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><CreditCard size={20} className="text-gray-400" /> 2. Booking & Cancellation Policies</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-1">
                                             <label className="text-sm font-medium text-gray-700">Cancellation Rule</label>
                                             <select value={cancellationPolicy} onChange={(e) => setCancellationPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
@@ -350,25 +371,20 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                             </select>
                                             <p className="text-xs text-blue-600 mt-1">{policyDescriptions.noShow[noShowPolicy]}</p>
                                         </div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Deposit Requirement (%)</label><input type="number" placeholder="50" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Min. Length of Stay</label><input type="number" defaultValue="1" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Overbooking Limit (Rooms)</label><input type="number" placeholder="0" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
-                                        <div className="flex items-center gap-3 md:pt-6">
-                                            <div className="form-control">
-                                                <label className="label cursor-pointer gap-2">
-                                                    <input type="checkbox" className="toggle toggle-primary toggle-sm" />
-                                                    <span className="label-text text-sm font-medium">Allow Overbooking?</span>
-                                                </label>
-                                            </div>
+                                        <div className="col-span-2 space-y-1">
+                                            <label className="text-sm font-medium text-gray-700">Detailed Cancellation Policy Text</label>
+                                            <textarea value={cancellationPolicyText} onChange={(e) => setCancellationPolicyText(e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="Enter the full text of the cancellation policy to be displayed on booking confirmations..."></textarea>
+                                        </div>
+                                        <div className="col-span-2 space-y-1">
+                                            <label className="text-sm font-medium text-gray-700">Guest Registration Card Terms</label>
+                                            <textarea value={regCardTerms} onChange={(e) => setRegCardTerms(e.target.value)} rows={3} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="Terms & Conditions printed on the Guest Registration Card..."></textarea>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 5. House Rules */}
+                                {/* 3. House Rules */}
                                 <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Shield size={20} className="text-gray-400" /> 5. House Rules</h2>
+                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Shield size={20} className="text-gray-400" /> 3. House Rules</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                         <div className="space-y-1">
                                             <label className="text-sm font-medium text-gray-700">Smoking Policy</label>
@@ -379,8 +395,6 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                             </select>
                                             <p className="text-xs text-blue-600 mt-1">{policyDescriptions.smoking[smokingPolicy]}</p>
                                         </div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Smoking Fine</label><input type="number" placeholder="5000" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
                                         <div className="space-y-1">
                                             <label className="text-sm font-medium text-gray-700">Pet Policy</label>
                                             <select value={petPolicy} onChange={(e) => setPetPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
@@ -390,8 +404,6 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                             </select>
                                             <p className="text-xs text-blue-600 mt-1">{policyDescriptions.pet[petPolicy]}</p>
                                         </div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Pet Charge (Daily)</label><input type="number" placeholder="0" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
                                         <div className="space-y-1 col-span-2">
                                             <label className="text-sm font-medium text-gray-700">Visitor Policy</label>
                                             <select value={visitorPolicy} onChange={(e) => setVisitorPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
@@ -401,24 +413,23 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                             </select>
                                             <p className="text-xs text-blue-600 mt-1">{policyDescriptions.visitor[visitorPolicy]}</p>
                                         </div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Lost & Found Period (Days)</label><input type="number" defaultValue="90" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
                                     </div>
                                 </div>
 
                                 {/* 6. Night Audit Automation */}
                                 <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Moon size={20} className="text-gray-400" /> 6. Night Audit Automation</h2>
+                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Moon size={20} className="text-gray-400" /> 4. Night Audit Automation</h2>
                                     <div className="space-y-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                             <div className="space-y-1">
                                                 <label className="text-sm font-medium text-gray-700">Audit Time</label>
-                                                <input type="time" defaultValue="02:00" className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                                <input type="time" value={auditTime} onChange={(e) => setAuditTime(e.target.value)} className="w-full px-3 py-2 border rounded-lg outline-none" />
                                                 <p className="text-xs text-gray-500">When the business date changes (e.g., 02:00 AM)</p>
                                             </div>
                                             <div className="space-y-1 col-span-2">
                                                 <label className="text-sm font-medium text-gray-700">Email Reports To</label>
-                                                <input type="text" placeholder="owner@hotel.com, gm@hotel.com" className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                                <p className="text-xs text-gray-500">Comma separated emails (Owner, GM) to send Daily Sales Report</p>
+                                                <input type="email" value={emailReports} onChange={(e) => setEmailReports(e.target.value)} placeholder="owner@hotel.com, manager@hotel.com" className="w-full px-3 py-2 border rounded-lg outline-none" />
+                                                <p className="text-xs text-gray-500">Comma separated emails for daily reports</p>
                                             </div>
                                         </div>
 
@@ -426,51 +437,51 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                             <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
                                                 <div className="flex justify-between items-center w-full">
                                                     <span className="text-sm font-medium text-gray-700">Auto-Run Audit?</span>
-                                                    <input type="checkbox" className="toggle toggle-sm text-blue-600" />
+                                                    <input type="checkbox" checked={autoRun} onChange={() => setAutoRun(!autoRun)} className="toggle toggle-sm text-blue-600" />
                                                 </div>
                                                 <span className="text-xs text-gray-500">If ON, system runs audit automatically at set time</span>
                                             </label>
 
                                             <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
                                                 <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Auto-Post Room Rent</span>
-                                                    <input type="checkbox" className="toggle toggle-sm text-blue-600" defaultChecked />
+                                                    <span className="text-sm font-medium text-gray-700">Auto-Post Room Rent?</span>
+                                                    <input type="checkbox" checked={autoPostRent} onChange={() => setAutoPostRent(!autoPostRent)} className="toggle toggle-sm text-blue-600" />
                                                 </div>
-                                                <span className="text-xs text-gray-500">Automatically post room charges for all Checked-In guests?</span>
+                                                <span className="text-xs text-gray-500">Automatically post room charges during audit</span>
                                             </label>
 
                                             <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
                                                 <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Force Close POS</span>
-                                                    <input type="checkbox" className="toggle toggle-sm text-blue-600" defaultChecked />
+                                                    <span className="text-sm font-medium text-gray-700">Force Close POS?</span>
+                                                    <input type="checkbox" checked={forceClosePos} onChange={() => setForceClosePos(!forceClosePos)} className="toggle toggle-sm text-blue-600" />
                                                 </div>
-                                                <span className="text-xs text-gray-500">Auto-close open shifts/terminals in POS/Restaurant?</span>
+                                                <span className="text-xs text-gray-500">Close all open POS sessions automatically</span>
                                             </label>
 
                                             <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
                                                 <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Block User Login</span>
-                                                    <input type="checkbox" className="toggle toggle-sm text-blue-600" />
+                                                    <span className="text-sm font-medium text-gray-700">Block User Login?</span>
+                                                    <input type="checkbox" checked={blockLogin} onChange={() => setBlockLogin(!blockLogin)} className="toggle toggle-sm text-blue-600" />
                                                 </div>
-                                                <span className="text-xs text-gray-500">Prevent staff login during audit process (approx 10-15 mins)</span>
+                                                <span className="text-xs text-gray-500">Prevent logins during audit process (approx 5m)</span>
                                             </label>
 
                                             <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
                                                 <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Auto-Backup</span>
-                                                    <input type="checkbox" className="toggle toggle-sm text-blue-600" defaultChecked />
+                                                    <span className="text-sm font-medium text-gray-700">Auto-Backup?</span>
+                                                    <input type="checkbox" checked={autoBackup} onChange={() => setAutoBackup(!autoBackup)} className="toggle toggle-sm text-blue-600" />
                                                 </div>
-                                                <span className="text-xs text-gray-500">Trigger database backup immediately after audit?</span>
+                                                <span className="text-xs text-gray-500">Backup database before running audit</span>
                                             </label>
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-gray-700">Reports to Generate</label>
+                                        <div className="pt-4 border-t">
+                                            <span className="text-sm font-medium text-gray-700 block mb-2">Reports to Generate & Email</span>
                                             <div className="flex flex-wrap gap-2">
-                                                {['Manager Report', 'Occupancy Report', 'Revenue Report', 'Tax Report', 'Detailed Postings', 'Arrival/Departure'].map(report => (
-                                                    <label key={report} className="flex items-center gap-2 px-3 py-1.5 bg-white border rounded shadow-sm text-sm cursor-pointer hover:border-blue-300">
-                                                        <input type="checkbox" className="rounded text-blue-600" defaultChecked={['Manager Report', 'Occupancy Report'].includes(report)} />
-                                                        {report}
+                                                {['Daily Revenue', 'Occupancy Report', 'Arrival List', 'Departure List', 'In-House Guest List', 'Manager Report'].map(report => (
+                                                    <label key={report} className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors ${selectedReports.includes(report) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'hover:bg-gray-50'}`}>
+                                                        <input type="checkbox" checked={selectedReports.includes(report)} onChange={() => toggleReport(report)} className="rounded text-blue-600 w-4 h-4" />
+                                                        <span className="text-xs font-medium">{report}</span>
                                                     </label>
                                                 ))}
                                             </div>
@@ -487,12 +498,37 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                 <div>
                                     <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><CreditCard size={20} className="text-gray-400" /> Financial Settings</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Base Currency *</label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>BDT</option><option>USD</option><option>EUR</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Tax/VAT Rule</label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Exclusive (Plus Tax)</option><option>Inclusive (Net Price)</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Fiscal Year Start</label><input type="date" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Base Currency *</label><select defaultValue={initialData?.currency || "BDT"} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>BDT</option><option>USD</option><option>MYR</option><option>GBP</option></select></div>
 
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">BIN / VAT No</label><input type="text" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Service Charge %</label><input type="number" placeholder="10" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                        <div className="flex items-center gap-3 md:pt-6">
+                                            <div className="form-control">
+                                                <label className="label cursor-pointer gap-2">
+                                                    <input type="checkbox" checked={isTaxInclusive} onChange={() => setIsTaxInclusive(!isTaxInclusive)} className="toggle toggle-primary toggle-sm" />
+                                                    <span className="label-text text-sm font-medium">Is Tax Inclusive?</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">BIN / VAT No</label><input type="text" defaultValue={initialData?.finance?.binNo} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Service Charge %</label><input type="number" value={serviceCharge} onChange={(e) => setServiceCharge(Number(e.target.value))} placeholder="10" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+
+                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Credit Card Gateway</label><select value={creditCardGateway} onChange={(e) => setCreditCardGateway(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Stripe</option><option>Shift4</option><option>SSLCommerz</option><option>Razorpay</option></select></div>
+
+                                        <div className="col-span-1 md:col-span-3 border-t pt-4 grid grid-cols-3 gap-6">
+                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Round Off Type</label><select value={roundOffType} onChange={(e) => setRoundOffType(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>No Round Off</option><option>Nearest</option><option>Up</option><option>Down</option></select></div>
+                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Round Off Limit</label><input type="number" value={roundOffLimit} onChange={(e) => setRoundOffLimit(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
+                                            <div className="flex items-center gap-3 md:pt-6">
+                                                <label className="label cursor-pointer gap-2">
+                                                    <input type="checkbox" checked={addRoundOffToRate} onChange={() => setAddRoundOffToRate(!addRoundOffToRate)} className="toggle toggle-primary toggle-sm" />
+                                                    <span className="label-text text-sm font-medium">Add Round Off to Rate?</span>
+                                                </label>
+                                            </div>
+                                            <div className="col-span-3 space-y-1">
+                                                <label className="text-sm font-medium text-gray-700">Invoice / Bill Notes (Terms)</label>
+                                                <textarea value={invoiceTerms} onChange={(e) => setInvoiceTerms(e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="Detailed terms or notes to appear on every invoice..."></textarea>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -524,6 +560,13 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                 <div>
                                     <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Monitor size={20} className="text-gray-400" /> System Configuration</h2>
                                     <div className="grid grid-cols-1 gap-6">
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Web Rate Mode</label><select value={webRateMode} onChange={(e) => setWebRateMode(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Regular</option><option>Corporate</option><option>Promo</option></select></div>
+                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Web Inventory Mode</label><select value={webInventoryMode} onChange={(e) => setWebInventoryMode(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Regular (Live)</option><option>Allotted</option></select></div>
+                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">POS Configuration</label><select value={posConfigType} onChange={(e) => setPosConfigType(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Integrated POS</option><option>Third-party</option></select></div>
+                                        </div>
+
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-gray-700">Active Modules</label>
                                             <div className="flex flex-wrap gap-3">
@@ -538,7 +581,7 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
 
                                         <div className="space-y-3 pt-4 border-t">
                                             <div className="flex justify-between items-center">
-                                                <label className="text-sm font-medium text-gray-700">POS Configuration</label>
+                                                <label className="text-sm font-medium text-gray-700">POS Outlets Setup</label>
                                                 <button onClick={addPosConfig} className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
                                                     <Plus size={16} /> Add Config
                                                 </button>
@@ -574,12 +617,10 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 pt-4 border-t">
-                                        {['Auto-Email Folio'].map(item => (
-                                            <label key={item} className="flex items-center gap-2 p-3 border rounded hover:bg-gray-50 cursor-pointer">
-                                                <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
-                                                <span className="text-sm text-gray-700">{item}</span>
-                                            </label>
-                                        ))}
+                                        <label className="flex items-center gap-2 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                                            <input type="checkbox" checked={autoEmailFolio} onChange={() => setAutoEmailFolio(!autoEmailFolio)} className="w-4 h-4 text-blue-600 rounded" />
+                                            <span className="text-sm text-gray-700">Auto-Email Folio on Checkout</span>
+                                        </label>
                                     </div>
                                 </div>
 
@@ -598,18 +639,30 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
                         {activeTab === 'branding' && (
                             <div className="space-y-8 animate-fadeIn">
                                 <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><ImageIcon size={20} className="text-gray-400" /> Branding & Socials</h2>
+                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><ImageIcon size={20} className="text-gray-400" /> Branding & Assets</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
                                             <span className="text-sm font-medium text-gray-700 block">Primary Logo *</span>
                                             <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
-                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Main Logo</span>
+                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Main Logo (Dashboard/Footer)</span>
                                             </div>
                                         </div>
                                         <div className="space-y-2">
                                             <span className="text-sm font-medium text-gray-700 block">Report Header</span>
                                             <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
-                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Banner</span>
+                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Report Banner</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <span className="text-sm font-medium text-gray-700 block">Report Footer</span>
+                                            <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
+                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Footer Image</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <span className="text-sm font-medium text-gray-700 block">Login / Guest Portal Screen</span>
+                                            <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
+                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Cover Image</span>
                                             </div>
                                         </div>
                                         <div className="col-span-2 grid grid-cols-3 gap-4">
@@ -665,12 +718,12 @@ const AddProperty = ({ onBack }: AddPropertyProps) => {
 
                     </div>
                 </div>
-            </main>
+            </main >
             <style>{`
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
                 .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
             `}</style>
-        </div>
+        </div >
     );
 };
 
