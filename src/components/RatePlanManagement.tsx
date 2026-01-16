@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-    Plus, Search, Filter, Edit2, Trash2, Save, X, Calendar, DollarSign,
-    Clock, Shield, Percent, Info, CheckCircle, AlertCircle
+    Plus, Edit2, Trash2, Save, X, Calendar, DollarSign,
+    Shield, Percent, Info
 } from 'lucide-react';
 
 interface RatePlan {

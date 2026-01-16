@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-    Search, Plus, Filter, Edit2, Trash2, Save, X, ChevronLeft,
-    MapPin, Wifi, Key, Layers, Info, CheckCircle, AlertCircle
+    Search, Plus, Filter, Edit2, Trash2, Save, ChevronLeft,
+    MapPin, Wifi, Key, Layers, Info
 } from 'lucide-react';
 
 interface Room {
@@ -265,12 +265,12 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
 
                                     <div className="pt-3 border-t flex justify-between items-center text-xs">
                                         <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${room.housekeepingStatus === 'Clean' ? 'bg-green-50 text-green-700' :
-                                                room.housekeepingStatus === 'Dirty' ? 'bg-red-50 text-red-700' :
-                                                    'bg-blue-50 text-blue-700'
+                                            room.housekeepingStatus === 'Dirty' ? 'bg-red-50 text-red-700' :
+                                                'bg-blue-50 text-blue-700'
                                             }`}>
                                             <div className={`w-1.5 h-1.5 rounded-full ${room.housekeepingStatus === 'Clean' ? 'bg-green-500' :
-                                                    room.housekeepingStatus === 'Dirty' ? 'bg-red-500' :
-                                                        'bg-blue-500'
+                                                room.housekeepingStatus === 'Dirty' ? 'bg-red-500' :
+                                                    'bg-blue-500'
                                                 }`} />
                                             {room.housekeepingStatus}
                                         </div>
