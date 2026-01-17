@@ -1,6 +1,6 @@
 
-import { useState, useMemo } from 'react';
-import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, PieChart, Layers, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -122,20 +122,41 @@ const generateGenericMockData = (reportName: string, count: number = 25): Report
     });
 };
 
-const Reports = () => {
-    const [sidebarOpen] = useState(true);
+const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [expandedMenu, setExpandedMenu] = useState<string | null>('Reservation Report');
     const [activeReport, setActiveReport] = useState('Cancelled Reservation'); // Default to the one user requested
     const [startDate, setStartDate] = useState('2024-06-11');
     const [endDate, setEndDate] = useState('2024-06-11');
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Template Modals State
+    const [isTemplateListModalOpen, setIsTemplateListModalOpen] = useState(false);
+    const [isAddTemplateModalOpen, setIsAddTemplateModalOpen] = useState(false);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const menuItems = [
         {
             title: 'Reservation Report',
+            icon: <ListOrdered size={20} />,
             items: ['Arrival List', 'Cancelled Reservation', 'Country Wise Reservation Statistics', 'Departure List', 'Forecast Report', 'No Show Reservation', 'Release Reservation List', 'Reservation Activity', 'Void Reservation']
         },
         {
             title: 'Front Office Report',
+            icon: <Monitor size={20} />,
             items: [
                 'Guest Checked In',
                 'Guest Checked Out',
@@ -153,6 +174,7 @@ const Reports = () => {
         },
         {
             title: 'Back Office Report',
+            icon: <Building2 size={20} />,
             items: [
                 'Advance Deposit Ledger',
                 'Ageing Debtors - Summary',
@@ -194,14 +216,181 @@ const Reports = () => {
         },
         {
             title: 'Audit Report',
+            icon: <Shield size={20} />,
             items: ['Audit Trails', 'IP Report', 'Void Charge', 'Void Payment', 'Void Transaction']
         },
-        { title: 'Statistical Report', items: [] },
-        { title: 'Graphs and Charts', items: [] },
-        { title: 'Consolidate Report', items: [] },
+        { title: 'Statistical Report', icon: <BarChart2 size={20} />, items: [] },
+        { title: 'Graphs and Charts', icon: <PieChart size={20} />, items: [] },
+        { title: 'Consolidate Report', icon: <Layers size={20} />, items: [] },
     ];
 
+    // Template Creation State
+    const [newTemplateName, setNewTemplateName] = useState('New Report');
+    const [newTemplateOrientation, setNewTemplateOrientation] = useState('Landscape');
+    const [templateColumns] = useState<any[]>([
+        { id: '1', name: 'Res. No', header: 'Res. No', order: 1, align: 'Left' },
+        { id: '2', name: 'Guest Name', header: 'Guest Name', order: 2, align: 'Left' },
+        { id: '3', name: 'Arrival', header: 'Arrival', order: 1, align: 'Left' },
+        { id: '4', name: 'Dept.', header: 'Dept.', order: 1, align: 'Left' },
+        { id: '5', name: 'Folio No', header: 'Folio No', order: 1, align: 'Left' },
+    ]);
+
+    const renderTemplateListModal = () => {
+        if (!isTemplateListModalOpen) return null;
+        return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 transition-all animate-in fade-in duration-300">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-300">
+                    <div className="p-4 border-b flex justify-between items-center bg-white sticky top-0">
+                        <h2 className="text-xl font-bold text-slate-800 tracking-tight">Custom Template(s)</h2>
+                        <button onClick={() => setIsTemplateListModalOpen(false)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-full transition-colors">
+                            <X size={24} strokeWidth={2.5} />
+                        </button>
+                    </div>
+                    <div className="p-5">
+                        <div className="border border-gray-200 rounded-lg overflow-hidden mb-6 overflow-x-auto no-scrollbar">
+                            <table className="w-full text-sm min-w-[400px]">
+                                <thead className="bg-gray-50 border-b">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Custom Report List</th>
+                                        <th className="px-4 py-2 text-right font-semibold text-gray-700 w-24">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="px-4 py-3 text-gray-600">Custom Report List</td>
+                                        <td className="px-4 py-3 text-right"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4">
+                            <button
+                                onClick={() => {
+                                    setIsTemplateListModalOpen(false);
+                                    setIsAddTemplateModalOpen(true);
+                                }}
+                                className="order-1 sm:order-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-lg shadow-blue-200 active:scale-95 text-sm"
+                            >
+                                Add New
+                            </button>
+                            <button
+                                onClick={() => setIsTemplateListModalOpen(false)}
+                                className="order-2 sm:order-1 px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-medium active:scale-95 text-sm"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderAddTemplateModal = () => {
+        if (!isAddTemplateModalOpen) return null;
+        return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 transition-all animate-in fade-in duration-300">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-300">
+                    <div className="p-4 border-b flex justify-between items-center bg-white">
+                        <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">Add Report Template</h2>
+                        <button onClick={() => setIsAddTemplateModalOpen(false)} className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors">
+                            <X size={24} strokeWidth={2.5} />
+                        </button>
+                    </div>
+
+                    <div className="p-4 sm:p-6 space-y-5 overflow-y-auto no-scrollbar">
+                        <div className="flex flex-col sm:grid sm:grid-cols-12 sm:items-center gap-2 sm:gap-4">
+                            <label className="sm:col-span-3 font-bold text-gray-800 text-sm">Report Name</label>
+                            <input
+                                type="text"
+                                value={newTemplateName}
+                                onChange={(e) => setNewTemplateName(e.target.value)}
+                                className="sm:col-span-9 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                            />
+                        </div>
+
+                        <div className="flex flex-col sm:grid sm:grid-cols-12 sm:items-center gap-2 sm:gap-4">
+                            <label className="sm:col-span-3 font-bold text-gray-800 text-sm">Page Orientation</label>
+                            <select
+                                value={newTemplateOrientation}
+                                onChange={(e) => setNewTemplateOrientation(e.target.value)}
+                                className="sm:col-span-9 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition-all cursor-pointer text-sm"
+                            >
+                                <option>Landscape</option>
+                                <option>Portrait</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-gray-800">Columns</span>
+                                <button className="p-1 border rounded hover:bg-gray-50 text-gray-600 transition-colors shadow-sm">
+                                    <Plus size={16} strokeWidth={3} />
+                                </button>
+                            </div>
+
+                            <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm overflow-x-auto no-scrollbar">
+                                <table className="w-full text-sm border-collapse min-w-[600px]">
+                                    <thead className="bg-gray-50 border-b">
+                                        <tr>
+                                            <th className="w-10 py-2 border-r"></th>
+                                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">Column Name</th>
+                                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">Header Text</th>
+                                            <th className="px-3 py-2 text-center font-semibold text-gray-600 border-r">Order</th>
+                                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">Align</th>
+                                            <th className="px-3 py-2 text-center font-semibold text-gray-600">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {templateColumns.map((col) => (
+                                            <tr key={col.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="w-10 text-center border-r py-3 text-gray-400">
+                                                    <GripVertical size={16} className="mx-auto cursor-pointer" />
+                                                </td>
+                                                <td className="px-3 py-3 border-r text-gray-700">{col.name}</td>
+                                                <td className="px-3 py-3 border-r text-gray-700 font-medium">{col.header}</td>
+                                                <td className="px-3 py-3 border-r text-center text-gray-700">{col.order}</td>
+                                                <td className="px-3 py-3 border-r text-gray-700">{col.align}</td>
+                                                <td className="px-3 py-3 text-center">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button className="p-1 hover:text-blue-600 transition-colors"><Edit size={16} /></button>
+                                                        <button className="p-1 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
+                                                        <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors"><Menu size={16} /></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white mt-auto">
+                            <button
+                                onClick={() => setIsAddTemplateModalOpen(false)}
+                                className="order-1 sm:order-2 px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-200 active:scale-95 text-sm"
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={() => setIsAddTemplateModalOpen(false)}
+                                className="order-2 sm:order-1 px-8 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-semibold active:scale-95 text-sm"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderFilters = () => {
+        const handleEditTemplate = (e: any) => {
+            e.preventDefault();
+            setIsTemplateListModalOpen(true);
+        };
         switch (activeReport) {
             case 'Arrival List':
                 return (
@@ -434,7 +623,7 @@ const Reports = () => {
                                         <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
                                             <option>Default</option>
                                         </select>
-                                        <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
+                                        <button onClick={handleEditTemplate} className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                     </div>
                                 </div>
                             </div>
@@ -584,7 +773,7 @@ const Reports = () => {
                                         <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
                                             <option>Default</option>
                                         </select>
-                                        <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
+                                        <button onClick={handleEditTemplate} className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                     </div>
                                 </div>
                             </div>
@@ -778,7 +967,7 @@ const Reports = () => {
                                         <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
                                             <option>Default</option>
                                         </select>
-                                        <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
+                                        <button onClick={handleEditTemplate} className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                     </div>
                                 </div>
                             </div>
@@ -3885,32 +4074,64 @@ const Reports = () => {
 
     return (
         <div className="flex h-screen bg-gray-100 font-sans text-sm text-gray-700">
-            <div className={`w-64 bg-white border-r flex flex-col flex-shrink-0 transition-all ${sidebarOpen ? '' : '-ml-64'}`}>
-                <div className="p-3 border-b flex items-center gap-2">
-                    <div className="relative w-full">
-                        <Search className="absolute left-2.5 top-2.5 text-gray-400" size={14} />
-                        <input type="text" placeholder="Search" className="w-full pl-8 pr-3 py-1.5 border rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500" />
+            {/* Sidebar */}
+            <aside className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out z-30 shadow-sm`}>
+                <div className={`p-4 border-b flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} bg-[#1e293b] text-white min-h-[56px]`}>
+                    {!isSidebarCollapsed && <span className="font-bold text-base tracking-tight uppercase opacity-90">Report Center</span>}
+                    <button
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors"
+                        title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    >
+                        {isSidebarCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
+                    </button>
+                </div>
+
+                {/* Search */}
+                <div className="p-3 border-b bg-gray-50/50">
+                    <div className="relative">
+                        <Search className={`absolute ${isSidebarCollapsed ? 'left-1/2 -translate-x-1/2' : 'left-2.5'} top-2 text-gray-400`} size={14} />
+                        {!isSidebarCollapsed && (
+                            <input type="text" placeholder="Search reports..." className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                        )}
+                        {isSidebarCollapsed && <div className="h-6"></div>}
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+
+                <div className="flex-1 overflow-y-auto no-scrollbar">
                     {menuItems.map((menu, idx) => (
-                        <div key={idx}>
+                        <div key={idx} className="border-b border-gray-50 last:border-0">
                             <button
-                                onClick={() => setExpandedMenu(expandedMenu === menu.title ? null : menu.title)}
-                                className={`w-full flex items-center justify-between px-4 py-3 text-left font-medium hover:bg-gray-50 transition-colors ${expandedMenu === menu.title ? 'bg-slate-800 text-white hover:bg-slate-700' : 'text-gray-700'}`}
+                                onClick={() => {
+                                    if (isSidebarCollapsed) {
+                                        setIsSidebarCollapsed(false);
+                                        setExpandedMenu(menu.title);
+                                    } else {
+                                        setExpandedMenu(expandedMenu === menu.title ? null : menu.title);
+                                    }
+                                }}
+                                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center py-4' : 'justify-between px-4 py-3'} text-left font-medium hover:bg-gray-50 transition-all ${expandedMenu === menu.title && !isSidebarCollapsed ? 'bg-slate-800 text-white hover:bg-slate-700' : 'text-gray-700'}`}
+                                title={isSidebarCollapsed ? menu.title : ""}
                             >
-                                <span className="flex items-center gap-2">{menu.title}</span>
-                                {expandedMenu === menu.title ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                <div className="flex items-center gap-3">
+                                    <span className={`${expandedMenu === menu.title && !isSidebarCollapsed ? 'text-blue-400' : 'text-gray-400'}`}>
+                                        {menu.icon}
+                                    </span>
+                                    {!isSidebarCollapsed && <span className="text-[13px]">{menu.title}</span>}
+                                </div>
+                                {!isSidebarCollapsed && menu.items.length > 0 && (
+                                    expandedMenu === menu.title ? <ChevronDown size={14} className="opacity-50" /> : <ChevronRight size={14} className="opacity-50" />
+                                )}
                             </button>
-                            {expandedMenu === menu.title && (
-                                <div className="bg-white py-1">
+                            {expandedMenu === menu.title && !isSidebarCollapsed && (
+                                <div className="bg-gray-50/50 py-1">
                                     {menu.items.map((item, i) => (
                                         <div
                                             key={i}
                                             onClick={() => { setActiveReport(item); setShowReport(false); }}
-                                            className={`px-8 py-2 cursor-pointer flex items-center gap-2 hover:bg-blue-50 hover:text-blue-600 ${activeReport === item ? 'text-blue-600 font-medium' : 'text-gray-600'}`}
+                                            className={`px-11 py-2 cursor-pointer flex items-center gap-2 hover:bg-blue-50 hover:text-blue-600 transition-colors text-[12px] ${activeReport === item ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-gray-500'}`}
                                         >
-                                            <div className={`w-1.5 h-1.5 rounded-full ${activeReport === item ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+                                            <div className={`w-1 h-1 rounded-full ${activeReport === item ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
                                             {item}
                                         </div>
                                     ))}
@@ -3919,17 +4140,71 @@ const Reports = () => {
                         </div>
                     ))}
                 </div>
-            </div>
+            </aside>
 
             <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="bg-white border-b px-6 py-4 flex justify-between items-center">
+                <div className="bg-white border-b px-6 py-4 flex justify-between items-center h-14 min-h-[56px] sticky top-0 z-40">
                     <h1 className="text-xl font-bold text-slate-800">{activeReport}</h1>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-4">
                         {showReport && (
-                            <button onClick={handleBackToFilters} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-xs font-medium">
+                            <button onClick={handleBackToFilters} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-xs font-medium mr-2">
                                 &larr; Back to Filters
                             </button>
                         )}
+
+                        {/* User Profile */}
+                        <div className="relative" ref={dropdownRef}>
+                            <div
+                                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-1.5 rounded-lg transition-colors"
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            >
+                                <div className="text-right hidden sm:block">
+                                    <p className="text-xs font-bold text-gray-800 leading-tight">{user?.name || 'Guest User'}</p>
+                                    <p className="text-[10px] text-gray-500 font-medium">{user?.role || 'Guest'}</p>
+                                    <p className="text-[10px] text-blue-800 font-medium">{user?.property || 'No Property'}</p>
+                                </div>
+                                <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-200">
+                                    <img
+                                        src={user?.image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}
+                                        alt="User"
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Dropdown Menu */}
+                            {isDropdownOpen && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 animate-in fade-in slide-in-from-top-2 z-50">
+                                    <button
+                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                        onClick={() => setIsDropdownOpen(false)}
+                                    >
+                                        <User size={16} className="text-gray-400" />
+                                        My Profile
+                                    </button>
+                                    <button
+                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                        onClick={() => setIsDropdownOpen(false)}
+                                    >
+                                        <Building2 size={16} className="text-gray-400" />
+                                        Switch Hotel
+                                    </button>
+                                    <div className="h-px bg-gray-100 my-1"></div>
+                                    <div className="px-2 pb-1">
+                                        <button
+                                            className="w-full text-center px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-lg transition-all hover:shadow-sm flex items-center justify-center gap-2"
+                                            onClick={() => {
+                                                setIsDropdownOpen(false);
+                                                onLogout();
+                                            }}
+                                        >
+                                            <LogOut size={16} />
+                                            Logout
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -3968,6 +4243,8 @@ const Reports = () => {
                     )}
                 </div>
             </div>
+            {renderTemplateListModal()}
+            {renderAddTemplateModal()}
         </div>
     );
 };

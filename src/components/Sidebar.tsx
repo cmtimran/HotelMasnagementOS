@@ -17,19 +17,33 @@ import {
     Monitor,
     ChefHat,
     User,
-    CreditCard,
     Shield,
     LayoutDashboard,
     Building2,
     BedDouble,
     Percent,
-    UserCog,
     BadgeDollarSign,
     Info,
     FileText,
     Briefcase,
     Circle,
-    Utensils
+    Utensils,
+    Calendar,
+    LayoutGrid,
+    Plus,
+    Sparkles,
+    ClipboardList,
+    TrendingUp,
+    Target,
+    BarChart3,
+    Database,
+    Moon,
+    CheckCircle,
+    DollarSign,
+    PackageSearch,
+    Wine,
+    UserCheck,
+    Tag
 } from 'lucide-react';
 
 interface MenuItem {
@@ -50,15 +64,18 @@ interface SidebarProps {
 
 const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: SidebarProps) => {
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
+        dashboardKey: false,
         posManagement: false,
+        frontOffice: false,
+        housekeeping: false,
+        b2b: false,
+        admin: false,
         menuKey: false,
         setupKey: false,
         staffKey: false,
         propertyKey: false,
         roomKey: false,
         rateKey: false,
-        userKey: false,
-        settingsKey: false,
         financeKey: false,
         reportsKey: false,
     });
@@ -68,6 +85,16 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
     };
 
     const menuGroups: MenuItem[] = [
+        // Dashboard - Top Level
+        {
+            key: 'dashboardKey',
+            label: 'Dashboard',
+            icon: <LayoutDashboard size={20} />,
+            items: [
+                { id: 'dashboard', label: 'HMS Overview', icon: <LayoutDashboard size={16} /> },
+                { id: 'manager-dashboard', label: 'Manager Dashboard', icon: <BarChart3 size={16} /> },
+            ]
+        },
         {
             key: 'posManagement',
             label: 'POS Management',
@@ -75,6 +102,7 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             items: [
                 { id: 'pos-dashboard', label: 'POS Dashboard', icon: <LayoutDashboard size={16} /> },
                 { id: 'pos', label: 'POS / Billing', icon: <UtensilsCrossed size={16} /> },
+                { id: 'kds', label: 'Kitchen Display', icon: <Monitor size={16} /> },
                 {
                     key: 'menuKey',
                     label: 'Menu Management',
@@ -104,10 +132,35 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                     icon: <Users size={16} />,
                     items: [
                         { id: 'waiters', label: 'Waiters', icon: <User size={16} /> },
-                        { id: 'pos-users', label: 'POS Users', icon: <CreditCard size={16} /> },
-                        { id: 'admin-users', label: 'Admin Users', icon: <Shield size={16} /> },
                     ]
                 }
+            ]
+        },
+        {
+            key: 'frontOffice',
+            label: 'Front Office',
+            icon: <BedDouble size={20} />,
+            items: [
+                { id: 'quick-reservation', label: 'Quick Reservation', icon: <Plus size={16} /> },
+                { id: 'enhanced-checkin', label: 'Enhanced Check-In', icon: <UserCheck size={16} /> },
+                { id: 'group-booking', label: 'Group Booking', icon: <Users size={16} /> },
+                { id: 'folio-operations', label: 'Folio Operations', icon: <FileText size={16} /> },
+                { id: 'guest-profile', label: 'Guest Profile', icon: <User size={16} /> },
+                { id: 'room-rack', label: 'Room Rack', icon: <LayoutGrid size={16} /> },
+                { id: 'reservations', label: 'Reservations', icon: <Calendar size={16} /> },
+                { id: 'stay-view', label: 'Stay View', icon: <Calendar size={16} /> },
+                { id: 'floor-plan', label: 'Floor Plan', icon: <Map size={16} /> },
+                { id: 'minibar-posting', label: 'Minibar Posting', icon: <Wine size={16} /> },
+            ]
+        },
+        {
+            key: 'housekeeping',
+            label: 'Housekeeping & Maintenance',
+            icon: <Sparkles size={20} />,
+            items: [
+                { id: 'housekeeping', label: 'Housekeeping Grid', icon: <ClipboardList size={16} /> },
+                { id: 'maintenance', label: 'Maintenance', icon: <Settings size={16} /> },
+                { id: 'lost-and-found', label: 'Lost & Found', icon: <PackageSearch size={16} /> },
             ]
         },
         {
@@ -117,6 +170,9 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             items: [
                 { id: 'properties', label: 'Properties', icon: <Building2 size={16} /> },
                 { id: 'hotel-info', label: 'Hotel Info', icon: <Info size={16} /> },
+                { id: 'property-setup', label: 'Property Setup', icon: <Settings size={16} /> },
+                { id: 'buildings-floors', label: 'Buildings & Floors', icon: <Building2 size={16} /> },
+                { id: 'auto-floor', label: 'Auto-Floor Generation', icon: <Layers size={16} /> },
             ]
         },
         {
@@ -124,43 +180,37 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             label: 'Room Management',
             icon: <BedDouble size={20} />,
             items: [
-                { id: 'building-floor', label: 'Floors & Buildings', icon: <Building2 size={16} /> },
-                { id: 'manage-room-type', label: 'Room Types', icon: <Tags size={16} /> },
-                { id: 'manage-room', label: 'Rooms', icon: <BedDouble size={16} /> },
+                { id: 'room-types', label: 'Room Types', icon: <BedDouble size={16} /> },
+                { id: 'physical-rooms', label: 'Physical Rooms', icon: <LayoutGrid size={16} /> },
                 { id: 'joint-room', label: 'Connecting Rooms', icon: <Layers size={16} /> },
             ]
         },
         {
-            key: 'rateKey',
+            key: 'rateManagementKey',
             label: 'Rate Management',
             icon: <Percent size={20} />,
             items: [
                 { id: 'rate-plans', label: 'Rate Plans', icon: <Tags size={16} /> },
                 { id: 'meal-plans', label: 'Meal Plans', icon: <Utensils size={16} /> },
+                { id: 'rate-calendar', label: 'Rate Calendar', icon: <Calendar size={16} /> },
+                { id: 'occupancy-heatmap', label: 'Occupancy Heatmap', icon: <Target size={16} /> },
+                { id: 'seasonality', label: 'Seasonality', icon: <TrendingUp size={16} /> },
+                { id: 'weekend-config', label: 'Weekend Config', icon: <Calendar size={16} /> },
+                { id: 'tiered-cancellation', label: 'Cancellation Rules', icon: <Percent size={16} /> },
             ]
         },
-        {
-            key: 'userKey',
-            label: 'User Management',
-            icon: <UserCog size={20} />,
-            items: [
-                { id: 'user-management', label: 'Users', icon: <Users size={16} /> },
-            ]
-        },
-        {
-            key: 'settingsKey',
-            label: 'Settings',
-            icon: <Settings size={20} />,
-            items: [
-                { id: 'general-settings', label: 'General Settings', icon: <Settings size={16} /> },
-            ]
-        },
+
+
         {
             key: 'financeKey',
             label: 'Finance',
             icon: <BadgeDollarSign size={20} />,
             items: [
-                { id: 'finance-overview', label: 'Overview', icon: <FileText size={16} /> },
+                { id: 'night-audit', label: 'Night Audit', icon: <Moon size={16} /> },
+                { id: 'city-ledger', label: 'City Ledger (AR)', icon: <DollarSign size={16} /> },
+                { id: 'revenue-dashboard', label: 'Revenue Dashboard', icon: <TrendingUp size={16} /> },
+                { id: 'approval-center', label: 'Approval Center', icon: <CheckCircle size={16} /> },
+                { id: 'multiple-folio', label: 'Multiple Folio', icon: <FileText size={16} /> },
             ]
         },
         {
@@ -168,7 +218,33 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             label: 'Reports',
             icon: <FileText size={20} />,
             items: [
-                { id: 'reports', label: 'All Reports', icon: <ListOrdered size={16} />, newTab: true },
+                { id: 'advanced-reports', label: 'Advanced Reports', icon: <BarChart3 size={16} /> },
+                { id: 'police-report', label: 'Police Report (C-Form)', icon: <Shield size={16} /> },
+                { id: 'occupancy-forecast', label: 'Occupancy Forecast', icon: <TrendingUp size={16} /> },
+                { id: 'staff-meal', label: 'Staff Meal Tracking', icon: <Utensils size={16} /> },
+            ]
+        },
+        {
+            key: 'b2b',
+            label: 'B2B & Revenue',
+            icon: <TrendingUp size={20} />,
+            items: [
+                { id: 'corporate-profiles', label: 'Corporate Profiles', icon: <Building2 size={16} /> },
+                { id: 'business-origins', label: 'Business Origins', icon: <Target size={16} /> },
+            ]
+        },
+        {
+            key: 'adminKey',
+            label: 'Admin & Security',
+            icon: <Shield size={20} />,
+            items: [
+                { id: 'users', label: 'Users', icon: <Users size={16} /> },
+                { id: 'roles-permissions', label: 'Roles & Permissions', icon: <Shield size={16} /> },
+                { id: 'audit-logs', label: 'Audit Logs', icon: <FileText size={16} /> },
+                { id: 'market-codes', label: 'Market Codes', icon: <Tag size={16} /> },
+                { id: 'guest-360', label: 'Guest 360 View', icon: <User size={16} /> },
+                { id: 'blacklist', label: 'Blacklist Management', icon: <Shield size={16} /> },
+                { id: 'master-data', label: 'Master Data Config', icon: <Database size={16} /> },
             ]
         }
     ];

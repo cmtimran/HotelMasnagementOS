@@ -21,6 +21,44 @@ import RoomManagement from './components/RoomManagement';
 import RatePlanManagement from './components/RatePlanManagement';
 import MealPlanManagement from './components/MealPlanManagement';
 import Reports from './components/Reports';
+import AdminSecurity from './components/AdminSecurity';
+import MasterDataConfig from './components/MasterDataConfig';
+import RoomRack from './components/RoomRack';
+import ReservationList from './components/ReservationList';
+import HousekeepingGrid from './components/HousekeepingGrid';
+import RateCalendar from './components/RateCalendar';
+import OccupancyHeatmap from './components/OccupancyHeatmap';
+import RevenueDashboard from './components/RevenueDashboard';
+import KitchenDisplay from './components/KitchenDisplay';
+import StayView from './components/StayView';
+import MaintenanceKanban from './components/MaintenanceKanban';
+import FloorPlan from './components/FloorPlan';
+import TableLayout from './components/TableLayout';
+import CorporateProfileManagement from './components/CorporateProfileManagement';
+import BusinessOriginManagement from './components/BusinessOriginManagement';
+import AdvancedReports from './components/AdvancedReports';
+import QuickReservation from './components/QuickReservation';
+import FolioOperations from './components/FolioOperations';
+import GuestProfile from './components/GuestProfile';
+import NightAuditDashboard from './components/NightAuditDashboard';
+import GroupBookingForm from './components/GroupBookingForm';
+import CityLedgerDashboard from './components/CityLedgerDashboard';
+import ApprovalCenter from './components/ApprovalCenter';
+import LostAndFound from './components/LostAndFound';
+import PoliceReport from './components/PoliceReport';
+import MinibarPosting from './components/MinibarPosting';
+import EnhancedCheckIn from './components/EnhancedCheckIn';
+import SeasonalityManager from './components/SeasonalityManager';
+import Guest360View from './components/Guest360View';
+import MarketCodesManager from './components/MarketCodesManager';
+import WeekendConfiguration from './components/WeekendConfiguration';
+import MultipleFolioManagement from './components/MultipleFolioManagement';
+import AutoFloorGeneration from './components/AutoFloorGeneration';
+import BlacklistManagement from './components/BlacklistManagement';
+import OccupancyForecast from './components/OccupancyForecast';
+import TieredCancellation from './components/TieredCancellation';
+import StaffMealTracking from './components/StaffMealTracking';
+import PropertySetup from './components/PropertySetup';
 
 interface UserData {
   name: string;
@@ -380,12 +418,7 @@ function App() {
         return <AddProperty onBack={() => setActivePage('dashboard')} />;
       case 'edit-property':
         return <AddProperty onBack={() => setActivePage('hotel-info')} initialData={editingProperty} />;
-      case 'building-floor':
-        return <BuildingManagement />;
-      case 'manage-room-type':
-        return <RoomTypeManagement />;
-      case 'joint-room':
-        return <ConnectingRoomManagement />;
+
       case 'properties':
         return (
           <>
@@ -619,14 +652,105 @@ function App() {
         return <RoomTypeManagement />;
       case 'manage-room':
         return <RoomManagement onBack={() => setActivePage('dashboard')} />;
+      case 'room-rack':
+        return <RoomRack />;
+      case 'reservations':
+        return <ReservationList />;
+      case 'housekeeping':
+        return <HousekeepingGrid />;
+      case 'stay-view':
+        return <StayView />;
+      case 'floor-plan':
+        return <FloorPlan />;
       case 'joint-room':
         return <ConnectingRoomManagement />;
       case 'rate-plans':
         return <RatePlanManagement />;
+      case 'rate-calendar':
+        return <RateCalendar />;
+      case 'occupancy-heatmap':
+        return <OccupancyHeatmap />;
       case 'meal-plans':
         return <MealPlanManagement />;
       case 'reports':
-        return <Reports />;
+        return <Reports user={currentUser} onLogout={handleLogout} />;
+      case 'revenue-dashboard':
+        return <RevenueDashboard />;
+      case 'kds':
+        return <KitchenDisplay />;
+      case 'table-layout':
+        return <TableLayout />;
+      case 'maintenance':
+        return <MaintenanceKanban />;
+      case 'corporate-profiles':
+        return <CorporateProfileManagement />;
+      case 'business-origins':
+        return <BusinessOriginManagement />;
+      case 'advanced-reports':
+        return <AdvancedReports />;
+      case 'quick-reservation':
+        return <QuickReservation />;
+      case 'enhanced-checkin':
+        return <EnhancedCheckIn />;
+      case 'group-booking':
+        return <GroupBookingForm />;
+      case 'folio-operations':
+        return <FolioOperations />;
+      case 'guest-profile':
+        return <GuestProfile />;
+      case 'minibar-posting':
+        return <MinibarPosting roomNumber="305" />;
+      case 'night-audit':
+        return <NightAuditDashboard />;
+      case 'city-ledger':
+        return <CityLedgerDashboard />;
+      case 'approval-center':
+        return <ApprovalCenter />;
+      case 'lost-and-found':
+        return <LostAndFound />;
+      case 'police-report':
+        return <PoliceReport />;
+      case 'seasonality':
+        return <SeasonalityManager />;
+      case 'guest-360':
+        return <Guest360View />;
+      case 'market-codes':
+        return <MarketCodesManager />;
+      case 'weekend-config':
+        return <WeekendConfiguration />;
+      case 'multiple-folio':
+        return <MultipleFolioManagement />;
+      case 'auto-floor':
+        return <AutoFloorGeneration />;
+      case 'blacklist':
+        return <BlacklistManagement />;
+      case 'occupancy-forecast':
+        return <OccupancyForecast />;
+      case 'tiered-cancellation':
+        return <TieredCancellation />;
+      case 'staff-meal':
+        return <StaffMealTracking />;
+      case 'property-setup':
+        return <PropertySetup />;
+      case 'room-types':
+        return <RoomTypeManagement />;
+      case 'physical-rooms':
+        return <RoomManagement onBack={() => setActivePage('dashboard')} />;
+      case 'buildings-floors':
+        return <BuildingManagement />;
+      case 'users':
+        return <AdminSecurity initialTab="users" />;
+      case 'roles-permissions':
+        return <AdminSecurity initialTab="roles" />;
+      case 'audit-logs':
+        return <AdminSecurity initialTab="audit" />;
+      case 'master-data-currency':
+      case 'master-data-source':
+      case 'master-data-charges':
+      case 'master-data-discounts':
+        // Extract tab name from page ID (e.g., 'master-data-currency' -> 'currency')
+        const tabName = activePage.replace('master-data-', '') as 'currency' | 'source' | 'charges' | 'discounts';
+        return <MasterDataConfig initialTab={tabName} />;
       default:
         return null;
     }
@@ -669,7 +793,7 @@ function App() {
 
         {/* Top Header */}
         {activePage !== 'reports' && (
-          <Header setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
+          <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
         )}
 
         {/* Scrollable Page Content */}
