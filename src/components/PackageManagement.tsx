@@ -4,7 +4,7 @@ import {
     Utensils, Waves, Car, Shirt, Wine, Dumbbell, Star,
     Check, X, Info, DollarSign, Calendar,
     BedDouble, Users, ArrowLeft, Save, Eye, ToggleLeft,
-    ToggleRight, AlertCircle, Zap, Shield, Gift
+    ToggleRight, AlertCircle, Zap, Shield, Gift, TrendingUp
 } from 'lucide-react';
 
 // ============================================================
@@ -39,16 +39,6 @@ interface OutletCredit {
     revenueCode: string;
 }
 
-interface AllowanceRule {
-    serviceType: string;
-    allowanceAmount: number;
-    allowanceUnit: 'Currency' | 'Items' | 'Sessions';
-    period: 'Per Stay' | 'Per Night' | 'Per Day';
-    extraChargeRate?: number;
-    revenueCode: string;
-    postingDescription: string;
-}
-
 interface HotelPackage {
     id: number;
     name: string;
@@ -70,16 +60,25 @@ interface HotelPackage {
         infantMaxAge: number;
         maxExtraBeds: number;
         extraBedMealIncluded: boolean;
+        welcomeAmenity: string;
+        lateCheckoutAllowed: boolean;
+        lateCheckoutTime: string;
+        wifiIncluded: boolean;
+        priorityCheckin: boolean;
     };
 
     mealInclusions: {
-        hasBreakfast: boolean; breakfastVenue: string; breakfastStyle: string;
+        hasBreakfast: boolean; breakfastVenue: string; breakfastStyle: string; breakfastMenu: string; breakfastCuisine: string;
         breakfastAdultRate: number; breakfastChildRate: number; breakfastInfantFree: boolean;
-        hasLunch: boolean; lunchVenue: string; lunchAdultRate: number; lunchChildRate: number;
-        hasDinner: boolean; dinnerVenue: string; dinnerStyle: string;
+        
+        hasLunch: boolean; lunchVenue: string; lunchStyle: string; lunchAdultRate: number; lunchChildRate: number; lunchMenu: string; lunchCuisine: string;
+        
+        hasDinner: boolean; dinnerVenue: string; dinnerStyle: string; dinnerMenu: string; dinnerCuisine: string;
         dinnerCredit: number; dinnerAdultRate: number; dinnerChildRate: number;
-        hasBrunch: boolean; brunchVenue: string; brunchAdultRate: number;
-        hasCupole: boolean; cupoleVenue: string; cupoleCredit: number;
+        
+        hasBrunch: boolean; brunchVenue: string; brunchStyle: string; brunchAdultRate: number; brunchMenu: string; brunchCuisine: string;
+        
+        hasCupole: boolean; cupoleVenue: string; cupoleStyle: string; cupoleCredit: number; cupoleMenu: string; cupoleCuisine: string;
     };
 
     poolConfig: {
@@ -128,9 +127,18 @@ interface HotelPackage {
     };
 
     finance: {
-        surcharge: number;
+        baseSurcharge: number;
+        dateBasedSurcharges: {
+            dateRange: string;
+            surchargeAmount: number;
+            reason: string;
+        }[];
         autoPost: boolean;
-        revenueAllocations: AllowanceRule[];
+        revenueAllocations: {
+            department: string;
+            amount: number;
+            type: 'Fixed' | 'Percentage';
+        }[];
     };
 }
 
@@ -151,23 +159,28 @@ const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
         applicableRoomTypes: [],
         extraBedAllowed: true,
         extraBedRate: 2500,
-        extraAdultRate: 1500,
-        extraChildRate: 800,
+        extraAdultRate: 2000,
+        extraChildRate: 1000,
         childAgeFrom: 5,
         childAgeTo: 12,
         infantFree: true,
         infantMaxAge: 4,
-        maxExtraBeds: 2,
+        maxExtraBeds: 1,
         extraBedMealIncluded: false,
+        welcomeAmenity: '',
+        lateCheckoutAllowed: false,
+        lateCheckoutTime: '12:00',
+        wifiIncluded: true,
+        priorityCheckin: false
     },
     mealInclusions: {
-        hasBreakfast: false, breakfastVenue: '', breakfastStyle: 'Buffet',
+        hasBreakfast: false, breakfastVenue: '', breakfastStyle: 'Buffet', breakfastMenu: '', breakfastCuisine: '',
         breakfastAdultRate: 0, breakfastChildRate: 0, breakfastInfantFree: true,
-        hasLunch: false, lunchVenue: '', lunchAdultRate: 0, lunchChildRate: 0,
-        hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet',
+        hasLunch: false, lunchVenue: '', lunchStyle: 'Buffet', lunchAdultRate: 0, lunchChildRate: 0, lunchMenu: '', lunchCuisine: '',
+        hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet', dinnerMenu: '', dinnerCuisine: '',
         dinnerCredit: 0, dinnerAdultRate: 0, dinnerChildRate: 0,
-        hasBrunch: false, brunchVenue: '', brunchAdultRate: 0,
-        hasCupole: false, cupoleVenue: '', cupoleCredit: 0,
+        hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+        hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
     },
     poolConfig: { included: false, complimentaryAdults: 2, complimentaryChildren: 1, extraAdultRate: 500, extraChildRate: 300 },
     transportConfig: { type: 'None', vehicleType: 'Sedan', pickupRate: 1500, dropRate: 1500 },
@@ -205,7 +218,7 @@ const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
     },
     outletCredits: [],
     validity: { startDate: '', endDate: '', minNights: 1, maxNights: 30, blackoutDates: '' },
-    finance: { surcharge: 0, autoPost: true, revenueAllocations: [] }
+    finance: { baseSurcharge: 0, dateBasedSurcharges: [], autoPost: true, revenueAllocations: [] }
 });
 
 const SAMPLE_PACKAGES: HotelPackage[] = [
@@ -217,16 +230,21 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
             applicableRoomTypes: ['Premium Suite', 'Deluxe King'],
             extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 2000,
             extraChildRate: 1000, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 0, extraBedMealIncluded: false
+            infantFree: true, infantMaxAge: 4, maxExtraBeds: 0, extraBedMealIncluded: true,
+            welcomeAmenity: 'Fruit Basket & Signature Juice',
+            lateCheckoutAllowed: true,
+            lateCheckoutTime: '14:00',
+            wifiIncluded: true,
+            priorityCheckin: true,
         },
         mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'The Cove Restaurant', breakfastStyle: 'Buffet',
-            breakfastAdultRate: 850, breakfastChildRate: 450, breakfastInfantFree: true,
-            hasLunch: false, lunchVenue: '', lunchAdultRate: 0, lunchChildRate: 0,
-            hasDinner: true, dinnerVenue: 'Candlelight Beach', dinnerStyle: 'Set Menu', 
-            dinnerCredit: 5000, dinnerAdultRate: 2500, dinnerChildRate: 1500,
-            hasBrunch: false, brunchVenue: '', brunchAdultRate: 0,
-            hasCupole: true, cupoleVenue: 'Cupole Rooftop', cupoleCredit: 3500,
+            hasBreakfast: true, breakfastVenue: 'Sky Cafe', breakfastStyle: 'Buffet', breakfastMenu: 'Signature International', breakfastCuisine: 'Continental',
+            breakfastAdultRate: 1500, breakfastChildRate: 750, breakfastInfantFree: true,
+            hasLunch: false, lunchVenue: '', lunchStyle: 'Buffet', lunchAdultRate: 0, lunchChildRate: 0, lunchMenu: '', lunchCuisine: '',
+            hasDinner: true, dinnerVenue: 'Garden Grill', dinnerStyle: 'Set Menu', dinnerMenu: 'Traditional Bengali Thali', dinnerCuisine: 'Local',
+            dinnerCredit: 0, dinnerAdultRate: 2500, dinnerChildRate: 1250,
+            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+            hasCupole: true, cupoleVenue: 'Cupole Rooftop', cupoleStyle: 'Set Menu', cupoleCredit: 3500, cupoleMenu: 'Sky Dinner', cupoleCuisine: 'Mediterranean',
         },
         poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 0, extraAdultRate: 500, extraChildRate: 300 },
         transportConfig: { type: 'Both', vehicleType: 'Luxury Sedan', pickupRate: 1800, dropRate: 1800 },
@@ -257,7 +275,12 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
             { outletName: 'Pool Bar', creditType: 'Per Day', creditAmount: 1000, revenueCode: 'REV-FB-BAR' }
         ],
         validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 30, blackoutDates: '2025-12-24, 2025-12-25, 2025-12-31' },
-        finance: { surcharge: 4500, autoPost: true, revenueAllocations: [] }
+        finance: {
+            baseSurcharge: 4500,
+            dateBasedSurcharges: [],
+            autoPost: true,
+            revenueAllocations: [{ department: 'Rooms', amount: 70, type: 'Percentage' }, { department: 'F&B', amount: 30, type: 'Percentage' }]
+        }
     },
     {
         id: 2, name: 'Family Adventure', shortCode: 'FAMADV', packageType: 'Family',
@@ -267,16 +290,21 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
             applicableRoomTypes: ['Deluxe Room', 'Junior Suite', 'Garden View'],
             extraBedAllowed: true, extraBedRate: 2500, extraAdultRate: 1800,
             extraChildRate: 1000, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 2, extraBedMealIncluded: true
+            infantFree: true, infantMaxAge: 4, maxExtraBeds: 2, extraBedMealIncluded: true,
+            welcomeAmenity: 'Kids Activity Pack',
+            lateCheckoutAllowed: false,
+            lateCheckoutTime: '12:00',
+            wifiIncluded: true,
+            priorityCheckin: false,
         },
         mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Garden Terrace', breakfastStyle: 'Buffet',
+            hasBreakfast: true, breakfastVenue: 'Garden Terrace', breakfastStyle: 'Buffet', breakfastMenu: 'Family Buffet', breakfastCuisine: 'Multi-cuisine',
             breakfastAdultRate: 750, breakfastChildRate: 400, breakfastInfantFree: true,
-            hasLunch: true, lunchVenue: 'Waves Poolside', lunchAdultRate: 900, lunchChildRate: 500,
-            hasDinner: true, dinnerVenue: 'Garden Terrace', dinnerStyle: 'Buffet',
+            hasLunch: true, lunchVenue: 'Waves Poolside', lunchStyle: 'A La Carte', lunchAdultRate: 900, lunchChildRate: 500, lunchMenu: 'Aqua Lunch', lunchCuisine: 'Seafood',
+            hasDinner: true, dinnerVenue: 'Garden Terrace', dinnerStyle: 'Buffet', dinnerMenu: 'Grand Buffet', dinnerCuisine: 'Global',
             dinnerCredit: 0, dinnerAdultRate: 1200, dinnerChildRate: 600,
-            hasBrunch: false, brunchVenue: '', brunchAdultRate: 0,
-            hasCupole: false, cupoleVenue: '', cupoleCredit: 0,
+            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
         },
         poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 3, extraAdultRate: 500, extraChildRate: 0 },
         transportConfig: { type: 'Both', vehicleType: 'Executive Van', pickupRate: 2500, dropRate: 2500 },
@@ -306,7 +334,12 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
             { outletName: 'Game Zone', creditType: 'Per Stay', creditAmount: 2000, revenueCode: 'REV-REC-GAME' }
         ],
         validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 3, maxNights: 14, blackoutDates: '' },
-        finance: { surcharge: 6500, autoPost: true, revenueAllocations: [] }
+        finance: {
+            baseSurcharge: 6500,
+            dateBasedSurcharges: [],
+            autoPost: true,
+            revenueAllocations: [{ department: 'Rooms', amount: 50, type: 'Percentage' }, { department: 'F&B', amount: 50, type: 'Percentage' }]
+        }
     },
     {
         id: 3, name: 'Corporate Executive', shortCode: 'BIZEXEC', packageType: 'Standard',
@@ -316,16 +349,21 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
             applicableRoomTypes: ['Deluxe King', 'Junior Suite'],
             extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 2500,
             extraChildRate: 1200, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 0, extraBedMealIncluded: false
+            infantFree: true, infantMaxAge: 4, maxExtraBeds: 0, extraBedMealIncluded: false,
+            welcomeAmenity: 'Business Kit',
+            lateCheckoutAllowed: true,
+            lateCheckoutTime: '16:00',
+            wifiIncluded: true,
+            priorityCheckin: true,
         },
         mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Executive Lounge', breakfastStyle: 'A La Carte',
+            hasBreakfast: true, breakfastVenue: 'Executive Lounge', breakfastStyle: 'A La Carte', breakfastMenu: 'Business Breakfast', breakfastCuisine: 'Continental',
             breakfastAdultRate: 1200, breakfastChildRate: 0, breakfastInfantFree: true,
-            hasLunch: false, lunchVenue: '', lunchAdultRate: 0, lunchChildRate: 0,
-            hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet',
+            hasLunch: false, lunchVenue: '', lunchStyle: 'Set Menu', lunchAdultRate: 0, lunchChildRate: 0, lunchMenu: '', lunchCuisine: '',
+            hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet', dinnerMenu: '', dinnerCuisine: '',
             dinnerCredit: 0, dinnerAdultRate: 0, dinnerChildRate: 0,
-            hasBrunch: false, brunchVenue: '', brunchAdultRate: 0,
-            hasCupole: false, cupoleVenue: '', cupoleCredit: 0,
+            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
         },
         poolConfig: { included: true, complimentaryAdults: 1, complimentaryChildren: 0, extraAdultRate: 500, extraChildRate: 500 },
         transportConfig: { type: 'Both', vehicleType: 'Tesla Model 3', pickupRate: 2000, dropRate: 2000 },
@@ -352,57 +390,236 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
             { outletName: 'Business Center', creditType: 'Per Stay', creditAmount: 1000, revenueCode: 'REV-GEN-BIZ' }
         ],
         validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 7, blackoutDates: '' },
-        finance: { surcharge: 4500, autoPost: true, revenueAllocations: [] }
+        finance: {
+            baseSurcharge: 4500,
+            dateBasedSurcharges: [],
+            autoPost: true,
+            revenueAllocations: [{ department: 'Rooms', amount: 80, type: 'Percentage' }, { department: 'F&B', amount: 20, type: 'Percentage' }]
+        }
     },
     {
-        id: 4, name: 'Wellness & Spa Retreat', shortCode: 'SPAWELL', packageType: 'Standard',
-        status: 'Active', color: '#8B5CF6',
-        description: 'Rejuvenate your body and mind with daily spa treatments and organic full board meals.',
+        id: 4, name: 'Standard Bed & Breakfast', shortCode: 'STDBB', packageType: 'Standard',
+        status: 'Active', color: '#6366F1',
+        description: 'Simple and comfortable. Includes daily buffet breakfast for two.',
         roomConfig: {
-            applicableRoomTypes: ['Sea View', 'Premium Suite'],
-            extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 3500,
-            extraChildRate: 2000, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 0, extraBedMealIncluded: false
+            applicableRoomTypes: ['Family Suite', 'Interconnecting'],
+            extraBedAllowed: true, extraBedRate: 2500, extraAdultRate: 2000,
+            extraChildRate: 1000, childAgeFrom: 5, childAgeTo: 12,
+            infantFree: true, infantMaxAge: 4, maxExtraBeds: 2, extraBedMealIncluded: true,
+            welcomeAmenity: '',
+            lateCheckoutAllowed: false,
+            lateCheckoutTime: '12:00',
+            wifiIncluded: true,
+            priorityCheckin: false,
         },
         mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Organic Cafe', breakfastStyle: 'Healthy Buffet',
-            breakfastAdultRate: 950, breakfastChildRate: 550, breakfastInfantFree: true,
-            hasLunch: true, lunchVenue: 'Organic Cafe', lunchAdultRate: 1500, lunchChildRate: 800,
-            hasDinner: true, dinnerVenue: 'Organic Cafe', dinnerStyle: 'Set Menu',
-            dinnerCredit: 0, dinnerAdultRate: 2200, dinnerChildRate: 1200,
-            hasBrunch: false, brunchVenue: '', brunchAdultRate: 0,
-            hasCupole: false, cupoleVenue: '', cupoleCredit: 0,
+            hasBreakfast: true, breakfastVenue: 'Main Restaurant', breakfastStyle: 'Buffet', breakfastMenu: 'Standard Buffet', breakfastCuisine: 'Continental',
+            breakfastAdultRate: 850, breakfastChildRate: 450, breakfastInfantFree: true,
+            hasLunch: true, lunchVenue: 'Waves Poolside', lunchStyle: 'Buffet', lunchAdultRate: 1500, lunchChildRate: 800, lunchMenu: 'Aqua Menu', lunchCuisine: 'Multi-cuisine',
+            hasDinner: true, dinnerVenue: 'Main Restaurant', dinnerStyle: 'Buffet', dinnerMenu: 'Global Feast', dinnerCuisine: 'Continental',
+            dinnerCredit: 0, dinnerAdultRate: 2200, dinnerChildRate: 1100,
+            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
         },
-        poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 0, extraAdultRate: 0, extraChildRate: 0 },
-        transportConfig: { type: 'Pickup', vehicleType: 'Luxury Van', pickupRate: 3000, dropRate: 0 },
+        poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 2, extraAdultRate: 800, extraChildRate: 400 },
+        transportConfig: { type: 'None', vehicleType: 'SUV', pickupRate: 0, dropRate: 0 },
+        laundryConfig: { included: false, allowanceType: 'Per Day', itemsAllowance: 0, extraItemRate: 0, items: [] },
+        minibarConfig: { included: false, dailyCredit: 0, replenishment: 'On Request', items: [] },
+        recreationConfig: { included: true, activities: [{ name: 'Trampoline Park', includedSessions: 2, adultRate: 1200, childRate: 1200, minAge: 5 }] },
+        outletCredits: [{ outletName: 'Arcade Zone', creditType: 'Per Day', creditAmount: 1000, revenueCode: 'REV-RECR-GAME' }],
+        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 14, blackoutDates: '' },
+        finance: {
+            baseSurcharge: 2500,
+            dateBasedSurcharges: [
+                { dateRange: '2024-12-24 to 2024-12-26', surchargeAmount: 5000, reason: 'Christmas Peak' }
+            ],
+            autoPost: true,
+            revenueAllocations: [
+                { department: 'Rooms', amount: 60, type: 'Percentage' },
+                { department: 'F&B', amount: 30, type: 'Percentage' },
+                { department: 'Others', amount: 10, type: 'Percentage' }
+            ]
+        }
+    },
+    {
+        id: 5, name: 'Wellness & Spa Retreat', shortCode: 'SPA-REL', packageType: 'Standard',
+        status: 'Active', color: '#8B5CF6',
+        description: 'Focus on health and tranquility. Detox and rejuvenate.',
+        roomConfig: {
+            applicableRoomTypes: ['Garden Villa', 'Zen Suite'],
+            extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 0,
+            extraChildRate: 0, childAgeFrom: 0, childAgeTo: 0,
+            infantFree: false, infantMaxAge: 0, maxExtraBeds: 0, extraBedMealIncluded: false,
+            welcomeAmenity: 'Herbal Tea Set',
+            lateCheckoutAllowed: true,
+            lateCheckoutTime: '15:00',
+            wifiIncluded: true,
+            priorityCheckin: true,
+        },
+        mealInclusions: {
+            hasBreakfast: true, breakfastVenue: 'Organic Garden', breakfastStyle: 'A La Carte', breakfastMenu: 'Detox Morning', breakfastCuisine: 'Healthy/Organic',
+            breakfastAdultRate: 1500, breakfastChildRate: 0, breakfastInfantFree: false,
+            hasLunch: true, lunchVenue: 'Zen Terrace', lunchStyle: 'A La Carte', lunchAdultRate: 2500, lunchChildRate: 0, lunchMenu: 'Light & Green', lunchCuisine: 'Healthy/Organic',
+            hasDinner: true, dinnerVenue: 'Zen Terrace', dinnerStyle: 'Set Menu', dinnerMenu: 'Evening Rejuvenation', dinnerCuisine: 'Healthy/Organic',
+            dinnerCredit: 0, dinnerAdultRate: 3500, dinnerChildRate: 0,
+            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
+        },
+        poolConfig: { included: true, complimentaryAdults: 1, complimentaryChildren: 0, extraAdultRate: 500, extraChildRate: 0 },
+        transportConfig: { type: 'Pickup', vehicleType: 'Tesla Model S', pickupRate: 3500, dropRate: 0 },
+        laundryConfig: { included: true, allowanceType: 'Per Stay', itemsAllowance: 2, extraItemRate: 100, items: [] },
+        minibarConfig: { included: true, dailyCredit: 0, replenishment: 'Daily', items: [{ name: 'Cold Press Juice', category: 'Non-Alcoholic', qty: 2, unitPrice: 850 }] },
+        recreationConfig: {
+            included: true, activities: [
+                { name: 'Yoga Session', includedSessions: 2, adultRate: 1500, childRate: 0, minAge: 12 },
+                { name: 'Full Body Massage', includedSessions: 1, adultRate: 6500, childRate: 0, minAge: 18 }
+            ]
+        },
+        outletCredits: [],
+        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 10, blackoutDates: '' },
+        finance: {
+            baseSurcharge: 18000,
+            dateBasedSurcharges: [],
+            autoPost: true,
+            revenueAllocations: [{ department: 'Spa', amount: 100, type: 'Percentage' }]
+        }
+    },
+    {
+        id: 6, name: 'Business Executive Bundle', shortCode: 'BIZ-EXE', packageType: 'Corporate',
+        status: 'Active', color: '#1F2937',
+        description: 'Optimized for business travelers. High-speed WiFi and airport transfers.',
+        roomConfig: {
+            applicableRoomTypes: ['Executive Room', 'Business Suite'],
+            extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 0,
+            extraChildRate: 0, childAgeFrom: 0, childAgeTo: 0,
+            infantFree: false, infantMaxAge: 0, maxExtraBeds: 0, extraBedMealIncluded: false,
+            welcomeAmenity: 'Welcome Drink',
+            lateCheckoutAllowed: true,
+            lateCheckoutTime: '16:00',
+            wifiIncluded: true,
+            priorityCheckin: true,
+        },
+        mealInclusions: {
+            hasBreakfast: true, breakfastVenue: 'Executive Lounge', breakfastStyle: 'Buffet', breakfastMenu: 'Express Business', breakfastCuisine: 'Continental',
+            breakfastAdultRate: 950, breakfastChildRate: 0, breakfastInfantFree: false,
+            hasLunch: true, lunchVenue: 'Atrium Cafe', lunchStyle: 'Set Menu', lunchAdultRate: 1800, lunchChildRate: 0, lunchMenu: '3-Course Power Lunch', lunchCuisine: 'Multi-cuisine',
+            hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet', dinnerMenu: '', dinnerCuisine: '',
+            dinnerCredit: 5000, dinnerAdultRate: 0, dinnerChildRate: 0,
+            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
+        },
+        poolConfig: { included: true, complimentaryAdults: 1, complimentaryChildren: 0, extraAdultRate: 600, extraChildRate: 0 },
+        transportConfig: { type: 'Both', vehicleType: 'Luxury Sedan', pickupRate: 2000, dropRate: 2000 },
+        laundryConfig: { included: true, allowanceType: 'Per Day', itemsAllowance: 2, extraItemRate: 250, items: [] },
+        minibarConfig: { included: false, dailyCredit: 0, replenishment: 'Daily', items: [] },
+        recreationConfig: { included: false, activities: [] },
+        outletCredits: [
+            { outletName: 'Business Center', creditType: 'Per Stay', creditAmount: 5000, revenueCode: 'REV-MISC-BIZ' }
+        ],
+        validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 3, maxNights: 10, blackoutDates: '' },
+        finance: {
+            baseSurcharge: 12000,
+            dateBasedSurcharges: [],
+            autoPost: true,
+            revenueAllocations: [{ department: 'Rooms', amount: 70, type: 'Percentage' }, { department: 'Transport', amount: 30, type: 'Percentage' }]
+        }
+    },
+    {
+        id: 7, name: 'Standard Bed & Breakfast', shortCode: 'STDBB', packageType: 'Standard',
+        status: 'Active', color: '#6366F1',
+        description: 'Simple and comfortable. Includes daily buffet breakfast for two.',
+        roomConfig: {
+            applicableRoomTypes: ['Deluxe Room', 'Deluxe King', 'Garden View'],
+            extraBedAllowed: true, extraBedRate: 2000, extraAdultRate: 1500,
+            extraChildRate: 800, childAgeFrom: 5, childAgeTo: 12,
+            infantFree: true, infantMaxAge: 4, maxExtraBeds: 1, extraBedMealIncluded: true,
+            welcomeAmenity: '',
+            lateCheckoutAllowed: false,
+            lateCheckoutTime: '12:00',
+            wifiIncluded: true,
+            priorityCheckin: false,
+        },
+        mealInclusions: {
+            hasBreakfast: true, breakfastVenue: 'Main Restaurant', breakfastStyle: 'Buffet', breakfastMenu: 'Standard Buffet', breakfastCuisine: 'Continental',
+            breakfastAdultRate: 850, breakfastChildRate: 450, breakfastInfantFree: true,
+            hasLunch: false, lunchVenue: '', lunchStyle: 'Buffet', lunchAdultRate: 0, lunchChildRate: 0, lunchMenu: '', lunchCuisine: '',
+            hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet', dinnerMenu: '', dinnerCuisine: '',
+            dinnerCredit: 0, dinnerAdultRate: 0, dinnerChildRate: 0,
+            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
+            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
+        },
+        poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 1, extraAdultRate: 500, extraChildRate: 300 },
+        transportConfig: { type: 'None', vehicleType: 'Sedan', pickupRate: 0, dropRate: 0 },
+        laundryConfig: { included: false, allowanceType: 'Per Stay', itemsAllowance: 0, extraItemRate: 0, items: [] },
+        minibarConfig: { included: false, dailyCredit: 0, replenishment: 'Daily', items: [] },
+        recreationConfig: { included: false, activities: [] },
+        outletCredits: [],
+        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 30, blackoutDates: '' },
+        finance: {
+            baseSurcharge: 1000,
+            dateBasedSurcharges: [],
+            autoPost: true,
+            revenueAllocations: [{ department: 'Rooms', amount: 100, type: 'Percentage' }]
+        }
+    },
+    {
+        id: 8, name: 'Royal Full Board Experience', shortCode: 'ROYALAP', packageType: 'Seasonal',
+        status: 'Active', color: '#F59E0B',
+        description: 'The ultimate stay. Includes Breakfast, Lunch, and Dinner with premium amenities.',
+        roomConfig: {
+            applicableRoomTypes: ['Presidential Suite', 'Premium Suite'],
+            extraBedAllowed: true, extraBedRate: 5000, extraAdultRate: 4000,
+            extraChildRate: 2500, childAgeFrom: 5, childAgeTo: 12,
+            infantFree: true, infantMaxAge: 4, maxExtraBeds: 2, extraBedMealIncluded: true,
+            welcomeAmenity: 'Champagne & Chocolates',
+            lateCheckoutAllowed: true,
+            lateCheckoutTime: '18:00',
+            wifiIncluded: true,
+            priorityCheckin: true,
+        },
+        mealInclusions: {
+            hasBreakfast: true, breakfastVenue: 'Executive Lounge', breakfastStyle: 'A La Carte', breakfastMenu: 'Royal Feast A', breakfastCuisine: 'Continental',
+            breakfastAdultRate: 1500, breakfastChildRate: 800, breakfastInfantFree: true,
+            hasLunch: true, lunchVenue: 'Waves Poolside', lunchStyle: 'Buffet', lunchAdultRate: 2000, lunchChildRate: 1200, lunchMenu: 'Aqua Gourmet', lunchCuisine: 'Pan-Asian',
+            hasDinner: true, dinnerVenue: 'Main Restaurant', dinnerStyle: 'Gourmet Buffet', dinnerMenu: 'Global Gala Night', dinnerCuisine: 'Multi-cuisine',
+            dinnerCredit: 0, dinnerAdultRate: 3500, dinnerChildRate: 1800,
+            hasBrunch: true, brunchVenue: 'Garden Terrace', brunchStyle: 'Buffet', brunchAdultRate: 2500, brunchMenu: 'Morning Bliss', brunchCuisine: 'Continental',
+            hasCupole: true, cupoleVenue: 'Private Beach', cupoleStyle: 'Set Menu', cupoleCredit: 8000, cupoleMenu: 'Starlight Dinner', cupoleCuisine: 'Italian',
+        },
+        poolConfig: { included: true, complimentaryAdults: 4, complimentaryChildren: 2, extraAdultRate: 0, extraChildRate: 0 },
+        transportConfig: { type: 'Both', vehicleType: 'Limousine', pickupRate: 5000, dropRate: 5000 },
         laundryConfig: {
-            included: true, allowanceType: 'Per Stay', itemsAllowance: 10, extraItemRate: 150,
+            included: true, allowanceType: 'Per Day', itemsAllowance: 5, extraItemRate: 250,
             items: [
-                { name: 'Yoga Wear', includedQty: 5, extraRate: 100 },
-                { name: 'Spa Robe (Wash)', includedQty: 5, extraRate: 200 },
+                { name: 'Suit', includedQty: 2, extraRate: 500 },
+                { name: 'Evening Gown', includedQty: 1, extraRate: 800 },
             ]
         },
         minibarConfig: {
-            included: true, dailyCredit: 500, replenishment: 'Daily',
+            included: true, dailyCredit: 2500, replenishment: 'Daily',
             items: [
-                { name: 'Herbal Tea Pack', category: 'Beverage', qty: 10, unitPrice: 50 },
-                { name: 'Fresh Coconut Water', category: 'Beverage', qty: 2, unitPrice: 150 },
+                { name: 'Champagne Mini', category: 'Spirit', qty: 1, unitPrice: 4500 },
+                { name: 'Imported Snacks', category: 'Snack', qty: 4, unitPrice: 350 },
             ]
         },
         recreationConfig: {
             included: true, activities: [
-                { name: 'Daily Yoga Session', includedSessions: 7, adultRate: 1500, childRate: 1000, minAge: 12 },
-                { name: 'Meditation Workshop', includedSessions: 3, adultRate: 1000, childRate: 500, minAge: 12 },
+                { name: 'Private Yacht Cruise', includedSessions: 1, adultRate: 15000, childRate: 5000, minAge: 0 },
+                { name: 'Spa Day Pass', includedSessions: 1, adultRate: 8000, childRate: 0, minAge: 16 },
             ]
         },
         outletCredits: [
-            { outletName: 'Zen Spa', creditType: 'Per Day', creditAmount: 5000, revenueCode: 'REV-SPA-ZEN' }
+            { outletName: 'Jewel Bar', creditType: 'Per Stay', creditAmount: 10000, revenueCode: 'REV-FB-BAR' }
         ],
-        validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 3, maxNights: 10, blackoutDates: '' },
-        finance: { surcharge: 12000, autoPost: true, revenueAllocations: [] }
+        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 7, blackoutDates: '' },
+        finance: {
+            baseSurcharge: 25000,
+            dateBasedSurcharges: [],
+            autoPost: true,
+            revenueAllocations: [{ department: 'Rooms', amount: 40, type: 'Percentage' }, { department: 'F&B', amount: 60, type: 'Percentage' }]
+        }
     }
 ];
-
 // ============================================================
 // ALLOWANCE ENGINE PREVIEW
 // ============================================================
@@ -412,27 +629,39 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
 
     if (pkg.mealInclusions.hasBreakfast) rules.push({
         icon: <Utensils size={14} />,
-        label: 'Breakfast',
-        detail: `৳${pkg.mealInclusions.breakfastAdultRate}/Adult · ৳${pkg.mealInclusions.breakfastChildRate}/Child · ${pkg.mealInclusions.breakfastVenue}`,
+        label: `Breakfast (${pkg.mealInclusions.breakfastStyle})`,
+        detail: `${pkg.mealInclusions.breakfastMenu} · ${pkg.mealInclusions.breakfastCuisine} · ${pkg.mealInclusions.breakfastVenue}`,
         code: 'REV-FB-BRKFST', dept: 'DEPT-02 F&B'
     });
     if (pkg.mealInclusions.hasLunch) rules.push({
         icon: <Utensils size={14} />,
-        label: 'Lunch',
-        detail: `৳${pkg.mealInclusions.lunchAdultRate}/Adult · ৳${pkg.mealInclusions.lunchChildRate}/Child · ${pkg.mealInclusions.lunchVenue}`,
+        label: `Lunch (${pkg.mealInclusions.lunchStyle})`,
+        detail: `${pkg.mealInclusions.lunchMenu} · ${pkg.mealInclusions.lunchCuisine} · ${pkg.mealInclusions.lunchVenue}`,
         code: 'REV-FB-LUNCH', dept: 'DEPT-02 F&B'
     });
     if (pkg.mealInclusions.hasDinner) rules.push({
         icon: <Utensils size={14} />,
-        label: 'Dinner',
-        detail: pkg.mealInclusions.dinnerStyle === 'Credit' ? `৳${pkg.mealInclusions.dinnerCredit} credit · ${pkg.mealInclusions.dinnerVenue}` : `৳${pkg.mealInclusions.dinnerAdultRate}/Adult · ${pkg.mealInclusions.dinnerVenue}`,
+        label: `Dinner (${pkg.mealInclusions.dinnerStyle})`,
+        detail: pkg.mealInclusions.dinnerStyle === 'Credit' ? `৳${pkg.mealInclusions.dinnerCredit} limit · ${pkg.mealInclusions.dinnerMenu} · ${pkg.mealInclusions.dinnerVenue}` : `${pkg.mealInclusions.dinnerMenu} · ${pkg.mealInclusions.dinnerCuisine} · ${pkg.mealInclusions.dinnerVenue}`,
         code: 'REV-FB-DINNER', dept: 'DEPT-02 F&B'
     });
     if (pkg.mealInclusions.hasCupole) rules.push({
         icon: <Star size={14} />,
-        label: 'Cupole Special Dinner',
-        detail: `৳${pkg.mealInclusions.cupoleCredit} credit · ${pkg.mealInclusions.cupoleVenue}`,
+        label: 'Cupole Rooftop Dinner',
+        detail: `৳${pkg.mealInclusions.cupoleCredit} limit · ${pkg.mealInclusions.cupoleMenu} · ${pkg.mealInclusions.cupoleVenue}`,
         code: 'REV-FB-CUPOLE', dept: 'DEPT-02 F&B'
+    });
+    if (pkg.roomConfig.welcomeAmenity) rules.push({
+        icon: <Gift size={14} />,
+        label: 'Welcome Experience',
+        detail: `${pkg.roomConfig.welcomeAmenity}${pkg.roomConfig.priorityCheckin ? ' · Priority Check-in' : ''}${pkg.roomConfig.lateCheckoutAllowed ? ' · Late Checkout (2PM)' : ''}`,
+        code: 'REV-RM-AMENITY', dept: 'DEPT-01 Rooms'
+    });
+    if (pkg.roomConfig.wifiIncluded) rules.push({
+        icon: <Zap size={14} />,
+        label: 'Connectivity',
+        detail: 'High-speed Fiber WiFi included for all devices',
+        code: 'REV-RM-WIFI', dept: 'DEPT-01 Rooms'
     });
     if (pkg.poolConfig.included) rules.push({
         icon: <Waves size={14} />,
@@ -458,13 +687,13 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
         detail: `৳${pkg.minibarConfig.dailyCredit}/day credit · ${pkg.minibarConfig.replenishment} replenishment · Extra charged to folio`,
         code: 'REV-MINI-BAR', dept: 'DEPT-02 Minibar'
     });
-    if (pkg.recreationConfig.included) pkg.recreationConfig.activities.forEach(act => rules.push({
+    if (pkg.recreationConfig.included) pkg.recreationConfig.activities.forEach((act: RecreationActivity) => rules.push({
         icon: <Dumbbell size={14} />,
         label: act.name,
         detail: `${act.includedSessions} session(s) included · Extra Adult ৳${act.adultRate} · Child ৳${act.childRate}`,
         code: 'REV-REC-SPORT', dept: 'DEPT-04 Recreation'
     }));
-    pkg.outletCredits.forEach(oc => rules.push({
+    pkg.outletCredits.forEach((oc: OutletCredit) => rules.push({
         icon: <Gift size={14} />,
         label: `${oc.outletName} Credit`,
         detail: `৳${oc.creditAmount} ${oc.creditType} · Extra usage charged to folio`,
@@ -472,27 +701,63 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
     }));
 
     return (
-        <div className="bg-gray-900 rounded-xl p-4 text-xs space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-                <Zap size={14} className="text-yellow-400" />
-                <span className="text-yellow-400 font-semibold">Allowance Engine — Auto-Routing Rules</span>
-            </div>
-            {rules.length === 0 && (
-                <div className="text-gray-500 text-center py-4">No inclusions configured yet</div>
-            )}
-            {rules.map((r, i) => (
-                <div key={i} className="flex items-start gap-3 bg-gray-800 rounded-lg p-2.5">
-                    <div className="text-blue-400 mt-0.5 flex-shrink-0">{r.icon}</div>
-                    <div className="flex-1 min-w-0">
-                        <div className="text-white font-medium">{r.label}</div>
-                        <div className="text-gray-400 truncate">{r.detail}</div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                        <div className="text-emerald-400 font-mono text-[10px]">{r.code}</div>
-                        <div className="text-gray-500 text-[10px]">{r.dept}</div>
-                    </div>
+        <div className="space-y-4">
+            <div className="bg-blue-900/40 p-5 rounded-2xl border border-blue-400/30 backdrop-blur-md">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-bold text-blue-200 uppercase tracking-widest flex items-center gap-2">
+                        <TrendingUp size={16} /> Revenue Allocation Engine
+                    </h4>
+                    <div className="text-[10px] bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full border border-blue-400/20 font-black">FINANCE V1.2</div>
                 </div>
-            ))}
+                <div className="grid grid-cols-2 gap-4">
+                    {pkg.finance.revenueAllocations.map((alloc, i) => (
+                        <div key={i} className="flex flex-col gap-1 p-3 bg-blue-950/30 rounded-xl border border-white/5">
+                            <span className="text-[10px] text-blue-400 font-black uppercase tracking-tighter">{alloc.department}</span>
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold text-white">
+                                    {alloc.type === 'Fixed' ? `৳${alloc.amount.toLocaleString()}` : `${alloc.amount}%`}
+                                </span>
+                                <div className="h-1 flex-1 bg-white/5 mx-3 rounded-full overflow-hidden">
+                                    <div className="h-full bg-blue-400 rounded-full" style={{ width: alloc.type === 'Percentage' ? `${alloc.amount}%` : '40%' }}></div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {pkg.finance.dateBasedSurcharges.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
+                        <div className="text-[10px] text-yellow-400 font-black uppercase tracking-widest text-center">Seasonal Peak Rules Appllied</div>
+                        {pkg.finance.dateBasedSurcharges.map((s, i) => (
+                            <div key={i} className="flex justify-between items-center bg-yellow-400/5 p-2 rounded-lg border border-yellow-400/10">
+                                <span className="text-xs text-yellow-100/70 font-medium">{s.reason}</span>
+                                <span className="text-xs font-black text-yellow-400">+৳{s.surchargeAmount.toLocaleString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+            <div className="bg-gray-900 rounded-xl p-4 text-xs space-y-2">
+                <div className="flex items-center gap-2 mb-3">
+                    <Zap size={14} className="text-yellow-400" />
+                    <span className="text-yellow-400 font-semibold">Allowance Engine — Auto-Routing Rules</span>
+                </div>
+                {rules.length === 0 && (
+                    <div className="text-gray-500 text-center py-4">No inclusions configured yet</div>
+                )}
+                {rules.map((r, i) => (
+                    <div key={i} className="flex items-start gap-3 bg-gray-800 rounded-lg p-2.5">
+                        <div className="text-blue-400 mt-0.5 flex-shrink-0">{r.icon}</div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-white font-medium">{r.label}</div>
+                            <div className="text-gray-400 truncate">{r.detail}</div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                            <div className="text-emerald-400 font-mono text-[10px]">{r.code}</div>
+                            <div className="text-gray-500 text-[10px]">{r.dept}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
@@ -728,7 +993,7 @@ const PackageManagement = () => {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-xs text-gray-400">Surcharge</div>
-                                        <div className="text-sm font-bold text-gray-900">৳{pkg.finance.surcharge.toLocaleString()}<span className="text-xs font-normal text-gray-400">/night</span></div>
+                                        <div className="text-sm font-bold text-gray-900">৳{pkg.finance.baseSurcharge.toLocaleString()}<span className="text-xs font-normal text-gray-400">/night</span></div>
                                     </div>
                                 </div>
                             </div>
@@ -811,7 +1076,8 @@ const PackageManagement = () => {
                         <div className="space-y-5">
 
                             {/* ── TAB: BASIC INFO ── */}
-                            {activeTab === 'basic' && <>
+                            {activeTab === 'basic' && (
+                                <div className="space-y-5">
                                 <FormSection title="Package Identity" icon={<Package size={16} />}>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2">
@@ -845,10 +1111,12 @@ const PackageManagement = () => {
                                         </Field>
                                     </div>
                                 </FormSection>
-                            </>}
+                                </div>
+                            )}
 
                             {/* ── TAB: ROOM CONFIG ── */}
-                            {activeTab === 'room' && <>
+                            {activeTab === 'room' && (
+                                <div className="space-y-5">
                                 <FormSection title="Applicable Room Types" icon={<BedDouble size={16} />}>
                                     <div className="grid grid-cols-2 gap-2">
                                         {ROOM_TYPES.map(rt => (
@@ -911,24 +1179,39 @@ const PackageManagement = () => {
                                         </div>
                                     </div>
 
-                                    <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100 flex items-center justify-between">
-                                        <div>
-                                            <div className="text-sm font-medium text-amber-800">Extra Bed Guest Gets Meals</div>
-                                            <div className="text-xs text-amber-600">If yes, meal allowances include extra bed occupant</div>
+                                    <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 grid grid-cols-2 gap-4">
+                                        <div className="col-span-2 text-xs font-bold text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-1">
+                                            <Gift size={14} /> Room Experience (ETC Info)
                                         </div>
-                                        <Toggle checked={fm.roomConfig.extraBedMealIncluded} onChange={v => upd('roomConfig.extraBedMealIncluded', v)} />
+                                        <Field label="Welcome Amenity">
+                                            <input className={inp} value={fm.roomConfig.welcomeAmenity} onChange={e => upd('roomConfig.welcomeAmenity', e.target.value)} placeholder="e.g. Fruit Basket" />
+                                        </Field>
+                                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
+                                            <span className="text-xs font-medium">Late Checkout (2PM)</span>
+                                            <Toggle checked={fm.roomConfig.lateCheckoutAllowed} onChange={v => upd('roomConfig.lateCheckoutAllowed', v)} />
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
+                                            <span className="text-xs font-medium">Priority Check-in</span>
+                                            <Toggle checked={fm.roomConfig.priorityCheckin} onChange={v => upd('roomConfig.priorityCheckin', v)} />
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100">
+                                            <span className="text-xs font-medium">Complimentary WiFi</span>
+                                            <Toggle checked={fm.roomConfig.wifiIncluded} onChange={v => upd('roomConfig.wifiIncluded', v)} />
+                                        </div>
                                     </div>
                                 </FormSection>
-                            </>}
+                                </div>
+                            )}
 
                             {/* ── TAB: MEALS ── */}
-                            {activeTab === 'meals' && <>
+                            {activeTab === 'meals' && (
+                                <div className="space-y-5">
                                 {[
-                                    { key: 'hasBreakfast', label: 'Breakfast', venueKey: 'breakfastVenue', styleKey: 'breakfastStyle', adultKey: 'breakfastAdultRate', childKey: 'breakfastChildRate', code: 'REV-FB-BRKFST', showCredit: false },
-                                    { key: 'hasLunch', label: 'Lunch', venueKey: 'lunchVenue', styleKey: null, adultKey: 'lunchAdultRate', childKey: 'lunchChildRate', code: 'REV-FB-LUNCH', showCredit: false },
-                                    { key: 'hasDinner', label: 'Dinner', venueKey: 'dinnerVenue', styleKey: 'dinnerStyle', adultKey: 'dinnerAdultRate', childKey: 'dinnerChildRate', code: 'REV-FB-DINNER', showCredit: true, creditKey: 'dinnerCredit' },
-                                    { key: 'hasCupole', label: 'Cupole Special Dinner', venueKey: 'cupoleVenue', styleKey: null, adultKey: 'cupoleAdultRate', childKey: null, code: 'REV-FB-CUPOLE', showCredit: true, creditKey: 'cupoleCredit' },
-                                    { key: 'hasBrunch', label: 'Brunch', venueKey: 'brunchVenue', styleKey: null, adultKey: 'brunchAdultRate', childKey: null, code: 'REV-FB-BRUNCH', showCredit: false },
+                                    { key: 'hasBreakfast', label: 'Breakfast', venueKey: 'breakfastVenue', styleKey: 'breakfastStyle', menuKey: 'breakfastMenu', cuisineKey: 'breakfastCuisine', adultKey: 'breakfastAdultRate', childKey: 'breakfastChildRate', code: 'REV-FB-BRKFST', showCredit: false },
+                                    { key: 'hasLunch', label: 'Lunch', venueKey: 'lunchVenue', styleKey: null, menuKey: 'lunchMenu', cuisineKey: 'lunchCuisine', adultKey: 'lunchAdultRate', childKey: 'lunchChildRate', code: 'REV-FB-LUNCH', showCredit: false },
+                                    { key: 'hasDinner', label: 'Dinner', venueKey: 'dinnerVenue', styleKey: 'dinnerStyle', menuKey: 'dinnerMenu', cuisineKey: 'dinnerCuisine', adultKey: 'dinnerAdultRate', childKey: 'dinnerChildRate', code: 'REV-FB-DINNER', showCredit: true, creditKey: 'dinnerCredit' },
+                                    { key: 'hasCupole', label: 'Cupole Special Dinner', venueKey: 'cupoleVenue', styleKey: null, menuKey: 'cupoleMenu', cuisineKey: 'cupoleCuisine', adultKey: 'cupoleAdultRate', childKey: null, code: 'REV-FB-CUPOLE', showCredit: true, creditKey: 'cupoleCredit' },
+                                    { key: 'hasBrunch', label: 'Brunch', venueKey: 'brunchVenue', styleKey: null, menuKey: 'brunchMenu', cuisineKey: 'brunchCuisine', adultKey: 'brunchAdultRate', childKey: null, code: 'REV-FB-BRUNCH', showCredit: false },
                                 ].map(meal => (
                                     <FormSection key={meal.key} title={meal.label} icon={<Utensils size={16} />}>
                                         <div className="flex items-center justify-between mb-4">
@@ -941,22 +1224,36 @@ const PackageManagement = () => {
                                                 onChange={v => upd(`mealInclusions.${meal.key}`, v)} />
                                         </div>
                                         {(fm.mealInclusions[meal.key as keyof typeof fm.mealInclusions] as boolean) && (
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <Field label="Venue / Restaurant">
-                                                    <input className={inp} placeholder="e.g. The Cove Restaurant"
-                                                        value={fm.mealInclusions[meal.venueKey as keyof typeof fm.mealInclusions] as string}
-                                                        onChange={e => upd(`mealInclusions.${meal.venueKey}`, e.target.value)} />
-                                                </Field>
-                                                {meal.styleKey && (
-                                                    <Field label="Serving Style">
-                                                        <select className={sel}
-                                                            value={fm.mealInclusions[meal.styleKey as keyof typeof fm.mealInclusions] as string}
-                                                            onChange={e => upd(`mealInclusions.${meal.styleKey}`, e.target.value)}>
-                                                            <option>Buffet</option><option>Set Menu</option>
-                                                            <option>À la carte</option><option>Credit</option>
-                                                        </select>
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                                                    <Field label="Venue">
+                                                        <input className={inp} placeholder="Venue"
+                                                            value={fm.mealInclusions[meal.venueKey as keyof typeof fm.mealInclusions] as string}
+                                                            onChange={e => upd(`mealInclusions.${meal.venueKey}`, e.target.value)} />
                                                     </Field>
-                                                )}
+                                                    {meal.styleKey && (
+                                                        <Field label="Serving Style">
+                                                            <select className={sel}
+                                                                value={fm.mealInclusions[meal.styleKey as keyof typeof fm.mealInclusions] as string}
+                                                                onChange={e => upd(`mealInclusions.${meal.styleKey}`, e.target.value)}>
+                                                                <option>Buffet</option><option>Set Menu</option>
+                                                                <option>À la carte</option><option>Credit</option>
+                                                            </select>
+                                                        </Field>
+                                                    )}
+                                                    <Field label="Menu Name">
+                                                        <input className={inp} placeholder="e.g. Chef Special"
+                                                            value={fm.mealInclusions[meal.menuKey as keyof typeof fm.mealInclusions] as string}
+                                                            onChange={e => upd(`mealInclusions.${meal.menuKey}`, e.target.value)} />
+                                                    </Field>
+                                                    <Field label="Cuisine">
+                                                        <input className={inp} placeholder="e.g. Continental"
+                                                            value={fm.mealInclusions[meal.cuisineKey as keyof typeof fm.mealInclusions] as string}
+                                                            onChange={e => upd(`mealInclusions.${meal.cuisineKey}`, e.target.value)} />
+                                                    </Field>
+                                                </div>
+
+                                                <div className="grid grid-cols-3 gap-4">
                                                 {meal.showCredit && meal.creditKey && (
                                                     <Field label={`${meal.label} Credit (৳)`} hint="Guest uses up to this amount free">
                                                         <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
@@ -980,27 +1277,17 @@ const PackageManagement = () => {
                                                     </Field>
                                                 )}
                                             </div>
-                                        )}
-                                    </FormSection>
-                                ))}
-
-                                {fm.mealInclusions.hasBreakfast && (
-                                    <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Shield size={14} className="text-emerald-600" />
-                                            <span className="text-xs font-semibold text-emerald-700">Infant Meal Policy</span>
                                         </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-emerald-600">Children under {fm.roomConfig.infantMaxAge} years eat free</span>
-                                            <Toggle checked={fm.mealInclusions.breakfastInfantFree} onChange={v => upd('mealInclusions.breakfastInfantFree', v)} />
-                                        </div>
-                                    </div>
-                                )}
-                            </>}
+                                    )}
+                                </FormSection>
+                            ))}
+                        </div>
+                    )}
 
-                            {/* ── TAB: RECREATION ── */}
-                            {activeTab === 'recreation' && <>
-                                <FormSection title="Swimming Pool" icon={<Waves size={16} />}>
+                    {/* ── TAB: RECREATION ── */}
+                    {activeTab === 'recreation' && (
+                        <div className="space-y-5">
+                            <FormSection title="Swimming Pool" icon={<Waves size={16} />}>
                                     <div className="flex items-center justify-between mb-4">
                                         <div>
                                             <span className="text-sm font-medium text-gray-800">Include Pool Access</span>
@@ -1086,7 +1373,8 @@ const PackageManagement = () => {
                                         </div>
                                     )}
                                 </FormSection>
-                            </>}
+                            </div>
+                        )}
 
                             {/* ── TAB: TRANSPORT ── */}
                             {activeTab === 'transport' && (
@@ -1134,7 +1422,8 @@ const PackageManagement = () => {
                             )}
 
                             {/* ── TAB: LAUNDRY & MINIBAR ── */}
-                            {activeTab === 'laundry' && <>
+                            {activeTab === 'laundry' && (
+                                <div className="space-y-5">
                                 {/* LAUNDRY */}
                                 <FormSection title="Laundry Allowance" icon={<Shirt size={16} />}>
                                     <div className="flex items-center justify-between mb-4">
@@ -1145,7 +1434,7 @@ const PackageManagement = () => {
                                         <Toggle checked={fm.laundryConfig.included} onChange={v => upd('laundryConfig.included', v)} />
                                     </div>
                                     {fm.laundryConfig.included && (
-                                        <>
+                                        <div className="space-y-4">
                                             <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 mb-4">
                                                 <div className="text-xs font-semibold text-blue-700 mb-3 flex items-center gap-1"><Zap size={12} /> Allowance Engine — Item Limit</div>
                                                 <div className="grid grid-cols-3 gap-3">
@@ -1196,7 +1485,7 @@ const PackageManagement = () => {
                                                 <AlertCircle size={12} className="inline mr-1" />
                                                 Engine: Guest sends {fm.laundryConfig.itemsAllowance} pieces → Free. Piece {fm.laundryConfig.itemsAllowance + 1}+ → ৳{fm.laundryConfig.extraItemRate} each, auto-charged to folio
                                             </div>
-                                        </>
+                                        </div>
                                     )}
                                 </FormSection>
 
@@ -1210,7 +1499,7 @@ const PackageManagement = () => {
                                         <Toggle checked={fm.minibarConfig.included} onChange={v => upd('minibarConfig.included', v)} />
                                     </div>
                                     {fm.minibarConfig.included && (
-                                        <>
+                                        <div className="space-y-4">
                                             <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 mb-4">
                                                 <div className="text-xs font-semibold text-blue-700 mb-3 flex items-center gap-1"><Zap size={12} /> Allowance Engine — Credit Limit</div>
                                                 <div className="grid grid-cols-2 gap-3">
@@ -1260,10 +1549,11 @@ const PackageManagement = () => {
                                                 <Check size={12} className="inline mr-1" />
                                                 Engine: Guest consumes ৳{fm.minibarConfig.dailyCredit} or less → Free. Above ৳{fm.minibarConfig.dailyCredit} → Extra auto-charged to folio
                                             </div>
-                                        </>
+                                        </div>
                                     )}
                                 </FormSection>
-                            </>}
+                            </div>
+                        )}
 
                             {/* ── TAB: OUTLETS ── */}
                             {activeTab === 'outlets' && (
@@ -1348,10 +1638,10 @@ const PackageManagement = () => {
                             {activeTab === 'finance' && (
                                 <FormSection title="Finance & Revenue Routing" icon={<DollarSign size={16} />}>
                                     <div className="grid grid-cols-2 gap-4 mb-5">
-                                        <Field label="Package Surcharge" hint="added to room rate/night">
+                                        <Field label="Base Surcharge" hint="added to room rate/night">
                                             <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
-                                                <input type="number" className={inp + ' pl-7'} value={fm.finance.surcharge}
-                                                    onChange={e => upd('finance.surcharge', +e.target.value)} /></div>
+                                                <input type="number" className={inp + ' pl-7'} value={fm.finance.baseSurcharge}
+                                                    onChange={e => upd('finance.baseSurcharge', +e.target.value)} /></div>
                                         </Field>
                                         <div />
                                         <div className="col-span-2 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
@@ -1362,22 +1652,18 @@ const PackageManagement = () => {
                                             <Toggle checked={fm.finance.autoPost} onChange={v => upd('finance.autoPost', v)} />
                                         </div>
                                     </div>
-
                                     {/* Revenue Allocation Preview */}
-                                    <div className="bg-gray-900 rounded-xl p-4">
-                                        <div className="text-xs font-semibold text-gray-300 mb-3">Revenue Department Allocation Preview</div>
-                                        <div className="space-y-1.5">
-                                            {fm.mealInclusions.hasBreakfast && <div className="flex justify-between text-xs"><span className="text-gray-400">Breakfast × {fm.mealInclusions.breakfastAdultRate}</span><span className="text-emerald-400">DEPT-02 F&B → REV-FB-BRKFST</span></div>}
-                                            {fm.mealInclusions.hasDinner && <div className="flex justify-between text-xs"><span className="text-gray-400">Dinner × {fm.mealInclusions.dinnerAdultRate}</span><span className="text-emerald-400">DEPT-02 F&B → REV-FB-DINNER</span></div>}
-                                            {fm.mealInclusions.hasCupole && <div className="flex justify-between text-xs"><span className="text-gray-400">Cupole Credit ৳{fm.mealInclusions.cupoleCredit}</span><span className="text-emerald-400">DEPT-02 F&B → REV-FB-CUPOLE</span></div>}
-                                            {fm.poolConfig.included && <div className="flex justify-between text-xs"><span className="text-gray-400">Pool Access (complimentary)</span><span className="text-blue-400">DEPT-04 Recreation → REV-REC-POOL</span></div>}
-                                            {fm.transportConfig.type !== 'None' && <div className="flex justify-between text-xs"><span className="text-gray-400">Airport Transfer ৳{fm.transportConfig.pickupRate + fm.transportConfig.dropRate}</span><span className="text-purple-400">DEPT-05 Transport → REV-TRN</span></div>}
-                                            {fm.laundryConfig.included && <div className="flex justify-between text-xs"><span className="text-gray-400">Laundry ({fm.laundryConfig.itemsAllowance} items)</span><span className="text-yellow-400">DEPT-06 Minor → REV-LAUN-STD</span></div>}
-                                            {fm.minibarConfig.included && <div className="flex justify-between text-xs"><span className="text-gray-400">Minibar ৳{fm.minibarConfig.dailyCredit}/day credit</span><span className="text-pink-400">DEPT-02 Minibar → REV-MINI-BAR</span></div>}
-                                            {fm.outletCredits.map((oc, i) => <div key={i} className="flex justify-between text-xs"><span className="text-gray-400">{oc.outletName} ৳{oc.creditAmount} {oc.creditType}</span><span className="text-orange-400">DEPT-03 Spa → {oc.revenueCode}</span></div>)}
-                                            <div className="flex justify-between text-xs border-t border-gray-700 pt-2 mt-2">
-                                                <span className="text-gray-300 font-semibold">Package Surcharge</span>
-                                                <span className="text-white font-semibold">৳{fm.finance.surcharge}/night → DEPT-01 Rooms (01-B)</span>
+                                    <div className="bg-gray-900 rounded-xl p-4 mt-4">
+                                        <div className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-widest border-b border-gray-800 pb-2">Revenue Routing Forecast</div>
+                                        <div className="space-y-1.5 min-h-[100px]">
+                                            {fm.poolConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Pool Access (Complimentary)</span><span className="text-blue-400 font-mono text-[9px]">DEPT-04 Recreation → REV-REC-POOL</span></div>}
+                                            {fm.transportConfig.type !== 'None' && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Airport Transfer (In/Out)</span><span className="text-purple-400 font-mono text-[9px]">DEPT-05 Transport → REV-TRN</span></div>}
+                                            {fm.laundryConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Laundry ({fm.laundryConfig.itemsAllowance} items)</span><span className="text-yellow-400 font-mono text-[9px]">DEPT-06 Minor → REV-LAUN-STD</span></div>}
+                                            {fm.minibarConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Minibar Credit ৳{fm.minibarConfig.dailyCredit}</span><span className="text-pink-400 font-mono text-[9px]">DEPT-02 Minibar → REV-MINI-BAR</span></div>}
+                                            {fm.outletCredits.map((oc, i) => <div key={i} className="flex justify-between text-[10px]"><span className="text-gray-500">{oc.outletName} Credit ({oc.creditType})</span><span className="text-orange-400 font-mono text-[9px]">DEPT-03 Outlets → {oc.revenueCode}</span></div>)}
+                                            <div className="flex justify-between text-[10px] border-t border-gray-800 pt-2 mt-2">
+                                                <span className="text-gray-300 font-bold uppercase tracking-widest">Base Pkg Surcharge</span>
+                                                <span className="text-white font-black">৳{fm.finance.baseSurcharge}/night → DEPT-01 Rooms</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1397,7 +1683,7 @@ const PackageManagement = () => {
                                     <p className="text-xs text-gray-500 mb-3">{fm.description || 'No description yet'}</p>
                                     <div className="flex items-center justify-between text-xs text-gray-500 border-t pt-2">
                                         <span>Min {fm.validity.minNights} nights</span>
-                                        <span className="font-bold text-gray-900">+৳{fm.finance.surcharge}<span className="font-normal">/night</span></span>
+                                        <span className="font-bold text-gray-900">+৳{fm.finance.baseSurcharge}<span className="font-normal">/night</span></span>
                                     </div>
                                 </div>
                                 <AllowanceEngineViewer pkg={{ ...fm, id: 0 }} />

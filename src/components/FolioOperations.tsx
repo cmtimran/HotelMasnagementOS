@@ -39,7 +39,7 @@ const FolioOperations = () => {
     const [activeTab, setActiveTab] = useState('folio-operations');
     const [activeWindow, setActiveWindow] = useState<1 | 2>(1);
 
-    const [rooms, setRooms] = useState<Room[]>([
+    const [rooms] = useState<Room[]>([
         { id: 1, number: '111', guest: 'Aniya Nusrat', folioNumber: 'FOL-2025-001', expanded: true, package: 'Ultimate Honeymoon Package' },
         { id: 2, number: '112', guest: 'Mr. Ariyan Nusrat', folioNumber: 'FOL-2025-002', expanded: false, package: 'Standard Room Only' }
     ]);

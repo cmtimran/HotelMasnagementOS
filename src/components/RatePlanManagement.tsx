@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Calendar, DollarSign,
-    Shield, Percent, Info, Search
+    Shield, Percent, Star, Calendar as CalendarIcon,
+    TrendingUp, AlertCircle, Layers, Coffee, Utensils,
+    Moon, Sun, MapPin, Clock, FileText
 } from 'lucide-react';
 
 interface RatePlan {
@@ -12,15 +14,18 @@ interface RatePlan {
     currency: string;
     description: string;
     status: 'Active' | 'Inactive';
-
-    // Inclusions
     mealPlan: string;
-    packageId?: number; // Link to HotelPackage (Layer 2)
+    packageId?: number;
     taxIncluded: boolean;
-    cancellationPolicy: string;
     promoCode?: string;
-
-    // Validity
+    policies: {
+        depositRequired: boolean;
+        depositAmount: number;
+        depositType: 'Percentage' | 'Fixed';
+        cancellationType: 'Flexible' | 'Moderate' | 'Strict' | 'Non-Refundable';
+        cancellationDeadline: number;
+        refundPercentage: number;
+    };
     activationDate: string;
     expirationDate: string;
     stayDateStart?: string;
@@ -29,17 +34,13 @@ interface RatePlan {
     seasonName?: string;
     seasonStart?: string;
     seasonEnd?: string;
-    validDays: string[]; // Mon, Tue, etc.
-
-    // Restrictions
+    validDays: string[];
     minNights: number;
     maxNights?: number;
     cutOffDays: number;
     closedToArrival: boolean;
     closedToDeparture: boolean;
     stopSell: boolean;
-
-    // Pricing
     pricing: RatePricing[];
 }
 
@@ -51,26 +52,40 @@ interface RatePricing {
     tripleRate: number;
     extraAdult: number;
     extraChild: number;
-    baseOccupancy: number; // fetched from room type ideally
-    maxOccupancy: number; // fetched from room type ideally
+    baseOccupancy: number;
+    maxOccupancy: number;
 }
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+const SAMPLE_PACKAGES_L2 = [
+    { id: 1, name: 'Honeymoon Delight', code: 'HONEY' },
+    { id: 2, name: 'Family Adventure', code: 'FAMADV' },
+    { id: 3, name: 'Corporate Executive', code: 'BIZEXEC' },
+    { id: 4, name: 'Wellness & Spa Retreat', code: 'SPA-REL' }
+];
+
 export default function RatePlanManagement() {
-    const [view, setView] = useState<'list' | 'form'>('list');
+    const [view, setView] = useState<'list' | 'form' | 'calendar'>('list');
     const [ratePlans, setRatePlans] = useState<RatePlan[]>([
         {
             id: 1,
-            name: 'Best Available Rate',
-            shortCode: 'BAR',
-            marketSegment: 'FIT / Walk-in',
+            name: 'Best Available Rate (BAR)',
+            shortCode: 'BAR-01',
+            marketSegment: 'FIT / Direct',
             currency: 'BDT',
-            description: 'Most flexible rate available for transient guests.',
+            description: 'Standard flexible rate for all direct bookings. No advance payment required.',
             status: 'Active',
-            mealPlan: 'EP (European Plan - Room Only)',
+            mealPlan: 'EP',
             taxIncluded: false,
-            cancellationPolicy: 'Flexible 24h',
+            policies: {
+                depositRequired: false,
+                depositAmount: 0,
+                depositType: 'Percentage',
+                cancellationType: 'Flexible',
+                cancellationDeadline: 24,
+                refundPercentage: 100
+            },
             activationDate: '2024-01-01',
             expirationDate: '2025-12-31',
             isSeasonal: false,
@@ -81,80 +96,103 @@ export default function RatePlanManagement() {
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Deluxe King', structure: 'Flat', baseRate: 12500, doubleRate: 12500, tripleRate: 15000, extraAdult: 2500, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 3 }
+                { roomTypeId: 'Deluxe Suite', structure: 'Flat', baseRate: 14500, doubleRate: 14500, tripleRate: 18000, extraAdult: 3500, extraChild: 1500, baseOccupancy: 2, maxOccupancy: 3 }
             ]
         },
         {
             id: 2,
-            name: 'Early Bird - 30 Days Advance',
-            shortCode: 'EB30',
-            marketSegment: 'Online / Web',
-            currency: 'BDT',
-            description: 'Save 15% by booking at least 1 month in advance.',
-            status: 'Active',
-            mealPlan: 'CP (Bed & Breakfast)',
-            taxIncluded: true,
-            cancellationPolicy: 'Strict 72h',
-            activationDate: '2024-01-01',
-            expirationDate: '2025-12-31',
-            isSeasonal: false,
-            validDays: DAYS_OF_WEEK,
-            minNights: 1,
-            cutOffDays: 30,
-            closedToArrival: false,
-            closedToDeparture: false,
-            stopSell: false,
-            pricing: [
-                { roomTypeId: 'Premium Suite', structure: 'Flat', baseRate: 18000, doubleRate: 18000, tripleRate: 22000, extraAdult: 4000, extraChild: 2000, baseOccupancy: 2, maxOccupancy: 4 }
-            ]
-        },
-        {
-            id: 3,
-            name: 'Corporate Monthly Negotiated',
-            shortCode: 'CORP-M',
+            name: 'Corporate Negotiated (Standard)',
+            shortCode: 'CORP-A1',
             marketSegment: 'Corporate',
             currency: 'BDT',
-            description: 'Special fixed rate for long-term corporate contracts.',
+            description: 'Negotiated flat rate for Tier-1 Corporate partners. Priority check-in included.',
             status: 'Active',
-            mealPlan: 'MAP (Half Board)',
-            taxIncluded: false,
-            cancellationPolicy: 'Corporate 48h',
+            mealPlan: 'CP',
+            packageId: 3, // Linked to Corporate Executive
+            taxIncluded: true,
+            policies: {
+                depositRequired: true,
+                depositAmount: 0,
+                depositType: 'Fixed',
+                cancellationType: 'Moderate',
+                cancellationDeadline: 48,
+                refundPercentage: 100
+            },
             activationDate: '2024-01-01',
             expirationDate: '2025-12-31',
             isSeasonal: false,
             validDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-            minNights: 3,
+            minNights: 1,
             cutOffDays: 0,
             closedToArrival: false,
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Deluxe Room', structure: 'Flat', baseRate: 9500, doubleRate: 9500, tripleRate: 12000, extraAdult: 2000, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 2 }
+                { roomTypeId: 'Premium King', structure: 'Flat', baseRate: 11000, doubleRate: 11000, tripleRate: 14000, extraAdult: 2500, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 3 }
+            ]
+        },
+        {
+            id: 3,
+            name: 'Honeymoon Bliss Experience',
+            shortCode: 'HON-PKG',
+            marketSegment: 'Promotional',
+            currency: 'BDT',
+            description: 'Premium romantic getaway including flower bed decoration and candlelight dinner.',
+            status: 'Active',
+            mealPlan: 'MAP',
+            packageId: 1, // Linked to Honeymoon Delight
+            taxIncluded: false,
+            policies: {
+                depositRequired: true,
+                depositAmount: 50,
+                depositType: 'Percentage',
+                cancellationType: 'Strict',
+                cancellationDeadline: 72,
+                refundPercentage: 50
+            },
+            activationDate: '2024-02-01',
+            expirationDate: '2025-06-30',
+            isSeasonal: true,
+            seasonName: 'Summer Season',
+            validDays: DAYS_OF_WEEK,
+            minNights: 2,
+            cutOffDays: 48,
+            closedToArrival: false,
+            closedToDeparture: false,
+            stopSell: false,
+            pricing: [
+                { roomTypeId: 'Junior Suite', structure: 'Flat', baseRate: 18500, doubleRate: 18500, tripleRate: 22000, extraAdult: 4500, extraChild: 2000, baseOccupancy: 2, maxOccupancy: 3 }
             ]
         },
         {
             id: 4,
-            name: 'Weekend Staycation Bundle',
-            shortCode: 'WKND-STAY',
-            marketSegment: 'Leisure',
+            name: 'Long Stay Weekly (7+ Nights)',
+            shortCode: 'LSTAY-7',
+            marketSegment: 'Wholesale',
             currency: 'BDT',
-            description: 'Full board weekend getaway for families.',
+            description: 'Heavy discount for stays of 7 days or more. Housekeeping every 2nd day.',
             status: 'Active',
-            mealPlan: 'AP (Full Board)',
+            mealPlan: 'EP',
             taxIncluded: true,
-            cancellationPolicy: 'Flexible 48h',
+            policies: {
+                depositRequired: true,
+                depositAmount: 100,
+                depositType: 'Fixed',
+                cancellationType: 'Non-Refundable',
+                cancellationDeadline: 0,
+                refundPercentage: 0
+            },
             activationDate: '2024-01-01',
             expirationDate: '2025-12-31',
-            isSeasonal: true,
-            seasonName: 'Weekends Only',
-            validDays: ['Fri', 'Sat', 'Sun'],
-            minNights: 2,
-            cutOffDays: 0,
+            isSeasonal: false,
+            validDays: DAYS_OF_WEEK,
+            minNights: 7,
+            cutOffDays: 24,
             closedToArrival: false,
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Junior Suite', structure: 'Flat', baseRate: 22000, doubleRate: 22000, tripleRate: 25000, extraAdult: 3000, extraChild: 1500, baseOccupancy: 2, maxOccupancy: 3 }
+                { roomTypeId: 'Standard Room', structure: 'Flat', baseRate: 8500, doubleRate: 8500, tripleRate: 10500, extraAdult: 2000, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 2 }
             ]
         }
     ]);
@@ -163,117 +201,146 @@ export default function RatePlanManagement() {
     const [searchQuery, setSearchQuery] = useState('');
     const [editingPlan, setEditingPlan] = useState<RatePlan | null>(null);
 
+    const toggleDay = (day: string) => {
+        const currentDays = formData.validDays || [];
+        if (currentDays.includes(day)) {
+            setFormData({ ...formData, validDays: currentDays.filter((d: string) => d !== day) });
+        } else {
+            setFormData({ ...formData, validDays: [...currentDays, day] });
+        }
+    };
+
     const openCreate = () => {
         setFormData({
             status: 'Active',
             currency: 'BDT',
-            validDays: DAYS_OF_WEEK
+            validDays: DAYS_OF_WEEK,
+            mealPlan: 'EP',
+            policies: {
+                depositRequired: false,
+                depositAmount: 0,
+                depositType: 'Percentage',
+                cancellationType: 'Flexible',
+                cancellationDeadline: 24,
+                refundPercentage: 100
+            },
+            activationDate: new Date().toISOString().split('T')[0],
+            expirationDate: '2025-12-31',
+            minNights: 1,
+            cutOffDays: 0,
+            taxIncluded: false,
+            isSeasonal: false,
+            closedToArrival: false,
+            closedToDeparture: false,
+            stopSell: false,
+            pricing: [{ roomTypeId: 'New Room Category', structure: 'Flat', baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 3 }]
         });
         setEditingPlan(null);
         setView('form');
+        setActiveTab(1);
     };
 
     const openEdit = (plan: RatePlan) => {
         setFormData({ ...plan });
         setEditingPlan(plan);
         setView('form');
+        setActiveTab(1);
     };
 
     const handleSave = () => {
         if (formData.name && formData.shortCode) {
+            const finalData = { ...formData, id: editingPlan?.id || Date.now() } as RatePlan;
             if (editingPlan) {
-                setRatePlans(ratePlans.map(p => p.id === editingPlan.id ? { ...formData, id: editingPlan.id } as RatePlan : p));
+                setRatePlans(ratePlans.map((p: RatePlan) => p.id === editingPlan.id ? finalData : p));
             } else {
-                const newPlan = { ...formData, id: Date.now() } as RatePlan;
-                setRatePlans([...ratePlans, newPlan]);
+                setRatePlans([...ratePlans, finalData]);
             }
             setView('list');
             setFormData({});
             setEditingPlan(null);
-            setActiveTab(1);
-        }
-    };
-
-    const toggleDay = (day: string) => {
-        const currentDays = formData.validDays || [];
-        if (currentDays.includes(day)) {
-            setFormData({ ...formData, validDays: currentDays.filter(d => d !== day) });
-        } else {
-            setFormData({ ...formData, validDays: [...currentDays, day] });
         }
     };
 
     const renderList = () => (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Rate Plans</h1>
-                    <p className="text-sm text-gray-500">Manage pricing strategies and restrictions</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Rate Plan Management</h1>
+                    <p className="text-sm text-gray-500">Define selling strategies, yield rules, and inventory fencings</p>
                 </div>
-                <button
-                    onClick={openCreate}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-semibold"
-                >
-                    <Plus size={18} />
-                    Add Rate Plan
-                </button>
-            </div>
-
-            <div className="mb-6 relative">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input 
-                    type="text" 
-                    placeholder="Search rate plans..." 
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                />
+                <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Search strategy..."
+                            className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64 transition-all"
+                            value={searchQuery}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                        />
+                        <Star className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={() => setView('calendar')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-all shadow-sm">
+                            <CalendarIcon size={18} /> Yield Console
+                        </button>
+                        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md">
+                            <Plus size={18} /> Define New Plan
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <table className="w-full text-left">
+                <table className="w-full text-left text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Identity</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Type</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Channels</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700 text-center">Inclusions</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Status</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700">Identity & Segment</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700">Meal Plan</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700">Policies</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700">Fencings</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700 text-right">Pricing (Base)</th>
                             <th className="px-6 py-4 font-semibold text-gray-700 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y text-gray-600">
                         {ratePlans
-                            .filter(plan => 
-                                plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase())
-                            )
-                            .map(plan => (
-                            <tr key={plan.id} className="hover:bg-gray-50">
+                            .filter((plan: RatePlan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase()))
+                            .map((plan: RatePlan) => (
+                            <tr key={plan.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4">
-                                    <div className="font-medium text-gray-900">{plan.name}</div>
-                                    <div className="text-xs text-gray-500">{plan.shortCode}</div>
-                                </td>
-                                <td className="px-6 py-4 text-gray-600">{plan.marketSegment}</td>
-                                <td className="px-6 py-4 text-gray-600">
-                                    {plan.isSeasonal ? 'Seasonal' : 'Year-round'}
+                                    <div className="font-bold text-gray-900">{plan.name}</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[10px] font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{plan.shortCode}</span>
+                                        <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">{plan.marketSegment}</span>
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${plan.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                        }`}>
-                                        {plan.status}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Coffee size={14} className="text-amber-500" />
+                                        <span className="font-semibold">{plan.mealPlan}</span>
+                                    </div>
+                                    {plan.packageId && <div className="text-[10px] text-indigo-500 font-medium mt-1 inline-flex items-center gap-1"><Layers size={10}/> Package Linked</div>}
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex flex-wrap gap-1">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${plan.policies.cancellationType === 'Non-Refundable' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                                            {plan.policies.cancellationType}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] flex items-center gap-1.5 font-medium"><Clock size={12} className="text-gray-400"/> Min {plan.minNights} N</div>
+                                        {plan.stopSell && <div className="text-[11px] text-red-600 font-black flex items-center gap-1"><AlertCircle size={12}/> STOP SELL</div>}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <button 
-                                        onClick={() => openEdit(plan)}
-                                        className="text-gray-400 hover:text-blue-600 mr-3 transition-colors"
-                                    >
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <button className="text-gray-400 hover:text-red-600 transition-colors">
-                                        <Trash2 size={16} />
-                                    </button>
+                                    <div className="font-bold text-gray-900">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
+                                    <div className="text-[10px] text-gray-400">Exc. Tax</div>
+                                </td>
+                                <td className="px-6 py-4 text-right space-x-2">
+                                    <button onClick={() => openEdit(plan)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Edit2 size={16} /></button>
+                                    <button className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={16} /></button>
                                 </td>
                             </tr>
                         ))}
@@ -284,443 +351,356 @@ export default function RatePlanManagement() {
     );
 
     const renderForm = () => (
-        <div className="h-full flex flex-col bg-gray-50">
-            {/* Header */}
-            <div className="bg-white border-b px-6 py-4 flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setView('list')} className="p-2 hover:bg-gray-100 rounded-lg">
-                        <X size={20} className="text-gray-500" />
+        <div className="h-full flex flex-col bg-gray-50 min-h-screen">
+            <div className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+                <div className="flex items-center gap-6">
+                    <button onClick={() => setView('list')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-all">
+                        <X size={24} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-900">
-                            {formData.id ? 'Edit Rate Plan' : 'New Rate Plan'}
+                        <h1 className="text-xl font-bold text-gray-900 uppercase tracking-tight">
+                            {editingPlan ? `Edit Rate Plan: ${editingPlan.shortCode}` : 'Define New Strategy'}
                         </h1>
-                        <p className="text-sm text-gray-500">Configure comprehensive rate settings</p>
+                        <p className="text-xs text-gray-500">Configure inclusions, validity, pricing, and yield fences</p>
                     </div>
                 </div>
                 <div className="flex gap-3">
-                    <button onClick={() => setView('list')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium">Cancel</button>
-                    <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    <button onClick={() => setView('list')} className="px-5 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg font-bold text-xs uppercase transition-all">Cancel</button>
+                    <button onClick={handleSave} className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md text-sm">
                         <Save size={18} />
-                        Save Rate Plan
+                        Deploy Strategy
                     </button>
                 </div>
             </div>
 
-            {/* Stepper/Tabs */}
-            <div className="flex border-b bg-white px-6">
+            <div className="flex border-b bg-white px-8">
                 {[
-                    { id: 1, label: 'Identity & Market', icon: <Info size={16} /> },
-                    { id: 2, label: 'Inclusions', icon: <Percent size={16} /> },
+                    { id: 1, label: 'Identity', icon: <FileText size={16} /> },
+                    { id: 2, label: 'Inclusions', icon: <Utensils size={16} /> },
                     { id: 3, label: 'Validity', icon: <Calendar size={16} /> },
                     { id: 4, label: 'Restrictions', icon: <Shield size={16} /> },
-                    { id: 5, label: 'Pricing Grid', icon: <DollarSign size={16} /> },
-                ].map(step => (
+                    { id: 5, label: 'Pricing Matrix', icon: <DollarSign size={16} /> }
+                ].map((tab: { id: number; label: string; icon: React.ReactNode }) => (
                     <button
-                        key={step.id}
-                        onClick={() => setActiveTab(step.id)}
-                        className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === step.id ? 'border-primary-600 text-blue-600 border-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-                            }`}
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-2 px-8 py-4 text-xs font-bold border-b-4 transition-all ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                     >
-                        {step.icon}
-                        {step.label}
+                        {tab.icon}
+                        {tab.label.toUpperCase()}
                     </button>
                 ))}
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-8 max-w-5xl mx-auto w-full">
-
-                {/* 1. Identity & Market */}
-                {activeTab === 1 && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <h3 className="text-lg font-semibold border-b pb-4 mb-4">Basic Information</h3>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Rate Plan Name <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="e.g. Winter Getaway"
-                                    value={formData.name || ''}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                />
+            <div className="flex-1 overflow-auto p-10 max-w-5xl mx-auto w-full">
+                <div className="animate-in fade-in slide-in-from-bottom-5 duration-500">
+                    {activeTab === 1 && (
+                        <div className="bg-white rounded-xl shadow-sm border p-8 space-y-8">
+                            <div className="flex items-center gap-2 border-b pb-4">
+                                <FileText size={18} className="text-blue-600" />
+                                <h3 className="text-lg font-bold text-gray-900">Basic Information</h3>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Short Code <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="e.g. BAR"
-                                    value={formData.shortCode || ''}
-                                    onChange={e => setFormData({ ...formData, shortCode: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Market Segment <span className="text-red-500">*</span></label>
-                                <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white"
-                                    value={formData.marketSegment || ''}
-                                    onChange={e => setFormData({ ...formData, marketSegment: e.target.value })}
-                                >
-                                    <option value="">Select Segment...</option>
-                                    <option value="Walk-in">Walk-in</option>
-                                    <option value="Corporate">Corporate</option>
-                                    <option value="OTA">OTA</option>
-                                    <option value="Travel Agent">Travel Agent</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Currency <span className="text-red-500">*</span></label>
-                                <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white"
-                                    value={formData.currency || 'USD'}
-                                    onChange={e => setFormData({ ...formData, currency: e.target.value })}
-                                >
-                                    <option value="BDT">BDT (৳)</option>
-                                    <option value="USD">USD ($)</option>
-                                    <option value="EUR">EUR (€)</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Status <span className="text-red-500">*</span></label>
-                                <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white"
-                                    value={formData.status || 'Active'}
-                                    onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                                >
-                                    <option value="Active">Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
-                            </div>
-                            <div className="col-span-2 space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Description</label>
-                                <textarea
-                                    className="w-full px-3 py-2 border rounded-lg h-24 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="Details shown to staff/guests..."
-                                    value={formData.description || ''}
-                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                />
+                            <div className="grid grid-cols-2 gap-8">
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Plan Name <span className="text-red-500">*</span></label>
+                                    <input className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all" value={formData.name || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})} placeholder="e.g. Best Available Rate" />
+                                </div>
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Short Code</label>
+                                    <input className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono tracking-widest font-bold text-blue-600" value={formData.shortCode || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, shortCode: e.target.value.toUpperCase()})} placeholder="BAR-01" />
+                                </div>
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Market Segment</label>
+                                    <select className="w-full px-4 py-3 border rounded-lg bg-white text-sm" value={formData.marketSegment || ''} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, marketSegment: e.target.value })}>
+                                        <option value="FIT / Direct">FIT / Direct Guest</option>
+                                        <option value="Corporate">Corporate / Negotiated</option>
+                                        <option value="OTA Channels">OTA Channels (Booking, Expedia)</option>
+                                        <option value="Wholesale">Wholesale / FIT</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Status</label>
+                                    <select className="w-full px-4 py-3 border rounded-lg bg-white text-sm" value={formData.status || 'Active'} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, status: e.target.value as any })}>
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <div className="col-span-2 space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Strategy Description</label>
+                                    <textarea className="w-full px-4 py-3 border rounded-lg h-24 focus:ring-2 focus:ring-blue-500 outline-none text-sm resize-none italic leading-relaxed" value={formData.description || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe why this strategy exists..." />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* 2. Inclusions */}
-                {activeTab === 2 && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <div className="flex items-center justify-between border-b pb-4">
-                            <h3 className="text-lg font-semibold">Inclusions & Policies</h3>
-                            <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-widest">
-                                Layer 3 Configuration
+                    {activeTab === 2 && (
+                        <div className="bg-white rounded-xl shadow-sm border p-8 space-y-10">
+                            <div className="flex items-center gap-2 border-b pb-4">
+                                <Utensils size={18} className="text-blue-600" />
+                                <h3 className="text-lg font-bold text-gray-900">Meal Plan & Packages</h3>
                             </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Linked Hotel Package (Layer 2) <span className="text-blue-500 text-[10px] ml-1">(Optional)</span></label>
-                                <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm font-semibold text-blue-600 border-blue-200 outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={formData.packageId || ''}
-                                    onChange={e => setFormData({ ...formData, packageId: parseInt(e.target.value) || undefined })}
-                                >
-                                    <option value="">No Bundle (Room Rate Only)</option>
-                                    <option value="101">Winter Wonderland Bundle (Meals + Pool)</option>
-                                    <option value="102">Honeymoon Special (Dinner + Spa)</option>
-                                    <option value="103">Business Suite Package (Transport + Laundry)</option>
-                                </select>
-                                <p className="text-[10px] text-gray-400">Selecting a package will automatically apply its service allowance rules to this rate plan.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Base Meal Plan <span className="text-red-500">*</span></label>
-                                <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm"
-                                    value={formData.mealPlan || 'EP'}
-                                    onChange={e => setFormData({ ...formData, mealPlan: e.target.value })}
-                                >
-                                    <option value="EP">EP (Room Only)</option>
-                                    <option value="CP">CP (Breakfast)</option>
-                                    <option value="MAP">MAP (Half Board)</option>
-                                    <option value="AP">AP (Full Board)</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Cancellation Policy</label>
-                                <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm"
-                                    value={formData.cancellationPolicy || ''}
-                                    onChange={e => setFormData({ ...formData, cancellationPolicy: e.target.value })}
-                                >
-                                    <option value="Flexible 24h">Flexible (24h)</option>
-                                    <option value="Non-Refundable">Non-Refundable</option>
-                                    <option value="Moderate 48h">Moderate (48h)</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Promo Code</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                    placeholder="e.g. SAVE10"
-                                    value={formData.promoCode || ''}
-                                    onChange={e => setFormData({ ...formData, promoCode: e.target.value })}
-                                />
-                            </div>
-                            <div className="col-span-2 pt-2">
-                                <label className="flex items-center gap-3 cursor-pointer bg-gray-50 p-4 rounded-xl border-dashed border-2 border-gray-200 hover:border-blue-300 transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500"
-                                        checked={formData.taxIncluded || false}
-                                        onChange={e => setFormData({ ...formData, taxIncluded: e.target.checked })}
-                                    />
-                                    <div>
-                                        <span className="font-bold text-gray-800 block text-sm">Tax Included in Quoted Price</span>
-                                        <span className="text-[10px] text-gray-500 uppercase font-semibold">Finance & Accounting Rule</span>
+                            <div className="grid grid-cols-2 gap-10">
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-1">Meal Plan Selection</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {[
+                                            { id: 'EP', label: 'EP', detail: 'Room Only' },
+                                            { id: 'CP', label: 'CP', detail: 'Breakfast' },
+                                            { id: 'MAP', label: 'MAP', detail: 'Brk + Din' },
+                                            { id: 'AP', label: 'AP', detail: 'Full Board' }
+                                        ].map((item: { id: string; label: string; detail: string }) => (
+                                            <button 
+                                                key={item.id} 
+                                                onClick={() => setFormData({ ...formData, mealPlan: item.id })}
+                                                className={`p-4 rounded-xl border-2 text-left transition-all ${formData.mealPlan === item.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-gray-50 border-gray-100 hover:border-blue-200 hover:bg-white text-gray-600'}`}
+                                            >
+                                                <div className="text-sm font-bold">{item.id}</div>
+                                                <div className={`text-[10px] ${formData.mealPlan === item.id ? 'text-blue-100' : 'text-gray-400'}`}>{item.detail}</div>
+                                            </button>
+                                        ))}
                                     </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-1">Linked Package (Layer 2)</label>
+                                    <select className="w-full px-4 py-3 border-2 border-blue-100 rounded-xl bg-blue-50 text-blue-900 font-bold text-sm" value={formData.packageId || ''} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, packageId: parseInt(e.target.value) || undefined })}>
+                                        <option value="">None (Standalone Plan)</option>
+                                        {SAMPLE_PACKAGES_L2.map((pkg: { id: number; name: string; code: string }) => (
+                                            <option key={pkg.id} value={pkg.id}>{pkg.name}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[10px] text-gray-400 italic">Sub-Level-2 packages will add extra revenue routing and amenity bundles to this rate plan automatically.</p>
+                                </div>
+                            </div>
+                            <div className="p-6 bg-amber-50 rounded-xl border border-amber-100 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-white rounded-lg shadow-sm text-amber-600"><Percent size={20} /></div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 text-sm">Tax Policy</h4>
+                                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">Pricing inclusive/exclusive tax rule</p>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" className="sr-only peer" checked={formData.taxIncluded || false} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, taxIncluded: e.target.checked })} />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
                                 </label>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* 3. Validity */}
-                {activeTab === 3 && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <h3 className="text-lg font-semibold border-b pb-4 mb-4">Validity & Seasonality</h3>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Activation Date <span className="text-red-500">*</span></label>
-                                <input
-                                    type="date"
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    value={formData.activationDate || ''}
-                                    onChange={e => setFormData({ ...formData, activationDate: e.target.value })}
-                                />
+                    {activeTab === 3 && (
+                        <div className="bg-white rounded-xl shadow-sm border p-8 space-y-10">
+                            <div className="flex items-center gap-2 border-b pb-4">
+                                <Calendar size={18} className="text-blue-600" />
+                                <h3 className="text-lg font-bold text-gray-900">Validity & Seasonality</h3>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Expiration Date <span className="text-red-500">*</span></label>
-                                <input
-                                    type="date"
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    value={formData.expirationDate || ''}
-                                    onChange={e => setFormData({ ...formData, expirationDate: e.target.value })}
-                                />
-                            </div>
-
-                            <div className="col-span-2 grid grid-cols-2 gap-6 pt-4 border-t">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700">Stay Start Date</label>
-                                    <input
-                                        type="date"
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={formData.stayDateStart || ''}
-                                        onChange={e => setFormData({ ...formData, stayDateStart: e.target.value })}
-                                    />
-                                    <p className="text-xs text-gray-500">Optional: Specific travel dates</p>
+                            <div className="grid grid-cols-2 gap-8">
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1"><Sun size={12} className="inline mr-1"/> Activation Date</label>
+                                    <input type="date" className="w-full px-4 py-3 border rounded-lg text-sm" value={formData.activationDate || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, activationDate: e.target.value})} />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700">Stay End Date</label>
-                                    <input
-                                        type="date"
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={formData.stayDateEnd || ''}
-                                        onChange={e => setFormData({ ...formData, stayDateEnd: e.target.value })}
-                                    />
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1"><Moon size={12} className="inline mr-1"/> Expiration Date</label>
+                                    <input type="date" className="w-full px-4 py-3 border rounded-lg text-sm" value={formData.expirationDate || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, expirationDate: e.target.value})} />
                                 </div>
                             </div>
-
-                            <div className="col-span-2 space-y-3">
-                                <label className="flex items-center gap-3 cursor-pointer bg-gray-50 p-3 rounded-lg border">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                        checked={formData.isSeasonal || false}
-                                        onChange={e => setFormData({ ...formData, isSeasonal: e.target.checked })}
-                                    />
-                                    <div>
-                                        <span className="font-medium text-gray-900 block">Is Season Based?</span>
-                                        <span className="text-xs text-gray-500">Enable if rate applies only to specific seasons</span>
-                                    </div>
-                                </label>
-                            </div>
-
-                            {formData.isSeasonal && (
-                                <>
-                                    <div className="col-span-2 space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">Season Name</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-3 py-2 border rounded-lg"
-                                            placeholder="e.g. Summer Peak 2024"
-                                            value={formData.seasonName || ''}
-                                            onChange={e => setFormData({ ...formData, seasonName: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">Season Start <span className="text-red-500">*</span></label>
-                                        <input type="date" className="w-full px-3 py-2 border rounded-lg" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">Season End <span className="text-red-500">*</span></label>
-                                        <input type="date" className="w-full px-3 py-2 border rounded-lg" />
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="col-span-2 space-y-2">
-                                <label className="text-sm font-medium text-gray-700 block mb-2">Valid Days</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {DAYS_OF_WEEK.map(day => (
-                                        <button
-                                            key={day}
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block pl-1">Market Days Availability</label>
+                                <div className="flex gap-2">
+                                    {DAYS_OF_WEEK.map((day: string) => (
+                                        <button 
+                                            key={day} 
                                             onClick={() => toggleDay(day)}
-                                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${formData.validDays?.includes(day)
-                                                ? 'bg-blue-600 text-white border-blue-600'
-                                                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
-                                                }`}
+                                            className={`flex-1 py-4 rounded-xl text-xs font-black transition-all ${formData.validDays?.includes(day) ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-300 hover:bg-white border border-gray-100'}`}
                                         >
                                             {day}
                                         </button>
                                     ))}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* 4. Restrictions */}
-                {activeTab === 4 && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <h3 className="text-lg font-semibold border-b pb-4 mb-4">Restrictions & Inventory Fences</h3>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Min Nights</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    defaultValue={1}
-                                    value={formData.minNights}
-                                    onChange={e => setFormData({ ...formData, minNights: parseInt(e.target.value) })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Max Nights</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    value={formData.maxNights || ''}
-                                    onChange={e => setFormData({ ...formData, maxNights: parseInt(e.target.value) })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Cut-off Days (Advance Booking)</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    placeholder="0 = Same Day"
-                                    value={formData.cutOffDays}
-                                    onChange={e => setFormData({ ...formData, cutOffDays: parseInt(e.target.value) })}
-                                />
-                            </div>
-
-                            <div className="col-span-2 grid grid-cols-3 gap-4 pt-4">
-                                <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 text-red-600"
-                                        checked={formData.closedToArrival || false}
-                                        onChange={e => setFormData({ ...formData, closedToArrival: e.target.checked })}
-                                    />
-                                    <span className="text-sm font-medium text-gray-700">Closed to Arrival</span>
-                                </label>
-                                <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 text-red-600"
-                                        checked={formData.closedToDeparture || false}
-                                        onChange={e => setFormData({ ...formData, closedToDeparture: e.target.checked })}
-                                    />
-                                    <span className="text-sm font-medium text-gray-700">Closed to Departure</span>
-                                </label>
-                                <label className="flex items-center gap-3 p-3 border border-red-200 bg-red-50 rounded-lg cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 text-red-600"
-                                        checked={formData.stopSell || false}
-                                        onChange={e => setFormData({ ...formData, stopSell: e.target.checked })}
-                                    />
-                                    <span className="text-sm font-bold text-red-700">STOP SELL</span>
-                                </label>
+                            <div className={`p-8 rounded-2xl border-2 border-dashed transition-all ${formData.isSeasonal ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-gray-50 border-gray-200'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-lg ${formData.isSeasonal ? 'bg-amber-500 text-white' : 'bg-white text-gray-300'}`}><Star size={24} /></div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 text-sm">Seasonal Rate marking</h4>
+                                            <p className="text-[10px] text-gray-500 font-medium">Markup strategy based on high-demand periods</p>
+                                        </div>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" className="sr-only peer" checked={formData.isSeasonal || false} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, isSeasonal: e.target.checked })} />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-amber-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                                    </label>
+                                </div>
+                                {formData.isSeasonal && (
+                                    <div className="mt-8 grid grid-cols-3 gap-4 animate-in fade-in duration-500">
+                                        <div className="space-y-1 text-[10px] font-black uppercase text-amber-600 col-span-1">
+                                            <label className="pl-1">Season Name</label>
+                                            <input className="w-full px-3 py-2 border border-amber-200 rounded-lg text-xs" value={formData.seasonName || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, seasonName: e.target.value})} placeholder="e.g. Summer Break" />
+                                        </div>
+                                        <div className="space-y-1 text-[10px] font-black uppercase text-amber-600">
+                                            <label className="pl-1">From</label>
+                                            <input type="date" className="w-full px-3 py-2 border border-amber-200 rounded-lg text-xs" />
+                                        </div>
+                                        <div className="space-y-1 text-[10px] font-black uppercase text-amber-600">
+                                            <label className="pl-1">To</label>
+                                            <input type="date" className="w-full px-3 py-2 border border-amber-200 rounded-lg text-xs" />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* 5. Pricing Grid */}
-                {activeTab === 5 && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <div className="flex justify-between items-center border-b pb-4 mb-4">
-                            <h3 className="text-lg font-semibold">Room Rate Configuration</h3>
-                            <button className="text-sm text-blue-600 font-medium">+ Add Room Type</button>
-                        </div>
-
-                        {/* Example Pricing Item */}
-                        <div className="border rounded-xl p-4 space-y-4 bg-gray-50/50">
-                            <div className="flex justify-between">
-                                <h4 className="font-bold text-gray-800">Deluxe King Room</h4>
-                                <select className="text-sm border rounded px-2 py-1 bg-white">
-                                    <option>Flat Rate</option>
-                                    <option>Derived (BAR - %)</option>
-                                </select>
+                    {activeTab === 4 && (
+                        <div className="bg-white rounded-xl shadow-sm border p-8 space-y-10">
+                            <div className="flex items-center gap-2 border-b pb-4">
+                                <Shield size={18} className="text-blue-600" />
+                                <h3 className="text-lg font-bold text-gray-900">Yield Fences & Controls</h3>
                             </div>
-
-                            <div className="grid grid-cols-5 gap-4">
-                                <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">Single (1 Pax)</label>
-                                    <div className="relative">
-                                        <span className="absolute left-2 top-1.5 text-gray-400 text-xs">$</span>
-                                        <input type="number" className="w-full pl-5 pr-2 py-1.5 text-sm border rounded" placeholder="0.00" />
-                                    </div>
+                            <div className="grid grid-cols-2 gap-8">
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Minimum Nights</label>
+                                    <input type="number" className="w-full px-4 py-3 border rounded-lg text-sm font-bold" value={formData.minNights} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, minNights: parseInt(e.target.value) || 1})} />
                                 </div>
-                                <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">Double (2 Pax)</label>
-                                    <div className="relative">
-                                        <span className="absolute left-2 top-1.5 text-gray-400 text-xs">$</span>
-                                        <input type="number" className="w-full pl-5 pr-2 py-1.5 text-sm border rounded" placeholder="0.00" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">Triple (3 Pax)</label>
-                                    <div className="relative">
-                                        <span className="absolute left-2 top-1.5 text-gray-400 text-xs">$</span>
-                                        <input type="number" className="w-full pl-5 pr-2 py-1.5 text-sm border rounded" placeholder="0.00" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">Ext. Adult</label>
-                                    <div className="relative">
-                                        <span className="absolute left-2 top-1.5 text-gray-400 text-xs">$</span>
-                                        <input type="number" className="w-full pl-5 pr-2 py-1.5 text-sm border rounded" placeholder="0.00" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">Ext. Child</label>
-                                    <div className="relative">
-                                        <span className="absolute left-2 top-1.5 text-gray-400 text-xs">$</span>
-                                        <input type="number" className="w-full pl-5 pr-2 py-1.5 text-sm border rounded" placeholder="0.00" />
-                                    </div>
+                                <div className="space-y-2 text-xs">
+                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Booking Cut-off (Hours)</label>
+                                    <input type="number" className="w-full px-4 py-3 border rounded-lg text-sm font-bold" placeholder="0 = Immediate" value={formData.cutOffDays} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, cutOffDays: parseInt(e.target.value) || 0})} />
                                 </div>
                             </div>
-                            <div className="flex gap-4 text-xs text-gray-500">
-                                <span>Base Occupancy: 2</span>
-                                <span>Max Occupancy: 3</span>
+                            <div className="grid grid-cols-3 gap-6">
+                                {[
+                                    { label: 'Closed to Arrival', key: 'closedToArrival' as const, icon: <MapPin size={20}/> },
+                                    { label: 'Closed to Departure', key: 'closedToDeparture' as const, icon: <X size={20}/> }
+                                ].map((item: { label: string; key: 'closedToArrival' | 'closedToDeparture'; icon: React.ReactNode }) => (
+                                    <button 
+                                        key={item.key}
+                                        onClick={() => setFormData({ ...formData, [item.key]: !formData[item.key] })}
+                                        className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${formData[item.key] ? 'bg-white border-blue-500 shadow-md' : 'bg-gray-50 border-gray-100 hover:border-gray-200'}`}
+                                    >
+                                        <div className={`p-3 rounded-full ${formData[item.key] ? 'bg-blue-600 text-white' : 'bg-white text-gray-300'}`}>{item.icon}</div>
+                                        <div className="text-center font-bold text-xs uppercase tracking-tighter text-gray-700">{item.label}</div>
+                                        <div className={`text-[10px] font-black uppercase ${formData[item.key] ? 'text-blue-600' : 'text-gray-300'}`}>
+                                            {formData[item.key] ? 'Enabled' : 'Disabled'}
+                                        </div>
+                                    </button>
+                                ))}
+                                <button 
+                                    onClick={() => setFormData({...formData, stopSell: !formData.stopSell})}
+                                    className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all group ${formData.stopSell ? 'bg-red-600 border-red-600 text-white shadow-xl shadow-red-200 animate-pulse' : 'bg-gray-900 border-gray-900 text-white hover:bg-gray-800'}`}
+                                >
+                                    <AlertCircle size={32} className={formData.stopSell ? 'text-white' : 'text-red-500'} />
+                                    <div className="text-center font-black text-xs uppercase tracking-widest">STOP SELL SWITCH</div>
+                                    <div className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${formData.stopSell ? 'bg-white text-red-600' : 'bg-red-600/20 text-red-500'}`}>
+                                        {formData.stopSell ? 'INVENTORY LOCKED' : 'MARKET OPEN'}
+                                    </div>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {activeTab === 5 && (
+                        <div className="space-y-8">
+                            {(formData.pricing || []).map((price: RatePricing, idx: number) => (
+                                <div key={idx} className="bg-white rounded-2xl shadow-sm border p-8 space-y-8 group hover:border-blue-200 transition-all duration-300 relative">
+                                    <button onClick={() => setFormData({ ...formData, pricing: (formData.pricing || []).filter((_: RatePricing, i: number) => i !== idx) })} className="absolute top-6 right-6 p-2 text-gray-300 hover:text-red-500 border rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                                        <Trash2 size={16} />
+                                    </button>
+                                    <div className="flex items-center gap-4 border-b pb-6 mb-2">
+                                        <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-lg italic">#{idx + 1}</div>
+                                        <div className="flex-1">
+                                            <input 
+                                                className="w-full text-xl font-bold bg-transparent border-none outline-none focus:ring-0 p-0 text-gray-900 placeholder:text-gray-200" 
+                                                placeholder="Enter Room Category Name..." 
+                                                value={price.roomTypeId}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                    const newPricing = [...(formData.pricing || [])];
+                                                    newPricing[idx] = { ...newPricing[idx], roomTypeId: e.target.value };
+                                                    setFormData({ ...formData, pricing: newPricing });
+                                                }}
+                                            />
+                                            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Tier-Wise Revenue Grid</div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-5 gap-4">
+                                        {[
+                                            { label: 'Single Rate', key: 'baseRate' },
+                                            { label: 'Double Rate', key: 'doubleRate' },
+                                            { label: 'Triple Rate', key: 'tripleRate' },
+                                            { label: 'Extra Adult', key: 'extraAdult' },
+                                            { label: 'Extra Child', key: 'extraChild' }
+                                        ].map((field: { label: string; key: string }) => (
+                                            <div key={field.key} className="space-y-2">
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block pl-1">{field.label}</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 font-bold">৳</span>
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full pl-7 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-800"
+                                                        value={(price as any)[field.key]}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            const newPricing = [...(formData.pricing || [])];
+                                                            (newPricing[idx] as any)[field.key] = parseInt(e.target.value) || 0;
+                                                            setFormData({ ...formData, pricing: newPricing });
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            <button 
+                                onClick={() => setFormData({ ...formData, pricing: [...(formData.pricing || []), { roomTypeId: 'New Tier Strategy', structure: 'Flat', baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 4 }] as any })}
+                                className="w-full py-12 border-2 border-dashed border-gray-200 rounded-2xl text-gray-300 font-bold text-lg uppercase tracking-widest hover:border-blue-400 hover:text-blue-500 transition-all hover:bg-blue-50/50 flex flex-col items-center gap-3"
+                            >
+                                <Plus size={32} />
+                                Add Inventory Tier Configuration
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 
-    return view === 'list' ? renderList() : renderForm();
+    const renderCalendar = () => (
+        <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in zoom-in duration-300">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold flex items-center gap-3">
+                        <TrendingUp className="text-blue-600" /> Yield Operations Grid
+                    </h2>
+                    <p className="text-sm text-gray-500">Monthly control for fencings and demand logic</p>
+                </div>
+                <button onClick={() => setView('list')} className="px-4 py-2 bg-white border rounded-lg text-sm font-bold hover:bg-gray-50 uppercase tracking-widest text-gray-600"><X size={16} className="inline mr-2"/> Close Console</button>
+            </div>
+            <div className="grid grid-cols-7 gap-4">
+                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d: string) => (
+                    <div key={d} className="text-center font-black text-gray-400 text-[10px] uppercase tracking-widest">{d}</div>
+                ))}
+                {[...Array(30)].map((_: any, i: number) => (
+                    <div key={i} className="h-32 bg-white border border-gray-100 rounded-xl p-4 hover:border-blue-500 transition-all flex flex-col justify-between shadow-sm cursor-pointer">
+                        <div className="flex justify-between items-start">
+                            <span className="font-bold text-gray-900">{i + 1}</span>
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                        </div>
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-[9px] bg-blue-50 p-1 rounded font-bold text-blue-700">
+                                <span>BAR</span>
+                                <span>৳14.5k</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="w-full font-sans text-gray-900 bg-gray-50 min-h-screen">
+            {view === 'list' && renderList()}
+            {view === 'form' && renderForm()}
+            {view === 'calendar' && renderCalendar()}
+        </div>
+    );
 }

@@ -15,11 +15,16 @@ interface HotelService {
     status: 'Active' | 'Inactive';
 
     // Pricing
-    unitName: string; // e.g., 'Per Unit', 'Per KM', 'Per Hour'
-    internalCost: number;
-    sellingPrice: number;
+    unitName: string; 
+    internalCost: number; // Cost Price
+    sellingPrice: number; // Selling Price (Base)
     revenueCode: string;
     taxInclusive: boolean;
+    taxConfig: {
+        vat: number; // VAT %
+        sd: number;  // Supplementary Duty %
+        serviceCharge: number; // SC %
+    };
 
     // Operations
     isOutsourced: boolean;
@@ -42,6 +47,7 @@ export default function ServiceManagement() {
             sellingPrice: 1500,
             revenueCode: 'REV-TRANS-GUEST',
             taxInclusive: false,
+            taxConfig: { vat: 15, sd: 5, serviceCharge: 10 },
             isOutsourced: false,
             allowanceType: 'Quantity'
         },
@@ -57,6 +63,7 @@ export default function ServiceManagement() {
             sellingPrice: 250,
             revenueCode: 'REV-LND-VALET',
             taxInclusive: true,
+            taxConfig: { vat: 15, sd: 0, serviceCharge: 5 },
             isOutsourced: true,
             vendorName: 'QuickClean Valet',
             allowanceType: 'Quantity'
@@ -73,6 +80,7 @@ export default function ServiceManagement() {
             sellingPrice: 4500,
             revenueCode: 'REV-WELL-SPA',
             taxInclusive: true,
+            taxConfig: { vat: 15, sd: 0, serviceCharge: 15 },
             isOutsourced: false,
             allowanceType: 'Credit'
         },
@@ -88,6 +96,7 @@ export default function ServiceManagement() {
             sellingPrice: 800,
             revenueCode: 'REV-REC-GYM',
             taxInclusive: true,
+            taxConfig: { vat: 15, sd: 0, serviceCharge: 0 },
             isOutsourced: false,
             allowanceType: 'Unlimited'
         },
@@ -103,6 +112,7 @@ export default function ServiceManagement() {
             sellingPrice: 2500,
             revenueCode: 'REV-ROOM-EXTRA',
             taxInclusive: false,
+            taxConfig: { vat: 15, sd: 0, serviceCharge: 10 },
             isOutsourced: false,
             allowanceType: 'Quantity'
         },
@@ -114,10 +124,11 @@ export default function ServiceManagement() {
             description: 'Pack of 2 water, 2 sodas, and 1 juice',
             status: 'Active',
             unitName: 'Per Stay',
-            internalCost: 200,
-            sellingPrice: 750,
-            revenueCode: 'REV-FB-MINI',
+            internalCost: 1000,
+            sellingPrice: 2500,
+            revenueCode: 'REV-RM-ANCILLARY',
             taxInclusive: true,
+            taxConfig: { vat: 15, sd: 0, serviceCharge: 10 },
             isOutsourced: false,
             allowanceType: 'Quantity'
         }
@@ -131,7 +142,8 @@ export default function ServiceManagement() {
             taxInclusive: false,
             isOutsourced: false,
             allowanceType: 'Quantity',
-            category: 'Transportation'
+            category: 'Transportation',
+            taxConfig: { vat: 0, sd: 0, serviceCharge: 0 }
         });
         setEditingService(null);
         setView('form');
@@ -217,6 +229,9 @@ export default function ServiceManagement() {
                             <div>
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Rate ({service.unitName})</div>
                                 <div className="text-lg font-black text-gray-900">৳{service.sellingPrice}</div>
+                                <div className={`text-[10px] font-bold ${service.sellingPrice - service.internalCost >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    Margin: ৳{service.sellingPrice - service.internalCost}
+                                </div>
                             </div>
                             <div className="flex gap-2">
                                 <button 
@@ -381,20 +396,45 @@ export default function ServiceManagement() {
                                     </select>
                                 </div>
 
-                                <div className="col-span-2 flex items-center justify-between p-4 bg-blue-50/30 rounded-2xl border border-blue-50">
+                                <div className="col-span-2 p-4 bg-gray-50 rounded-xl border-2 border-dashed space-y-4">
                                     <div className="flex items-center gap-3">
                                         <input
                                             type="checkbox"
-                                            className="w-6 h-6 rounded-lg text-blue-600 focus:ring-0"
+                                            className="w-5 h-5 text-blue-600 rounded"
                                             checked={formData.taxInclusive || false}
                                             onChange={e => setFormData({ ...formData, taxInclusive: e.target.checked })}
                                         />
-                                        <div>
-                                            <span className="text-sm font-bold text-blue-900 block">Tax Inclusive Price</span>
-                                            <span className="text-[10px] text-blue-500 font-bold uppercase">Finance Rule</span>
+                                        <span className="text-sm font-bold text-gray-700">Price is Tax Inclusive</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">VAT %</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full px-3 py-1.5 border rounded-lg text-sm font-bold" 
+                                                value={formData.taxConfig?.vat || 0}
+                                                onChange={e => setFormData({ ...formData, taxConfig: { ...formData.taxConfig!, vat: parseInt(e.target.value) || 0 } })}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SD %</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full px-3 py-1.5 border rounded-lg text-sm font-bold"
+                                                value={formData.taxConfig?.sd || 0}
+                                                onChange={e => setFormData({ ...formData, taxConfig: { ...formData.taxConfig!, sd: parseInt(e.target.value) || 0 } })}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SC %</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full px-3 py-1.5 border rounded-lg text-sm font-bold"
+                                                value={formData.taxConfig?.serviceCharge || 0}
+                                                onChange={e => setFormData({ ...formData, taxConfig: { ...formData.taxConfig!, serviceCharge: parseInt(e.target.value) || 0 } })}
+                                            />
                                         </div>
                                     </div>
-                                    <ArrowRight size={20} className="text-blue-200" />
                                 </div>
                             </div>
                         </div>

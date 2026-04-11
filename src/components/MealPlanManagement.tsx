@@ -14,11 +14,42 @@ interface MealPlan {
 
     // Inclusions
     hasBreakfast: boolean;
+    breakfastMenu: string;
+    breakfastStyle: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
+    breakfastVenue: string;
+    breakfastCuisine: string;
+
     hasLunch: boolean;
+    lunchMenu: string;
+    lunchStyle: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
+    lunchVenue: string;
+    lunchCuisine: string;
+
     hasDinner: boolean;
+    dinnerMenu: string;
+    dinnerStyle: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
+    dinnerVenue: string;
+    dinnerCuisine: string;
+
     hasBrunch: boolean;
-    hasCupole: boolean; // Special Couple/Private Dinner
+    brunchMenu: string;
+    brunchStyle: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
+    brunchVenue: string;
+    brunchCuisine: string;
+
+    hasCupole: boolean; 
+    cupoleMenu: string;
+    cupoleStyle: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
+    cupoleVenue: string;
+    cupoleCuisine: string;
+
     hasSnacks: boolean;
+    snacksMenu: string;
+    snacksStyle: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
+    snacksVenue: string;
+    snacksCuisine: string;
+    
+    // Global Default (Fallback)
     servingType: 'Buffet' | 'Set Menu' | 'Fixed Credit' | 'À la carte';
 
     // Pricing
@@ -48,11 +79,35 @@ export default function MealPlanManagement() {
             description: 'Includes daily buffet breakfast at The Cove Restaurant',
             status: 'Active',
             hasBreakfast: true,
+            breakfastMenu: 'Continental Menu A',
+            breakfastStyle: 'Buffet',
+            breakfastVenue: 'Main Restaurant',
+            breakfastCuisine: 'Continental',
             hasLunch: false,
+            lunchMenu: '',
+            lunchStyle: 'Buffet',
+            lunchVenue: '',
+            lunchCuisine: '',
             hasDinner: false,
+            dinnerMenu: '',
+            dinnerStyle: 'Buffet',
+            dinnerVenue: '',
+            dinnerCuisine: '',
             hasBrunch: false,
+            brunchMenu: '',
+            brunchStyle: 'Buffet',
+            brunchVenue: '',
+            brunchCuisine: '',
             hasCupole: false,
+            cupoleMenu: '',
+            cupoleStyle: 'Buffet',
+            cupoleVenue: '',
+            cupoleCuisine: '',
             hasSnacks: false,
+            snacksMenu: '',
+            snacksStyle: 'Buffet',
+            snacksVenue: '',
+            snacksCuisine: '',
             servingType: 'Buffet',
             internalCost: 250,
             sellingPriceAdult: 850,
@@ -74,11 +129,35 @@ export default function MealPlanManagement() {
             description: 'Breakfast and your choice of Buffet Lunch or Buffet Dinner',
             status: 'Active',
             hasBreakfast: true,
+            breakfastMenu: 'International Buffet',
+            breakfastStyle: 'Buffet',
+            breakfastVenue: 'Main Restaurant',
+            breakfastCuisine: 'Continental',
             hasLunch: true,
+            lunchMenu: 'Business Set Menu',
+            lunchStyle: 'Set Menu',
+            lunchVenue: 'The Atrium Cafe',
+            lunchCuisine: 'Multi-cuisine',
             hasDinner: true,
+            dinnerMenu: 'Chef Special Buffet',
+            dinnerStyle: 'Buffet',
+            dinnerVenue: 'Main Restaurant',
+            dinnerCuisine: 'Continental',
             hasBrunch: false,
+            brunchMenu: '',
+            brunchStyle: 'Buffet',
+            brunchVenue: '',
+            brunchCuisine: '',
             hasCupole: false,
+            cupoleMenu: '',
+            cupoleStyle: 'Buffet',
+            cupoleVenue: '',
+            cupoleCuisine: '',
             hasSnacks: false,
+            snacksMenu: '',
+            snacksStyle: 'Buffet',
+            snacksVenue: '',
+            snacksCuisine: '',
             servingType: 'Buffet',
             internalCost: 750,
             sellingPriceAdult: 2200,
@@ -100,11 +179,35 @@ export default function MealPlanManagement() {
             description: 'Includes Breakfast, Lunch, and Dinner (Full Board)',
             status: 'Active',
             hasBreakfast: true,
+            breakfastMenu: 'Full American Breakfast',
+            breakfastStyle: 'Buffet',
+            breakfastVenue: 'Executive Lounge',
+            breakfastCuisine: 'Continental',
             hasLunch: true,
+            lunchMenu: 'Multicuisine Lunch',
+            lunchStyle: 'Buffet',
+            lunchVenue: 'Main Restaurant',
+            lunchCuisine: 'Pan-Asian',
             hasDinner: true,
+            dinnerMenu: 'Gala Theme Dinner',
+            dinnerStyle: 'Buffet',
+            dinnerVenue: 'Main Restaurant',
+            dinnerCuisine: 'Multi-cuisine',
             hasBrunch: false,
+            brunchMenu: '',
+            brunchStyle: 'Buffet',
+            brunchVenue: '',
+            brunchCuisine: '',
             hasCupole: false,
+            cupoleMenu: '',
+            cupoleStyle: 'Buffet',
+            cupoleVenue: '',
+            cupoleCuisine: '',
             hasSnacks: true,
+            snacksMenu: 'Afternoon High Tea',
+            snacksStyle: 'Set Menu',
+            snacksVenue: 'The Atrium Cafe',
+            snacksCuisine: 'Continental',
             servingType: 'Buffet',
             internalCost: 1200,
             sellingPriceAdult: 3500,
@@ -126,11 +229,35 @@ export default function MealPlanManagement() {
             description: 'Quick set-menu lunch specifically designed for corporate timings',
             status: 'Active',
             hasBreakfast: false,
+            breakfastMenu: '',
+            breakfastStyle: 'Buffet',
+            breakfastVenue: '',
+            breakfastCuisine: '',
             hasLunch: true,
+            lunchMenu: 'Executive Box Menu',
+            lunchStyle: 'Set Menu',
+            lunchVenue: 'The Atrium Cafe',
+            lunchCuisine: 'Continental',
             hasDinner: false,
+            dinnerMenu: '',
+            dinnerStyle: 'Buffet',
+            dinnerVenue: '',
+            dinnerCuisine: '',
             hasBrunch: false,
+            brunchMenu: '',
+            brunchStyle: 'Buffet',
+            brunchVenue: '',
+            brunchCuisine: '',
             hasCupole: false,
+            cupoleMenu: '',
+            cupoleStyle: 'Buffet',
+            cupoleVenue: '',
+            cupoleCuisine: '',
             hasSnacks: false,
+            snacksMenu: '',
+            snacksStyle: 'Buffet',
+            snacksVenue: '',
+            snacksCuisine: '',
             servingType: 'Set Menu',
             internalCost: 350,
             sellingPriceAdult: 1200,
@@ -143,6 +270,56 @@ export default function MealPlanManagement() {
             startTime: '12:30',
             endTime: '15:30',
             venue: 'The Atrium Cafe'
+        },
+        {
+            id: 5,
+            name: 'European Plan (EP)',
+            marketingName: 'Room Only',
+            shortCode: 'EP',
+            description: 'Accommodation only, no meals included. Best for travelers who prefer dining out.',
+            status: 'Active',
+            hasBreakfast: false,
+            breakfastMenu: '',
+            breakfastStyle: 'Buffet',
+            breakfastVenue: '',
+            breakfastCuisine: '',
+            hasLunch: false,
+            lunchMenu: '',
+            lunchStyle: 'Buffet',
+            lunchVenue: '',
+            lunchCuisine: '',
+            hasDinner: false,
+            dinnerMenu: '',
+            dinnerStyle: 'Buffet',
+            dinnerVenue: '',
+            dinnerCuisine: '',
+            hasBrunch: false,
+            brunchMenu: '',
+            brunchStyle: 'Buffet',
+            brunchVenue: '',
+            brunchCuisine: '',
+            hasCupole: false,
+            cupoleMenu: '',
+            cupoleStyle: 'Buffet',
+            cupoleVenue: '',
+            cupoleCuisine: '',
+            hasSnacks: false,
+            snacksMenu: '',
+            snacksStyle: 'Buffet',
+            snacksVenue: '',
+            snacksCuisine: '',
+            servingType: 'À la carte',
+            internalCost: 0,
+            sellingPriceAdult: 0,
+            sellingPriceChild: 0,
+            infantMealsFree: true,
+            maxInfantAge: 5,
+            postingFrequency: 'Daily',
+            revenueCode: 'REV-ROOM-ONLY',
+            taxInclusive: true,
+            startTime: '00:00',
+            endTime: '00:00',
+            venue: 'N/A'
         }
     ]);
     const [formData, setFormData] = useState<Partial<MealPlan>>({});
@@ -156,11 +333,35 @@ export default function MealPlanManagement() {
             postingFrequency: 'Daily',
             taxInclusive: false,
             hasBreakfast: false,
+            breakfastMenu: 'Standard Menu',
+            breakfastStyle: 'Buffet',
+            breakfastVenue: 'Main Restaurant',
+            breakfastCuisine: 'Continental',
             hasLunch: false,
+            lunchMenu: 'Standard Menu',
+            lunchStyle: 'Buffet',
+            lunchVenue: 'Main Restaurant',
+            lunchCuisine: 'Continental',
             hasDinner: false,
+            dinnerMenu: 'Standard Menu',
+            dinnerStyle: 'Buffet',
+            dinnerVenue: 'Main Restaurant',
+            dinnerCuisine: 'Continental',
             hasBrunch: false,
+            brunchMenu: '',
+            brunchStyle: 'Buffet',
+            brunchVenue: '',
+            brunchCuisine: '',
             hasCupole: false,
+            cupoleMenu: '',
+            cupoleStyle: 'Buffet',
+            cupoleVenue: '',
+            cupoleCuisine: '',
             hasSnacks: false,
+            snacksMenu: '',
+            snacksStyle: 'Buffet',
+            snacksVenue: '',
+            snacksCuisine: '',
             infantMealsFree: true,
             maxInfantAge: 4
         });
@@ -219,9 +420,8 @@ export default function MealPlanManagement() {
                         <tr>
                             <th className="px-6 py-4 font-semibold text-gray-700">Identity</th>
                             <th className="px-6 py-4 font-semibold text-gray-700">Inclusions</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Pricing (Adult/Child)</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Revenue Code</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Status</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700 font-mono text-[10px] uppercase">Menus Assigned</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700 text-right text-[10px] uppercase">Pricing</th>
                             <th className="px-6 py-4 font-semibold text-gray-700 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -235,26 +435,20 @@ export default function MealPlanManagement() {
                                 <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-1">
                                         {plan.hasBreakfast && <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded text-[10px] font-bold">B</span>}
-                                        {plan.hasBrunch && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-[10px] font-bold">BR</span>}
                                         {plan.hasLunch && <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold">L</span>}
                                         {plan.hasDinner && <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 rounded text-[10px] font-bold">D</span>}
-                                        {plan.hasCupole && <span className="px-1.5 py-0.5 bg-pink-100 text-pink-800 rounded text-[10px] font-bold">C</span>}
-                                        {plan.hasSnacks && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-[10px] font-bold">S</span>}
                                     </div>
-                                    <div className="text-[10px] text-gray-400 mt-1 uppercase font-semibold">{plan.servingType}</div>
                                 </td>
                                 <td className="px-6 py-4">
+                                    <div className="space-y-1">
+                                        {plan.hasBreakfast && <div className="text-[10px] flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-yellow-400"/> {plan.breakfastMenu} <span className="text-gray-300">({plan.breakfastStyle})</span></div>}
+                                        {plan.hasLunch && <div className="text-[10px] flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-400"/> {plan.lunchMenu} <span className="text-gray-300">({plan.lunchStyle})</span></div>}
+                                        {plan.hasDinner && <div className="text-[10px] flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-indigo-400"/> {plan.dinnerMenu} <span className="text-gray-300">({plan.dinnerStyle})</span></div>}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
                                     <div className="font-semibold text-gray-900">৳{plan.sellingPriceAdult} / ৳{plan.sellingPriceChild}</div>
-                                    {plan.infantMealsFree && <div className="text-[10px] text-emerald-500 font-medium">Infants (0-{plan.maxInfantAge}) Free</div>}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">{plan.revenueCode}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${plan.status === 'Active' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-gray-100 text-gray-800 border border-gray-200'
-                                        }`}>
-                                        {plan.status.toUpperCase()}
-                                    </span>
+                                    <div className="text-[10px] text-gray-400">{plan.revenueCode}</div>
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
                                     <button 
@@ -323,7 +517,7 @@ export default function MealPlanManagement() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-auto p-8 max-w-4xl mx-auto w-full">
+            <div className="flex-1 overflow-auto p-8 max-w-5xl mx-auto w-full">
 
                 {/* 1. Identity */}
                 {activeTab === 'identity' && (
@@ -389,49 +583,99 @@ export default function MealPlanManagement() {
 
                 {/* 2. Inclusions */}
                 {activeTab === 'inclusions' && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
+                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center gap-2 border-b pb-4">
                             <Utensils size={18} className="text-blue-600" />
-                            <h3 className="text-lg font-bold text-gray-900">Meal Configuration</h3>
+                            <h3 className="text-lg font-bold text-gray-900 tracking-tight">Meal Selection & Menus</h3>
                         </div>
 
-                        <div className="space-y-4 mb-6">
-                            <label className="text-xs font-bold text-gray-700 block uppercase tracking-wider">Select Meals Included</label>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {[
-                                    { key: 'hasBreakfast', label: 'Breakfast', color: 'yellow' },
-                                    { key: 'hasBrunch', label: 'Brunch', color: 'orange' },
-                                    { key: 'hasLunch', label: 'Lunch', color: 'emerald' },
-                                    { key: 'hasDinner', label: 'Dinner', color: 'indigo' },
-                                    { key: 'hasCupole', label: 'Cupole Dinner', color: 'pink' },
-                                    { key: 'hasSnacks', label: 'Snacks/Mini', color: 'purple' },
-                                ].map((item) => (
-                                    <label key={item.key} className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData[item.key as keyof MealPlan] ? `bg-white border-blue-500 shadow-md` : 'bg-gray-50 border-gray-100 hover:border-gray-200'
-                                        }`}>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                            {[
+                                { key: 'hasBreakfast', menuKey: 'breakfastMenu', styleKey: 'breakfastStyle', venueKey: 'breakfastVenue', cuisineKey: 'breakfastCuisine', label: 'Breakfast', icon: '🍳' },
+                                { key: 'hasLunch', menuKey: 'lunchMenu', styleKey: 'lunchStyle', venueKey: 'lunchVenue', cuisineKey: 'lunchCuisine', label: 'Lunch', icon: '🥗' },
+                                { key: 'hasDinner', menuKey: 'dinnerMenu', styleKey: 'dinnerStyle', venueKey: 'dinnerVenue', cuisineKey: 'dinnerCuisine', label: 'Dinner', icon: '🍽️' },
+                                { key: 'hasBrunch', menuKey: 'brunchMenu', styleKey: 'brunchStyle', venueKey: 'brunchVenue', cuisineKey: 'brunchCuisine', label: 'Brunch', icon: '🥪' },
+                                { key: 'hasCupole', menuKey: 'cupoleMenu', styleKey: 'cupoleStyle', venueKey: 'cupoleVenue', cuisineKey: 'cupoleCuisine', label: 'Cupole', icon: '🕯️' },
+                                { key: 'hasSnacks', menuKey: 'snacksMenu', styleKey: 'snacksStyle', venueKey: 'snacksVenue', cuisineKey: 'snacksCuisine', label: 'Snacks', icon: '🍪' },
+                            ].map((item) => (
+                                <div key={item.key} className="space-y-3">
+                                    <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData[item.key as keyof MealPlan] ? `bg-white border-blue-500 shadow-sm` : 'bg-gray-50 border-gray-100 hover:border-gray-200 opacity-60'}`}>
                                         <input
                                             type="checkbox"
                                             className="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-0"
                                             checked={!!formData[item.key as keyof MealPlan]}
                                             onChange={() => toggleInclusion(item.key as keyof MealPlan)}
                                         />
-                                        <span className={`text-sm font-bold ${formData[item.key as keyof MealPlan] ? 'text-blue-600' : 'text-gray-500'}`}>{item.label}</span>
+                                        <span className={`text-sm font-bold flex items-center gap-2 ${formData[item.key as keyof MealPlan] ? 'text-blue-600' : 'text-gray-500'}`}>
+                                            {item.icon} {item.label}
+                                        </span>
                                     </label>
-                                ))}
-                            </div>
-                        </div>
 
-                        <div className="space-y-2 text-xs">
-                            <label className="font-bold text-gray-700 block">Serving Style</label>
-                            <select
-                                className="w-full px-3 py-2 border rounded-xl bg-white text-sm"
-                                value={formData.servingType || 'Buffet'}
-                                onChange={e => setFormData({ ...formData, servingType: e.target.value as any })}
-                            >
-                                <option value="Buffet">Standard Buffet</option>
-                                <option value="Set Menu">Chef's Set Menu</option>
-                                <option value="Fixed Credit">Menu Credit (Allowance)</option>
-                                <option value="À la carte">À la carte Service</option>
-                            </select>
+                                    {formData[item.key as keyof MealPlan] && (
+                                        <div className="p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                            {/* Grid of 2x2 for sub-fields */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Venue</label>
+                                                    <select
+                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        value={formData[item.venueKey as keyof MealPlan] as string || ''}
+                                                        onChange={e => setFormData({ ...formData, [item.venueKey]: e.target.value })}
+                                                    >
+                                                        <option value="">Select Outlet...</option>
+                                                        <option value="Main Restaurant">Main Restaurant</option>
+                                                        <option value="The Atrium Cafe">The Atrium Cafe</option>
+                                                        <option value="Poolside Grill">Poolside Grill</option>
+                                                        <option value="Executive Lounge">Executive Lounge</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Cuisine</label>
+                                                    <select
+                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        value={formData[item.cuisineKey as keyof MealPlan] as string || ''}
+                                                        onChange={e => setFormData({ ...formData, [item.cuisineKey]: e.target.value })}
+                                                    >
+                                                        <option value="">Select Cuisine...</option>
+                                                        <option value="Continental">Continental</option>
+                                                        <option value="Bengali">Bengali</option>
+                                                        <option value="Pan-Asian">Pan-Asian</option>
+                                                        <option value="Italian">Italian</option>
+                                                        <option value="Multi-cuisine">Multi-cuisine</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Menu</label>
+                                                    <select
+                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        value={formData[item.menuKey as keyof MealPlan] as string || ''}
+                                                        onChange={e => setFormData({ ...formData, [item.menuKey]: e.target.value })}
+                                                    >
+                                                        <option value="">Select Menu...</option>
+                                                        <option value="Standard Buffet">Standard Buffet</option>
+                                                        <option value="Menu A - Intl">Menu A - Intl</option>
+                                                        <option value="Menu B - Local">Menu B - Local</option>
+                                                        <option value="Chef Signature">Chef Signature</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Serving</label>
+                                                    <select
+                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        value={formData[item.styleKey as keyof MealPlan] as string || 'Buffet'}
+                                                        onChange={e => setFormData({ ...formData, [item.styleKey]: e.target.value as any })}
+                                                    >
+                                                        <option value="Buffet">Buffet</option>
+                                                        <option value="Set Menu">Set Menu</option>
+                                                        <option value="À la carte">A La Carte</option>
+                                                        <option value="Fixed Credit">Credit</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
