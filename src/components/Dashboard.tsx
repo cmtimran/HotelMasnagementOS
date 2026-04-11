@@ -41,7 +41,7 @@ const Dashboard = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">HMS Overview</h1>
+                    <h1 className="text-2xl font-bold text-gray-800">HMS Overview</h1>
                     <p className="text-gray-500 text-sm">Real-time property operations dashboard.</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -61,14 +61,14 @@ const Dashboard = () => {
 
                 {/* Occupancy Rate - Radial Gauge */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col items-center justify-center relative overflow-hidden">
-                    <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2 w-full text-left">Occupancy Rate</h3>
+                    <h3 className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2 w-full text-left">Occupancy Rate</h3>
                     <div className="relative w-32 h-32 flex items-center justify-center">
                         <svg className="w-full h-full transform -rotate-90">
                             <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-gray-100" />
                             <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={351.86} strokeDashoffset={351.86 * (1 - 0.78)} className="text-blue-600" />
                         </svg>
                         <div className="absolute flex flex-col items-center">
-                            <span className="text-3xl font-bold text-gray-900">78%</span>
+                            <span className="text-3xl font-bold text-gray-800">78%</span>
                             <span className="text-xs text-gray-400">Real-time</span>
                         </div>
                     </div>
@@ -76,21 +76,21 @@ const Dashboard = () => {
 
                 {/* Front Desk Activity */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col">
-                    <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Front Desk Activity</h3>
+                    <h3 className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-4">Front Desk Activity</h3>
                     <div className="grid grid-cols-3 gap-2 flex-1">
                         <div className="flex flex-col items-center justify-center p-2 bg-green-50 rounded-lg">
                             <LogIn size={20} className="text-green-600 mb-1" />
-                            <span className="text-lg font-bold text-gray-900">12</span>
+                            <span className="text-lg font-semibold text-gray-800">12</span>
                             <span className="text-[10px] text-gray-500 uppercase">Arrivals</span>
                         </div>
                         <div className="flex flex-col items-center justify-center p-2 bg-orange-50 rounded-lg">
                             <LogOut size={20} className="text-orange-600 mb-1" />
-                            <span className="text-lg font-bold text-gray-900">8</span>
+                            <span className="text-lg font-semibold text-gray-800">8</span>
                             <span className="text-[10px] text-gray-500 uppercase">Departures</span>
                         </div>
                         <div className="flex flex-col items-center justify-center p-2 bg-blue-50 rounded-lg">
                             <BedDouble size={20} className="text-blue-600 mb-1" />
-                            <span className="text-lg font-bold text-gray-900">45</span>
+                            <span className="text-lg font-semibold text-gray-800">45</span>
                             <span className="text-[10px] text-gray-500 uppercase">In-House</span>
                         </div>
                     </div>
@@ -126,7 +126,7 @@ const Dashboard = () => {
                     <div className="absolute top-4 right-4 p-2 bg-red-100 rounded-full text-red-500">
                         <Ban size={20} />
                     </div>
-                    <span className="text-4xl font-bold text-gray-900 mb-1">5</span>
+                    <span className="text-4xl font-bold text-gray-800 mb-1">5</span>
                     <span className="text-sm font-medium text-gray-600">Cancellations Today</span>
                     <span className="text-xs text-red-500 mt-2 font-medium flex items-center bg-red-100 px-2 py-1 rounded-full"><TrendingUp size={10} className="mr-1" /> +2 vs Avg</span>
                 </div>
@@ -138,7 +138,7 @@ const Dashboard = () => {
                 {/* Revenue Pace/Trend */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-gray-900 font-bold text-sm">Revenue Pace (OTB vs Budget)</h3>
+                        <h3 className="text-gray-800 font-semibold text-sm">Revenue Pace (OTB vs Budget)</h3>
                         <span className="text-xs text-gray-500">This Month</span>
                     </div>
                     {/* Simple Line Chart Visualization */}
@@ -165,8 +165,8 @@ const Dashboard = () => {
                 {/* Today's Collections */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-gray-900 font-bold text-sm">Today's Collections</h3>
-                        <span className="font-bold text-lg text-gray-900">৳ 125k</span>
+                        <h3 className="text-gray-800 font-semibold text-sm">Today's Collections</h3>
+                        <span className="font-semibold text-lg text-gray-800">৳ 125k</span>
                     </div>
                     <div className="space-y-4 mt-2">
                         <div>
@@ -201,8 +201,8 @@ const Dashboard = () => {
 
                 {/* Guest Sentiment */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col items-center justify-center">
-                    <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 w-full text-center">Guest Sentiment</h3>
-                    <div className="text-5xl font-bold text-gray-900 mb-2">4.8</div>
+                    <h3 className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-4 w-full text-center">Guest Sentiment</h3>
+                    <div className="text-5xl font-bold text-gray-800 mb-2">4.8</div>
                     <div className="flex gap-1 mb-4">
                         {[1, 2, 3, 4].map(i => <Star key={i} size={24} className="fill-yellow-400 text-yellow-400" />)}
                         <Star size={24} className="fill-yellow-400 text-yellow-400" style={{ clipPath: 'inset(0 20% 0 0)' }} />
@@ -244,7 +244,7 @@ const Dashboard = () => {
 
                 {/* Housekeeping Status */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Housekeeping Status</h3>
+                    <h3 className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-4">Housekeeping Status</h3>
                     <div className="flex-1 flex flex-col justify-center space-y-4">
                         <div className="flex h-4 w-full rounded-full overflow-hidden">
                             <div className="bg-green-500 w-[60%]" title="Clean: 60%"></div>
@@ -264,7 +264,7 @@ const Dashboard = () => {
                 {/* Booking Source */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-gray-900 font-bold text-sm">Booking Source</h3>
+                        <h3 className="text-gray-800 font-semibold text-sm">Booking Source</h3>
                         <MoreHorizontal size={16} className="text-gray-400 cursor-pointer" />
                     </div>
                     <div className="flex items-center gap-6">
@@ -290,13 +290,13 @@ const Dashboard = () => {
                 {/* Room Grid / Tape Chart */}
                 <div className="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-gray-900 font-bold text-sm">Room Status Grid</h3>
+                        <h3 className="text-gray-800 font-semibold text-sm">Room Status Grid</h3>
                         <span className="text-xs text-blue-600 hover:underline cursor-pointer">View All Floors</span>
                     </div>
                     <div className="grid grid-cols-8 gap-2">
                         {roomStatus.map((room) => (
                             <div key={room.number}
-                                className={`${getStatusColor(room.status)} h-12 rounded-lg flex items-center justify-center text-white text-xs font-bold cursor-pointer hover:opacity-90 transition-opacity relative group`}
+                                className={`${getStatusColor(room.status)} h-12 rounded-lg flex items-center justify-center text-white text-xs font-semibold cursor-pointer hover:opacity-90 transition-opacity relative group`}
                                 title={`Room ${room.number}: ${room.status}`}
                             >
                                 {room.number}
@@ -318,7 +318,7 @@ const Dashboard = () => {
                     {/* Upcoming Guests */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-gray-900 font-bold text-sm">Upcoming / VIP Guests</h3>
+                            <h3 className="text-gray-800 font-semibold text-sm">Upcoming / VIP Guests</h3>
                             <ChevronRight size={16} className="text-gray-400" />
                         </div>
                         <div className="space-y-3">
@@ -328,7 +328,7 @@ const Dashboard = () => {
                                         <User size={14} />
                                     </div>
                                     <div className="flex-1">
-                                        <h4 className="text-xs font-bold text-gray-900">{guest.name}</h4>
+                                        <h4 className="text-xs font-semibold text-gray-800">{guest.name}</h4>
                                         <p className="text-[10px] text-gray-500">{guest.type} • {guest.room}</p>
                                     </div>
                                     <span className="text-[10px] font-medium px-2 py-1 bg-white border border-gray-200 rounded text-gray-600">{guest.status}</span>
@@ -340,7 +340,7 @@ const Dashboard = () => {
                     {/* Maintenance Issues */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-gray-900 font-bold text-sm">Maintenance Alerts</h3>
+                            <h3 className="text-gray-800 font-semibold text-sm">Maintenance Alerts</h3>
                             <span className="text-xs text-red-600 font-medium">3 Pending</span>
                         </div>
                         <div className="space-y-3">
@@ -351,8 +351,8 @@ const Dashboard = () => {
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start">
-                                            <h4 className="text-xs font-bold text-gray-900">Room {item.room}</h4>
-                                            <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${item.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>{item.priority}</span>
+                                            <h4 className="text-xs font-semibold text-gray-800">Room {item.room}</h4>
+                                            <span className={`text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${item.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>{item.priority}</span>
                                         </div>
                                         <p className="text-[11px] text-gray-600 mt-0.5">{item.issue}</p>
                                     </div>

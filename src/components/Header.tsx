@@ -1,15 +1,34 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UtensilsCrossed, ClipboardList, User, Building2, LogOut } from 'lucide-react';
+import {
+    UtensilsCrossed,
+    ClipboardList,
+    User,
+    Building2,
+    LogOut,
+    LayoutDashboard,
+    Monitor,
+    BedDouble,
+    FileText
+} from 'lucide-react';
 
 interface HeaderProps {
+    activePage: string;
     setActivePage: (page: string) => void;
     onLogout: () => void;
     user: any;
 }
 
-const Header: React.FC<HeaderProps> = ({ setActivePage, onLogout, user }) => {
+const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, user }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const shortcuts = [
+        { id: 'dashboard', label: 'HMS Overview', icon: <LayoutDashboard size={14} /> },
+        { id: 'front-desk', label: 'Front Desk', icon: <Monitor size={14} /> },
+        { id: 'manage-room', label: 'Rooms', icon: <BedDouble size={14} /> },
+        { id: 'pos', label: 'POS / Billing', icon: <UtensilsCrossed size={14} /> },
+        { id: 'reports', label: 'Reports', icon: <FileText size={14} /> },
+    ];
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -25,9 +44,26 @@ const Header: React.FC<HeaderProps> = ({ setActivePage, onLogout, user }) => {
     }, []);
 
     return (
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0 z-40 sticky top-0">
-            {/* Left Side - Global Search (Optional placeholder based on common UI patterns) */}
-            <div className="flex-1 max-w-xl">
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0 z-40 sticky top-0 shadow-sm">
+            {/* Left Side - Shortcuts */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-2">
+                {shortcuts.map((item) => (
+                    <button
+                        key={item.id}
+                        onClick={() => setActivePage(item.id)}
+                        className={`
+                            flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all whitespace-nowrap
+                            ${activePage === item.id
+                                ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'}
+                        `}
+                    >
+                        <span className={activePage === item.id ? 'text-white' : 'text-gray-400'}>
+                            {item.icon}
+                        </span>
+                        {item.label}
+                    </button>
+                ))}
             </div>
 
             {/* Right Side - Actions & Profile */}

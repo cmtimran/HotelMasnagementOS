@@ -29,7 +29,16 @@ import {
     FileText,
     Briefcase,
     Circle,
-    Utensils
+    Utensils,
+    Calendar,
+    LayoutGrid,
+    Plus,
+    Sparkles,
+    ClipboardList,
+    TrendingUp,
+    Target,
+    BarChart3,
+    Database
 } from 'lucide-react';
 
 interface MenuItem {
@@ -51,6 +60,10 @@ interface SidebarProps {
 const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: SidebarProps) => {
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
         posManagement: false,
+        frontOffice: false,
+        housekeeping: false,
+        b2b: false,
+        admin: false,
         menuKey: false,
         setupKey: false,
         staffKey: false,
@@ -108,6 +121,29 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                         { id: 'admin-users', label: 'Admin Users', icon: <Shield size={16} /> },
                     ]
                 }
+            ]
+        },
+        {
+            key: 'frontOffice',
+            label: 'Front Office',
+            icon: <BedDouble size={20} />,
+            items: [
+                { id: 'quick-reservation', label: 'Quick Reservation', icon: <Plus size={16} /> },
+                { id: 'folio-operations', label: 'Folio Operations', icon: <FileText size={16} /> },
+                { id: 'guest-profile', label: 'Guest Profile', icon: <User size={16} /> },
+                { id: 'room-rack', label: 'Room Rack', icon: <LayoutGrid size={16} /> },
+                { id: 'reservations', label: 'Reservations', icon: <Calendar size={16} /> },
+                { id: 'stay-view', label: 'Stay View', icon: <Calendar size={16} /> },
+                { id: 'floor-plan', label: 'Floor Plan', icon: <Map size={16} /> },
+            ]
+        },
+        {
+            key: 'housekeeping',
+            label: 'Housekeeping & Maintenance',
+            icon: <Sparkles size={20} />,
+            items: [
+                { id: 'housekeeping', label: 'Housekeeping Grid', icon: <ClipboardList size={16} /> },
+                { id: 'maintenance', label: 'Maintenance', icon: <Settings size={16} /> },
             ]
         },
         {
@@ -169,6 +205,26 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             icon: <FileText size={20} />,
             items: [
                 { id: 'reports', label: 'All Reports', icon: <ListOrdered size={16} />, newTab: true },
+            ]
+        },
+        {
+            key: 'b2b',
+            label: 'B2B & Revenue',
+            icon: <TrendingUp size={20} />,
+            items: [
+                { id: 'corporate-profiles', label: 'Corporate Profiles', icon: <Building2 size={16} /> },
+                { id: 'business-origins', label: 'Business Origins', icon: <Target size={16} /> },
+                { id: 'advanced-reports', label: 'Advanced Reports', icon: <BarChart3 size={16} /> },
+            ]
+        },
+        {
+            key: 'admin',
+            label: 'Admin & Security',
+            icon: <Shield size={20} />,
+            items: [
+                { id: 'users', label: 'Users', icon: <Users size={16} /> },
+                { id: 'roles-permissions', label: 'Roles & Permissions', icon: <Shield size={16} /> },
+                { id: 'master-data', label: 'Master Data Config', icon: <Database size={16} /> },
             ]
         }
     ];
