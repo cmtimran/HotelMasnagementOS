@@ -352,9 +352,24 @@ export default function ServiceManagement() {
 
                             <div className="grid grid-cols-2 gap-8">
                                 <div className="space-y-3">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Selling Price (Guest Rate)</label>
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Internal Cost (Cost Price)</label>
                                     <div className="relative">
                                         <span className="absolute left-5 top-4 text-gray-400 font-bold">৳</span>
+                                        <input
+                                            type="number"
+                                            className="w-full pl-10 pr-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-lg font-bold text-gray-600 shadow-inner"
+                                            placeholder="Base cost..."
+                                            value={formData.internalCost || ''}
+                                            onChange={e => setFormData({ ...formData, internalCost: parseFloat(e.target.value) })}
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 pl-1 uppercase font-bold tracking-tighter">Investment per unit of service</p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Selling Price (Guest Rate)</label>
+                                    <div className="relative">
+                                        <span className="absolute left-5 top-4 text-emerald-400 font-bold">৳</span>
                                         <input
                                             type="number"
                                             className="w-full pl-10 pr-5 py-4 bg-emerald-50/30 border-2 border-emerald-50 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-black text-emerald-900"
@@ -363,6 +378,7 @@ export default function ServiceManagement() {
                                             onChange={e => setFormData({ ...formData, sellingPrice: parseFloat(e.target.value) })}
                                         />
                                     </div>
+                                    <p className="text-[10px] text-emerald-600 pl-1 uppercase font-bold tracking-tighter">Standard retail price displayed to guests</p>
                                 </div>
 
                                 <div className="space-y-3">
@@ -377,6 +393,8 @@ export default function ServiceManagement() {
                                         <option value="Per Piece">Per Piece</option>
                                         <option value="Per KM">Per Kilometre</option>
                                         <option value="Per Hour">Per Hour</option>
+                                        <option value="Per Session">Per Session</option>
+                                        <option value="Per Night">Per Night</option>
                                         <option value="Per Stay">Per Stay</option>
                                     </select>
                                 </div>

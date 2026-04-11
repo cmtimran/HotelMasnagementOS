@@ -47,6 +47,7 @@ interface RatePlan {
 interface RatePricing {
     roomTypeId: string;
     structure: 'Flat' | 'Derived';
+    operatingCost: number; // Internal room operating cost (OPEX)
     baseRate: number;
     doubleRate: number;
     tripleRate: number;
@@ -96,7 +97,7 @@ export default function RatePlanManagement() {
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Deluxe Suite', structure: 'Flat', baseRate: 14500, doubleRate: 14500, tripleRate: 18000, extraAdult: 3500, extraChild: 1500, baseOccupancy: 2, maxOccupancy: 3 }
+                { roomTypeId: 'Deluxe Suite', structure: 'Flat', operatingCost: 4500, baseRate: 14500, doubleRate: 14500, tripleRate: 18000, extraAdult: 3500, extraChild: 1500, baseOccupancy: 2, maxOccupancy: 3 }
             ]
         },
         {
@@ -128,7 +129,7 @@ export default function RatePlanManagement() {
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Premium King', structure: 'Flat', baseRate: 11000, doubleRate: 11000, tripleRate: 14000, extraAdult: 2500, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 3 }
+                { roomTypeId: 'Premium King', structure: 'Flat', operatingCost: 3800, baseRate: 11000, doubleRate: 11000, tripleRate: 14000, extraAdult: 2500, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 3 }
             ]
         },
         {
@@ -161,7 +162,7 @@ export default function RatePlanManagement() {
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Junior Suite', structure: 'Flat', baseRate: 18500, doubleRate: 18500, tripleRate: 22000, extraAdult: 4500, extraChild: 2000, baseOccupancy: 2, maxOccupancy: 3 }
+                { roomTypeId: 'Junior Suite', structure: 'Flat', operatingCost: 5500, baseRate: 18500, doubleRate: 18500, tripleRate: 22000, extraAdult: 4500, extraChild: 2000, baseOccupancy: 2, maxOccupancy: 3 }
             ]
         },
         {
@@ -192,7 +193,7 @@ export default function RatePlanManagement() {
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Standard Room', structure: 'Flat', baseRate: 8500, doubleRate: 8500, tripleRate: 10500, extraAdult: 2000, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 2 }
+                { roomTypeId: 'Standard Room', structure: 'Flat', operatingCost: 2500, baseRate: 8500, doubleRate: 8500, tripleRate: 10500, extraAdult: 2000, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 2 }
             ]
         }
     ]);
@@ -233,7 +234,7 @@ export default function RatePlanManagement() {
             closedToArrival: false,
             closedToDeparture: false,
             stopSell: false,
-            pricing: [{ roomTypeId: 'New Room Category', structure: 'Flat', baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 3 }]
+            pricing: [{ roomTypeId: 'New Room Category', structure: 'Flat', operatingCost: 0, baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 3 }]
         });
         setEditingPlan(null);
         setView('form');
@@ -444,10 +445,11 @@ export default function RatePlanManagement() {
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-1">Meal Plan Selection</label>
                                     <div className="grid grid-cols-2 gap-3">
                                         {[
-                                            { id: 'EP', label: 'EP', detail: 'Room Only' },
-                                            { id: 'CP', label: 'CP', detail: 'Breakfast' },
-                                            { id: 'MAP', label: 'MAP', detail: 'Brk + Din' },
-                                            { id: 'AP', label: 'AP', detail: 'Full Board' }
+                                            { id: 'EP', label: 'EP', detail: 'European Plan (Room Only/No Meals)' },
+                                            { id: 'CP', label: 'CP', detail: 'Continental Plan: Buffet Breakfast (৳850)' },
+                                            { id: 'MAP', label: 'MAP', detail: 'Modified American Plan: Breakfast + Lunch/Dinner (৳2200)' },
+                                            { id: 'AP', label: 'AP', detail: 'American Plan: All Inclusive Full Board (৳3500)' },
+                                            { id: 'CORP-LUNCH', label: 'CORP-LUNCH', detail: 'Corporate Executive Lunch: Box Menu (৳1200)' }
                                         ].map((item: { id: string; label: string; detail: string }) => (
                                             <button 
                                                 key={item.id} 
@@ -455,7 +457,7 @@ export default function RatePlanManagement() {
                                                 className={`p-4 rounded-xl border-2 text-left transition-all ${formData.mealPlan === item.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-gray-50 border-gray-100 hover:border-blue-200 hover:bg-white text-gray-600'}`}
                                             >
                                                 <div className="text-sm font-bold">{item.id}</div>
-                                                <div className={`text-[10px] ${formData.mealPlan === item.id ? 'text-blue-100' : 'text-gray-400'}`}>{item.detail}</div>
+                                                <div className={`text-[10px] leading-tight mt-1 ${formData.mealPlan === item.id ? 'text-blue-100' : 'text-gray-400'}`}>{item.detail}</div>
                                             </button>
                                         ))}
                                     </div>
@@ -618,7 +620,28 @@ export default function RatePlanManagement() {
                                                     setFormData({ ...formData, pricing: newPricing });
                                                 }}
                                             />
-                                            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Tier-Wise Revenue Grid</div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tier-Wise Revenue Grid</div>
+                                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded ${price.baseRate >= price.operatingCost ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                    GOP: ৳{(price.baseRate - price.operatingCost).toLocaleString()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Internal Operating Cost (OPEX)</label>
+                                            <div className="relative inline-block">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">৳</span>
+                                                <input 
+                                                    type="number"
+                                                    className="w-32 pl-7 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm font-bold text-gray-500 text-right focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                    value={price.operatingCost}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                        const newPricing = [...(formData.pricing || [])];
+                                                        newPricing[idx] = { ...newPricing[idx], operatingCost: parseInt(e.target.value) || 0 };
+                                                        setFormData({ ...formData, pricing: newPricing });
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-5 gap-4">
@@ -650,7 +673,7 @@ export default function RatePlanManagement() {
                                 </div>
                             ))}
                             <button 
-                                onClick={() => setFormData({ ...formData, pricing: [...(formData.pricing || []), { roomTypeId: 'New Tier Strategy', structure: 'Flat', baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 4 }] as any })}
+                                onClick={() => setFormData({ ...formData, pricing: [...(formData.pricing || []), { roomTypeId: 'New Tier Strategy', structure: 'Flat', operatingCost: 0, baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 4 }] as any })}
                                 className="w-full py-12 border-2 border-dashed border-gray-200 rounded-2xl text-gray-300 font-bold text-lg uppercase tracking-widest hover:border-blue-400 hover:text-blue-500 transition-all hover:bg-blue-50/50 flex flex-col items-center gap-3"
                             >
                                 <Plus size={32} />

@@ -139,6 +139,7 @@ interface HotelPackage {
             amount: number;
             type: 'Fixed' | 'Percentage';
         }[];
+        totalCost: number; // The internal cost for the hotel to provide this bundle
     };
 }
 
@@ -218,7 +219,7 @@ const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
     },
     outletCredits: [],
     validity: { startDate: '', endDate: '', minNights: 1, maxNights: 30, blackoutDates: '' },
-    finance: { baseSurcharge: 0, dateBasedSurcharges: [], autoPost: true, revenueAllocations: [] }
+    finance: { baseSurcharge: 0, totalCost: 0, dateBasedSurcharges: [], autoPost: true, revenueAllocations: [] }
 });
 
 const SAMPLE_PACKAGES: HotelPackage[] = [
@@ -277,6 +278,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 30, blackoutDates: '2025-12-24, 2025-12-25, 2025-12-31' },
         finance: {
             baseSurcharge: 4500,
+            totalCost: 3200, // Cost for Honeymoon amenities
             dateBasedSurcharges: [],
             autoPost: true,
             revenueAllocations: [{ department: 'Rooms', amount: 70, type: 'Percentage' }, { department: 'F&B', amount: 30, type: 'Percentage' }]
@@ -336,6 +338,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 3, maxNights: 14, blackoutDates: '' },
         finance: {
             baseSurcharge: 6500,
+            totalCost: 4800, // Cost for family meals/activities
             dateBasedSurcharges: [],
             autoPost: true,
             revenueAllocations: [{ department: 'Rooms', amount: 50, type: 'Percentage' }, { department: 'F&B', amount: 50, type: 'Percentage' }]
@@ -392,6 +395,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 7, blackoutDates: '' },
         finance: {
             baseSurcharge: 4500,
+            totalCost: 2800, // Cost for Biz lounge/transfer
             dateBasedSurcharges: [],
             autoPost: true,
             revenueAllocations: [{ department: 'Rooms', amount: 80, type: 'Percentage' }, { department: 'F&B', amount: 20, type: 'Percentage' }]
@@ -430,6 +434,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 14, blackoutDates: '' },
         finance: {
             baseSurcharge: 2500,
+            totalCost: 1500, // Cost for Breakfast
             dateBasedSurcharges: [
                 { dateRange: '2024-12-24 to 2024-12-26', surchargeAmount: 5000, reason: 'Christmas Peak' }
             ],
@@ -479,6 +484,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 10, blackoutDates: '' },
         finance: {
             baseSurcharge: 18000,
+            totalCost: 12000, // Cost for Spa/Detox meals
             dateBasedSurcharges: [],
             autoPost: true,
             revenueAllocations: [{ department: 'Spa', amount: 100, type: 'Percentage' }]
@@ -519,6 +525,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 3, maxNights: 10, blackoutDates: '' },
         finance: {
             baseSurcharge: 12000,
+            totalCost: 7500, // Cost for Business Bundle
             dateBasedSurcharges: [],
             autoPost: true,
             revenueAllocations: [{ department: 'Rooms', amount: 70, type: 'Percentage' }, { department: 'Transport', amount: 30, type: 'Percentage' }]
@@ -557,6 +564,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 30, blackoutDates: '' },
         finance: {
             baseSurcharge: 1000,
+            totalCost: 650, // Cost for Breakfast
             dateBasedSurcharges: [],
             autoPost: true,
             revenueAllocations: [{ department: 'Rooms', amount: 100, type: 'Percentage' }]
@@ -614,6 +622,7 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 7, blackoutDates: '' },
         finance: {
             baseSurcharge: 25000,
+            totalCost: 18000, // Cost for Royal AP (Limo/Fine Dining)
             dateBasedSurcharges: [],
             autoPost: true,
             revenueAllocations: [{ department: 'Rooms', amount: 40, type: 'Percentage' }, { department: 'F&B', amount: 60, type: 'Percentage' }]
@@ -1638,12 +1647,32 @@ const PackageManagement = () => {
                             {activeTab === 'finance' && (
                                 <FormSection title="Finance & Revenue Routing" icon={<DollarSign size={16} />}>
                                     <div className="grid grid-cols-2 gap-4 mb-5">
-                                        <Field label="Base Surcharge" hint="added to room rate/night">
+                                        <Field label="Total Inclusion Cost" hint="internal cost of all services">
                                             <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
-                                                <input type="number" className={inp + ' pl-7'} value={fm.finance.baseSurcharge}
+                                                <input type="number" className={inp + ' pl-7 bg-gray-50'} value={fm.finance.totalCost}
+                                                    onChange={e => upd('finance.totalCost', +e.target.value)} /></div>
+                                        </Field>
+                                        <Field label="Package Surcharge (Selling)" hint="added to room rate/night">
+                                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-bold">৳</span>
+                                                <input type="number" className={inp + ' pl-7 border-emerald-100 bg-emerald-50/20 font-bold text-emerald-900'} value={fm.finance.baseSurcharge}
                                                     onChange={e => upd('finance.baseSurcharge', +e.target.value)} /></div>
                                         </Field>
-                                        <div />
+                                        <div className="col-span-2">
+                                            <div className={`p-3 rounded-lg flex items-center justify-between border ${fm.finance.baseSurcharge >= fm.finance.totalCost ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <TrendingUp size={16} className={fm.finance.baseSurcharge >= fm.finance.totalCost ? 'text-emerald-600' : 'text-red-600'} />
+                                                    <span className={`text-sm font-bold ${fm.finance.baseSurcharge >= fm.finance.totalCost ? 'text-emerald-700' : 'text-red-700'}`}>
+                                                        {fm.finance.baseSurcharge >= fm.finance.totalCost ? 'Inclusion Profitability Check: PASS' : 'Inclusion Profitability Check: FAIL (Selling below cost)'}
+                                                    </span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[10px] text-gray-500 uppercase font-black">Bundle Margin</div>
+                                                    <div className={`text-sm font-black ${fm.finance.baseSurcharge >= fm.finance.totalCost ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        ৳{(fm.finance.baseSurcharge - fm.finance.totalCost).toLocaleString()}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div className="col-span-2 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
                                             <div>
                                                 <div className="text-sm font-medium text-gray-800">Night Audit Auto-Posting</div>
