@@ -16,7 +16,16 @@ import {
     Trash2
 } from 'lucide-react';
 
-type TabType = 'currency' | 'source' | 'charges' | 'discounts';
+type TabType = 'currency' | 'source' | 'charges' | 'discounts' | 'revenue';
+
+interface RevenueGroup {
+    id: number;
+    code: string;
+    description: string;
+    department: 'F&B' | 'Rooms' | 'Laundry' | 'Transport' | 'Other';
+    glCode: string; // General Ledger Code
+}
+
 
 interface Currency {
     id: number;
@@ -149,6 +158,14 @@ const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType })
     const [discountForm, setDiscountForm] = useState({ name: '', type: 'Percentage (%)', value: '', requiresAuth: false, reasonRequired: false, maxLimit: '2000', applicableOn: [] as string[] });
     const [showDiscountForm, setShowDiscountForm] = useState(false);
 
+    // Revenue States
+    const [revenueGroups] = useState<RevenueGroup[]>([
+        { id: 1, code: 'REV-FB-BRK', description: 'Breakfast Sales', department: 'F&B', glCode: '40010' },
+        { id: 2, code: 'REV-ROOM-FIT', description: 'Room Rent - Transient', department: 'Rooms', glCode: '10010' },
+        { id: 3, code: 'REV-TRANS-GUEST', description: 'Guest Transportation', department: 'Transport', glCode: '50020' },
+        { id: 4, code: 'REV-LND-VALET', description: 'Valet Laundry Service', department: 'Laundry', glCode: '60010' }
+    ]);
+
     useEffect(() => {
         setActiveTab(initialTab);
     }, [initialTab]);
@@ -158,6 +175,7 @@ const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType })
         { id: 'source', label: 'Source & Market', icon: <Target size={18} /> },
         { id: 'charges', label: 'Extra Charges', icon: <Plus size={18} /> },
         { id: 'discounts', label: 'Global Discounts', icon: <Percent size={18} /> },
+        { id: 'revenue', label: 'Finance & Revenue', icon: <TrendingUp size={18} /> },
     ];
 
     // Currency Handlers
@@ -863,14 +881,6 @@ const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType })
                         </div>
                     </div>
                 ))}
-
-                <button
-                    onClick={() => setShowChargeForm(true)}
-                    className="border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center p-6 text-gray-400 hover:border-blue-400 hover:text-blue-600 transition-all group min-h-[200px]"
-                >
-                    <Plus className="mb-2 group-hover:scale-110 transition-transform" />
-                    <span className="text-sm font-medium">New Charge Code</span>
-                </button>
             </div>
         </div>
     );
@@ -1010,6 +1020,41 @@ const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType })
             </div>
         </div>
     );
+    const renderRevenueTab = () => (
+        <div className="p-6 space-y-6">
+            <div className="bg-gray-900 rounded-xl p-8 text-white relative overflow-hidden shadow-lg border border-gray-800">
+                <div className="relative z-10 max-w-xl">
+                    <h3 className="text-2xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 font-sans tracking-tight">Financial Blueprint</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed font-medium">Link service departments to General Ledger (GL) codes. This provides the <span className="text-blue-400 font-black">NICE HMS Allowance Engine</span> with the logic needed for automated department balancing.</p>
+                </div>
+                <TrendingUp className="absolute -right-8 -bottom-8 w-48 h-48 text-blue-500/10 rotate-12" />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+                {revenueGroups.map(group => (
+                    <div key={group.id} className="bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between hover:border-blue-300 transition-all group shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center font-black text-blue-600 text-[10px] border border-gray-100 uppercase">
+                                {group.department}
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-gray-900 text-sm tracking-tight">{group.description}</h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] font-black px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-md border border-blue-100 uppercase tracking-tighter">{group.code}</span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">GL: {group.glCode}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button className="p-2 text-gray-400 hover:text-blue-600 rounded-lg transition-all">
+                                <Edit size={16} />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 
     const renderContent = () => {
         switch (activeTab) {
@@ -1017,44 +1062,42 @@ const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType })
             case 'source': return renderSourceTab();
             case 'charges': return renderChargesTab();
             case 'discounts': return renderDiscountsTab();
+            case 'revenue': return renderRevenueTab();
             default: return renderCurrencyTab();
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
-            {/* Header */}
-            <header className="bg-white border-b sticky top-0 z-10 px-4 py-3 flex justify-between items-center shadow-sm">
-                <div className="flex items-center gap-3">
-                    <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
+        <div className="min-h-screen bg-gray-100/50 text-gray-800 font-sans">
+            <header className="bg-white border-b sticky top-0 z-10 px-6 py-4 flex justify-between items-center shadow-sm">
+                <div className="flex items-center gap-4">
+                    <button className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors border border-gray-100">
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800">Master Data & Financial Configuration</h1>
-                        <p className="text-xs text-gray-500">Control business rules, daily rates, and financial policies</p>
+                        <h1 className="text-xl font-black text-gray-900 tracking-tight">System Master Data</h1>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Finance, Ops & Localization</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm">Save Draft</button>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2">
-                        <Save size={16} /> Save & Publish
+                <div className="flex gap-3">
+                    <button className="px-5 py-2.5 bg-gray-900 text-white rounded-xl hover:bg-blue-600 transition-all font-bold text-sm shadow-lg shadow-gray-900/10 flex items-center gap-2">
+                        <Save size={18} />
+                        Update Infrastructure
                     </button>
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-                <div className="flex flex-col md:flex-row gap-6">
-                    {/* Tabs Sidebar */}
-                    <div className="w-full md:w-56 flex-shrink-0 space-y-3">
-                        <nav className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col sticky top-24 overflow-hidden">
+            <main className="max-w-7xl mx-auto p-8">
+                <div className="flex flex-col md:flex-row gap-8">
+                    <div className="w-full md:w-64 flex-shrink-0">
+                        <nav className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 sticky top-28 space-y-1">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id as TabType)}
-                                    className={`flex items-center gap-3 px-4 py-4 text-sm font-medium transition-colors w-full text-left border-l-4 ${activeTab === tab.id
-                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                        : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                    className={`flex items-center gap-3 px-4 py-3 text-xs font-black transition-all w-full text-left rounded-xl uppercase tracking-widest ${activeTab === tab.id
+                                        ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
+                                        : 'text-gray-400 hover:bg-gray-50 hover:text-gray-900'
                                         }`}
                                 >
                                     {tab.icon}
@@ -1063,9 +1106,7 @@ const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType })
                             ))}
                         </nav>
                     </div>
-
-                    {/* Content Area */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                         {renderContent()}
                     </div>
                 </div>

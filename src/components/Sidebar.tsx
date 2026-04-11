@@ -38,7 +38,10 @@ import {
     TrendingUp,
     Target,
     BarChart3,
-    Database
+    Database,
+    Moon,
+    Ticket,
+    ShieldCheck
 } from 'lucide-react';
 
 interface MenuItem {
@@ -62,6 +65,7 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
         posManagement: false,
         frontOffice: false,
         housekeeping: false,
+        premiumOps: false,
         b2b: false,
         admin: false,
         menuKey: false,
@@ -135,6 +139,17 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                 { id: 'reservations', label: 'Reservations', icon: <Calendar size={16} /> },
                 { id: 'stay-view', label: 'Stay View', icon: <Calendar size={16} /> },
                 { id: 'floor-plan', label: 'Floor Plan', icon: <Map size={16} /> },
+                { id: 'occupancy-heatmap', label: 'Occupancy Heatmap', icon: <Grid3X3 size={16} /> },
+            ]
+        },
+        {
+            key: 'premiumOps',
+            label: 'Premium Operations',
+            icon: <Sparkles size={20} />,
+            items: [
+                { id: 'night-audit', label: 'Night Audit (Auto Posting)', icon: <Moon size={16} /> },
+                { id: 'service-vouchers', label: 'Digital Vouchers', icon: <Ticket size={16} /> },
+                { id: 'allowance-checker', label: 'Allowance Engine', icon: <ShieldCheck size={16} /> },
             ]
         },
         {
@@ -171,8 +186,11 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             label: 'Rate Management',
             icon: <Percent size={20} />,
             items: [
-                { id: 'rate-plans', label: 'Rate Plans', icon: <Tags size={16} /> },
-                { id: 'meal-plans', label: 'Meal Plans', icon: <Utensils size={16} /> },
+                { id: 'rate-plans', label: 'Rate Plans (Layer 3)', icon: <Tags size={16} /> },
+                { id: 'package-builder', label: 'Package Builder (Layer 2)', icon: <Package size={16} /> },
+                { id: 'meal-plans', label: 'Meal Plans (Layer 1)', icon: <Utensils size={16} /> },
+                { id: 'service-master', label: 'Service Master (Layer 1)', icon: <Sparkles size={16} /> },
+                { id: 'rate-calendar', label: 'Rate Calendar', icon: <Plus size={16} /> },
             ]
         },
         {
@@ -225,6 +243,7 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                 { id: 'users', label: 'Users', icon: <Users size={16} /> },
                 { id: 'roles-permissions', label: 'Roles & Permissions', icon: <Shield size={16} /> },
                 { id: 'master-data', label: 'Master Data Config', icon: <Database size={16} /> },
+                { id: 'policy-management', label: 'Global Policy Settings', icon: <ShieldCheck size={16} /> },
             ]
         }
     ];
@@ -259,18 +278,6 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                     {
                         (isOpen || (isCollapsed && depth === 0)) && (
                             <div className={`${isCollapsed ? 'mt-1' : 'mt-1 space-y-1'}`}>
-                                {/* If collapsed, we don't strictly show children unless we want a popover. 
-                                For now, I'll follow the previous pattern: if collapsed, maybe don't show children inline 
-                                or show them if they are top-level. 
-                                The previous implementation showed children with indentation if manually expanded, 
-                                BUT if collapsed, it showed them in a weird way?
-                                user request: "add all restaurant related menu under the POS Section"
-                                If collapsed, recursive menus are tricky. 
-                                For simplicity: hide deep children if collapsed, or just show top level icons.
-                                Let's assume standard behavior: if collapsed, only icons shown.
-                                If the user clicks a group in collapsed mode, we might need to expand sidebar.
-                                For now, I will render children.
-                             */}
                                 {!isCollapsed && item.items?.map(child => renderMenuItem(child, depth + 1))}
                             </div>
                         )

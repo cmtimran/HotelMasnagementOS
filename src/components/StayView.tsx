@@ -205,7 +205,7 @@ const StayView = () => {
                                         </div>
                                         {/* Booking count badge */}
                                         <div className="mt-1 inline-block px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
-                                            {Math.floor(Math.random() * 10)}
+                                            {(date.getDate() % 5) + 2}
                                         </div>
                                     </div>
                                 ))}

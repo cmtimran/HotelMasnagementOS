@@ -1,16 +1,28 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { 
+    X, Plus, Tag, CheckCircle2, 
+    Coffee, ShieldCheck, Trash2
+} from 'lucide-react';
 
 interface RoomSelection {
     id: number;
     roomType: string;
     quantity: number;
-    rateType: string;
+    rateType: string; 
+    packageId?: number; 
     roomNumber: string;
     assigned: boolean;
     adult: number;
     child: number;
+    infant: number;
     rate: number;
+}
+
+interface AddOn {
+    id: number;
+    name: string;
+    price: number;
+    category: string;
 }
 
 const QuickReservation = () => {
@@ -18,54 +30,45 @@ const QuickReservation = () => {
     const [checkInTime, setCheckInTime] = useState('11:30');
     const [checkOut, setCheckOut] = useState('2025-04-07');
     const [checkOutTime, setCheckOutTime] = useState('11:35');
-    const [paymentMethod, setPaymentMethod] = useState('');
     const [businessSource, setBusinessSource] = useState('');
 
     const [rooms, setRooms] = useState<RoomSelection[]>([
         {
             id: 1,
             roomType: 'Extreme Deluxe',
-            quantity: 2,
-            rateType: 'Deluxe Plan',
-            roomNumber: '105, Bat. Deluxe',
+            quantity: 1,
+            rateType: 'Winter Bundle',
+            roomNumber: '105',
             assigned: true,
             adult: 2,
             child: 1,
-            rate: 450
-        },
-        {
-            id: 2,
-            roomType: 'Super Deluxe',
-            quantity: 3,
-            rateType: 'Super Room',
-            roomNumber: '205, Sup. Deluxe',
-            assigned: true,
-            adult: 6,
-            child: 6,
-            rate: 450
+            infant: 0,
+            rate: 15500
         }
+    ]);
+
+    const [selectedAddOns] = useState<AddOn[]>([
+        { id: 1, name: 'Extra Bed', price: 1500, category: 'Room' }
     ]);
 
     const [guestTitle, setGuestTitle] = useState('Mr.');
     const [guestName, setGuestName] = useState('Aniya Nusrat');
     const [guestMobile, setGuestMobile] = useState('');
     const [guestEmail, setGuestEmail] = useState('nusrat@gmail.com');
-    const [guestCompany, setGuestCompany] = useState('Company-001');
+    const [guestCompany, setGuestCompany] = useState('NEXUS-IT');
 
     const calculateNights = () => {
         const start = new Date(checkIn);
         const end = new Date(checkOut);
         const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        return diff > 0 ? diff : 0;
+        return diff > 0 ? diff : 1;
     };
 
     const nights = calculateNights();
 
-    const calculateTotal = () => {
-        return rooms.reduce((sum, room) => sum + (room.rate * room.quantity * nights), 0);
-    };
-
-    const totalAmount = calculateTotal();
+    const roomTotal = rooms.reduce((sum, room) => sum + (room.rate * room.quantity * nights), 0);
+    const addOnTotal = selectedAddOns.reduce((sum, ad) => sum + ad.price, 0);
+    const grandTotal = roomTotal + addOnTotal;
 
     const updateRoom = (id: number, field: keyof RoomSelection, value: any) => {
         setRooms(rooms.map(r => r.id === id ? { ...r, [field]: value } : r));
@@ -85,196 +88,128 @@ const QuickReservation = () => {
             assigned: false,
             adult: 1,
             child: 0,
-            rate: 0
+            infant: 0,
+            rate: 6500
         }]);
     };
 
     return (
-        <div className="h-screen bg-gray-50 flex flex-col">
-            {/* Top Header - Blue */}
-            <div className="bg-blue-600 px-6 py-3 flex items-center justify-between">
-                <h1 className="text-white text-lg font-semibold">Quick Reservation</h1>
-                <button className="text-white hover:bg-blue-700 p-1 rounded">
-                    <X size={20} />
-                </button>
+        <div className="h-screen bg-gray-50 flex flex-col font-sans">
+            {/* Premium Header */}
+            <div className="bg-gray-900 px-8 py-5 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                        <CheckCircle2 size={24} />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-black text-white tracking-tight">Express Guest Onboarding</h1>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none mt-1">NICE HMS Integrated Package Engine</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-8">
+                    <div className="text-right">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Est. Settlement</p>
+                        <p className="text-2xl font-black text-blue-400">৳ {grandTotal.toLocaleString()}</p>
+                    </div>
+                    <button className="text-gray-400 hover:text-white transition-colors bg-gray-800 p-2 rounded-xl">
+                        <X size={24} />
+                    </button>
+                </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 overflow-auto p-6">
-                <div className="bg-white rounded shadow-sm">
-                    {/* Date Section */}
-                    <div className="grid grid-cols-5 gap-4 p-4 border-b">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Check-in</label>
-                            <div className="flex gap-1">
-                                <input
-                                    type="date"
-                                    value={checkIn}
-                                    onChange={(e) => setCheckIn(e.target.value)}
-                                    className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
-                                <input
-                                    type="time"
-                                    value={checkInTime}
-                                    onChange={(e) => setCheckInTime(e.target.value)}
-                                    className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
+            {/* Main Content Layout */}
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-6 p-6">
+                {/* Left Side: Stay & Inventory */}
+                <div className="flex-1 overflow-auto space-y-6">
+                    {/* Stay Config */}
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 grid grid-cols-4 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Check-In Arrival</label>
+                            <div className="flex border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                                <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="flex-1 px-3 py-3 text-sm font-bold bg-white" />
+                                <input type="time" value={checkInTime} onChange={e => setCheckInTime(e.target.value)} className="w-24 px-3 py-3 text-sm font-bold bg-gray-50 border-l border-gray-100" />
                             </div>
                         </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Nights</label>
-                            <input
-                                type="number"
-                                value={nights}
-                                readOnly
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-gray-50 font-semibold"
-                            />
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nights</label>
+                            <div className="px-5 py-3 bg-blue-50 rounded-xl text-blue-600 font-black text-sm text-center border border-blue-100 shadow-sm">{nights} Nights Stay</div>
                         </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Check-out</label>
-                            <div className="flex gap-1">
-                                <input
-                                    type="date"
-                                    value={checkOut}
-                                    onChange={(e) => setCheckOut(e.target.value)}
-                                    className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
-                                <input
-                                    type="time"
-                                    value={checkOutTime}
-                                    onChange={(e) => setCheckOutTime(e.target.value)}
-                                    className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Check-Out Departure</label>
+                            <div className="flex border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                                <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} className="flex-1 px-3 py-3 text-sm font-bold bg-white" />
+                                <input type="time" value={checkOutTime} onChange={e => setCheckOutTime(e.target.value)} className="w-24 px-3 py-3 text-sm font-bold bg-gray-50 border-l border-gray-100" />
                             </div>
                         </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
-                            <select
-                                value={paymentMethod}
-                                onChange={(e) => setPaymentMethod(e.target.value)}
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                            >
-                                <option value="">Please select</option>
-                                <option value="cash">Cash</option>
-                                <option value="card">Credit Card</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Business Source</label>
-                            <select
-                                value={businessSource}
-                                onChange={(e) => setBusinessSource(e.target.value)}
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                            >
-                                <option value="">Please select</option>
-                                <option value="direct">Direct</option>
-                                <option value="ota">OTA</option>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Revenue Source</label>
+                            <select value={businessSource} onChange={e => setBusinessSource(e.target.value)} className="w-full px-5 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold shadow-sm">
+                                <option value="direct">Direct Guest</option>
+                                <option value="ota">OTA / Booking.com</option>
+                                <option value="corporate">Corporate Contract</option>
                             </select>
                         </div>
                     </div>
 
-                    {/* Room Selection Table */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50 border-b">
+                    {/* Room & Package Selection */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 border-b border-gray-100">
                                 <tr>
-                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Room Type</th>
-                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">No. of Rooms</th>
-                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Rate Type/Plan</th>
-                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Room No.</th>
-                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Assign</th>
-                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Adult</th>
-                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Child</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Rate (฿) [Tax Inc.]</th>
-                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700"></th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Room Config</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Pax</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Package / Rate</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Nightly Rate</th>
+                                    <th className="px-6 py-4"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y">
-                                {rooms.map((room) => (
-                                    <tr key={room.id} className="hover:bg-gray-50">
-                                        <td className="px-3 py-2">
-                                            <select
-                                                value={room.roomType}
-                                                onChange={(e) => updateRoom(room.id, 'roomType', e.target.value)}
-                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                            >
-                                                <option value="">Select</option>
-                                                <option value="Extreme Deluxe">Extreme Deluxe</option>
-                                                <option value="Super Deluxe">Super Deluxe</option>
-                                            </select>
+                            <tbody>
+                                {rooms.map(room => (
+                                    <tr key={room.id} className="border-b border-gray-50 group hover:bg-gray-50/50 transition-all">
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1">
+                                                <select value={room.roomType} onChange={e => updateRoom(room.id, 'roomType', e.target.value)} className="w-full text-sm font-black text-gray-900 bg-transparent border-0 p-0 focus:ring-0">
+                                                    <option>Extreme Deluxe</option>
+                                                    <option>Executive Suite</option>
+                                                    <option>Super Room</option>
+                                                </select>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase">Room {room.roomNumber}</span>
+                                                    <span className="text-[10px] font-bold text-gray-400">Assigned</span>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td className="px-3 py-2">
-                                            <input
-                                                type="number"
-                                                value={room.quantity}
-                                                onChange={(e) => updateRoom(room.id, 'quantity', Number(e.target.value))}
-                                                className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                                min="1"
-                                            />
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-[10px] text-gray-400 font-bold uppercase">A</span>
+                                                    <span className="text-xs font-black">{room.adult}</span>
+                                                </div>
+                                                <div className="w-[1px] h-4 bg-gray-200 mx-1" />
+                                                <div className="flex flex-col items-center text-pink-500">
+                                                    <span className="text-[10px] text-gray-400 font-bold uppercase">C</span>
+                                                    <span className="text-xs font-black">{room.child}</span>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td className="px-3 py-2">
-                                            <select
-                                                value={room.rateType}
-                                                onChange={(e) => updateRoom(room.id, 'rateType', e.target.value)}
-                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                            >
-                                                <option value="">Select</option>
-                                                <option value="Deluxe Plan">Deluxe Plan</option>
-                                                <option value="Super Room">Super Room</option>
-                                            </select>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1">
+                                                <select value={room.rateType} onChange={e => updateRoom(room.id, 'rateType', e.target.value)} className="text-sm font-black text-blue-600 bg-transparent border-0 p-0 focus:ring-0">
+                                                    <option value="Winter Bundle">Ultimate Honeymoon Package</option>
+                                                    <option value="BAR">Best Available Rate</option>
+                                                </select>
+                                                <div className="flex gap-1">
+                                                    <Tag size={10} className="text-emerald-500 mt-0.5" />
+                                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">Meals + Pool + Transport Included</span>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td className="px-3 py-2">
-                                            <input
-                                                type="text"
-                                                value={room.roomNumber}
-                                                onChange={(e) => updateRoom(room.id, 'roomNumber', e.target.value)}
-                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                            />
+                                        <td className="px-6 py-4 text-right">
+                                            <p className="text-sm font-black text-gray-900">৳ {room.rate.toLocaleString()}</p>
+                                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Tax Inclusve</p>
                                         </td>
-                                        <td className="px-3 py-2 text-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={room.assigned}
-                                                onChange={(e) => updateRoom(room.id, 'assigned', e.target.checked)}
-                                                className="w-4 h-4"
-                                            />
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <input
-                                                type="number"
-                                                value={room.adult}
-                                                onChange={(e) => updateRoom(room.id, 'adult', Number(e.target.value))}
-                                                className="w-14 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-center"
-                                                min="0"
-                                            />
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <input
-                                                type="number"
-                                                value={room.child}
-                                                onChange={(e) => updateRoom(room.id, 'child', Number(e.target.value))}
-                                                className="w-14 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-center"
-                                                min="0"
-                                            />
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <input
-                                                type="number"
-                                                value={room.rate}
-                                                onChange={(e) => updateRoom(room.id, 'rate', Number(e.target.value))}
-                                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-right"
-                                                min="0"
-                                            />
-                                        </td>
-                                        <td className="px-3 py-2 text-center">
-                                            <button
-                                                onClick={() => removeRoom(room.id)}
-                                                className="text-red-600 hover:text-red-800"
-                                            >
+                                        <td className="px-6 py-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => removeRoom(room.id)} className="p-2 text-gray-300 hover:text-red-500">
                                                 <X size={16} />
                                             </button>
                                         </td>
@@ -282,97 +217,118 @@ const QuickReservation = () => {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-
-                    {/* Add Room Button */}
-                    <div className="px-4 py-2 border-t">
-                        <button
-                            onClick={addRoom}
-                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                            + Add Room
+                        <button onClick={addRoom} className="w-full py-4 text-xs font-black text-gray-400 uppercase tracking-[0.2em] hover:bg-gray-50 hover:text-blue-600 transition-all border-t border-gray-50">
+                            + Add New Room Strategy
                         </button>
                     </div>
 
-                    {/* Total Amount */}
-                    <div className="px-4 py-3 border-t bg-gray-50 flex justify-end">
-                        <div className="text-right">
-                            <span className="text-sm text-gray-600 mr-4">Total Amount:</span>
-                            <span className="text-lg font-bold text-gray-900">฿{totalAmount}</span>
+                    {/* Dynamic Add-Ons Section */}
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                                <Coffee size={16} className="text-rose-500" />
+                                Incremental Services (Add-ons)
+                            </h3>
+                            <span className="text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-md uppercase tracking-widest">Layer 1 Master Service Integration</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            {selectedAddOns.map((ad, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 bg-gray-50 group hover:border-blue-200 transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-gray-100 shadow-sm text-gray-400">
+                                            <Plus size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-black text-gray-900">{ad.name}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase">{ad.category}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right flex items-center gap-4">
+                                        <p className="text-sm font-black text-gray-900">৳ {ad.price}</p>
+                                        <button className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            <button className="flex items-center justify-center p-4 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-600 transition-all">
+                                <Plus size={20} className="mb-0.5" />
+                                <span className="ml-2 text-xs font-black uppercase tracking-widest">Browse Master Services</span>
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    {/* Guest Details */}
-                    <div className="p-4 border-t">
-                        <div className="grid grid-cols-5 gap-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
-                                <select
-                                    value={guestTitle}
-                                    onChange={(e) => setGuestTitle(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                >
+                {/* Right Side: Guest Info & Summary Container */}
+                <div className="w-96 flex flex-col gap-6">
+                    {/* Guest Profile Mini */}
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-6">
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Primary Guest Identity</h3>
+                        <div className="space-y-4">
+                            <div className="flex gap-2">
+                                <select value={guestTitle} onChange={e => setGuestTitle(e.target.value)} className="w-20 px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm font-black focus:ring-2 focus:ring-blue-500">
                                     <option>Mr.</option>
                                     <option>Mrs.</option>
                                     <option>Ms.</option>
                                 </select>
+                                <input type="text" value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="Full Name *" className="flex-1 px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm font-black focus:ring-2 focus:ring-blue-500" />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Name*</label>
-                                <input
-                                    type="text"
-                                    value={guestName}
-                                    onChange={(e) => setGuestName(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
+                            <input 
+                                type="text" 
+                                value={guestMobile} 
+                                onChange={e => setGuestMobile(e.target.value)} 
+                                placeholder="Mobile Communication *" 
+                                className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm font-black focus:ring-2 focus:ring-blue-500" 
+                            />
+                            <input type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)} placeholder="Email Address" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm font-black focus:ring-2 focus:ring-blue-500" />
+                            <input type="text" value={guestCompany} onChange={e => setGuestCompany(e.target.value)} placeholder="Corporate/Agent (NEXUS-IT)" className="w-full px-4 py-3 bg-emerald-50 border-0 rounded-xl text-sm font-black text-emerald-900 focus:ring-2 focus:ring-emerald-500 placeholder-emerald-300" />
+                        </div>
+                    </div>
+
+                    {/* Price Summary Breakdown */}
+                    <div className="bg-gray-900 rounded-3xl p-8 text-white shadow-xl shadow-gray-900/40 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 -mr-16 -mt-16 rounded-full blur-3xl" />
+                        
+                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.2em] mb-6">Reservation Summary</h3>
+                        
+                        <div className="space-y-4 mb-8">
+                            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                                <span className="text-xs font-bold text-gray-400">Total Room Nights ({nights})</span>
+                                <span className="text-sm font-black tracking-tight">৳ {roomTotal.toLocaleString()}</span>
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Mobile No.*</label>
-                                <input
-                                    type="text"
-                                    value={guestMobile}
-                                    onChange={(e) => setGuestMobile(e.target.value)}
-                                    placeholder="Regular Guest"
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
+                            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                                <span className="text-xs font-bold text-gray-400">Selected Add-ons</span>
+                                <span className="text-sm font-black tracking-tight">৳ {addOnTotal.toLocaleString()}</span>
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    value={guestEmail}
-                                    onChange={(e) => setGuestEmail(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
+                            <div className="flex justify-between items-center bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                                <div className="flex items-center gap-2">
+                                    <ShieldCheck size={14} className="text-emerald-500" />
+                                    <span className="text-xs font-bold text-emerald-400">Package Savings Applied</span>
+                                </div>
+                                <span className="text-xs font-black text-emerald-500">- ৳ 2,400</span>
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Company Name</label>
-                                <input
-                                    type="text"
-                                    value={guestCompany}
-                                    onChange={(e) => setGuestCompany(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                />
+                        </div>
+
+                        <div className="border-t border-white/10 pt-6">
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Grand Estimated Total</p>
+                                    <p className="text-4xl font-black text-white tracking-tighter">৳ {grandTotal.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-white shadow-lg shadow-blue-600/40">
+                                    Confirmed
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-end gap-2">
-                        <button className="px-4 py-2 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50">
-                            Add Payment
+                    {/* Final Action Buttons */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <button className="py-4 bg-white border border-gray-200 text-gray-900 font-bold rounded-2xl hover:bg-gray-50 transition-all text-xs uppercase tracking-widest shadow-sm">
+                            Temporary Hold
                         </button>
-                        <button className="px-4 py-2 text-sm border border-purple-600 text-purple-600 rounded hover:bg-purple-50">
-                            Hold Till
-                        </button>
-                        <button className="px-4 py-2 text-sm border border-orange-600 text-orange-600 rounded hover:bg-orange-50">
-                            Temporary Reserve
-                        </button>
-                        <button className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700">
-                            Reserve
-                        </button>
-                        <button className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                            Check In
+                        <button className="py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20">
+                            Check-In Now
                         </button>
                     </div>
                 </div>

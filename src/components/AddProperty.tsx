@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import {
-    Save, ArrowLeft, Image as ImageIcon, Building2, MapPin, Clock,
-    CreditCard, Settings, Monitor, Shield, User, Trash2, Plus, Moon
+    ArrowLeft, Building2, Clock,
+    CreditCard, Monitor, User,
+    Briefcase, MapPin, Shield, Settings,
+    Zap, CheckCircle2, LogIn, ShieldCheck, ShieldAlert,
+    DollarSign, Calendar, AlertCircle, FileText,
+    Image, Trash2, Plus
 } from 'lucide-react';
 
 interface AddPropertyProps {
@@ -9,146 +13,12 @@ interface AddPropertyProps {
     initialData?: any;
 }
 
-interface PosConfig {
-    id: number;
-    type: string;
-    count: number;
-}
-
-interface BankAccount {
-    id: number;
-    bankName: string;
-    accountName: string;
-    accountNum: string;
-    swift: string;
-}
-
-interface Poc {
-    id: number;
-    role: string;
-    name: string;
-    phone: string;
-    email: string;
-}
-
 const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
     const [activeTab, setActiveTab] = useState('identity');
-    const [posConfigs, setPosConfigs] = useState<PosConfig[]>([{ id: 1, type: 'Restaurant', count: 1 }]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(initialData?.finance?.bankAccounts || [{ id: 1, bankName: '', accountName: '', accountNum: '', swift: '' }]);
-    const [pocs, setPocs] = useState<Poc[]>(initialData?.pocs || [{ id: 1, role: 'General Manager', name: '', phone: '', email: '' }]);
-    const [activeModules, setActiveModules] = useState<string[]>(['Front Office', 'Housekeeping']);
-    const [weekends, setWeekends] = useState<string[]>(initialData?.operations?.weekends || ['Fri', 'Sat']);
+    const [activePolicyPillar, setActivePolicyPillar] = useState('booking');
 
-    // --- New State Variables for Added Fields ---
-    const [defaultNationality, setDefaultNationality] = useState('Bangladeshi');
-    const [mapCoordinates, setMapCoordinates] = useState({ lat: '', lng: '' });
-    const [stateCaption, setStateCaption] = useState('State');
-    const [zipCaption, setZipCaption] = useState('Zip Code');
+    // --- State Management ---
 
-    // Operations
-    const [timeFormat, setTimeFormat] = useState('24h');
-    const [dateFormat, setDateFormat] = useState('DD-MM-YYYY');
-    const [defaultSalutation, setDefaultSalutation] = useState('Mr.');
-    const [defaultIdentity, setDefaultIdentity] = useState('NID');
-    const [defaultBillTo, setDefaultBillTo] = useState('Guest');
-    const [cancellationPolicyText, setCancellationPolicyText] = useState('');
-
-    // Finance
-    const [isTaxInclusive, setIsTaxInclusive] = useState(false);
-    const [roundOffType, setRoundOffType] = useState('Nearest');
-    const [roundOffLimit, setRoundOffLimit] = useState(1.00);
-    const [addRoundOffToRate, setAddRoundOffToRate] = useState(false);
-    const [serviceCharge, setServiceCharge] = useState(10);
-    const [creditCardGateway, setCreditCardGateway] = useState('Stripe');
-
-    // System
-    const [webRateMode, setWebRateMode] = useState('Regular');
-    const [webInventoryMode, setWebInventoryMode] = useState('Regular (Live)');
-    const [autoEmailFolio, setAutoEmailFolio] = useState(true);
-    const [posConfigType, setPosConfigType] = useState('Integrated POS'); // vs Third-party
-
-    // POS Handlers
-    const addPosConfig = () => setPosConfigs([...posConfigs, { id: Date.now(), type: 'Restaurant', count: 1 }]);
-    const removePosConfig = (id: number) => setPosConfigs(posConfigs.filter(cfg => cfg.id !== id));
-    const updatePosConfig = (id: number, field: keyof PosConfig, value: string | number) => {
-        setPosConfigs(posConfigs.map(cfg => cfg.id === id ? { ...cfg, [field]: value } : cfg));
-    };
-
-    // Bank Handlers
-    const addBank = () => setBankAccounts([...bankAccounts, { id: Date.now(), bankName: '', accountName: '', accountNum: '', swift: '' }]);
-    const removeBank = (id: number) => setBankAccounts(bankAccounts.filter(b => b.id !== id));
-    const updateBank = (id: number, field: keyof BankAccount, value: string) => {
-        setBankAccounts(bankAccounts.map(b => b.id === id ? { ...b, [field]: value } : b));
-    };
-
-    // POC Handlers
-    const addPoc = () => setPocs([...pocs, { id: Date.now(), role: 'General Manager', name: '', phone: '', email: '' }]);
-    const removePoc = (id: number) => setPocs(pocs.filter(p => p.id !== id));
-    const updatePoc = (id: number, field: keyof Poc, value: string) => {
-        setPocs(pocs.map(p => p.id === id ? { ...p, [field]: value } : p));
-    };
-
-    // Module Handler
-    const toggleModule = (module: string) => {
-        setActiveModules(prev => prev.includes(module) ? prev.filter(m => m !== module) : [...prev, module]);
-    };
-
-    // Policy State
-    const [cancellationPolicy, setCancellationPolicy] = useState(initialData?.operations?.cancellation || 'Flexible');
-    const [noShowPolicy, setNoShowPolicy] = useState('Charge 1st Night');
-    const [smokingPolicy, setSmokingPolicy] = useState(initialData?.operations?.smoking || 'Non-Smoking Property');
-    const [petPolicy, setPetPolicy] = useState('Not Allowed');
-    const [visitorPolicy, setVisitorPolicy] = useState('Not Allowed in Room');
-    const [regCardTerms, setRegCardTerms] = useState(initialData?.operations?.regCardTerms || '');
-
-    // Finance State
-    const [invoiceTerms, setInvoiceTerms] = useState(initialData?.finance?.invoiceTerms || '');
-
-    // Identity State
-    const [selectedAmenities, setSelectedAmenities] = useState<string[]>(initialData?.amenities || ['WiFi', 'Parking']);
-    const toggleAmenity = (item: string) => setSelectedAmenities(prev => prev.includes(item) ? prev.filter(a => a !== item) : [...prev, item]);
-
-    // Automation State (Restored)
-    const [auditTime, setAuditTime] = useState(initialData?.automation?.auditTime || "02:00");
-    const [emailReports, setEmailReports] = useState(initialData?.automation?.email || "");
-    const [autoRun, setAutoRun] = useState(initialData?.automation?.autoRun || false);
-    const [autoPostRent, setAutoPostRent] = useState(initialData?.automation?.autoPostRent || true);
-    const [forceClosePos, setForceClosePos] = useState(initialData?.automation?.forceClosePos || true);
-    const [blockLogin, setBlockLogin] = useState(initialData?.automation?.blockLogin || false);
-    const [autoBackup, setAutoBackup] = useState(initialData?.automation?.autoBackup || true);
-    const [selectedReports, setSelectedReports] = useState<string[]>(initialData?.automation?.reports || ['Daily Revenue', 'Occupancy Report']);
-
-    const toggleReport = (report: string) => {
-        setSelectedReports(prev => prev.includes(report) ? prev.filter(r => r !== report) : [...prev, report]);
-    };
-
-    // Policy Descriptions
-    const policyDescriptions: { [key: string]: { [key: string]: string } } = {
-        cancellation: {
-            'Flexible': 'Free cancellation up to 24h before check-in',
-            'Moderate': 'Charge 1st night if cancelled within 48h',
-            'Strict': 'Non-refundable booking (100% charge)'
-        },
-        noShow: {
-            'Charge 1st Night': 'Guest charged for the first night only',
-            'Charge Full Amount': 'Guest charged for the entire stay duration'
-        },
-        smoking: {
-            'Non-Smoking Property': 'Smoking is strictly prohibited in all areas',
-            'Smoking Allowed': 'Smoking is allowed in rooms and common areas',
-            'Designated Areas Only': 'Smoking allowed only in specific zones (Balcony/Lobby)'
-        },
-        pet: {
-            'Not Allowed': 'Pets are not permitted on the property',
-            'Allowed (Free)': 'Pets allowed at no extra cost',
-            'Allowed (Paid)': 'Pets allowed with a daily cleaning fee'
-        },
-        visitor: {
-            'Not Allowed in Room': 'Visitors must meet guests in the lobby only',
-            'Allowed till 10 PM': 'Visitors allowed in room until 10:00 PM',
-            'ID Required': 'Visitors allowed with valid Photo ID registration'
-        }
-    };
 
     const tabs = [
         { id: 'identity', label: 'Identity & Location', icon: <Building2 size={18} /> },
@@ -158,572 +28,565 @@ const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
         { id: 'branding', label: 'Branding & POC', icon: <User size={18} /> },
     ];
 
+    const pillars = [
+        { id: 'booking', label: 'Booking & Cancel', icon: <Calendar size={14} /> },
+        { id: 'corporate', label: 'Corporate & Agency', icon: <Briefcase size={14} /> },
+        { id: 'revenue', label: 'Revenue & Inventory', icon: <Zap size={14} /> },
+        { id: 'arrival', label: 'Arrival & Departure', icon: <LogIn size={14} /> },
+        { id: 'occupancy', label: 'Guest & Occupancy', icon: <User size={14} /> },
+        { id: 'finance_sec', label: 'Finance & Security', icon: <DollarSign size={14} /> },
+        { id: 'ops', label: 'Operational & Safety', icon: <Settings size={14} /> },
+        { id: 'legal', label: 'Legal & Compliance', icon: <Shield size={14} /> },
+    ];
+
+    const SectionTitle = ({ icon: Icon, title }: { icon: any, title: string }) => (
+        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
+            <Icon size={18} className="text-gray-400" />
+            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-tight">{title}</h3>
+        </div>
+    );
+
+    const FormField = ({ label, required, children }: any) => (
+        <div className="space-y-1.5 flex flex-col">
+            <label className="text-[11px] font-bold text-gray-500 ml-1">
+                {label} {required && <span className="text-red-500">*</span>}
+            </label>
+            {children}
+        </div>
+    );
+
+    const Input = (props: any) => (
+        <input {...props} className={`w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder:text-gray-300 ${props.className}`} />
+    );
+
+    const Select = (props: any) => (
+        <select {...props} className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none appearance-none cursor-pointer">
+            {props.children}
+        </select>
+    );
+
+    const Checkbox = ({ label, checked, onChange, sub }: any) => (
+        <label className="flex items-start gap-3 cursor-pointer group p-2 hover:bg-gray-50 rounded-lg transition-all">
+            <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${checked ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300 group-hover:border-blue-400'}`}>
+                {checked && <div className="w-1.5 h-2.5 border-r-2 border-b-2 border-white rotate-45 mb-0.5" />}
+            </div>
+            <input type="checkbox" className="hidden" checked={checked} onChange={onChange} />
+            <div className="flex flex-col">
+                <span className={`text-xs font-bold ${checked ? 'text-blue-700' : 'text-gray-600'}`}>{label}</span>
+                {sub && <span className="text-[9px] text-gray-400 leading-tight font-medium">{sub}</span>}
+            </div>
+        </label>
+    );
+
+    const PillarButton = ({ pillar }: any) => (
+        <button 
+            onClick={() => setActivePolicyPillar(pillar.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${activePolicyPillar === pillar.id ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-white'}`}
+        >
+            {pillar.icon} <span>{pillar.label}</span>
+        </button>
+    );
+
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+        <div className="min-h-screen bg-[#f8f9fc] text-slate-700 font-sans">
             {/* Header */}
-            <header className="bg-white border-b sticky top-0 z-10 px-4 py-3 flex justify-between items-center shadow-sm">
-                <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-                        <ArrowLeft size={20} />
+            <header className="bg-white border-b px-8 py-3 flex justify-between items-center sticky top-0 z-30">
+                <div className="flex items-center gap-4">
+                    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg border border-gray-100 transition-all">
+                        <ArrowLeft size={18} className="text-gray-500" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800">{initialData ? 'Edit Property' : 'Add New Property'}</h1>
-                        <p className="text-xs text-gray-500">Configure your hotel settings and details</p>
+                        <h1 className="text-lg font-bold text-slate-800 tracking-tight">Add New Property</h1>
+                        <p className="text-[10px] text-slate-400 font-medium">Enterprise Policy Architecture Hub</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm">Save Draft</button>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2">
-                        <Save size={16} /> Save & Publish
+                    <button className="px-5 py-2 hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 transition-all">Save Draft</button>
+                    <button className="px-6 py-2 bg-[#0052cc] text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm shadow-blue-500/20 active:scale-95 transition-all">
+                        <CheckCircle2 size={16} /> Save & Publish
                     </button>
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-                <div className="flex flex-col md:flex-row gap-6">
-                    {/* Tabs Sidebar */}
-                    <div className="w-full md:w-56 flex-shrink-0 space-y-3">
-                        <nav className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col sticky top-24 overflow-hidden">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-3 px-4 py-4 text-sm font-medium transition-colors w-full text-left border-l-4 ${activeTab === tab.id
-                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                        : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                                        }`}
-                                >
-                                    {tab.icon}
-                                    <span>{tab.label}</span>
-                                </button>
-                            ))}
-                        </nav>
+            <main className="max-w-[1500px] mx-auto p-6 lg:p-10 flex flex-col lg:flex-row gap-8">
+                {/* Left Sidebar Nav */}
+                <aside className="w-full lg:w-72 flex-shrink-0">
+                    <nav className="bg-white rounded-2xl border border-gray-200 p-2 shadow-sm sticky top-24">
+                        {tabs.map((tab) => (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-[#e9f0ff] text-[#0052cc] border-l-4 border-[#0052cc]' : 'text-gray-400 hover:bg-gray-50'}`}>
+                                {tab.icon} <span>{tab.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </aside>
 
-                        <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100 text-xs text-blue-800">
-                            <strong>Tip:</strong> You can save as "Draft" at any time and resume later.
+                {/* Content Area */}
+                <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm min-h-[850px] overflow-hidden flex flex-col">
+                    
+                    {activeTab === 'identity' && (
+                        <div className="p-10 space-y-12 animate-in fade-in duration-300">
+                            <div>
+                                <SectionTitle icon={Building2} title="General Information" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <FormField label="Hotel Name" required><Input defaultValue={initialData?.name} placeholder="Official Property Name" /></FormField>
+                                    <FormField label="Property Code" required><Input defaultValue={initialData?.code} placeholder="e.g. HTL-DHK-01" /></FormField>
+                                    <FormField label="Property Type"><Select defaultValue={initialData?.type}><option>Hotel</option><option>Resort</option><option>Apartment</option></Select></FormField>
+                                    <FormField label="Grade / Star Rating"><Select defaultValue={initialData?.starRating}><option>5 Star</option><option>4 Star</option><option>3 Star</option></Select></FormField>
+                                    <FormField label="Total Rooms Count" required><Input type="number" defaultValue={initialData?.totalRooms} /></FormField>
+                                    <FormField label="Established Year"><Input placeholder="YYYY" /></FormField>
+                                    <FormField label="Website"><Input placeholder="https://..." /></FormField>
+                                    <FormField label="Default Nationality"><Select><option>Bangladeshi</option><option>American</option></Select></FormField>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <SectionTitle icon={MapPin} title="Location & Contact" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="md:col-span-2 lg:col-span-4"><FormField label="Address" required><textarea className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm min-h-[80px]" defaultValue={initialData?.address} /></FormField></div>
+                                    <FormField label="City"><Input placeholder="Dhaka" /></FormField>
+                                    <FormField label="Country" required><Input defaultValue="Bangladesh" /></FormField>
+                                    <FormField label="State"><Input placeholder="State" /></FormField>
+                                    <FormField label="Zip Code"><Input placeholder="Zip Code" /></FormField>
+                                    <FormField label="Map Latitude"><Input placeholder="e.g. 23.8103" /></FormField>
+                                    <FormField label="Map Longitude"><Input placeholder="e.g. 90.4125" /></FormField>
+                                    <FormField label="Timezone" required><Select><option>GMT+6 (Asia/Dhaka)</option></Select></FormField>
+                                    <FormField label="Phone"><Input placeholder="Property Phone" /></FormField>
+                                    <FormField label="Email"><Input type="email" placeholder="Property Email" /></FormField>
+                                </div>
+                            </div>
+
+                            <div>
+                                <SectionTitle icon={Zap} title="Property Amenities" />
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                    <Checkbox label="WiFi" checked={true} />
+                                    <Checkbox label="Parking" checked={true} />
+                                    <Checkbox label="Swimming Pool" />
+                                    <Checkbox label="Gym" />
+                                    <Checkbox label="Spa" />
+                                    <Checkbox label="Restaurant" checked={true} />
+                                    <Checkbox label="Bar" />
+                                    <Checkbox label="Room Service" checked={true} />
+                                    <Checkbox label="Conference Room" />
+                                    <Checkbox label="Airport Shuttle" />
+                                    <Checkbox label="Wheelchair Accessible" />
+                                    <Checkbox label="Elevator" checked={true} />
+                                </div>
+                            </div>
+
+                            <div>
+                                <SectionTitle icon={Briefcase} title="Corporate Office" />
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <FormField label="Corporate Address"><textarea className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm min-h-[80px]" placeholder="Office address..." /></FormField>
+                                    <FormField label="Corporate Phone"><Input placeholder="Corporate Phone" /></FormField>
+                                    <FormField label="Corporate Email"><Input type="email" placeholder="Corporate Email" /></FormField>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Form Content */}
-                    <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-6 min-h-[600px]">
-
-                        {/* TAB 1: IDENTITY & LOCATION */}
-                        {activeTab === 'identity' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                {/* Section 1: General Info */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Building2 size={20} className="text-gray-400" /> General Information</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-1 col-span-2">
-                                            <label className="text-sm font-medium text-gray-700">Hotel Name <span className="text-red-500">*</span></label>
-                                            <input type="text" defaultValue={initialData?.name} placeholder="Official Property Name" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Property Code <span className="text-red-500">*</span></label>
-                                            <input type="text" defaultValue={initialData?.id ? `HTL-${initialData.id.toString().padStart(2, '0')}` : ''} placeholder="e.g. HTL-DHK-01" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Property Type</label>
-                                            <select defaultValue="Hotel" className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>Hotel</option><option>Resort</option><option>Guest House</option><option>Motel</option><option>Apartment</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Grade / Star Rating</label>
-                                            <select defaultValue={initialData?.grade || '5 Star'} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>5 Star</option><option>4 Star</option><option>3 Star</option><option>2 Star</option><option>1 Star</option><option>Luxury</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Total Rooms Count <span className="text-red-500">*</span></label>
-                                            <input type="number" defaultValue={initialData?.rooms} className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Established Year</label>
-                                            <input type="number" defaultValue={initialData?.established} placeholder="YYYY" className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                        </div>
-                                        <div className="space-y-1 col-span-2">
-                                            <label className="text-sm font-medium text-gray-700">Website</label>
-                                            <input type="text" defaultValue={initialData?.website} placeholder="https://" className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Default Nationality</label>
-                                            <select value={defaultNationality} onChange={(e) => setDefaultNationality(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>Bangladeshi</option><option>Malaysian</option><option>Indian</option><option>American</option><option>British</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 2: Location */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><MapPin size={20} className="text-gray-400" /> Location & Contact</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="col-span-2 space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Address <span className="text-red-500">*</span></label>
-                                            <textarea rows={2} defaultValue={initialData?.address} className="w-full px-3 py-2 border rounded-lg outline-none"></textarea>
-                                        </div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">City</label><select defaultValue={initialData?.city} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Dhaka</option><option>Miami</option><option>London</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Country <span className="text-red-500">*</span></label><select defaultValue={initialData?.country} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Bangladesh</option><option>Malaysia</option><option>USA</option><option>UK</option></select></div>
-
-                                        {/* Dynamic Captions */}
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-gray-500 flex justify-between"><span>Region Caption</span> <input type="text" value={stateCaption} onChange={(e) => setStateCaption(e.target.value)} className="w-20 text-right border-b outline-none text-[10px]" /></label>
-                                            <input type="text" placeholder={stateCaption} className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-gray-500 flex justify-between"><span>Zip Caption</span> <input type="text" value={zipCaption} onChange={(e) => setZipCaption(e.target.value)} className="w-20 text-right border-b outline-none text-[10px]" /></label>
-                                            <input type="text" placeholder={zipCaption} className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                        </div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Map Latitude</label><input type="text" value={mapCoordinates.lat} onChange={(e) => setMapCoordinates({ ...mapCoordinates, lat: e.target.value })} placeholder="e.g. 23.8103" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Map Longitude</label><input type="text" value={mapCoordinates.lng} onChange={(e) => setMapCoordinates({ ...mapCoordinates, lng: e.target.value })} placeholder="e.g. 90.4125" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Timezone <span className="text-red-500">*</span></label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>GMT+6 (Asia/Dhaka)</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Phone</label><input type="text" defaultValue={initialData?.phone} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Email</label><input type="email" defaultValue={initialData?.email} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
-                                        <div className="col-span-1 md:col-span-2 mt-4 pt-4 border-t">
-                                            <h3 className="text-sm font-bold text-gray-900 mb-4">Property Amenities</h3>
-                                            <div className="flex flex-wrap gap-2">
-                                                {['WiFi', 'Parking', 'Swimming Pool', 'Gym', 'Spa', 'Restaurant', 'Bar', 'Room Service', 'Conference Room', 'Airport Shuttle', 'Wheelchair Accessible', 'Elevator'].map(item => (
-                                                    <label key={item} className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors ${selectedAmenities.includes(item) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'hover:bg-gray-50'}`}>
-                                                        <input type="checkbox" checked={selectedAmenities.includes(item)} onChange={() => toggleAmenity(item)} className="rounded text-blue-600" />
-                                                        <span className="text-sm font-medium">{item}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="col-span-1 md:col-span-2 mt-4 pt-4 border-t">
-                                            <h3 className="text-sm font-bold text-gray-900 mb-4">Corporate Office</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="col-span-2 space-y-1">
-                                                    <label className="text-sm font-medium text-gray-700">Corporate Address</label>
-                                                    <textarea rows={2} defaultValue={initialData?.corporate?.address} placeholder="Office address..." className="w-full px-3 py-2 border rounded-lg outline-none"></textarea>
-                                                </div>
-                                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Corporate Phone</label><input type="text" defaultValue={initialData?.corporate?.phone} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Corporate Email</label><input type="email" defaultValue={initialData?.corporate?.email} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                    {activeTab === 'operations' && (
+                        <div className="flex-1 flex overflow-hidden">
+                            {/* Inner Pillar Nav */}
+                            <div className="w-64 bg-gray-50 border-r border-gray-100 p-4 space-y-2 overflow-y-auto no-scrollbar">
+                                <p className="px-4 text-[9px] font-black text-gray-400 uppercase tracking-widest mb-4">Policy Engine Pillars</p>
+                                {pillars.map(pillar => <PillarButton key={pillar.id} pillar={pillar} />)}
                             </div>
-                        )}
 
-                        {/* TAB 2: OPERATIONS & POLICY */}
-                        {activeTab === 'operations' && (
-                            <div className="space-y-8 animate-fadeIn">
-
-                                {/* 1. Timing & Schedules */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Clock size={20} className="text-gray-400" /> 1. Operations & Defaults</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
-                                        {/* Formats */}
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Time Format</label><select value={timeFormat} onChange={(e) => setTimeFormat(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>24 Hours (14:00)</option><option>12 Hours (02:00 PM)</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Date Format</label><select value={dateFormat} onChange={(e) => setDateFormat(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>DD-MM-YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Check-in Time</label><input type="time" defaultValue={initialData?.operations?.checkIn || "14:00"} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Check-out Time</label><input type="time" defaultValue={initialData?.operations?.checkOut || "12:00"} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Default Salutation</label><select value={defaultSalutation} onChange={(e) => setDefaultSalutation(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Mr.</option><option>Ms.</option><option>Mrs.</option><option>Dr.</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Default Identity</label><select value={defaultIdentity} onChange={(e) => setDefaultIdentity(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>NID</option><option>Passport</option><option>Driving License</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Default Bill To</label><select value={defaultBillTo} onChange={(e) => setDefaultBillTo(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Guest</option><option>Company</option></select></div>
-
-                                        <div className="col-span-1 md:col-span-2 lg:col-span-4 space-y-1">
-                                            <label className="text-sm font-medium text-gray-700 block mb-2">Weekend Selection (for special pricing)</label>
-                                            <div className="flex gap-2 flex-wrap">
-                                                {['Fri', 'Sat', 'Sun', 'Thu'].map(day => (
-                                                    <label key={day} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded border cursor-pointer hover:bg-white hover:shadow-sm transition-all">
-                                                        <input type="checkbox" checked={weekends.includes(day)} onChange={() => {
-                                                            setWeekends(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
-                                                        }} className="rounded text-blue-600 w-4 h-4" /> <span className="font-medium">{day}</span>
-                                                    </label>
-                                                ))}
+                            {/* Inner Pillar Content */}
+                            <div className="flex-1 p-10 overflow-y-auto animate-in slide-in-from-right-2 duration-300">
+                                {activePolicyPillar === 'booking' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={Calendar} title="1. Booking & Cancellation Policies" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <FormField label="Cancellation Rule"><Select><option>Flexible (24h)</option><option>Moderate (48h)</option><option>Non-Refundable</option></Select></FormField>
+                                            <FormField label="No-Show Policy"><Select><option>First Night Charge</option><option>Total Price Charge</option><option>Flat Fee ($50)</option></Select></FormField>
+                                            <div className="md:col-span-2"><FormField label="Auto-Release Timing"><Select><option>Release at 6:00 PM (Local Time)</option><option>Hold Until Midnight</option></Select></FormField></div>
+                                            <div className="md:col-span-2"><FormField label="Detailed Cancellation Text"><textarea className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm min-h-[100px]" placeholder="Terms displayed on confirmation emails..." /></FormField></div>
+                                        </div>
+                                        <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 space-y-4">
+                                            <p className="text-[10px] font-bold text-blue-800 uppercase italic">Automation & Grace Period</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <Checkbox label="Allow Grace Period?" sub="Policy override for instant booking errors" checked={true} />
+                                                <FormField label="Grace Period Duration (Hours)"><Input type="number" defaultValue={2} /></FormField>
+                                                <Checkbox label="Require Booking Guarantee?" sub="Mandatory CC for all non-corporate bookings" checked={true} />
+                                                <Checkbox label="Auto-Charge No-Show?" sub="Execute charge during Night Audit" checked={true} />
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
-                                {/* 2. Policies */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><CreditCard size={20} className="text-gray-400" /> 2. Booking & Cancellation Policies</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Cancellation Rule</label>
-                                            <select value={cancellationPolicy} onChange={(e) => setCancellationPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option value="Flexible">Flexible (24h)</option>
-                                                <option value="Moderate">Moderate (48h)</option>
-                                                <option value="Strict">Strict (Non-refundable)</option>
-                                            </select>
-                                            <p className="text-xs text-blue-600 mt-1">{policyDescriptions.cancellation[cancellationPolicy]}</p>
+                                {activePolicyPillar === 'corporate' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={Briefcase} title="2. Corporate & Agency Management" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <FormField label="Default City Ledger (AR) Limit"><div className="flex items-center gap-2 font-bold text-gray-400"><span>$</span><Input type="number" defaultValue={5000} /></div></FormField>
+                                            <FormField label="IATA Agency Commission %"><div className="flex items-center gap-2 font-bold text-gray-400"><Input type="number" defaultValue={10} /><span>%</span></div></FormField>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">No-Show Policy</label>
-                                            <select value={noShowPolicy} onChange={(e) => setNoShowPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>Charge 1st Night</option>
-                                                <option>Charge Full Amount</option>
-                                            </select>
-                                            <p className="text-xs text-blue-600 mt-1">{policyDescriptions.noShow[noShowPolicy]}</p>
+                                        <Checkbox label="Allow Bill-to-Company?" sub="Enable direct billing for recognized corporate entities" checked={true} />
+                                    </div>
+                                )}
+
+                                {activePolicyPillar === 'revenue' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={Zap} title="3. Revenue & Inventory controls" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <FormField label="Waitlist Retention Days"><Input type="number" defaultValue={3} /></FormField>
+                                            <FormField label="Overbooking Limit (Rooms/%)"><Input placeholder="e.g. 5 or 5%" defaultValue="5%" /></FormField>
+                                            <div className="md:col-span-2">
+                                                <Checkbox label="Allow Overbooking?" sub="Trigger dashboard warnings when inventory > 100%" checked={false} />
+                                            </div>
                                         </div>
-                                        <div className="col-span-2 space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Detailed Cancellation Policy Text</label>
-                                            <textarea value={cancellationPolicyText} onChange={(e) => setCancellationPolicyText(e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="Enter the full text of the cancellation policy to be displayed on booking confirmations..."></textarea>
-                                        </div>
-                                        <div className="col-span-2 space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Guest Registration Card Terms</label>
-                                            <textarea value={regCardTerms} onChange={(e) => setRegCardTerms(e.target.value)} rows={3} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="Terms & Conditions printed on the Guest Registration Card..."></textarea>
+                                        <div className="bg-[#fff9e6] p-6 rounded-[2rem] border border-[#ffeeba] space-y-3">
+                                            <div className="flex items-center gap-2 text-[#856404] font-black uppercase text-[10px] italic"><AlertCircle size={14} /> Waitlist Automation</div>
+                                            <p className="text-[10px] text-[#856404]/80">If rooms are full, bookings go to 'Waitlist'. System will auto-email payment links if a cancellation occurs.</p>
+                                            <Checkbox label="Enable Dynamic Waitlist?" checked={true} />
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
-                                {/* 3. House Rules */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Shield size={20} className="text-gray-400" /> 3. House Rules</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Smoking Policy</label>
-                                            <select value={smokingPolicy} onChange={(e) => setSmokingPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>Non-Smoking Property</option>
-                                                <option>Smoking Allowed</option>
-                                                <option>Designated Areas Only</option>
-                                            </select>
-                                            <p className="text-xs text-blue-600 mt-1">{policyDescriptions.smoking[smokingPolicy]}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium text-gray-700">Pet Policy</label>
-                                            <select value={petPolicy} onChange={(e) => setPetPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>Not Allowed</option>
-                                                <option>Allowed (Free)</option>
-                                                <option>Allowed (Paid)</option>
-                                            </select>
-                                            <p className="text-xs text-blue-600 mt-1">{policyDescriptions.pet[petPolicy]}</p>
-                                        </div>
-                                        <div className="space-y-1 col-span-2">
-                                            <label className="text-sm font-medium text-gray-700">Visitor Policy</label>
-                                            <select value={visitorPolicy} onChange={(e) => setVisitorPolicy(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none">
-                                                <option>Not Allowed in Room</option>
-                                                <option>Allowed till 10 PM</option>
-                                                <option>ID Required</option>
-                                            </select>
-                                            <p className="text-xs text-blue-600 mt-1">{policyDescriptions.visitor[visitorPolicy]}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 6. Night Audit Automation */}
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Moon size={20} className="text-gray-400" /> 4. Night Audit Automation</h2>
-                                    <div className="space-y-6">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <div className="space-y-1">
-                                                <label className="text-sm font-medium text-gray-700">Audit Time</label>
-                                                <input type="time" value={auditTime} onChange={(e) => setAuditTime(e.target.value)} className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                                <p className="text-xs text-gray-500">When the business date changes (e.g., 02:00 AM)</p>
-                                            </div>
-                                            <div className="space-y-1 col-span-2">
-                                                <label className="text-sm font-medium text-gray-700">Email Reports To</label>
-                                                <input type="email" value={emailReports} onChange={(e) => setEmailReports(e.target.value)} placeholder="owner@hotel.com, manager@hotel.com" className="w-full px-3 py-2 border rounded-lg outline-none" />
-                                                <p className="text-xs text-gray-500">Comma separated emails for daily reports</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
-                                                <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Auto-Run Audit?</span>
-                                                    <input type="checkbox" checked={autoRun} onChange={() => setAutoRun(!autoRun)} className="toggle toggle-sm text-blue-600" />
-                                                </div>
-                                                <span className="text-xs text-gray-500">If ON, system runs audit automatically at set time</span>
-                                            </label>
-
-                                            <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
-                                                <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Auto-Post Room Rent?</span>
-                                                    <input type="checkbox" checked={autoPostRent} onChange={() => setAutoPostRent(!autoPostRent)} className="toggle toggle-sm text-blue-600" />
-                                                </div>
-                                                <span className="text-xs text-gray-500">Automatically post room charges during audit</span>
-                                            </label>
-
-                                            <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
-                                                <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Force Close POS?</span>
-                                                    <input type="checkbox" checked={forceClosePos} onChange={() => setForceClosePos(!forceClosePos)} className="toggle toggle-sm text-blue-600" />
-                                                </div>
-                                                <span className="text-xs text-gray-500">Close all open POS sessions automatically</span>
-                                            </label>
-
-                                            <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
-                                                <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Block User Login?</span>
-                                                    <input type="checkbox" checked={blockLogin} onChange={() => setBlockLogin(!blockLogin)} className="toggle toggle-sm text-blue-600" />
-                                                </div>
-                                                <span className="text-xs text-gray-500">Prevent logins during audit process (approx 5m)</span>
-                                            </label>
-
-                                            <label className="flex flex-col p-3 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors gap-2">
-                                                <div className="flex justify-between items-center w-full">
-                                                    <span className="text-sm font-medium text-gray-700">Auto-Backup?</span>
-                                                    <input type="checkbox" checked={autoBackup} onChange={() => setAutoBackup(!autoBackup)} className="toggle toggle-sm text-blue-600" />
-                                                </div>
-                                                <span className="text-xs text-gray-500">Backup database before running audit</span>
-                                            </label>
-                                        </div>
-
-                                        <div className="pt-4 border-t">
-                                            <span className="text-sm font-medium text-gray-700 block mb-2">Reports to Generate & Email</span>
-                                            <div className="flex flex-wrap gap-2">
-                                                {['Daily Revenue', 'Occupancy Report', 'Arrival List', 'Departure List', 'In-House Guest List', 'Manager Report'].map(report => (
-                                                    <label key={report} className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors ${selectedReports.includes(report) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'hover:bg-gray-50'}`}>
-                                                        <input type="checkbox" checked={selectedReports.includes(report)} onChange={() => toggleReport(report)} className="rounded text-blue-600 w-4 h-4" />
-                                                        <span className="text-xs font-medium">{report}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                            </div>
-                        )}
-
-                        {/* TAB 3: FINANCE */}
-                        {activeTab === 'finance' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><CreditCard size={20} className="text-gray-400" /> Financial Settings</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Base Currency *</label><select defaultValue={initialData?.currency || "BDT"} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>BDT</option><option>USD</option><option>MYR</option><option>GBP</option></select></div>
-
-                                        <div className="flex items-center gap-3 md:pt-6">
-                                            <div className="form-control">
-                                                <label className="label cursor-pointer gap-2">
-                                                    <input type="checkbox" checked={isTaxInclusive} onChange={() => setIsTaxInclusive(!isTaxInclusive)} className="toggle toggle-primary toggle-sm" />
-                                                    <span className="label-text text-sm font-medium">Is Tax Inclusive?</span>
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">BIN / VAT No</label><input type="text" defaultValue={initialData?.finance?.binNo} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Service Charge %</label><input type="number" value={serviceCharge} onChange={(e) => setServiceCharge(Number(e.target.value))} placeholder="10" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Credit Card Gateway</label><select value={creditCardGateway} onChange={(e) => setCreditCardGateway(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Stripe</option><option>Shift4</option><option>SSLCommerz</option><option>Razorpay</option></select></div>
-
-                                        <div className="col-span-1 md:col-span-3 border-t pt-4 grid grid-cols-3 gap-6">
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Round Off Type</label><select value={roundOffType} onChange={(e) => setRoundOffType(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>No Round Off</option><option>Nearest</option><option>Up</option><option>Down</option></select></div>
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Round Off Limit</label><input type="number" value={roundOffLimit} onChange={(e) => setRoundOffLimit(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                            <div className="flex items-center gap-3 md:pt-6">
-                                                <label className="label cursor-pointer gap-2">
-                                                    <input type="checkbox" checked={addRoundOffToRate} onChange={() => setAddRoundOffToRate(!addRoundOffToRate)} className="toggle toggle-primary toggle-sm" />
-                                                    <span className="label-text text-sm font-medium">Add Round Off to Rate?</span>
-                                                </label>
-                                            </div>
-                                            <div className="col-span-3 space-y-1">
-                                                <label className="text-sm font-medium text-gray-700">Invoice / Bill Notes (Terms)</label>
-                                                <textarea value={invoiceTerms} onChange={(e) => setInvoiceTerms(e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg outline-none" placeholder="Detailed terms or notes to appear on every invoice..."></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between items-center border-b pb-2 mb-4">
-                                        <h2 className="text-lg font-semibold flex items-center gap-2"><Building2 size={20} className="text-gray-400" /> Bank Accounts</h2>
-                                        <button onClick={addBank} className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"><Plus size={16} /> Add Bank</button>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {bankAccounts.map((bank) => (
-                                            <div key={bank.id} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 relative group">
-                                                <div className="space-y-1"><label className="text-xs font-medium text-gray-500">Bank Name</label><input type="text" value={bank.bankName} onChange={e => updateBank(bank.id, 'bankName', e.target.value)} className="w-full px-2 py-1.5 border rounded outline-none text-sm" /></div>
-                                                <div className="space-y-1"><label className="text-xs font-medium text-gray-500">Account Name</label><input type="text" value={bank.accountName} onChange={e => updateBank(bank.id, 'accountName', e.target.value)} className="w-full px-2 py-1.5 border rounded outline-none text-sm" /></div>
-                                                <div className="space-y-1"><label className="text-xs font-medium text-gray-500">Account Number</label><input type="text" value={bank.accountNum} onChange={e => updateBank(bank.id, 'accountNum', e.target.value)} className="w-full px-2 py-1.5 border rounded outline-none text-sm" /></div>
-                                                <div className="space-y-1"><label className="text-xs font-medium text-gray-500">Swift/Routing</label><input type="text" value={bank.swift} onChange={e => updateBank(bank.id, 'swift', e.target.value)} className="w-full px-2 py-1.5 border rounded outline-none text-sm" /></div>
-                                                <div className="flex items-end justify-end pb-1">
-                                                    <button onClick={() => removeBank(bank.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors"><Trash2 size={16} /></button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* TAB 4: SYSTEM */}
-                        {activeTab === 'system' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Monitor size={20} className="text-gray-400" /> System Configuration</h2>
-                                    <div className="grid grid-cols-1 gap-6">
-
+                                {activePolicyPillar === 'arrival' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={LogIn} title="4. Arrival & Departure Protocols" />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Web Rate Mode</label><select value={webRateMode} onChange={(e) => setWebRateMode(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Regular</option><option>Corporate</option><option>Promo</option></select></div>
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Web Inventory Mode</label><select value={webInventoryMode} onChange={(e) => setWebInventoryMode(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Regular (Live)</option><option>Allotted</option></select></div>
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">POS Configuration</label><select value={posConfigType} onChange={(e) => setPosConfigType(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>Integrated POS</option><option>Third-party</option></select></div>
+                                            <FormField label="Global Check-in Time"><Input type="time" defaultValue="14:00" /></FormField>
+                                            <FormField label="Global Check-out Time"><Input type="time" defaultValue="12:00" /></FormField>
                                         </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-gray-700">Active Modules</label>
-                                            <div className="flex flex-wrap gap-3">
-                                                {['Front Office', 'POS', 'Housekeeping', 'HR/Payroll', 'Banquets'].map(mod => (
-                                                    <label key={mod} className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors ${activeModules.includes(mod) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'hover:bg-gray-50'}`}>
-                                                        <input type="checkbox" checked={activeModules.includes(mod)} onChange={() => toggleModule(mod)} className="rounded text-blue-600" />
-                                                        <span className="text-sm font-medium">{mod}</span>
-                                                    </label>
-                                                ))}
+                                        <div className="p-6 bg-slate-50 rounded-2xl border border-gray-100 space-y-4">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Early Check-in Matrix</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <FormField label="Before 06:00 AM"><Select><option>Full Night Charge</option><option>Half Night</option></Select></FormField>
+                                                <FormField label="06:00 AM - 10:00 AM"><Select><option>50% Night Charge</option><option>Flat Fee</option></Select></FormField>
+                                                <FormField label="10:00 AM - 01:00 PM"><Select><option>Complimentary</option><option>Fixed $20</option></Select></FormField>
                                             </div>
                                         </div>
-
-                                        <div className="space-y-3 pt-4 border-t">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-sm font-medium text-gray-700">POS Outlets Setup</label>
-                                                <button onClick={addPosConfig} className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                                                    <Plus size={16} /> Add Config
-                                                </button>
+                                        <div className="p-6 bg-red-50/30 rounded-2xl border border-red-100/50 space-y-4">
+                                            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Early Departure (Penalty)</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField label="Departure Penalty Logic"><Select><option>Next Night/24h Rule</option><option>Charge Full Amount</option><option>Flat Fee $100</option><option>No Penalty</option></Select></FormField>
+                                                <Checkbox label="Show Manager Override?" sub="Staff can waive fee with Manager reason" checked={true} />
                                             </div>
-                                            {posConfigs.map((config) => (
-                                                <div key={config.id} className="flex gap-3 items-center">
-                                                    <select
-                                                        value={config.type}
-                                                        onChange={(e) => updatePosConfig(config.id, 'type', e.target.value)}
-                                                        className="flex-1 px-3 py-2 border rounded-lg bg-white outline-none"
-                                                    >
-                                                        <option>Restaurant</option>
-                                                        <option>Gym</option>
-                                                        <option>Spa</option>
-                                                        <option>Boutique</option>
-                                                        <option>Bar</option>
-                                                    </select>
-                                                    <input
-                                                        type="number"
-                                                        value={config.count}
-                                                        onChange={(e) => updatePosConfig(config.id, 'count', parseInt(e.target.value))}
-                                                        className="w-20 px-3 py-2 border rounded-lg outline-none"
-                                                        min="1"
-                                                    />
-                                                    <button
-                                                        onClick={() => removePosConfig(config.id)}
-                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg border border-red-200"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                </div>
-                                            ))}
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 pt-4 border-t">
-                                        <label className="flex items-center gap-2 p-3 border rounded hover:bg-gray-50 cursor-pointer">
-                                            <input type="checkbox" checked={autoEmailFolio} onChange={() => setAutoEmailFolio(!autoEmailFolio)} className="w-4 h-4 text-blue-600 rounded" />
-                                            <span className="text-sm text-gray-700">Auto-Email Folio on Checkout</span>
-                                        </label>
-                                    </div>
-                                </div>
+                                )}
 
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><Settings size={20} className="text-gray-400" /> Interfaces & APIs</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Key Card System</label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>VingCard</option><option>Salto</option><option>Onity</option></select></div>
-                                        <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Channel Manager</label><select className="w-full px-3 py-2 border rounded-lg bg-white outline-none"><option>SiteMinder</option><option>Staah</option></select></div>
-                                        <div className="col-span-2 space-y-1"><label className="text-sm font-medium text-gray-700">SMS Gateway API Key</label><input type="text" className="w-full px-3 py-2 border rounded-lg outline-none font-mono text-xs" /></div>
+                                {activePolicyPillar === 'occupancy' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={User} title="5. Guest & Occupancy Rules" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <FormField label="Child Age Threshold (Years)"><Input type="number" defaultValue={12} /></FormField>
+                                            <FormField label="Mandatory Visitor Identity"><Select><option>All Visitors (Photo ID)</option><option>Lobby Meetings Only</option></Select></FormField>
+                                        </div>
+                                        <Checkbox label="Enforce 10PM Visitor Curfew?" sub="Visitors must exit guest rooms by 10:00 PM" checked={true} />
+                                    </div>
+                                )}
+
+                                {activePolicyPillar === 'finance_sec' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={DollarSign} title="6. Finance & Anti-Fraud controls" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <FormField label="Security Deposit Logic"><Select><option>Fixed Amount ($)</option><option>% of Stay Total</option></Select></FormField>
+                                            <FormField label="Deposit Amount"><Input type="number" defaultValue={100} /></FormField>
+                                            <FormField label="Staff Adjustment Limit"><div className="flex items-center gap-2 font-bold text-gray-400"><span>$</span><Input type="number" defaultValue={10} /></div></FormField>
+                                            <FormField label="Tax Adjustment Mode"><Select><option>Auto-Update with Base Rent</option><option>Manual Adjustment</option></Select></FormField>
+                                        </div>
+                                        <div className="bg-slate-900 p-6 rounded-[2rem] text-white space-y-4">
+                                            <div className="flex items-center gap-3"><ShieldAlert className="text-amber-400" /> <span className="text-xs font-black uppercase italic tracking-tighter">Financial Security Protocol</span></div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <Checkbox label="Enable Deposit Ledger?" sub="Keep deposits separate from room revenue" checked={true} />
+                                                <Checkbox label="Strict Refund Approval?" sub="Requires Manager/Accountant sign-off" checked={true} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activePolicyPillar === 'ops' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={Settings} title="7. Operational Protocols" />
+                                        <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-6">
+                                            <div className="flex items-center gap-2 text-indigo-700 font-black uppercase text-[10px] italic"><FileText size={14} /> Meal & Resource Mapping</div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <FormField label="Meal Plan Sync"><Select><option>Sync with POS & KOT</option><option>Voucher Based</option></Select></FormField>
+                                                <FormField label="Parking Surcharge"><Input type="number" defaultValue={10} /></FormField>
+                                                <FormField label="Minibar Check-in Logic"><Select><option>Daily Restock</option><option>Post-Departure</option></Select></FormField>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Checkbox label="Enforce Smoking Penalty?" sub="Auto-add $200 penalty and mark OOO for deep clean" checked={true} />
+                                            <Checkbox label="Enable Welfare Checks?" sub="HK alert if DND/No-Entry for 24h" checked={true} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activePolicyPillar === 'legal' && (
+                                    <div className="space-y-10">
+                                        <SectionTitle icon={ShieldCheck} title="8. Legal & Compliance" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <FormField label="GDPR Retention (Months)"><Input type="number" defaultValue={24} /></FormField>
+                                        </div>
+                                        <div className="bg-red-50 p-6 rounded-xl border border-red-100 space-y-2">
+                                            <div className="flex items-center gap-2 text-red-700 font-bold text-xs"><Zap size={14} /> Force Majeure Emergency</div>
+                                            <p className="text-[10px] text-red-500">Enable global override for disaster events to bypass all standard cancellation fees.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'finance' && (
+                        <div className="p-10 space-y-12 animate-in fade-in duration-300">
+                            <div>
+                                <SectionTitle icon={CreditCard} title="Financial Settings" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    <div className="flex items-end gap-4 col-span-2">
+                                        <div className="flex-1">
+                                            <FormField label="Base Currency" required>
+                                                <Select><option>BDT</option><option>USD</option></Select>
+                                            </FormField>
+                                        </div>
+                                        <div className="pb-3">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                                <span className="text-xs font-medium text-gray-600">Is Tax Inclusive?</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <FormField label="BIN / VAT No"><Input /></FormField>
+
+                                    <FormField label="Service Charge %"><Input type="number" defaultValue="10" /></FormField>
+                                    <FormField label="Credit Card Gateway">
+                                        <Select><option>Stripe</option><option>SSLCommerz</option><option>PayPal</option></Select>
+                                    </FormField>
+                                    <div className="hidden lg:block"></div> {/* Spacer */}
+
+                                    <FormField label="Round Off Type">
+                                        <Select><option>Nearest</option><option>Up</option><option>Down</option></Select>
+                                    </FormField>
+                                    <div className="flex items-end gap-4">
+                                        <div className="flex-1">
+                                            <FormField label="Round Off Limit"><Input type="number" defaultValue="1" /></FormField>
+                                        </div>
+                                        <div className="pb-3 text-nowrap">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                                <span className="text-xs font-medium text-gray-600">Add Round Off to Rate?</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div className="hidden lg:block"></div> {/* Spacer */}
+
+                                    <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                                        <FormField label="Invoice / Bill Notes (Terms)">
+                                            <textarea className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm min-h-[100px] outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="Detailed terms or notes to appear on every invoice..." />
+                                        </FormField>
                                     </div>
                                 </div>
                             </div>
-                        )}
 
-                        {/* TAB 5: BRANDING & POC */}
-                        {activeTab === 'branding' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                <div>
-                                    <h2 className="text-lg font-semibold border-b pb-2 mb-4 flex items-center gap-2"><ImageIcon size={20} className="text-gray-400" /> Branding & Assets</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <span className="text-sm font-medium text-gray-700 block">Primary Logo *</span>
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
-                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Main Logo (Dashboard/Footer)</span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <span className="text-sm font-medium text-gray-700 block">Report Header</span>
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
-                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Report Banner</span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <span className="text-sm font-medium text-gray-700 block">Report Footer</span>
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
-                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Footer Image</span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <span className="text-sm font-medium text-gray-700 block">Login / Guest Portal Screen</span>
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 cursor-pointer">
-                                                <ImageIcon size={24} /> <span className="text-xs mt-1">Upload Cover Image</span>
-                                            </div>
-                                        </div>
-                                        <div className="col-span-2 grid grid-cols-3 gap-4">
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Facebook URL</label><input type="text" placeholder="facebook.com/page" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">Instagram URL</label><input type="text" placeholder="instagram.com/page" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                            <div className="space-y-1"><label className="text-sm font-medium text-gray-700">TripAdvisor Link</label><input type="text" placeholder="tripadvisor.com/hotel" className="w-full px-3 py-2 border rounded-lg outline-none" /></div>
-                                        </div>
+                            <div>
+                                <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-100">
+                                    <div className="flex items-center gap-2">
+                                        <Building2 size={18} className="text-gray-400" />
+                                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-tight">Bank Accounts</h3>
+                                    </div>
+                                    <button className="text-blue-600 text-xs font-bold hover:underline flex items-center gap-1">
+                                        <Plus size={14} /> Add Bank
+                                    </button>
+                                </div>
+                                <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6 overflow-x-auto">
+                                    <table className="w-full border-spacing-x-4 border-separate">
+                                        <thead>
+                                            <tr className="text-left">
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Bank Name</th>
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Account Name</th>
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Account Number</th>
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Swift/Routing</th>
+                                                <th className="w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td className="pb-2"><Input className="!py-1.5" /></td>
+                                                <td className="pb-2"><Input className="!py-1.5" /></td>
+                                                <td className="pb-2"><Input className="!py-1.5" /></td>
+                                                <td className="pb-2"><Input className="!py-1.5" /></td>
+                                                <td className="pb-2 text-center">
+                                                    <button className="text-red-400 hover:text-red-600 transition-colors">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'system' && (
+                        <div className="p-10 space-y-12 animate-in fade-in duration-300">
+                            <div>
+                                <SectionTitle icon={Monitor} title="System Configuration" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <FormField label="Web Rate Mode">
+                                        <Select><option>Regular</option><option>Dynamic</option></Select>
+                                    </FormField>
+                                    <FormField label="Web Inventory Mode">
+                                        <Select><option>Regular (Live)</option><option>Manual Override</option></Select>
+                                    </FormField>
+                                    <div className="md:col-span-2">
+                                        <FormField label="POS Configuration">
+                                            <Select><option>Integrated POS</option><option>External Interface</option></Select>
+                                        </FormField>
                                     </div>
                                 </div>
 
-                                <div>
-                                    <div className="flex justify-between items-center border-b pb-2 mb-4">
-                                        <h2 className="text-lg font-semibold flex items-center gap-2"><User size={20} className="text-gray-400" /> Key Contacts (POC)</h2>
-                                        <button onClick={addPoc} className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                                            <Plus size={16} /> Add Contact
+                                <div className="mt-8">
+                                    <p className="text-[11px] font-bold text-gray-500 mb-3 ml-1">Active Modules</p>
+                                    <div className="flex flex-wrap gap-4">
+                                        <Checkbox label="Front Office" checked={true} />
+                                        <Checkbox label="POS" checked={false} />
+                                        <Checkbox label="Housekeeping" checked={true} />
+                                        <Checkbox label="HR/Payroll" checked={false} />
+                                        <Checkbox label="Banquets" checked={false} />
+                                    </div>
+                                </div>
+
+                                <div className="mt-10">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <p className="text-[11px] font-bold text-gray-500 ml-1 uppercase tracking-tight">POS Outlets Setup</p>
+                                        <button className="text-blue-600 text-xs font-bold hover:underline flex items-center gap-1">
+                                            <Plus size={14} /> Add Config
                                         </button>
                                     </div>
-                                    <div className="space-y-4">
-                                        {pocs.map((poc) => (
-                                            <div key={poc.id} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 relative group">
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-gray-500">Role</label>
-                                                    <select
-                                                        value={poc.role}
-                                                        onChange={(e) => updatePoc(poc.id, 'role', e.target.value)}
-                                                        className="w-full px-2 py-1.5 border rounded outline-none text-sm bg-white"
-                                                    >
-                                                        <option>Owner</option>
-                                                        <option>Managing Director (MD)</option>
-                                                        <option>CEO</option>
-                                                        <option>General Manager (GM)</option>
-                                                        <option>IT Manager</option>
-                                                        <option>Front Office Manager</option>
-                                                        <option>Restaurant Manager</option>
-                                                        <option>Accounts Manager</option>
-                                                    </select>
-                                                </div>
-                                                <div className="space-y-1"><label className="text-xs font-medium text-gray-500">Name</label><input type="text" value={poc.name} onChange={e => updatePoc(poc.id, 'name', e.target.value)} className="w-full px-2 py-1.5 border rounded outline-none text-sm" /></div>
-                                                <div className="space-y-1"><label className="text-xs font-medium text-gray-500">Phone</label><input type="text" value={poc.phone} onChange={e => updatePoc(poc.id, 'phone', e.target.value)} className="w-full px-2 py-1.5 border rounded outline-none text-sm" /></div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-gray-500">Email</label>
-                                                    <div className="flex gap-2">
-                                                        <input type="email" value={poc.email} onChange={e => updatePoc(poc.id, 'email', e.target.value)} className="w-full px-2 py-1.5 border rounded outline-none text-sm flex-1" />
-                                                        <button onClick={() => removePoc(poc.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors self-end"><Trash2 size={16} /></button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
+                                    <div className="flex gap-4 items-center bg-gray-50/30 p-2 rounded-xl">
+                                        <div className="flex-1"><Select><option>Restaurant</option><option>Spa</option><option>Gym</option></Select></div>
+                                        <div className="w-24"><Input type="number" defaultValue="1" /></div>
+                                        <button className="p-2 text-red-200 hover:text-red-500 transition-colors border border-gray-100 rounded-lg hover:bg-white"><Trash2 size={16} /></button>
+                                    </div>
+                                </div>
+
+                                <div className="mt-10">
+                                    <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 inline-block">
+                                        <Checkbox label="Auto-Email Folio on Checkout" checked={true} />
                                     </div>
                                 </div>
                             </div>
-                        )}
 
-                    </div>
+                            <div>
+                                <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
+                                    <Settings size={18} className="text-gray-400" />
+                                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-tight">Interfaces & APIs</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <FormField label="Key Card System">
+                                        <Select><option>VingCard</option><option>Assa Abloy</option><option>Manual Keys</option></Select>
+                                    </FormField>
+                                    <FormField label="Channel Manager">
+                                        <Select><option>SiteMinder</option><option>Cloudbeds</option><option>Staah</option></Select>
+                                    </FormField>
+                                    <div className="md:col-span-2">
+                                        <FormField label="SMS Gateway API Key">
+                                            <Input placeholder="Enter API Key provided by your SMS vendor" />
+                                        </FormField>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'branding' && (
+                        <div className="p-10 space-y-12 animate-in fade-in duration-300">
+                            <div>
+                                <SectionTitle icon={Image} title="Branding & Assets" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-bold text-gray-500 ml-1">Primary Logo *</label>
+                                        <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 hover:border-blue-400 hover:bg-blue-50/30 transition-all cursor-pointer group">
+                                            <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors">
+                                                <Image size={24} />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Upload Main Logo (Dashboard/Footer)</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-bold text-gray-500 ml-1">Report Header</label>
+                                        <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 hover:border-blue-400 hover:bg-blue-50/30 transition-all cursor-pointer group">
+                                            <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors">
+                                                <Image size={24} />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Upload Report Banner</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-bold text-gray-500 ml-1">Report Footer</label>
+                                        <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 hover:border-blue-400 hover:bg-blue-50/30 transition-all cursor-pointer group">
+                                            <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors">
+                                                <Image size={24} />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Upload Footer Image</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-bold text-gray-500 ml-1">Login / Guest Portal Screen</label>
+                                        <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 hover:border-blue-400 hover:bg-blue-50/30 transition-all cursor-pointer group">
+                                            <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors">
+                                                <Image size={24} />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Upload Cover Image</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
+                                    <FormField label="Facebook URL"><Input placeholder="facebook.com/page" /></FormField>
+                                    <FormField label="Instagram URL"><Input placeholder="instagram.com/page" /></FormField>
+                                    <FormField label="TripAdvisor Link"><Input placeholder="tripadvisor.com/hotel" /></FormField>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-100">
+                                    <div className="flex items-center gap-2">
+                                        <User size={18} className="text-gray-400" />
+                                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-tight">Key Contacts (POC)</h3>
+                                    </div>
+                                    <button className="text-blue-600 text-xs font-bold hover:underline flex items-center gap-1">
+                                        <Plus size={14} /> Add Contact
+                                    </button>
+                                </div>
+                                <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6 overflow-x-auto">
+                                    <table className="w-full border-spacing-x-4 border-separate">
+                                        <thead>
+                                            <tr className="text-left">
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Role</th>
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Name</th>
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Phone</th>
+                                                <th className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-3">Email</th>
+                                                <th className="w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td className="pb-2"><Select className="!py-1.5"><option>Owner</option><option>GM</option><option>Manager</option></Select></td>
+                                                <td className="pb-2"><Input className="!py-1.5" /></td>
+                                                <td className="pb-2"><Input className="!py-1.5" /></td>
+                                                <td className="pb-2"><Input className="!py-1.5" /></td>
+                                                <td className="pb-2 text-center">
+                                                    <button className="text-red-400 hover:text-red-600 transition-colors">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                 </div>
-            </main >
-            <style>{`
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-                .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
-            `}</style>
-        </div >
+            </main>
+        </div>
     );
 };
 

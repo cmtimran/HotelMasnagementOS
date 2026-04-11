@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, MapPin, Globe, CreditCard, Star, Clock, Moon, Monitor, User, Edit2, Copy, Mail } from 'lucide-react';
+import { Building2, MapPin, Globe, CreditCard, Star, Clock, Moon, Monitor, User, Edit2, Copy, Mail, ShieldCheck } from 'lucide-react';
 import SendEmailModal from './SendEmailModal';
 
 interface HotelInfoViewProps {
@@ -15,6 +15,7 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
     const tabs = [
         { id: 'overview', label: 'Overview', icon: Building2 },
         { id: 'operations', label: 'Operations', icon: Clock },
+        { id: 'policies', label: 'Policies', icon: ShieldCheck },
         { id: 'finance', label: 'Finance', icon: CreditCard },
         { id: 'automation', label: 'Automation', icon: Monitor },
         { id: 'team', label: 'Team', icon: User },
@@ -220,6 +221,120 @@ Website: ${property.website}
                                         <dd className="font-medium text-gray-900">{property.operations?.smoking || 'N/A'}</dd>
                                     </div>
                                 </dl>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'policies' && (
+                    <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between pb-4 border-b">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-900 tracking-tight">Reservation Rules & Policies</h3>
+                                <p className="text-xs text-gray-500 font-medium">Standard operating procedures for guest stays and financial protection.</p>
+                            </div>
+                            <div className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
+                                Policy Engine v2.4
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Cancellation & No-Show */}
+                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
+                                <div className="flex items-center gap-3 text-rose-600">
+                                    <div className="p-2 bg-rose-50 rounded-lg"><Clock size={18} /></div>
+                                    <h4 className="font-black text-sm uppercase tracking-wider">Cancellation & No-Show</h4>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cancellation Policy</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.cancellation || 'Flexible: Free cancellation up to 48h before arrival'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Grace Period</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.gracePeriod || '4 Hours from booking time for immediate mistakes'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No-Show Penalty</label>
+                                        <p className="text-sm font-bold text-rose-600">{property.policies?.noShow || '100% of First Night Revenue'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Payment & Deposits */}
+                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
+                                <div className="flex items-center gap-3 text-blue-600">
+                                    <div className="p-2 bg-blue-50 rounded-lg"><CreditCard size={18} /></div>
+                                    <h4 className="font-black text-sm uppercase tracking-wider">Payments & Deposits</h4>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Rate Plan Payment</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.ratePayment || 'Advance Purchase: Full Prepayment Required'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Security Deposit</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.securityDeposit || '৳ 5,000 per stay (Refundable)'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Check-in & Departure */}
+                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
+                                <div className="flex items-center gap-3 text-emerald-600">
+                                    <div className="p-2 bg-emerald-50 rounded-lg"><Moon size={18} /></div>
+                                    <h4 className="font-black text-sm uppercase tracking-wider">Arrival & Departure</h4>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Early Check-in</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.earlyCheckin || 'Subject to availability (৳ 1,500 before 10 AM)'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Early Departure</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.earlyDeparture || 'Full amount of the stay will be charged'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Guest & Age Policy */}
+                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
+                                <div className="flex items-center gap-3 text-purple-600">
+                                    <div className="p-2 bg-purple-50 rounded-lg"><User size={18} /></div>
+                                    <h4 className="font-black text-sm uppercase tracking-wider">Guest & Age Policy</h4>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Minimum Age</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.agePolicy || 'Primary guest must be 18+ years old'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Child Policy</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.childPolicy || 'Up to 2 children under 5 stay free using existing bedding'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Extra Bed</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.extraBed || '৳ 2,500 per night (Max 1 per room)'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Group Bookings */}
+                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
+                                <div className="flex items-center gap-3 text-amber-600">
+                                    <div className="p-2 bg-amber-50 rounded-lg"><Building2 size={18} /></div>
+                                    <h4 className="font-black text-sm uppercase tracking-wider">Group Bookings</h4>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Definition</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.groupDefinition || '5 or more rooms per night'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Deposit Strategy</label>
+                                        <p className="text-sm font-bold text-gray-900">{property.policies?.groupDeposit || '50% non-refundable deposit required at confirmation'}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

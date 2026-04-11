@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Calendar, DollarSign,
-    Shield, Percent, Info
+    Shield, Percent, Info, Search
 } from 'lucide-react';
 
 interface RatePlan {
@@ -15,6 +15,7 @@ interface RatePlan {
 
     // Inclusions
     mealPlan: string;
+    packageId?: number; // Link to HotelPackage (Layer 2)
     taxIncluded: boolean;
     cancellationPolicy: string;
     promoCode?: string;
@@ -63,15 +64,15 @@ export default function RatePlanManagement() {
             id: 1,
             name: 'Best Available Rate',
             shortCode: 'BAR',
-            marketSegment: 'Walk-in',
-            currency: 'USD',
-            description: 'Standard flexible rate',
+            marketSegment: 'FIT / Walk-in',
+            currency: 'BDT',
+            description: 'Most flexible rate available for transient guests.',
             status: 'Active',
-            mealPlan: 'EP (Room Only)',
+            mealPlan: 'EP (European Plan - Room Only)',
             taxIncluded: false,
             cancellationPolicy: 'Flexible 24h',
             activationDate: '2024-01-01',
-            expirationDate: '2024-12-31',
+            expirationDate: '2025-12-31',
             isSeasonal: false,
             validDays: DAYS_OF_WEEK,
             minNights: 1,
@@ -80,19 +81,115 @@ export default function RatePlanManagement() {
             closedToDeparture: false,
             stopSell: false,
             pricing: [
-                { roomTypeId: 'Deluxe King', structure: 'Flat', baseRate: 150, doubleRate: 150, tripleRate: 180, extraAdult: 30, extraChild: 15, baseOccupancy: 2, maxOccupancy: 3 }
+                { roomTypeId: 'Deluxe King', structure: 'Flat', baseRate: 12500, doubleRate: 12500, tripleRate: 15000, extraAdult: 2500, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 3 }
+            ]
+        },
+        {
+            id: 2,
+            name: 'Early Bird - 30 Days Advance',
+            shortCode: 'EB30',
+            marketSegment: 'Online / Web',
+            currency: 'BDT',
+            description: 'Save 15% by booking at least 1 month in advance.',
+            status: 'Active',
+            mealPlan: 'CP (Bed & Breakfast)',
+            taxIncluded: true,
+            cancellationPolicy: 'Strict 72h',
+            activationDate: '2024-01-01',
+            expirationDate: '2025-12-31',
+            isSeasonal: false,
+            validDays: DAYS_OF_WEEK,
+            minNights: 1,
+            cutOffDays: 30,
+            closedToArrival: false,
+            closedToDeparture: false,
+            stopSell: false,
+            pricing: [
+                { roomTypeId: 'Premium Suite', structure: 'Flat', baseRate: 18000, doubleRate: 18000, tripleRate: 22000, extraAdult: 4000, extraChild: 2000, baseOccupancy: 2, maxOccupancy: 4 }
+            ]
+        },
+        {
+            id: 3,
+            name: 'Corporate Monthly Negotiated',
+            shortCode: 'CORP-M',
+            marketSegment: 'Corporate',
+            currency: 'BDT',
+            description: 'Special fixed rate for long-term corporate contracts.',
+            status: 'Active',
+            mealPlan: 'MAP (Half Board)',
+            taxIncluded: false,
+            cancellationPolicy: 'Corporate 48h',
+            activationDate: '2024-01-01',
+            expirationDate: '2025-12-31',
+            isSeasonal: false,
+            validDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            minNights: 3,
+            cutOffDays: 0,
+            closedToArrival: false,
+            closedToDeparture: false,
+            stopSell: false,
+            pricing: [
+                { roomTypeId: 'Deluxe Room', structure: 'Flat', baseRate: 9500, doubleRate: 9500, tripleRate: 12000, extraAdult: 2000, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 2 }
+            ]
+        },
+        {
+            id: 4,
+            name: 'Weekend Staycation Bundle',
+            shortCode: 'WKND-STAY',
+            marketSegment: 'Leisure',
+            currency: 'BDT',
+            description: 'Full board weekend getaway for families.',
+            status: 'Active',
+            mealPlan: 'AP (Full Board)',
+            taxIncluded: true,
+            cancellationPolicy: 'Flexible 48h',
+            activationDate: '2024-01-01',
+            expirationDate: '2025-12-31',
+            isSeasonal: true,
+            seasonName: 'Weekends Only',
+            validDays: ['Fri', 'Sat', 'Sun'],
+            minNights: 2,
+            cutOffDays: 0,
+            closedToArrival: false,
+            closedToDeparture: false,
+            stopSell: false,
+            pricing: [
+                { roomTypeId: 'Junior Suite', structure: 'Flat', baseRate: 22000, doubleRate: 22000, tripleRate: 25000, extraAdult: 3000, extraChild: 1500, baseOccupancy: 2, maxOccupancy: 3 }
             ]
         }
     ]);
     const [formData, setFormData] = useState<Partial<RatePlan>>({});
     const [activeTab, setActiveTab] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [editingPlan, setEditingPlan] = useState<RatePlan | null>(null);
+
+    const openCreate = () => {
+        setFormData({
+            status: 'Active',
+            currency: 'BDT',
+            validDays: DAYS_OF_WEEK
+        });
+        setEditingPlan(null);
+        setView('form');
+    };
+
+    const openEdit = (plan: RatePlan) => {
+        setFormData({ ...plan });
+        setEditingPlan(plan);
+        setView('form');
+    };
 
     const handleSave = () => {
         if (formData.name && formData.shortCode) {
-            const newPlan = { ...formData, id: Date.now() } as RatePlan;
-            setRatePlans([...ratePlans, newPlan]);
+            if (editingPlan) {
+                setRatePlans(ratePlans.map(p => p.id === editingPlan.id ? { ...formData, id: editingPlan.id } as RatePlan : p));
+            } else {
+                const newPlan = { ...formData, id: Date.now() } as RatePlan;
+                setRatePlans([...ratePlans, newPlan]);
+            }
             setView('list');
             setFormData({});
+            setEditingPlan(null);
             setActiveTab(1);
         }
     };
@@ -114,27 +211,44 @@ export default function RatePlanManagement() {
                     <p className="text-sm text-gray-500">Manage pricing strategies and restrictions</p>
                 </div>
                 <button
-                    onClick={() => { setFormData({ validDays: DAYS_OF_WEEK, status: 'Active', currency: 'USD' }); setView('form'); }}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    onClick={openCreate}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-semibold"
                 >
                     <Plus size={18} />
                     Add Rate Plan
                 </button>
             </div>
 
+            <div className="mb-6 relative">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                    type="text" 
+                    placeholder="Search rate plans..." 
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left">
                     <thead className="bg-gray-50 border-b">
                         <tr>
                             <th className="px-6 py-4 font-semibold text-gray-700">Identity</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Market</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Validity</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700">Type</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700">Channels</th>
+                            <th className="px-6 py-4 font-semibold text-gray-700 text-center">Inclusions</th>
                             <th className="px-6 py-4 font-semibold text-gray-700">Status</th>
                             <th className="px-6 py-4 font-semibold text-gray-700 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
-                        {ratePlans.map(plan => (
+                        {ratePlans
+                            .filter(plan => 
+                                plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase())
+                            )
+                            .map(plan => (
                             <tr key={plan.id} className="hover:bg-gray-50">
                                 <td className="px-6 py-4">
                                     <div className="font-medium text-gray-900">{plan.name}</div>
@@ -151,8 +265,15 @@ export default function RatePlanManagement() {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <button className="text-gray-400 hover:text-blue-600 mr-3"><Edit2 size={16} /></button>
-                                    <button className="text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                                    <button 
+                                        onClick={() => openEdit(plan)}
+                                        className="text-gray-400 hover:text-blue-600 mr-3 transition-colors"
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button className="text-gray-400 hover:text-red-600 transition-colors">
+                                        <Trash2 size={16} />
+                                    </button>
                                 </td>
                             </tr>
                         ))}
@@ -288,12 +409,31 @@ export default function RatePlanManagement() {
                 {/* 2. Inclusions */}
                 {activeTab === 2 && (
                     <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <h3 className="text-lg font-semibold border-b pb-4 mb-4">Inclusions & Policies</h3>
+                        <div className="flex items-center justify-between border-b pb-4">
+                            <h3 className="text-lg font-semibold">Inclusions & Policies</h3>
+                            <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-widest">
+                                Layer 3 Configuration
+                            </div>
+                        </div>
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Meal Plan <span className="text-red-500">*</span></label>
+                                <label className="text-sm font-medium text-gray-700">Linked Hotel Package (Layer 2) <span className="text-blue-500 text-[10px] ml-1">(Optional)</span></label>
                                 <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white"
+                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm font-semibold text-blue-600 border-blue-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={formData.packageId || ''}
+                                    onChange={e => setFormData({ ...formData, packageId: parseInt(e.target.value) || undefined })}
+                                >
+                                    <option value="">No Bundle (Room Rate Only)</option>
+                                    <option value="101">Winter Wonderland Bundle (Meals + Pool)</option>
+                                    <option value="102">Honeymoon Special (Dinner + Spa)</option>
+                                    <option value="103">Business Suite Package (Transport + Laundry)</option>
+                                </select>
+                                <p className="text-[10px] text-gray-400">Selecting a package will automatically apply its service allowance rules to this rate plan.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">Base Meal Plan <span className="text-red-500">*</span></label>
+                                <select
+                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm"
                                     value={formData.mealPlan || 'EP'}
                                     onChange={e => setFormData({ ...formData, mealPlan: e.target.value })}
                                 >
@@ -306,7 +446,7 @@ export default function RatePlanManagement() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700">Cancellation Policy</label>
                                 <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white"
+                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm"
                                     value={formData.cancellationPolicy || ''}
                                     onChange={e => setFormData({ ...formData, cancellationPolicy: e.target.value })}
                                 >
@@ -319,21 +459,24 @@ export default function RatePlanManagement() {
                                 <label className="text-sm font-medium text-gray-700">Promo Code</label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                                     placeholder="e.g. SAVE10"
                                     value={formData.promoCode || ''}
                                     onChange={e => setFormData({ ...formData, promoCode: e.target.value })}
                                 />
                             </div>
-                            <div className="space-y-2 flex items-center pt-6">
-                                <label className="flex items-center gap-3 cursor-pointer">
+                            <div className="col-span-2 pt-2">
+                                <label className="flex items-center gap-3 cursor-pointer bg-gray-50 p-4 rounded-xl border-dashed border-2 border-gray-200 hover:border-blue-300 transition-colors">
                                     <input
                                         type="checkbox"
-                                        className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                        className="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500"
                                         checked={formData.taxIncluded || false}
                                         onChange={e => setFormData({ ...formData, taxIncluded: e.target.checked })}
                                     />
-                                    <span className="font-medium text-gray-700">Tax Included in Price?</span>
+                                    <div>
+                                        <span className="font-bold text-gray-800 block text-sm">Tax Included in Quoted Price</span>
+                                        <span className="text-[10px] text-gray-500 uppercase font-semibold">Finance & Accounting Rule</span>
+                                    </div>
                                 </label>
                             </div>
                         </div>
