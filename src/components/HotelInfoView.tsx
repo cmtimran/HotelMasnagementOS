@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Building2, MapPin, Globe, CreditCard, Star, Clock, Moon, Monitor,
     User, Edit2, Copy, Mail, ShieldCheck, Phone, CheckCircle2, AlertCircle,
     Layers, Check, QrCode, Utensils, Wine, Car, ShieldAlert,
-    ExternalLink, Activity, ArrowUpRight, Lock, FileCheck, Compass, Zap
+    ExternalLink, Activity, ArrowUpRight, Lock, FileCheck, Compass, Zap,
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import SendEmailModal from './SendEmailModal';
 
@@ -18,6 +19,32 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const [localTime, setLocalTime] = useState<string>('');
+    const tabsRef = useRef<HTMLDivElement>(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    // Check tab bar overflow and scroll boundaries
+    const checkScroll = () => {
+        if (tabsRef.current) {
+            const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
+            setCanScrollLeft(scrollLeft > 4);
+            setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+        }
+    };
+
+    useEffect(() => {
+        checkScroll();
+        window.addEventListener('resize', checkScroll);
+        return () => window.removeEventListener('resize', checkScroll);
+    }, []);
+
+    const scrollTabs = (direction: 'left' | 'right') => {
+        if (tabsRef.current) {
+            const scrollAmount = direction === 'left' ? -180 : 180;
+            tabsRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            setTimeout(checkScroll, 250);
+        }
+    };
 
     // Real-time Hotel Property Clock
     useEffect(() => {
@@ -30,15 +57,16 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
         return () => clearInterval(timer);
     }, []);
 
+    // Concise, elegant labels that prevent horizontal clipping while keeping full meaning
     const tabs = [
         { id: 'overview', label: 'Overview', icon: Building2 },
-        { id: 'outlets', label: 'Outlets & Centers', icon: Layers },
-        { id: 'operations', label: 'Operations & Safety', icon: Clock },
-        { id: 'distribution', label: 'Distribution & Channels', icon: Globe },
+        { id: 'outlets', label: 'Outlets', icon: Layers },
+        { id: 'operations', label: 'Operations', icon: Clock },
+        { id: 'distribution', label: 'Channels', icon: Globe },
         { id: 'policies', label: 'Policies', icon: ShieldCheck },
-        { id: 'finance', label: 'Finance & Compliance', icon: CreditCard },
+        { id: 'finance', label: 'Finance', icon: CreditCard },
         { id: 'automation', label: 'Automation', icon: Monitor },
-        { id: 'team', label: 'Team & Emergency', icon: User },
+        { id: 'team', label: 'Team & Safety', icon: User },
     ];
 
     const handleCopyInfo = () => {
@@ -201,28 +229,66 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
                     </div>
                 </div>
 
-                {/* Unified Tab Bar Navigation */}
-                <div className="px-3.5 flex items-center gap-2 overflow-x-auto no-scrollbar bg-slate-50/60 py-1.5">
-                    {tabs.map(tab => {
-                        const Icon = tab.icon;
-                        const isSelected = activeTab === tab.id;
-                        return (
+                {/* Unified Tab Bar Navigation (Responsive with Scroll Controls & Auto-Center) */}
+                <div className="relative border-t border-gray-100 bg-slate-50/70 group">
+                    {/* Left Scroll Chevron */}
+                    {canScrollLeft && (
+                        <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center bg-gradient-to-r from-slate-50 via-slate-50 to-transparent pl-1 pr-3">
                             <button
-                                key={tab.id}
                                 type="button"
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`
-                                    h-7 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer select-none
-                                    ${isSelected
-                                        ? 'bg-white text-blue-600 font-semibold shadow-2xs border border-gray-200/80'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'}
-                                `}
+                                onClick={() => scrollTabs('left')}
+                                className="w-5 h-5 rounded-full bg-white shadow-xs border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 cursor-pointer transition-colors"
+                                aria-label="Scroll tabs left"
                             >
-                                <Icon size={13} className={isSelected ? 'text-blue-600' : 'text-gray-400'} />
-                                <span>{tab.label}</span>
+                                <ChevronLeft size={13} />
                             </button>
-                        );
-                    })}
+                        </div>
+                    )}
+
+                    {/* Scrollable Tabs Track */}
+                    <div
+                        ref={tabsRef}
+                        onScroll={checkScroll}
+                        className="px-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1.5 scroll-smooth"
+                    >
+                        {tabs.map(tab => {
+                            const Icon = tab.icon;
+                            const isSelected = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={(e) => {
+                                        setActiveTab(tab.id);
+                                        e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                                    }}
+                                    className={`
+                                        h-7 px-2.5 sm:px-3 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer select-none flex-shrink-0
+                                        ${isSelected
+                                            ? 'bg-white text-blue-600 font-semibold shadow-2xs border border-gray-200/80'
+                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'}
+                                    `}
+                                >
+                                    <Icon size={13} className={isSelected ? 'text-blue-600' : 'text-gray-400'} />
+                                    <span>{tab.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Right Scroll Chevron */}
+                    {canScrollRight && (
+                        <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center bg-gradient-to-l from-slate-50 via-slate-50 to-transparent pr-1 pl-3">
+                            <button
+                                type="button"
+                                onClick={() => scrollTabs('right')}
+                                className="w-5 h-5 rounded-full bg-white shadow-xs border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 cursor-pointer transition-colors"
+                                aria-label="Scroll tabs right"
+                            >
+                                <ChevronRight size={13} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
