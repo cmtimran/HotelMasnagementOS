@@ -41,137 +41,151 @@ Website: ${property.website}
     ];
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
             {/* Header Card */}
-            <div className="bg-blue-600 rounded-2xl overflow-hidden shadow-lg relative">
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 rounded-xl overflow-hidden shadow-2xs relative">
                 {/* Action Buttons */}
-                <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+                <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
                     <button
+                        type="button"
                         onClick={handleCopyInfo}
-                        className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg backdrop-blur-md transition-colors border border-white/10"
+                        className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-md backdrop-blur-md transition-colors border border-white/15 cursor-pointer shadow-2xs"
                         title="Copy Information"
                     >
-                        <Copy size={18} />
+                        <Copy size={13} />
                     </button>
                     <button
+                        type="button"
                         onClick={() => setIsEmailModalOpen(true)}
-                        className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg backdrop-blur-md transition-colors border border-white/10"
+                        className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-md backdrop-blur-md transition-colors border border-white/15 cursor-pointer shadow-2xs"
                         title="Send via Email"
                     >
-                        <Mail size={18} />
+                        <Mail size={13} />
                     </button>
                     <button
+                        type="button"
                         onClick={onManageProperty}
-                        className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-bold hover:bg-blue-50 transition-colors shadow-sm"
+                        className="h-7 px-3 bg-white hover:bg-blue-50 text-blue-600 rounded-md font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-[0.98]"
                     >
-                        <Edit2 size={16} /> Manage Property
+                        <Edit2 size={12} />
+                        <span>Manage Property</span>
                     </button>
                 </div>
 
-                <div className="p-8 flex items-end gap-6 relative">
-                    <div className="w-24 h-24 rounded-2xl bg-white shadow-lg p-1 flex-shrink-0 z-10">
-                        <img
-                            src={property.logo}
-                            alt={property.name}
-                            className="w-full h-full rounded-xl object-cover bg-gray-50 border border-gray-100"
-                        />
+                <div className="p-4 sm:p-4.5 flex items-center gap-3.5 relative">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-xl bg-white shadow-xs p-1 flex-shrink-0 z-10 flex items-center justify-center">
+                        {property.logo && !property.logo.includes('placehold.co') ? (
+                            <img
+                                src={property.logo}
+                                alt={property.name}
+                                className="w-full h-full rounded-lg object-cover bg-gray-50 border border-gray-100"
+                            />
+                        ) : (
+                            <div className="w-full h-full rounded-lg bg-blue-50 text-blue-700 font-bold text-sm flex items-center justify-center">
+                                {property.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}
+                            </div>
+                        )}
                     </div>
-                    <div className="mb-2 z-10 text-white">
-                        <h2 className="text-3xl font-bold tracking-tight mb-1">{property.name}</h2>
-                        <div className="flex items-center gap-4 text-blue-100 text-sm font-medium opacity-90">
-                            <span className="flex items-center gap-1.5"><MapPin size={15} /> {property.city}, {property.country}</span>
-                            <span className="flex items-center gap-1.5"><Globe size={15} /> {property.website}</span>
+                    <div className="z-10 text-white min-w-0 pr-32 sm:pr-44">
+                        <h2 className="text-base sm:text-lg font-bold tracking-tight leading-tight truncate">{property.name}</h2>
+                        <div className="flex flex-wrap items-center gap-3 text-blue-100 text-[11px] font-medium mt-0.5 opacity-90">
+                            <span className="flex items-center gap-1"><MapPin size={11} /> {property.city}, {property.country}</span>
+                            <span className="flex items-center gap-1"><Globe size={11} /> {property.website}</span>
                         </div>
                     </div>
                     {/* Background Decorative Circles */}
-                    <div className="absolute top-0 right-0 p-32 bg-blue-500 rounded-full blur-3xl opacity-20 pointer-events-none transform translate-x-10 -translate-y-10"></div>
-                    <div className="absolute bottom-0 left-0 p-24 bg-blue-400 rounded-full blur-3xl opacity-20 pointer-events-none transform -translate-x-10 translate-y-10"></div>
+                    <div className="absolute top-0 right-0 p-20 bg-blue-500 rounded-full blur-2xl opacity-15 pointer-events-none transform translate-x-6 -translate-y-6"></div>
                 </div>
 
                 {/* Tabs Bar */}
-                <div className="bg-white px-8 flex gap-8 overflow-x-auto border-b border-gray-100">
+                <div className="bg-white px-3.5 flex gap-5 overflow-x-auto border-b border-gray-100 no-scrollbar">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
+                            type="button"
                             onClick={() => setActiveTab(tab.id)}
-                            className={`py-4 text-sm font-medium flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id
+                            className={`py-2 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-all whitespace-nowrap cursor-pointer ${activeTab === tab.id
                                 ? 'border-blue-600 text-blue-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-800'
                                 }`}
                         >
-                            <tab.icon size={16} strokeWidth={2.5} />
-                            {tab.label}
+                            <tab.icon size={13} strokeWidth={2.2} />
+                            <span>{tab.label}</span>
                         </button>
                     ))}
                 </div>
             </div>
 
             {/* Main Content Area */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 min-h-[500px]">
+            <div className="bg-white rounded-xl shadow-2xs border border-gray-200/90 p-3.5 sm:p-4.5">
                 {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                         {/* Left Column: Details */}
-                        <div className="space-y-8">
+                        <div className="space-y-4">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">Business Details</h3>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between py-1 border-b border-gray-50">
-                                        <span className="text-gray-500 text-sm">Address</span>
-                                        <span className="font-medium text-gray-900 text-sm text-right">{property.address}</span>
+                                <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider mb-2.5">Business Details</h3>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between py-1 border-b border-gray-100 text-xs">
+                                        <span className="text-gray-500">Address</span>
+                                        <span className="font-semibold text-gray-900 text-right">{property.address}</span>
                                     </div>
-                                    <div className="flex justify-between py-1 border-b border-gray-50">
-                                        <span className="text-gray-500 text-sm">Website</span>
-                                        <a href={`https://${property.website}`} target="_blank" rel="noreferrer" className="font-medium text-blue-600 hover:underline text-sm">{property.website}</a>
+                                    <div className="flex justify-between py-1 border-b border-gray-100 text-xs">
+                                        <span className="text-gray-500">Website</span>
+                                        <a href={`https://${property.website}`} target="_blank" rel="noreferrer" className="font-semibold text-blue-600 hover:underline">{property.website}</a>
                                     </div>
                                 </div>
                             </div>
+
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">Corporate Office</h3>
-                                <div className="bg-gray-50 rounded-xl p-5 space-y-3 border border-gray-100">
-                                    <div className="flex gap-3">
-                                        <MapPin size={16} className="text-gray-400 mt-0.5" />
-                                        <span className="text-gray-700 text-sm font-medium">{property.corporate?.address || 'N/A'}</span>
+                                <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider mb-2.5">Corporate Office</h3>
+                                <div className="bg-slate-50/80 rounded-lg p-3 space-y-2 border border-slate-100 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+                                        <span className="text-gray-700 font-medium">{property.corporate?.address || 'N/A'}</span>
                                     </div>
-                                    <div className="flex gap-3">
-                                        <Globe size={16} className="text-gray-400 mt-0.5" />
-                                        <span className="text-gray-700 text-sm font-medium">{property.corporate?.email || 'N/A'}</span>
+                                    <div className="flex items-center gap-2">
+                                        <Globe size={13} className="text-gray-400 flex-shrink-0" />
+                                        <span className="text-gray-700 font-medium">{property.corporate?.email || 'N/A'}</span>
                                     </div>
-                                    <div className="flex gap-3">
-                                        <CreditCard size={16} className="text-gray-400 mt-0.5" />
-                                        <span className="text-gray-700 text-sm font-medium">{property.corporate?.phone || 'N/A'}</span>
+                                    <div className="flex items-center gap-2">
+                                        <CreditCard size={13} className="text-gray-400 flex-shrink-0" />
+                                        <span className="text-gray-700 font-medium">{property.corporate?.phone || 'N/A'}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Session Info Block */}
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">Current Session</h3>
-                                <div className="flex items-center gap-4 p-4 rounded-lg bg-blue-50 border border-blue-100">
-                                    <div className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 font-bold text-xl">
+                                <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider mb-2.5">Current Session</h3>
+                                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-blue-50/70 border border-blue-100/80">
+                                    <div className="w-9 h-9 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center font-bold text-xs flex-shrink-0">
                                         {currentUser?.name?.charAt(0) || 'U'}
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-blue-600 uppercase font-bold tracking-wider">Logged In As</p>
-                                        <p className="font-bold text-gray-900">{currentUser?.name || 'Unknown User'}</p>
-                                        <p className="text-sm text-gray-600">{currentUser?.role || 'Guest'}</p>
+                                    <div className="min-w-0">
+                                        <p className="text-[9.5px] text-blue-600 uppercase font-bold tracking-wider leading-none">Logged In As</p>
+                                        <p className="font-bold text-gray-900 text-xs leading-tight mt-0.5 truncate">{currentUser?.name || 'Unknown User'}</p>
+                                        <p className="text-[11px] text-gray-500 leading-none">{currentUser?.role || 'Guest'}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Right Column: Stats */}
-                        <div className="space-y-6">
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest">Property Stats</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-6 rounded-2xl border border-gray-100 shadow-sm bg-white hover:shadow-md transition-shadow">
-                                    <p className="text-gray-500 text-xs font-medium uppercase">Total Rooms</p>
-                                    <p className="text-4xl font-bold text-gray-900 mt-2">{property.rooms}</p>
+                        <div className="space-y-4">
+                            <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider">Property Metrics</h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="p-3.5 rounded-xl border border-gray-100 shadow-2xs bg-slate-50/40">
+                                    <p className="text-gray-500 text-[10.5px] font-semibold uppercase tracking-wider">Total Rooms</p>
+                                    <p className="text-2xl font-bold text-gray-900 mt-1">{property.rooms}</p>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">Physical Inventory Units</p>
                                 </div>
-                                <div className="p-6 rounded-2xl border border-gray-100 shadow-sm bg-white hover:shadow-md transition-shadow">
-                                    <p className="text-gray-500 text-xs font-medium uppercase">Grade</p>
-                                    <p className="text-3xl font-bold text-yellow-500 mt-2 flex items-center gap-2">
-                                        <Star size={24} fill="currentColor" /> {property.grade}
+                                <div className="p-3.5 rounded-xl border border-gray-100 shadow-2xs bg-slate-50/40">
+                                    <p className="text-gray-500 text-[10.5px] font-semibold uppercase tracking-wider">Property Grade</p>
+                                    <p className="text-2xl font-bold text-amber-500 mt-1 flex items-center gap-1.5">
+                                        <Star size={20} fill="currentColor" />
+                                        <span>{property.grade}</span>
                                     </p>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">Hospitality Classification</p>
                                 </div>
                             </div>
                         </div>
@@ -179,46 +193,55 @@ Website: ${property.website}
                 )}
 
                 {activeTab === 'operations' && (
-                    <div className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
-                                <div className="flex items-center gap-2 text-blue-700 font-bold text-sm uppercase tracking-wide"> <Clock size={16} /> Check-in</div>
-                                <p className="text-3xl font-bold text-gray-900">{property.operations?.checkIn || '14:00'}</p>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="p-3 rounded-lg bg-blue-50/60 border border-blue-100/80 space-y-1">
+                                <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs uppercase tracking-wide">
+                                    <Clock size={13} />
+                                    <span>Check-in</span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-900 font-mono">{property.operations?.checkIn || '14:00'}</p>
                             </div>
-                            <div className="p-4 rounded-xl bg-orange-50/50 border border-orange-100 space-y-2">
-                                <div className="flex items-center gap-2 text-orange-700 font-bold text-sm uppercase tracking-wide"> <Clock size={16} /> Check-out</div>
-                                <p className="text-3xl font-bold text-gray-900">{property.operations?.checkOut || '12:00'}</p>
+                            <div className="p-3 rounded-lg bg-orange-50/60 border border-orange-100/80 space-y-1">
+                                <div className="flex items-center gap-1.5 text-orange-700 font-bold text-xs uppercase tracking-wide">
+                                    <Clock size={13} />
+                                    <span>Check-out</span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-900 font-mono">{property.operations?.checkOut || '12:00'}</p>
                             </div>
-                            <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100 space-y-2">
-                                <div className="flex items-center gap-2 text-purple-700 font-bold text-sm uppercase tracking-wide"> <Moon size={16} /> Night Audit</div>
-                                <p className="text-3xl font-bold text-gray-900">{property.operations?.nightAudit || '02:00'}</p>
+                            <div className="p-3 rounded-lg bg-purple-50/60 border border-purple-100/80 space-y-1">
+                                <div className="flex items-center gap-1.5 text-purple-700 font-bold text-xs uppercase tracking-wide">
+                                    <Moon size={13} />
+                                    <span>Night Audit</span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-900 font-mono">{property.operations?.nightAudit || '02:00'}</p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-4">
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest border-b pb-2">Policies</h3>
-                                <dl className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-2.5">
+                                <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-1.5">Policies</h3>
+                                <dl className="space-y-2 text-xs">
                                     <div>
-                                        <dt className="text-xs text-gray-500 mb-1">Cancellation Policy</dt>
-                                        <dd className="font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg inline-block">{property.operations?.cancellation || 'Flexible'}</dd>
+                                        <dt className="text-[11px] text-gray-500 mb-0.5">Cancellation Policy</dt>
+                                        <dd className="font-semibold text-gray-900 bg-gray-50 px-2.5 py-1 rounded-md inline-block">{property.operations?.cancellation || 'Flexible'}</dd>
                                     </div>
                                     <div>
-                                        <dt className="text-xs text-gray-500 mb-1">Weekend Days</dt>
-                                        <dd className="flex gap-2">
+                                        <dt className="text-[11px] text-gray-500 mb-1">Weekend Days</dt>
+                                        <dd className="flex flex-wrap gap-1.5">
                                             {property.operations?.weekends?.map((day: string) => (
-                                                <span key={day} className="px-2.5 py-1 bg-gray-100 text-xs rounded-md font-bold text-gray-600 uppercase">{day}</span>
-                                            )) || <span className="text-gray-400 text-sm">None set</span>}
+                                                <span key={day} className="px-2 py-0.5 bg-gray-100 text-[10px] rounded font-bold text-gray-600 uppercase">{day}</span>
+                                            )) || <span className="text-gray-400 text-xs">None set</span>}
                                         </dd>
                                     </div>
                                 </dl>
                             </div>
-                            <div className="space-y-4">
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest border-b pb-2">House Rules</h3>
-                                <dl className="space-y-4">
+                            <div className="space-y-2.5">
+                                <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-1.5">House Rules</h3>
+                                <dl className="space-y-2 text-xs">
                                     <div>
-                                        <dt className="text-xs text-gray-500 mb-1">Smoking Policy</dt>
-                                        <dd className="font-medium text-gray-900">{property.operations?.smoking || 'N/A'}</dd>
+                                        <dt className="text-[11px] text-gray-500 mb-0.5">Smoking Policy</dt>
+                                        <dd className="font-semibold text-gray-900">{property.operations?.smoking || 'N/A'}</dd>
                                     </div>
                                 </dl>
                             </div>
@@ -227,112 +250,108 @@ Website: ${property.website}
                 )}
 
                 {activeTab === 'policies' && (
-                    <div className="space-y-8 animate-in fade-in duration-500">
-                        <div className="flex items-center justify-between pb-4 border-b">
+                    <div className="space-y-3.5 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
                             <div>
-                                <h3 className="text-xl font-black text-gray-900 tracking-tight">Reservation Rules & Policies</h3>
-                                <p className="text-xs text-gray-500 font-medium">Standard operating procedures for guest stays and financial protection.</p>
+                                <h3 className="text-sm font-bold text-gray-900 tracking-tight">Reservation Rules & Policies</h3>
+                                <p className="text-[11px] text-gray-500">Standard operating procedures for guest stays and financial protection.</p>
                             </div>
-                            <div className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
+                            <div className="px-2.5 py-0.5 bg-blue-50 text-blue-600 rounded-full text-[9.5px] font-bold uppercase tracking-wider border border-blue-100">
                                 Policy Engine v2.4
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {/* Cancellation & No-Show */}
-                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
-                                <div className="flex items-center gap-3 text-rose-600">
-                                    <div className="p-2 bg-rose-50 rounded-lg"><Clock size={18} /></div>
-                                    <h4 className="font-black text-sm uppercase tracking-wider">Cancellation & No-Show</h4>
+                            <div className="p-3.5 rounded-xl border border-gray-100 bg-slate-50/30 shadow-2xs space-y-2.5">
+                                <div className="flex items-center gap-2 text-rose-600">
+                                    <div className="p-1 rounded-md bg-rose-50 text-rose-600"><Clock size={13} /></div>
+                                    <h4 className="font-bold text-xs uppercase tracking-wider">Cancellation & No-Show</h4>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2 text-xs">
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cancellation Policy</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.cancellation || 'Flexible: Free cancellation up to 48h before arrival'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Cancellation Policy</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.cancellation || 'Flexible: Free cancellation up to 48h before arrival'}</p>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Grace Period</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.gracePeriod || '4 Hours from booking time for immediate mistakes'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Grace Period</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.gracePeriod || '4 Hours from booking time'}</p>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No-Show Penalty</label>
-                                        <p className="text-sm font-bold text-rose-600">{property.policies?.noShow || '100% of First Night Revenue'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">No-Show Penalty</label>
+                                        <p className="font-bold text-rose-600">{property.policies?.noShow || '100% of First Night Revenue'}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Payment & Deposits */}
-                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
-                                <div className="flex items-center gap-3 text-blue-600">
-                                    <div className="p-2 bg-blue-50 rounded-lg"><CreditCard size={18} /></div>
-                                    <h4 className="font-black text-sm uppercase tracking-wider">Payments & Deposits</h4>
+                            <div className="p-3.5 rounded-xl border border-gray-100 bg-slate-50/30 shadow-2xs space-y-2.5">
+                                <div className="flex items-center gap-2 text-blue-600">
+                                    <div className="p-1 rounded-md bg-blue-50 text-blue-600"><CreditCard size={13} /></div>
+                                    <h4 className="font-bold text-xs uppercase tracking-wider">Payments & Deposits</h4>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2 text-xs">
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Rate Plan Payment</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.ratePayment || 'Advance Purchase: Full Prepayment Required'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Rate Plan Payment</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.ratePayment || 'Advance Purchase: Full Prepayment Required'}</p>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Security Deposit</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.securityDeposit || '৳ 5,000 per stay (Refundable)'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Security Deposit</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.securityDeposit || '৳ 5,000 per stay (Refundable)'}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Check-in & Departure */}
-                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
-                                <div className="flex items-center gap-3 text-emerald-600">
-                                    <div className="p-2 bg-emerald-50 rounded-lg"><Moon size={18} /></div>
-                                    <h4 className="font-black text-sm uppercase tracking-wider">Arrival & Departure</h4>
+                            <div className="p-3.5 rounded-xl border border-gray-100 bg-slate-50/30 shadow-2xs space-y-2.5">
+                                <div className="flex items-center gap-2 text-emerald-600">
+                                    <div className="p-1 rounded-md bg-emerald-50 text-emerald-600"><Moon size={13} /></div>
+                                    <h4 className="font-bold text-xs uppercase tracking-wider">Arrival & Departure</h4>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2 text-xs">
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Early Check-in</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.earlyCheckin || 'Subject to availability (৳ 1,500 before 10 AM)'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Early Check-in</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.earlyCheckin || 'Subject to availability (৳ 1,500 before 10 AM)'}</p>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Early Departure</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.earlyDeparture || 'Full amount of the stay will be charged'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Early Departure</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.earlyDeparture || 'Full amount of the stay will be charged'}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Guest & Age Policy */}
-                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
-                                <div className="flex items-center gap-3 text-purple-600">
-                                    <div className="p-2 bg-purple-50 rounded-lg"><User size={18} /></div>
-                                    <h4 className="font-black text-sm uppercase tracking-wider">Guest & Age Policy</h4>
+                            <div className="p-3.5 rounded-xl border border-gray-100 bg-slate-50/30 shadow-2xs space-y-2.5">
+                                <div className="flex items-center gap-2 text-purple-600">
+                                    <div className="p-1 rounded-md bg-purple-50 text-purple-600"><User size={13} /></div>
+                                    <h4 className="font-bold text-xs uppercase tracking-wider">Guest & Age Policy</h4>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2 text-xs">
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Minimum Age</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.agePolicy || 'Primary guest must be 18+ years old'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Minimum Age</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.agePolicy || 'Primary guest must be 18+ years old'}</p>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Child Policy</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.childPolicy || 'Up to 2 children under 5 stay free using existing bedding'}</p>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Extra Bed</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.extraBed || '৳ 2,500 per night (Max 1 per room)'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Child Policy</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.childPolicy || 'Up to 2 children under 5 stay free'}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Group Bookings */}
-                            <div className="p-6 rounded-2xl border border-gray-100 bg-white shadow-sm space-y-4">
-                                <div className="flex items-center gap-3 text-amber-600">
-                                    <div className="p-2 bg-amber-50 rounded-lg"><Building2 size={18} /></div>
-                                    <h4 className="font-black text-sm uppercase tracking-wider">Group Bookings</h4>
+                            <div className="p-3.5 rounded-xl border border-gray-100 bg-slate-50/30 shadow-2xs space-y-2.5">
+                                <div className="flex items-center gap-2 text-amber-600">
+                                    <div className="p-1 rounded-md bg-amber-50 text-amber-600"><Building2 size={13} /></div>
+                                    <h4 className="font-bold text-xs uppercase tracking-wider">Group Bookings</h4>
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2 text-xs">
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Definition</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.groupDefinition || '5 or more rooms per night'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Definition</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.groupDefinition || '5 or more rooms per night'}</p>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Deposit Strategy</label>
-                                        <p className="text-sm font-bold text-gray-900">{property.policies?.groupDeposit || '50% non-refundable deposit required at confirmation'}</p>
+                                        <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Deposit Strategy</label>
+                                        <p className="font-semibold text-gray-900">{property.policies?.groupDeposit || '50% non-refundable deposit'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -341,63 +360,63 @@ Website: ${property.website}
                 )}
 
                 {activeTab === 'finance' && (
-                    <div className="space-y-12">
-                        <div className="grid grid-cols-1 gap-8">
-                            <div className="p-6 border border-gray-100 rounded-xl bg-gray-50/50">
-                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tax Configuration</h3>
-                                <div className="flex items-baseline gap-4">
-                                    <p className="text-2xl font-bold text-gray-900">{property.finance?.taxRule || 'Not Configured'}</p>
-                                    <span className="text-sm font-medium text-gray-500 bg-white px-2 py-1 rounded border">BIN: {property.finance?.binNo || 'N/A'}</span>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="p-3.5 border border-gray-100 rounded-xl bg-slate-50/50 space-y-1">
+                                <h3 className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">Tax Configuration</h3>
+                                <div className="flex items-center gap-3">
+                                    <p className="text-base font-bold text-gray-900">{property.finance?.taxRule || 'Not Configured'}</p>
+                                    <span className="text-[11px] font-semibold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200">BIN: {property.finance?.binNo || 'N/A'}</span>
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest border-b pb-2 mb-4">Bank Accounts</h3>
-                                <div className="grid grid-cols-1 gap-4">
+                                <h3 className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Linked Bank Accounts</h3>
+                                <div className="space-y-2">
                                     {property.finance?.bankAccounts?.map((acc: any) => (
-                                        <div key={acc.id} className="p-5 border border-gray-200 rounded-xl flex justify-between items-center hover:shadow-md transition-shadow bg-white">
+                                        <div key={acc.id} className="p-2.5 border border-gray-200/80 rounded-lg flex justify-between items-center bg-white shadow-2xs">
                                             <div>
-                                                <p className="font-bold text-gray-900 text-lg">{acc.bankName}</p>
-                                                <p className="text-sm text-gray-500 font-mono mt-1">{acc.accountNum}</p>
+                                                <p className="font-bold text-gray-900 text-xs">{acc.bankName}</p>
+                                                <p className="text-[11px] text-gray-500 font-mono">{acc.accountNum}</p>
                                             </div>
-                                            <div className="text-right bg-gray-50 px-4 py-2 rounded-lg">
-                                                <p className="text-xs text-gray-400 uppercase font-bold">SWIFT</p>
-                                                <p className="font-bold text-gray-700 font-mono">{acc.swift}</p>
+                                            <div className="text-right bg-slate-50 px-2 py-1 rounded">
+                                                <p className="text-[9.5px] text-gray-400 uppercase font-bold">SWIFT</p>
+                                                <p className="font-bold text-gray-700 font-mono text-xs">{acc.swift}</p>
                                             </div>
                                         </div>
-                                    )) || <p className="text-gray-500 text-sm italic">No bank accounts linked.</p>}
+                                    )) || <p className="text-gray-400 text-xs italic">No bank accounts linked.</p>}
                                 </div>
                             </div>
                         </div>
 
                         {/* Payment Transaction History */}
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <CreditCard size={20} className="text-blue-600" />
-                                Transaction History
+                        <div className="pt-2">
+                            <h3 className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+                                <CreditCard size={14} className="text-blue-600" />
+                                <span>Recent Transaction History</span>
                             </h3>
-                            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-medium">
+                            <div className="border border-gray-200/80 rounded-xl overflow-hidden bg-white shadow-2xs">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-slate-50/90 border-b border-gray-200/80 text-[10.5px] text-slate-500 font-bold uppercase tracking-wider">
                                         <tr>
-                                            <th className="px-6 py-4">Transaction ID</th>
-                                            <th className="px-6 py-4">Date</th>
-                                            <th className="px-6 py-4">Description</th>
-                                            <th className="px-6 py-4 text-right">Amount</th>
-                                            <th className="px-6 py-4 text-center">Status</th>
+                                            <th className="px-3.5 py-2">Transaction ID</th>
+                                            <th className="px-3.5 py-2">Date</th>
+                                            <th className="px-3.5 py-2">Description</th>
+                                            <th className="px-3.5 py-2 text-right">Amount</th>
+                                            <th className="px-3.5 py-2 text-center">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {transactions.map(txn => (
-                                            <tr key={txn.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 font-mono text-gray-500">{txn.id}</td>
-                                                <td className="px-6 py-4 text-gray-900">{txn.date}</td>
-                                                <td className="px-6 py-4 text-gray-900 font-medium">{txn.desc}</td>
-                                                <td className={`px-6 py-4 text-right font-bold ${txn.type === 'credit' ? 'text-green-600' : 'text-gray-900'}`}>
+                                            <tr key={txn.id} className="hover:bg-blue-50/30 transition-colors">
+                                                <td className="px-3.5 py-2 font-mono text-gray-500 text-[11px]">{txn.id}</td>
+                                                <td className="px-3.5 py-2 text-gray-900 text-[11px]">{txn.date}</td>
+                                                <td className="px-3.5 py-2 text-gray-900 font-medium text-xs">{txn.desc}</td>
+                                                <td className={`px-3.5 py-2 text-right font-bold text-xs ${txn.type === 'credit' ? 'text-emerald-600' : 'text-gray-900'}`}>
                                                     {txn.type === 'credit' ? '+' : ''}{txn.amount.toFixed(2)}
                                                 </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${txn.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                                <td className="px-3.5 py-2 text-center">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${txn.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-amber-50 text-amber-700 border border-amber-200/60'
                                                         }`}>
                                                         {txn.status}
                                                     </span>
@@ -405,13 +424,6 @@ Website: ${property.website}
                                             </tr>
                                         ))}
                                     </tbody>
-                                    <tfoot className="bg-gray-50 border-t border-gray-200">
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-3 text-right text-xs text-gray-500">
-                                                Showing recent transactions. <button className="text-blue-600 font-bold hover:underline ml-1">View All</button>
-                                            </td>
-                                        </tr>
-                                    </tfoot>
                                 </table>
                             </div>
                         </div>
@@ -419,34 +431,35 @@ Website: ${property.website}
                 )}
 
                 {activeTab === 'automation' && (
-                    <div className="space-y-6">
-                        <div className="bg-gray-900 text-white p-8 rounded-2xl shadow-lg relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-32 bg-blue-500 rounded-full blur-3xl opacity-10 pointer-events-none transform translate-x-10 -translate-y-10"></div>
-
+                    <div className="space-y-4">
+                        <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-xl shadow-xs relative overflow-hidden">
                             <div className="flex justify-between items-start relative z-10">
                                 <div>
-                                    <h3 className="text-2xl font-bold flex items-center gap-3"><Monitor className="text-blue-400" /> Night Audit Automation</h3>
-                                    <p className="text-gray-400 text-base mt-2 max-w-md">Configuration for automated nightly system tasks and reporting.</p>
+                                    <h3 className="text-sm sm:text-base font-bold flex items-center gap-2">
+                                        <Monitor size={16} className="text-blue-400" />
+                                        <span>Night Audit Automation</span>
+                                    </h3>
+                                    <p className="text-gray-400 text-xs mt-1 max-w-md">Configuration for automated nightly system tasks and reporting.</p>
                                 </div>
-                                <div className={`px-4 py-1.5 rounded-full text-sm font-bold border ${property.automation?.autoRun ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-red-500/20 border-red-500 text-red-400'}`}>
+                                <div className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${property.automation?.autoRun ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-rose-500/20 border-rose-500/50 text-rose-300'}`}>
                                     {property.automation?.autoRun ? 'ACTIVE' : 'INACTIVE'}
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 relative z-10">
-                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-md border border-white/10">
-                                    <p className="text-xs text-gray-400 uppercase tracking-wider font-bold">Audit Time</p>
-                                    <p className="text-3xl font-mono mt-2">{property.automation?.auditTime || 'N/A'}</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4 relative z-10">
+                                <div className="bg-white/10 p-2.5 rounded-lg backdrop-blur-md border border-white/10">
+                                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Audit Time</p>
+                                    <p className="text-lg font-mono font-bold mt-1 text-white">{property.automation?.auditTime || '02:00 AM'}</p>
                                 </div>
-                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-md border border-white/10">
-                                    <p className="text-xs text-gray-400 uppercase tracking-wider font-bold">Auto Post Rent</p>
-                                    <p className={`text-xl font-bold mt-2 ${property.automation?.autoPostRent ? 'text-green-400' : 'text-gray-500'}`}>
+                                <div className="bg-white/10 p-2.5 rounded-lg backdrop-blur-md border border-white/10">
+                                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Auto Post Rent</p>
+                                    <p className={`text-sm font-bold mt-1 ${property.automation?.autoPostRent ? 'text-emerald-400' : 'text-gray-400'}`}>
                                         {property.automation?.autoPostRent ? 'Enabled' : 'Disabled'}
                                     </p>
                                 </div>
-                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-md border border-white/10">
-                                    <p className="text-xs text-gray-400 uppercase tracking-wider font-bold">Auto Backup</p>
-                                    <p className="text-xl font-bold mt-2 text-green-400">Enabled</p>
+                                <div className="bg-white/10 p-2.5 rounded-lg backdrop-blur-md border border-white/10">
+                                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Auto Backup</p>
+                                    <p className="text-sm font-bold mt-1 text-emerald-400">Enabled</p>
                                 </div>
                             </div>
                         </div>
@@ -454,24 +467,24 @@ Website: ${property.website}
                 )}
 
                 {activeTab === 'team' && (
-                    <div className="space-y-6">
-                        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest border-b pb-4">Key Contacts</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                        <h3 className="text-[11px] font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">Key Contacts</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {property.pocs?.map((poc: any) => (
-                                <div key={poc.id} className="p-5 border border-gray-200 rounded-xl flex items-start gap-4 hover:border-blue-300 transition-colors bg-white group">
-                                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-lg shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <div key={poc.id} className="p-3 border border-gray-200/80 rounded-lg flex items-center gap-3 hover:border-blue-300 transition-colors bg-white shadow-2xs">
+                                    <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
                                         {poc.name.charAt(0)}
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-gray-900 text-lg">{poc.name}</p>
-                                        <p className="text-blue-600 text-xs font-bold uppercase tracking-wide mb-3">{poc.role}</p>
-                                        <div className="space-y-1">
-                                            <p className="text-sm text-gray-600 flex items-center gap-2"><User size={14} className="text-gray-400" /> {poc.phone}</p>
-                                            <p className="text-sm text-gray-600 flex items-center gap-2"><Globe size={14} className="text-gray-400" /> {poc.email}</p>
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-gray-900 text-xs truncate">{poc.name}</p>
+                                        <p className="text-blue-600 text-[10px] font-bold uppercase tracking-wide">{poc.role}</p>
+                                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1">
+                                            <span className="flex items-center gap-1"><User size={11} className="text-gray-400" /> {poc.phone}</span>
+                                            <span className="flex items-center gap-1"><Globe size={11} className="text-gray-400" /> {poc.email}</span>
                                         </div>
                                     </div>
                                 </div>
-                            )) || <p className="text-gray-500 italic">No contacts listed.</p>}
+                            )) || <p className="text-gray-400 text-xs italic">No contacts listed.</p>}
                         </div>
                     </div>
                 )}
