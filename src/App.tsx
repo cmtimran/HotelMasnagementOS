@@ -496,7 +496,7 @@ function App() {
       case 'service-master':
         return <ServiceManagement />;
       case 'reports':
-        return <Reports user={currentUser} onLogout={handleLogout} />;
+        return <Reports user={currentUser} onLogout={handleLogout} setActivePage={setActivePage} />;
       case 'revenue-dashboard':
         return <RevenueDashboard />;
       case 'kds':

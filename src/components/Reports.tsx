@@ -1,6 +1,6 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, PieChart, Layers, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical } from 'lucide-react';
+import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical, Calendar, LayoutDashboard } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -122,9 +122,22 @@ const generateGenericMockData = (reportName: string, count: number = 25): Report
     });
 };
 
-const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
+interface ReportsProps {
+    user: any;
+    onLogout: () => void;
+    setActivePage?: (page: string) => void;
+}
+
+const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const [expandedMenu, setExpandedMenu] = useState<string | null>('Reservation Report');
+    const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
+        'Reservation Report': true,
+        'Front Office Report': false,
+        'Back Office Report': false,
+        'Audit Report': false,
+        'Analytics & BI': false,
+    });
+    const [flyoutCategory, setFlyoutCategory] = useState<string | null>(null);
     const [activeReport, setActiveReport] = useState('Cancelled Reservation'); // Default to the one user requested
     const [startDate, setStartDate] = useState('2024-06-11');
     const [endDate, setEndDate] = useState('2024-06-11');
@@ -149,14 +162,22 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         };
     }, []);
 
+    const toggleCategory = (cat: string) => {
+        setOpenCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+    };
+
     const menuItems = [
         {
             title: 'Reservation Report',
+            key: 'reservation',
+            color: 'text-blue-600 bg-blue-50 border-blue-200',
             icon: <ListOrdered size={14} />,
             items: ['Arrival List', 'Cancelled Reservation', 'Country Wise Reservation Statistics', 'Departure List', 'Forecast Report', 'No Show Reservation', 'Release Reservation List', 'Reservation Activity', 'Void Reservation']
         },
         {
             title: 'Front Office Report',
+            key: 'frontOffice',
+            color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
             icon: <Monitor size={14} />,
             items: [
                 'Guest Checked In',
@@ -175,6 +196,8 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         },
         {
             title: 'Back Office Report',
+            key: 'backOffice',
+            color: 'text-amber-600 bg-amber-50 border-amber-200',
             icon: <Building2 size={14} />,
             items: [
                 'Advance Deposit Ledger',
@@ -217,12 +240,18 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         },
         {
             title: 'Audit Report',
+            key: 'audit',
+            color: 'text-purple-600 bg-purple-50 border-purple-200',
             icon: <Shield size={14} />,
             items: ['Audit Trails', 'IP Report', 'Void Charge', 'Void Payment', 'Void Transaction']
         },
-        { title: 'Statistical Report', icon: <BarChart2 size={14} />, items: [] },
-        { title: 'Graphs and Charts', icon: <PieChart size={14} />, items: [] },
-        { title: 'Consolidate Report', icon: <Layers size={14} />, items: [] },
+        {
+            title: 'Analytics & BI',
+            key: 'analytics',
+            color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+            icon: <BarChart2 size={14} />,
+            items: ['Advanced Revenue Analytics', 'Room Type Wise Daily Room Revenue', 'Revenue By Rate Type', 'Revenue By Room Type']
+        },
     ];
 
     const filteredMenuItems = useMemo(() => {
@@ -4086,150 +4115,384 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
     };
 
     return (
-        <div className="flex h-screen bg-slate-100 font-sans text-xs text-slate-700">
-            {/* Compact Sidebar */}
-            <aside className={`${isSidebarCollapsed ? 'w-14' : 'w-56'} bg-white border-r border-slate-200/80 flex flex-col flex-shrink-0 transition-all duration-200 ease-in-out z-30 shadow-2xs`}>
-                <div className={`px-3 border-b border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} bg-slate-900 text-white h-11 min-h-[44px]`}>
+        <div className="flex h-screen bg-slate-100 font-sans text-xs text-slate-700 antialiased overflow-hidden">
+            {/* Expert Collapsible Sidebar */}
+            <aside
+                className={`${isSidebarCollapsed ? 'w-14' : 'w-60'} bg-white border-r border-gray-200/90 h-screen sticky top-0 flex flex-col transition-all duration-200 ease-in-out flex-shrink-0 z-40 select-none shadow-[1px_0_4px_rgba(0,0,0,0.02)]`}
+            >
+                {/* Header / Brand Area */}
+                <div className={`h-11 px-2.5 flex items-center border-b border-gray-100 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
                     {!isSidebarCollapsed && (
-                        <div className="flex items-center gap-1.5">
-                            <FileText size={15} className="text-blue-400" />
-                            <span className="font-bold text-xs tracking-wider uppercase text-slate-100">Report Center</span>
+                        <div
+                            className="cursor-pointer flex items-center gap-2 min-w-0"
+                            onClick={() => setActivePage && setActivePage('dashboard')}
+                            title="HotelManagementOS"
+                        >
+                            <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center text-white shadow-xs flex-shrink-0">
+                                <FileText size={13} />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                                <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none truncate">Reports OS</h1>
+                                <p className="text-[8px] text-gray-400 font-semibold uppercase tracking-wider leading-none mt-0.5">Enterprise BI</p>
+                            </div>
                         </div>
                     )}
+
                     <button
-                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                        className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+                        type="button"
+                        onClick={() => {
+                            setIsSidebarCollapsed(!isSidebarCollapsed);
+                            setFlyoutCategory(null);
+                        }}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
                         title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                     >
-                        {isSidebarCollapsed ? <Menu size={16} /> : <ChevronLeft size={16} />}
+                        {isSidebarCollapsed ? <Menu size={14} /> : <ChevronLeft size={13} />}
                     </button>
                 </div>
 
                 {/* Quick Search */}
-                <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                <div className="p-2 border-b border-gray-100 bg-gray-50/40">
                     <div className="relative">
-                        <Search className={`absolute ${isSidebarCollapsed ? 'left-1/2 -translate-x-1/2' : 'left-2.5'} top-2 text-slate-400`} size={12} />
-                        {!isSidebarCollapsed && (
-                            <input
-                                type="text"
-                                placeholder="Search reports..."
-                                value={sidebarSearch}
-                                onChange={(e) => setSidebarSearch(e.target.value)}
-                                className="w-full pl-7 pr-2 py-1 border border-slate-200 rounded-md text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white h-7 placeholder:text-slate-400"
+                        <Search
+                            className={`absolute ${isSidebarCollapsed ? 'left-1/2 -translate-x-1/2 cursor-pointer' : 'left-2.5'} top-2 text-gray-400`}
+                            size={12}
+                            onClick={() => {
+                                if (isSidebarCollapsed) {
+                                    setIsSidebarCollapsed(false);
+                                }
+                            }}
+                        />
+                        {!isSidebarCollapsed ? (
+                            <div className="relative flex items-center">
+                                <input
+                                    type="text"
+                                    placeholder="Search 50+ reports..."
+                                    value={sidebarSearch}
+                                    onChange={(e) => setSidebarSearch(e.target.value)}
+                                    className="w-full pl-7 pr-6 py-1 border border-gray-200 rounded-md text-[11px] outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white h-7 placeholder:text-gray-400"
+                                />
+                                {sidebarSearch && (
+                                    <button
+                                        onClick={() => setSidebarSearch('')}
+                                        className="absolute right-1.5 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                                        title="Clear search"
+                                    >
+                                        <X size={11} />
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div
+                                onClick={() => setIsSidebarCollapsed(false)}
+                                className="h-6 flex items-center justify-center cursor-pointer text-gray-400 hover:text-blue-600"
+                                title="Click to search"
                             />
                         )}
-                        {isSidebarCollapsed && <div className="h-5"></div>}
                     </div>
                 </div>
 
-                {/* Menu list */}
-                <div className="flex-1 overflow-y-auto no-scrollbar py-1">
-                    {filteredMenuItems.map((menu, idx) => (
-                        <div key={idx} className="border-b border-slate-100/60 last:border-0">
-                            <button
-                                onClick={() => {
-                                    if (isSidebarCollapsed) {
-                                        setIsSidebarCollapsed(false);
-                                        setExpandedMenu(menu.title);
-                                    } else {
-                                        setExpandedMenu(expandedMenu === menu.title ? null : menu.title);
-                                    }
+                {/* Navigation Categories List */}
+                <div className="flex-1 overflow-y-auto no-scrollbar py-1 px-1.5 space-y-1">
+                    {filteredMenuItems.map((menu) => {
+                        const isCatOpen = openCategories[menu.title] ?? false;
+                        const hasActiveChild = menu.items.includes(activeReport);
+                        const isFlyoutOpen = isSidebarCollapsed && flyoutCategory === menu.title;
+
+                        return (
+                            <div
+                                key={menu.key || menu.title}
+                                className="relative"
+                                onMouseLeave={() => {
+                                    if (isSidebarCollapsed) setFlyoutCategory(null);
                                 }}
-                                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center py-2.5' : 'justify-between px-3 py-1.5'} text-left font-medium hover:bg-slate-50 transition-colors ${expandedMenu === menu.title && !isSidebarCollapsed ? 'bg-slate-100/80 text-blue-700 font-bold' : 'text-slate-700'}`}
-                                title={isSidebarCollapsed ? menu.title : ""}
                             >
-                                <div className="flex items-center gap-2">
-                                    <span className={`${expandedMenu === menu.title && !isSidebarCollapsed ? 'text-blue-600' : 'text-slate-400'}`}>
-                                        {menu.icon}
-                                    </span>
-                                    {!isSidebarCollapsed && <span className="text-xs">{menu.title}</span>}
-                                </div>
-                                {!isSidebarCollapsed && menu.items.length > 0 && (
-                                    expandedMenu === menu.title ? <ChevronDown size={12} className="opacity-60" /> : <ChevronRight size={12} className="opacity-60" />
-                                )}
-                            </button>
-                            {(expandedMenu === menu.title || sidebarSearch) && !isSidebarCollapsed && (
-                                <div className="bg-slate-50/70 py-0.5 space-y-0.5">
-                                    {menu.items
-                                        .filter(item => !sidebarSearch || item.toLowerCase().includes(sidebarSearch.toLowerCase()))
-                                        .map((item, i) => (
-                                        <div
-                                            key={i}
-                                            onClick={() => { setActiveReport(item); setShowReport(false); }}
-                                            className={`px-6 py-1 cursor-pointer flex items-center gap-2 hover:bg-blue-50 hover:text-blue-600 transition-colors text-[11px] ${activeReport === item ? 'text-blue-700 font-bold bg-blue-50 border-l-2 border-blue-600' : 'text-slate-600'}`}
-                                        >
-                                            <div className={`w-1 h-1 rounded-full ${activeReport === item ? 'bg-blue-600' : 'bg-slate-300'}`}></div>
-                                            <span className="truncate">{item}</span>
+                                {/* Category Header Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (isSidebarCollapsed) {
+                                            setFlyoutCategory(flyoutCategory === menu.title ? null : menu.title);
+                                        } else {
+                                            toggleCategory(menu.title);
+                                        }
+                                    }}
+                                    onMouseEnter={() => {
+                                        if (isSidebarCollapsed) setFlyoutCategory(menu.title);
+                                    }}
+                                    className={`
+                                        w-full flex items-center justify-between text-left text-[11.5px] font-semibold rounded-md transition-colors select-none cursor-pointer group
+                                        ${isSidebarCollapsed ? 'justify-center p-2' : 'px-2 py-1.5'}
+                                        ${hasActiveChild ? 'bg-blue-50/60 text-blue-800' : 'text-gray-700 hover:bg-gray-100/70 hover:text-gray-900'}
+                                    `}
+                                    title={isSidebarCollapsed ? `${menu.title} (${menu.items.length})` : undefined}
+                                >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className={`p-1 rounded flex-shrink-0 transition-colors ${menu.color || 'text-gray-400'}`}>
+                                            {menu.icon}
+                                        </span>
+                                        {!isSidebarCollapsed && (
+                                            <span className="truncate">{menu.title}</span>
+                                        )}
+                                    </div>
+                                    {!isSidebarCollapsed && (
+                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                            <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.2 rounded-full">
+                                                {menu.items.length}
+                                            </span>
+                                            <span className="text-gray-400 group-hover:text-gray-600 transition-transform">
+                                                {isCatOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                            </span>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                    )}
+                                </button>
+
+                                {/* Expanded Children in Non-Collapsed Sidebar */}
+                                {!isSidebarCollapsed && isCatOpen && (
+                                    <div className="mt-0.5 ml-3 pl-2 border-l border-gray-200/70 space-y-0.5 py-0.5 animate-in fade-in duration-150">
+                                        {menu.items.map((item) => {
+                                            const isSelected = activeReport === item;
+                                            return (
+                                                <button
+                                                    key={item}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setActiveReport(item);
+                                                        setShowReport(false);
+                                                    }}
+                                                    className={`
+                                                        w-full text-left flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-all select-none cursor-pointer
+                                                        ${isSelected
+                                                            ? 'bg-blue-50 text-blue-700 font-semibold shadow-2xs border-r-2 border-blue-600'
+                                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70 font-normal'}
+                                                    `}
+                                                >
+                                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isSelected ? 'bg-blue-600 ring-2 ring-blue-100' : 'bg-gray-300'}`} />
+                                                    <span className="truncate">{item}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Floating Flyout Popover when Sidebar is Collapsed */}
+                                {isSidebarCollapsed && isFlyoutOpen && (
+                                    <div
+                                        className="fixed left-14 ml-1 top-auto -mt-8 w-64 bg-white border border-gray-200 rounded-lg shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150"
+                                        onMouseEnter={() => setFlyoutCategory(menu.title)}
+                                        onMouseLeave={() => setFlyoutCategory(null)}
+                                    >
+                                        <div className="px-3 pb-2 border-b border-gray-100 flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5 font-bold text-xs text-gray-900">
+                                                <span className={`p-1 rounded ${menu.color}`}>
+                                                    {menu.icon}
+                                                </span>
+                                                <span>{menu.title}</span>
+                                            </div>
+                                            <span className="text-[9.5px] font-semibold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                                                {menu.items.length}
+                                            </span>
+                                        </div>
+                                        <div className="max-h-80 overflow-y-auto no-scrollbar p-1 space-y-0.5">
+                                            {menu.items.map((item) => {
+                                                const isSelected = activeReport === item;
+                                                return (
+                                                    <button
+                                                        key={item}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActiveReport(item);
+                                                            setShowReport(false);
+                                                            setFlyoutCategory(null);
+                                                        }}
+                                                        className={`
+                                                            w-full text-left flex items-center gap-2 px-2.5 py-1.5 rounded text-[11px] transition-all select-none cursor-pointer
+                                                            ${isSelected
+                                                                ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600'
+                                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-normal'}
+                                                        `}
+                                                    >
+                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isSelected ? 'bg-blue-600 ring-2 ring-blue-100' : 'bg-gray-300'}`} />
+                                                        <span className="truncate">{item}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Footer Section in Sidebar */}
+                <div className="p-2 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                    {!isSidebarCollapsed ? (
+                        <div className="flex items-center justify-between w-full text-[10px] text-gray-500 font-medium px-1">
+                            <span className="flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                BI Engine Active
+                            </span>
+                            <span className="text-gray-400 font-mono">v4.2</span>
                         </div>
-                    ))}
+                    ) : (
+                        <div className="w-full flex justify-center" title="BI Engine Active v4.2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        </div>
+                    )}
                 </div>
             </aside>
 
-            {/* Main Area */}
+            {/* Main Content Area */}
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                {/* Compact Header */}
-                <div className="bg-white border-b border-slate-200/80 px-3.5 py-1.5 flex justify-between items-center h-11 min-h-[44px] sticky top-0 z-40 shadow-2xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <h1 className="text-sm font-bold text-slate-900 tracking-tight truncate">{activeReport}</h1>
-                        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
-                            Enterprise PMS
-                        </span>
+                {/* Modern Expert Topbar */}
+                <header className="h-11 bg-white border-b border-gray-200/90 flex items-center justify-between px-3 flex-shrink-0 z-30 sticky top-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
+                    {/* Left: Collapse Toggle + Breadcrumbs + Module Shortcuts */}
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        {/* Hamburger toggle button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsSidebarCollapsed(!isSidebarCollapsed);
+                                setFlyoutCategory(null);
+                            }}
+                            className="w-7 h-7 rounded-md border border-gray-200/80 text-gray-600 flex items-center justify-center hover:bg-gray-100 hover:text-gray-900 transition-colors flex-shrink-0 cursor-pointer"
+                            title={isSidebarCollapsed ? "Expand Sidebar (Ctrl+B)" : "Collapse Sidebar"}
+                        >
+                            <Menu size={13} />
+                        </button>
+
+                        {/* Breadcrumbs */}
+                        <div className="flex items-center gap-1.5 text-xs min-w-0">
+                            <span className="text-gray-400 font-medium hidden sm:inline">Reports</span>
+                            <span className="text-gray-300 hidden sm:inline">/</span>
+                            <h1 className="font-bold text-gray-900 truncate tracking-tight text-xs sm:text-[13px] max-w-[150px] sm:max-w-[240px] md:max-w-[320px]">
+                                {activeReport}
+                            </h1>
+                            <span className="hidden lg:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Live BI
+                            </span>
+                        </div>
+
+                        {/* Module Shortcuts (Return to Overview / Front Desk / Analytics) */}
+                        {setActivePage && (
+                            <div className="hidden xl:flex items-center gap-1 ml-2 pl-2 border-l border-gray-200">
+                                <button
+                                    onClick={() => setActivePage('dashboard')}
+                                    className="h-6.5 px-2 rounded-md text-[10.5px] font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Return to Dashboard"
+                                >
+                                    <LayoutDashboard size={11} /> Overview
+                                </button>
+                                <button
+                                    onClick={() => setActivePage('front-desk')}
+                                    className="h-6.5 px-2 rounded-md text-[10.5px] font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Open Front Desk"
+                                >
+                                    <Monitor size={11} /> Front Desk
+                                </button>
+                                <button
+                                    onClick={() => setActivePage('advanced-reports')}
+                                    className="h-6.5 px-2 rounded-md text-[10.5px] font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Open Advanced Revenue BI"
+                                >
+                                    <BarChart2 size={11} /> Analytics
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        {showReport && (
+                    {/* Right: Date Range Indicator, Actions, Property Badge & User Profile */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Compact Date Indicator */}
+                        <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-200/70 rounded-md text-[10.5px] text-gray-600 font-medium">
+                            <Calendar size={11} className="text-gray-400" />
+                            <span>{startDate}</span>
+                            <span className="text-gray-300">→</span>
+                            <span>{endDate}</span>
+                        </div>
+
+                        {/* Contextual Actions */}
+                        {showReport ? (
                             <button
                                 onClick={handleBackToFilters}
-                                className="h-7 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors text-xs font-medium flex items-center gap-1 border border-slate-200/80 shadow-2xs"
+                                className="h-7 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors text-xs font-medium flex items-center gap-1 border border-gray-200/80 shadow-2xs cursor-pointer"
                             >
                                 <ChevronLeft size={13} /> Back to Filters
                             </button>
+                        ) : (
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={handleExportExcel}
+                                    className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Export current report to Excel"
+                                >
+                                    <FileSpreadsheet size={12} />
+                                    <span className="hidden sm:inline">Export Excel</span>
+                                </button>
+                                <button
+                                    onClick={() => setShowReport(true)}
+                                    className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Generate Preview"
+                                >
+                                    <Download size={12} />
+                                    <span className="hidden sm:inline">Generate</span>
+                                </button>
+                            </div>
                         )}
 
-                        {/* User Profile */}
+                        {/* Active Property Badge */}
+                        <div className="hidden md:flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-200/70 rounded-md text-[10.5px] text-gray-600 font-medium">
+                            <Building2 size={12} className="text-gray-400" />
+                            <span className="truncate max-w-[120px] font-semibold text-gray-700">{user?.property || 'Grand Palace'}</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        </div>
+
+                        {/* User Profile Dropdown */}
                         <div className="relative" ref={dropdownRef}>
-                            <div
-                                className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded-md transition-colors border border-transparent hover:border-slate-200"
+                            <button
+                                type="button"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-1.5 py-1 rounded-md transition-colors border border-transparent hover:border-gray-200"
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             >
-                                <div className="text-right hidden md:block">
-                                    <p className="text-xs font-bold text-slate-800 leading-tight">{user?.name || 'Manager'}</p>
-                                    <p className="text-[10px] text-slate-500 leading-tight">{user?.property || 'Grand Palace'}</p>
+                                <div className="text-right hidden sm:block">
+                                    <p className="text-[11px] font-bold text-gray-800 leading-tight">{user?.name || 'Manager'}</p>
+                                    <p className="text-[9.5px] text-gray-500 leading-tight">{user?.property || 'Grand Palace'}</p>
                                 </div>
-                                <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden border border-slate-200">
+                                <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden border border-gray-200 flex-shrink-0">
                                     <img
                                         src={user?.image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}
                                         alt="User"
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
-                            </div>
+                            </button>
 
                             {/* Dropdown Menu */}
                             {isDropdownOpen && (
-                                <div className="absolute right-0 mt-1.5 w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 animate-in fade-in slide-in-from-top-1 z-50 text-xs">
+                                <div className="absolute right-0 mt-1.5 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 animate-in fade-in slide-in-from-top-1 z-50 text-xs">
                                     <button
-                                        className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                        type="button"
+                                        className="w-full text-left px-3 py-1.5 text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
                                         onClick={() => setIsDropdownOpen(false)}
                                     >
-                                        <User size={13} className="text-slate-400" />
+                                        <User size={13} className="text-gray-400" />
                                         My Profile
                                     </button>
                                     <button
-                                        className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                        type="button"
+                                        className="w-full text-left px-3 py-1.5 text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
                                         onClick={() => setIsDropdownOpen(false)}
                                     >
-                                        <Building2 size={13} className="text-slate-400" />
+                                        <Building2 size={13} className="text-gray-400" />
                                         Switch Property
                                     </button>
-                                    <div className="h-px bg-slate-100 my-1"></div>
+                                    <div className="h-px bg-gray-100 my-1"></div>
                                     <div className="px-1.5 pb-0.5">
                                         <button
-                                            className="w-full text-center px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-all flex items-center justify-center gap-1.5"
+                                            type="button"
+                                            className="w-full text-center px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                                             onClick={() => {
                                                 setIsDropdownOpen(false);
                                                 onLogout();
@@ -4243,7 +4506,7 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             )}
                         </div>
                     </div>
-                </div>
+                </header>
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 bg-slate-50/60">
