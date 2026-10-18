@@ -2,8 +2,6 @@
 
 <div align="center">
 
-![HotelManagementOS Logo](public/logo.jpg)
-
 ### Next-Generation Cloud PMS, Real-Time Channel Manager & Hospitality ERP Suite
 
 [![React](https://img.shields.io/badge/React-19.2-blue?logo=react&logoColor=white)](https://react.dev/)
@@ -122,8 +120,7 @@ The engineering baseline of **HotelManagementOS** is governed by extensive IEEE 
 ```text
 HotelManagementOS/
 ├── .gemini/                                # Custom agent and development configurations
-├── public/                                 # Static public assets (logos, branding, favicons)
-│   ├── logo.jpg
+├── public/                                 # Static public assets (branding, icons, favicons)
 │   └── vite.svg
 ├── src/
 │   ├── assets/                             # Image assets and graphics

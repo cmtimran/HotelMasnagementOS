@@ -320,11 +320,13 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
             {/* Header / Logo Area */}
             <div className={`p-4 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
                 {!isCollapsed && (
-                    <div className="cursor-pointer flex items-center gap-2" onClick={() => setActivePage('dashboard')}>
-                        <img src="/logo.jpg" alt="Logo" className="h-10 w-auto object-contain" />
+                    <div className="cursor-pointer flex items-center gap-2.5" onClick={() => setActivePage('dashboard')}>
+                        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                            <Building2 size={20} />
+                        </div>
                         <div className="flex flex-col">
-                            <h1 className="text-xl font-bold text-gray-800 tracking-tight leading-none">PMS</h1>
-                            <p className="text-[9px] text-gray-500 font-medium leading-none mt-0.5">System</p>
+                            <h1 className="text-lg font-bold text-gray-900 tracking-tight leading-none">HotelOS</h1>
+                            <p className="text-[10px] text-gray-500 font-medium leading-none mt-1">Enterprise PMS</p>
                         </div>
                     </div>
                 )}
