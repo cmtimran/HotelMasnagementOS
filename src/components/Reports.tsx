@@ -128,6 +128,7 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
     const [activeReport, setActiveReport] = useState('Cancelled Reservation'); // Default to the one user requested
     const [startDate, setStartDate] = useState('2024-06-11');
     const [endDate, setEndDate] = useState('2024-06-11');
+    const [sidebarSearch, setSidebarSearch] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -151,12 +152,12 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
     const menuItems = [
         {
             title: 'Reservation Report',
-            icon: <ListOrdered size={20} />,
+            icon: <ListOrdered size={14} />,
             items: ['Arrival List', 'Cancelled Reservation', 'Country Wise Reservation Statistics', 'Departure List', 'Forecast Report', 'No Show Reservation', 'Release Reservation List', 'Reservation Activity', 'Void Reservation']
         },
         {
             title: 'Front Office Report',
-            icon: <Monitor size={20} />,
+            icon: <Monitor size={14} />,
             items: [
                 'Guest Checked In',
                 'Guest Checked Out',
@@ -174,7 +175,7 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         },
         {
             title: 'Back Office Report',
-            icon: <Building2 size={20} />,
+            icon: <Building2 size={14} />,
             items: [
                 'Advance Deposit Ledger',
                 'Ageing Debtors - Summary',
@@ -216,13 +217,22 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         },
         {
             title: 'Audit Report',
-            icon: <Shield size={20} />,
+            icon: <Shield size={14} />,
             items: ['Audit Trails', 'IP Report', 'Void Charge', 'Void Payment', 'Void Transaction']
         },
-        { title: 'Statistical Report', icon: <BarChart2 size={20} />, items: [] },
-        { title: 'Graphs and Charts', icon: <PieChart size={20} />, items: [] },
-        { title: 'Consolidate Report', icon: <Layers size={20} />, items: [] },
+        { title: 'Statistical Report', icon: <BarChart2 size={14} />, items: [] },
+        { title: 'Graphs and Charts', icon: <PieChart size={14} />, items: [] },
+        { title: 'Consolidate Report', icon: <Layers size={14} />, items: [] },
     ];
+
+    const filteredMenuItems = useMemo(() => {
+        if (!sidebarSearch.trim()) return menuItems;
+        const q = sidebarSearch.toLowerCase();
+        return menuItems.map(menu => ({
+            ...menu,
+            items: menu.items.filter(item => item.toLowerCase().includes(q))
+        })).filter(menu => menu.items.length > 0 || menu.title.toLowerCase().includes(q));
+    }, [sidebarSearch, menuItems]);
 
     // Template Creation State
     const [newTemplateName, setNewTemplateName] = useState('New Report');
@@ -238,47 +248,47 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
     const renderTemplateListModal = () => {
         if (!isTemplateListModalOpen) return null;
         return (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 transition-all animate-in fade-in duration-300">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-300">
-                    <div className="p-4 border-b flex justify-between items-center bg-white sticky top-0">
-                        <h2 className="text-xl font-bold text-slate-800 tracking-tight">Custom Template(s)</h2>
-                        <button onClick={() => setIsTemplateListModalOpen(false)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-full transition-colors">
-                            <X size={24} strokeWidth={2.5} />
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-3 transition-all animate-in fade-in duration-200">
+                <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-200 border border-slate-200">
+                    <div className="px-3.5 py-2 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0">
+                        <h2 className="text-sm font-bold text-slate-800 tracking-tight">Custom Report Template(s)</h2>
+                        <button onClick={() => setIsTemplateListModalOpen(false)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded-md transition-colors">
+                            <X size={15} strokeWidth={2.5} />
                         </button>
                     </div>
-                    <div className="p-5">
-                        <div className="border border-gray-200 rounded-lg overflow-hidden mb-6 overflow-x-auto no-scrollbar">
-                            <table className="w-full text-sm min-w-[400px]">
-                                <thead className="bg-gray-50 border-b">
+                    <div className="p-3">
+                        <div className="border border-slate-200 rounded-md overflow-hidden mb-3 overflow-x-auto no-scrollbar">
+                            <table className="w-full text-xs min-w-[360px]">
+                                <thead className="bg-slate-50 border-b border-slate-200">
                                     <tr>
-                                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Custom Report List</th>
-                                        <th className="px-4 py-2 text-right font-semibold text-gray-700 w-24">Action</th>
+                                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700 text-[11px]">Custom Report List</th>
+                                        <th className="px-3 py-1.5 text-right font-semibold text-slate-700 text-[11px] w-20">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <td className="px-4 py-3 text-gray-600">Custom Report List</td>
-                                        <td className="px-4 py-3 text-right"></td>
+                                    <tr className="hover:bg-slate-50/60">
+                                        <td className="px-3 py-2 text-slate-600">Custom Report List</td>
+                                        <td className="px-3 py-2 text-right"></td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4">
+                        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                            <button
+                                onClick={() => setIsTemplateListModalOpen(false)}
+                                className="h-7.5 px-3 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 transition-all font-medium text-xs shadow-2xs"
+                            >
+                                Cancel
+                            </button>
                             <button
                                 onClick={() => {
                                     setIsTemplateListModalOpen(false);
                                     setIsAddTemplateModalOpen(true);
                                 }}
-                                className="order-1 sm:order-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-lg shadow-blue-200 active:scale-95 text-sm"
+                                className="h-7.5 px-3.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all font-semibold shadow-2xs text-xs"
                             >
                                 Add New
-                            </button>
-                            <button
-                                onClick={() => setIsTemplateListModalOpen(false)}
-                                className="order-2 sm:order-1 px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-medium active:scale-95 text-sm"
-                            >
-                                Cancel
                             </button>
                         </div>
                     </div>
@@ -290,73 +300,73 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
     const renderAddTemplateModal = () => {
         if (!isAddTemplateModalOpen) return null;
         return (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 transition-all animate-in fade-in duration-300">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-300">
-                    <div className="p-4 border-b flex justify-between items-center bg-white">
-                        <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">Add Report Template</h2>
-                        <button onClick={() => setIsAddTemplateModalOpen(false)} className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors">
-                            <X size={24} strokeWidth={2.5} />
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-3 transition-all animate-in fade-in duration-200">
+                <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-200 border border-slate-200">
+                    <div className="px-3.5 py-2 border-b border-slate-200 flex justify-between items-center bg-white">
+                        <h2 className="text-sm font-bold text-slate-900 tracking-tight">Add Report Template</h2>
+                        <button onClick={() => setIsAddTemplateModalOpen(false)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded-md transition-colors">
+                            <X size={15} strokeWidth={2.5} />
                         </button>
                     </div>
 
-                    <div className="p-4 sm:p-6 space-y-5 overflow-y-auto no-scrollbar">
-                        <div className="flex flex-col sm:grid sm:grid-cols-12 sm:items-center gap-2 sm:gap-4">
-                            <label className="sm:col-span-3 font-bold text-gray-800 text-sm">Report Name</label>
+                    <div className="p-3.5 space-y-3 overflow-y-auto no-scrollbar">
+                        <div className="grid grid-cols-12 items-center gap-2">
+                            <label className="col-span-3 font-semibold text-slate-700 text-xs">Report Name</label>
                             <input
                                 type="text"
                                 value={newTemplateName}
                                 onChange={(e) => setNewTemplateName(e.target.value)}
-                                className="sm:col-span-9 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                                className="col-span-9 h-7 px-2.5 border border-slate-200 rounded-md focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-xs"
                             />
                         </div>
 
-                        <div className="flex flex-col sm:grid sm:grid-cols-12 sm:items-center gap-2 sm:gap-4">
-                            <label className="sm:col-span-3 font-bold text-gray-800 text-sm">Page Orientation</label>
+                        <div className="grid grid-cols-12 items-center gap-2">
+                            <label className="col-span-3 font-semibold text-slate-700 text-xs">Page Orientation</label>
                             <select
                                 value={newTemplateOrientation}
                                 onChange={(e) => setNewTemplateOrientation(e.target.value)}
-                                className="sm:col-span-9 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition-all cursor-pointer text-sm"
+                                className="col-span-9 h-7 px-2 border border-slate-200 rounded-md focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition-all cursor-pointer text-xs"
                             >
                                 <option>Landscape</option>
                                 <option>Portrait</option>
                             </select>
                         </div>
 
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <span className="font-bold text-gray-800">Columns</span>
-                                <button className="p-1 border rounded hover:bg-gray-50 text-gray-600 transition-colors shadow-sm">
-                                    <Plus size={16} strokeWidth={3} />
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 text-xs">Columns</span>
+                                <button className="h-6 px-1.5 border border-slate-200 rounded hover:bg-slate-50 text-slate-600 transition-colors shadow-2xs flex items-center gap-1 text-[11px]">
+                                    <Plus size={12} strokeWidth={2.5} /> Add Column
                                 </button>
                             </div>
 
-                            <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm overflow-x-auto no-scrollbar">
-                                <table className="w-full text-sm border-collapse min-w-[600px]">
-                                    <thead className="bg-gray-50 border-b">
+                            <div className="border border-slate-200 rounded-md overflow-hidden shadow-2xs overflow-x-auto no-scrollbar">
+                                <table className="w-full text-xs border-collapse min-w-[500px]">
+                                    <thead className="bg-slate-50 border-b border-slate-200">
                                         <tr>
-                                            <th className="w-10 py-2 border-r"></th>
-                                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">Column Name</th>
-                                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">Header Text</th>
-                                            <th className="px-3 py-2 text-center font-semibold text-gray-600 border-r">Order</th>
-                                            <th className="px-3 py-2 text-left font-semibold text-gray-600 border-r">Align</th>
-                                            <th className="px-3 py-2 text-center font-semibold text-gray-600">Action</th>
+                                            <th className="w-7 py-1.5 border-r border-slate-200"></th>
+                                            <th className="px-2.5 py-1.5 text-left font-semibold text-slate-600 border-r border-slate-200 text-[11px]">Column Name</th>
+                                            <th className="px-2.5 py-1.5 text-left font-semibold text-slate-600 border-r border-slate-200 text-[11px]">Header Text</th>
+                                            <th className="px-2.5 py-1.5 text-center font-semibold text-slate-600 border-r border-slate-200 text-[11px] w-12">Order</th>
+                                            <th className="px-2.5 py-1.5 text-left font-semibold text-slate-600 border-r border-slate-200 text-[11px] w-16">Align</th>
+                                            <th className="px-2.5 py-1.5 text-center font-semibold text-slate-600 text-[11px] w-20">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-200">
+                                    <tbody className="divide-y divide-slate-100">
                                         {templateColumns.map((col) => (
-                                            <tr key={col.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="w-10 text-center border-r py-3 text-gray-400">
-                                                    <GripVertical size={16} className="mx-auto cursor-pointer" />
+                                            <tr key={col.id} className="hover:bg-slate-50/60 transition-colors">
+                                                <td className="w-7 text-center border-r border-slate-100 py-1.5 text-slate-400">
+                                                    <GripVertical size={13} className="mx-auto cursor-pointer" />
                                                 </td>
-                                                <td className="px-3 py-3 border-r text-gray-700">{col.name}</td>
-                                                <td className="px-3 py-3 border-r text-gray-700 font-medium">{col.header}</td>
-                                                <td className="px-3 py-3 border-r text-center text-gray-700">{col.order}</td>
-                                                <td className="px-3 py-3 border-r text-gray-700">{col.align}</td>
-                                                <td className="px-3 py-3 text-center">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button className="p-1 hover:text-blue-600 transition-colors"><Edit size={16} /></button>
-                                                        <button className="p-1 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
-                                                        <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors"><Menu size={16} /></button>
+                                                <td className="px-2.5 py-1.5 border-r border-slate-100 text-slate-700">{col.name}</td>
+                                                <td className="px-2.5 py-1.5 border-r border-slate-100 text-slate-700 font-medium">{col.header}</td>
+                                                <td className="px-2.5 py-1.5 border-r border-slate-100 text-center text-slate-700">{col.order}</td>
+                                                <td className="px-2.5 py-1.5 border-r border-slate-100 text-slate-700">{col.align}</td>
+                                                <td className="px-2.5 py-1.5 text-center">
+                                                    <div className="flex items-center justify-center gap-1.5 text-slate-400">
+                                                        <button className="hover:text-blue-600 transition-colors"><Edit size={13} /></button>
+                                                        <button className="hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                                                        <button className="hover:text-slate-600 transition-colors"><Menu size={13} /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -366,18 +376,18 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white mt-auto">
+                        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 sticky bottom-0 bg-white">
                             <button
                                 onClick={() => setIsAddTemplateModalOpen(false)}
-                                className="order-1 sm:order-2 px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-200 active:scale-95 text-sm"
+                                className="h-7.5 px-3 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 transition-all font-medium text-xs shadow-2xs"
                             >
-                                Save
+                                Cancel
                             </button>
                             <button
                                 onClick={() => setIsAddTemplateModalOpen(false)}
-                                className="order-2 sm:order-1 px-8 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-semibold active:scale-95 text-sm"
+                                className="h-7.5 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all font-semibold shadow-2xs text-xs"
                             >
-                                Cancel
+                                Save
                             </button>
                         </div>
                     </div>
@@ -394,25 +404,25 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         switch (activeReport) {
             case 'Arrival List':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Arrival</label>
+                                <label className="font-medium text-slate-700 text-xs">Arrival</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                     <option>Deluxe</option>
                                     <option>Suite</option>
@@ -420,31 +430,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Rate Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Show Amount</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Show Amount</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Rent Per Night</option>
                                 </select>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate From</label>
+                                <label className="font-medium text-slate-700 text-xs">Rate From</label>
                                 <div className="col-span-2 flex items-center gap-2">
-                                    <input type="text" className="flex-1 w-full px-2 py-1.5 border rounded outline-none" />
+                                    <input type="text" className="flex-1 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     <span>To</span>
-                                    <input type="text" className="flex-1 w-full px-2 py-1.5 border rounded outline-none" />
+                                    <input type="text" className="flex-1 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Reservation Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Reservation Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -464,44 +474,44 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Company</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Company</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Travel Agent</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Travel Agent</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                 </select>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Business Source</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Business Source</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Market</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Market</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">User</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">User</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
                                 <div className="col-span-3 flex items-center justify-end gap-2 pt-2">
-                                    <span className="font-medium text-gray-700">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
+                                    <span className="font-medium text-slate-700 text-xs">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
                                     <input type="checkbox" className="w-4 h-4 ml-2" />
                                 </div>
                             </div>
@@ -510,25 +520,25 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Cancelled Reservation':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Cancelled From</label>
+                                <label className="font-medium text-slate-700 text-xs">Cancelled From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Rate Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                     <option>Rack Rate</option>
                                     <option>Corporate Rate</option>
@@ -536,8 +546,8 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Business Source</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Business Source</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                     <option>Direct</option>
                                     <option>OTA</option>
@@ -545,9 +555,9 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -556,10 +566,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                     <option>Deluxe</option>
                                     <option>Suite</option>
@@ -567,8 +577,8 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Cancelled By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Cancelled By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                     <option>Admin</option>
                                     <option>Manager</option>
@@ -576,8 +586,8 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Travel Agent</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Travel Agent</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>ALL</option>
                                 </select>
                             </div>
@@ -585,7 +595,7 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             <div className="grid grid-cols-3 items-center">
                                 <div className="col-span-3">
                                     <div className="flex items-center justify-between gap-2 pt-2">
-                                        <span className="font-medium text-gray-700">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
+                                        <span className="font-medium text-slate-700 text-xs">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
                                         <input type="checkbox" className="w-4 h-4" />
                                     </div>
                                 </div>
@@ -595,32 +605,32 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Country Wise Reservation Statistics':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                            <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Date Type</label>
+                                    <label className="font-medium text-slate-700 text-xs">Date Type</label>
                                     <div className="col-span-2 flex gap-4">
                                         <label className="flex items-center gap-2"><input type="radio" name="dateType" defaultChecked /> Created</label>
                                         <label className="flex items-center gap-2"><input type="radio" name="dateType" /> Arrival</label>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">From</label>
+                                    <label className="font-medium text-slate-700 text-xs">From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Report Template</label>
+                                    <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                     <div className="col-span-2 flex gap-2">
-                                        <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                        <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                             <option>Default</option>
                                         </select>
                                         <button onClick={handleEditTemplate} className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -634,55 +644,55 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Departure List':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Departure</label>
+                                <label className="font-medium text-slate-700 text-xs">Departure</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">User</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">User</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Rate Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Market</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Market</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Business Source</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Business Source</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
                                 <div className="col-span-3 flex items-center gap-2 pt-2">
-                                    <span className="font-medium text-gray-700">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
+                                    <span className="font-medium text-slate-700 text-xs">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
                                     <input type="checkbox" className="w-4 h-4" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -691,36 +701,36 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Reservation Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Reservation Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate From</label>
+                                <label className="font-medium text-slate-700 text-xs">Rate From</label>
                                 <div className="col-span-2 flex items-center gap-2">
-                                    <input type="text" className="flex-1 w-full px-2 py-1.5 border rounded outline-none" />
+                                    <input type="text" className="flex-1 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     <span>To</span>
-                                    <input type="text" className="flex-1 w-full px-2 py-1.5 border rounded outline-none" />
+                                    <input type="text" className="flex-1 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Travel Agent</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Travel Agent</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Company</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Company</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -729,21 +739,21 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Forecast Report':
                 return (
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-8">
                             <div className="flex items-center gap-2">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="relative">
-                                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                 </div>
                                 <span>To</span>
                                 <div className="relative">
-                                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <label className="font-medium text-gray-700">Report Type</label>
-                                <select className="px-2 py-1.5 border rounded outline-none bg-white min-w-[200px]">
+                                <label className="font-medium text-slate-700 text-xs">Report Type</label>
+                                <select className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white min-w-[200px]">
                                     <option>Totals by Date</option>
                                 </select>
                             </div>
@@ -752,34 +762,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'No Show Reservation':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                            <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">NoShow From</label>
+                                    <label className="font-medium text-slate-700 text-xs">NoShow From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Report Template</label>
+                                    <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                     <div className="col-span-2 flex gap-2">
-                                        <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                        <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                             <option>Default</option>
                                         </select>
                                         <button onClick={handleEditTemplate} className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="flex items-center justify-end gap-2 pt-2">
-                                    <span className="font-medium text-gray-700">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
+                                    <span className="font-medium text-slate-700 text-xs">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
                                     <input type="checkbox" className="w-4 h-4" />
                                 </div>
                             </div>
@@ -788,31 +798,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Release Reservation List':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Release Date</label>
+                                <label className="font-medium text-slate-700 text-xs">Release Date</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Rate Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -821,10 +831,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -833,76 +843,76 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Reservation Activity':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                             {/* Left Column */}
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">From</label>
+                                    <label className="font-medium text-slate-700 text-xs">From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Rate Type</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Rate Type</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Business Source</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Business Source</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Promotion Name</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Promotion Name</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Affiliate</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Affiliate</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                             </div>
 
                             {/* Right Column */}
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Room Type</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">User</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">User</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Select</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Travel Agent</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Travel Agent</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Package Name</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Package Name</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Sort By</label>
+                                    <label className="font-medium text-slate-700 text-xs">Sort By</label>
                                     <div className="col-span-2 flex gap-4">
                                         <label className="flex items-center gap-2"><input type="checkbox" /> Rate Type</label>
                                         <label className="flex items-center gap-2"><input type="checkbox" /> Special Package</label>
@@ -910,7 +920,7 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
                                     <div className="col-span-3 flex items-center justify-end gap-2 pt-2">
-                                        <span className="font-medium text-gray-700">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
+                                        <span className="font-medium text-slate-700 text-xs">Tax Inclusive Rates (Disc./Adj. included, if applied)</span>
                                         <input type="checkbox" className="w-4 h-4 ml-2" />
                                     </div>
                                 </div>
@@ -934,9 +944,9 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         <div className="grid grid-cols-3 items-center w-full md:w-1/2">
-                            <label className="font-medium text-gray-700">Report Template</label>
+                            <label className="font-medium text-slate-700 text-xs">Report Template</label>
                             <div className="col-span-2 flex gap-2">
-                                <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Default</option>
                                 </select>
                                 <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -946,25 +956,25 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Void Reservation':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                            <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Void From</label>
+                                    <label className="font-medium text-slate-700 text-xs">Void From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Report Template</label>
+                                    <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                     <div className="col-span-2 flex gap-2">
-                                        <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                        <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                             <option>Default</option>
                                         </select>
                                         <button onClick={handleEditTemplate} className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -976,18 +986,18 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Advance Deposit Ledger':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
@@ -998,9 +1008,9 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -1009,10 +1019,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>$</option>
                                 </select>
                             </div>
@@ -1021,34 +1031,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Ageing Debtors - Detail':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">City Ledger</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">City Ledger</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>ALL</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>$</option>
                                 </select>
                             </div>
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Transaction Date From</label>
+                                <label className="font-medium text-slate-700 text-xs">Transaction Date From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
@@ -1061,18 +1071,18 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Ageing Debtors - Summary':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
@@ -1082,25 +1092,25 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Account Name</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Account Name</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>ALL</option>
                                 </select>
                             </div>
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>$</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
                                 <div className="col-span-3 flex items-center justify-end gap-2 pt-8">
                                     <input type="checkbox" checked className="w-4 h-4 ml-2" />
-                                    <span className="font-medium text-gray-700">Show Folios Detail</span>
+                                    <span className="font-medium text-slate-700 text-xs">Show Folios Detail</span>
                                 </div>
                             </div>
 
@@ -1114,34 +1124,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Cashier Sales Report':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From Posting Date</label>
+                                <label className="font-medium text-slate-700 text-xs">From Posting Date</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Sort By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Sort By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Date</option>
                                 </select>
                             </div>
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">User</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">User</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1150,34 +1160,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'City Ledger - Detail':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">City Ledger</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">City Ledger</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>A to Z Pharma</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>$</option>
                                 </select>
                             </div>
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">City Ledger From</label>
+                                <label className="font-medium text-slate-700 text-xs">City Ledger From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
@@ -1186,32 +1196,32 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'City Ledger - Summary':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                            <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">From</label>
+                                    <label className="font-medium text-slate-700 text-xs">From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Report Template</label>
+                                    <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                     <div className="col-span-2 flex gap-2">
-                                        <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                        <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                             <option>Default</option>
                                         </select>
                                         <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
                                     <label className="font-medium text-gray-700 w-full text-right pr-4">Ignore zero balance account</label>
                                     <input type="checkbox" className="w-4 h-4" />
@@ -1222,26 +1232,26 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Complimentary Room Report':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Select Year</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Select Year</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>2024</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Nights By</label>
+                                <label className="font-medium text-slate-700 text-xs">Nights By</label>
                                 <div className="col-span-2 flex items-center gap-4">
                                     <label className="flex items-center gap-1"><input type="radio" name="nightsBy" defaultChecked /> Whole Stay</label>
                                     <label className="flex items-center gap-1"><input type="radio" name="nightsBy" /> Nights in month</label>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -1250,10 +1260,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Select Month</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Select Month</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>June</option>
                                 </select>
                             </div>
@@ -1264,49 +1274,49 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 return (
                     <div className="grid grid-cols-1 items-center gap-4">
                         <div className="flex flex-wrap items-center gap-4">
-                            <label className="font-medium text-gray-700">Process From</label>
+                            <label className="font-medium text-slate-700 text-xs">Process From</label>
                             <div className="flex items-center gap-2">
-                                <input type="date" value="2026-01-14" className="px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
-                                <input type="time" value="00:00" className="px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <input type="date" value="2026-01-14" className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
+                                <input type="time" value="00:00" className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                             <span>To</span>
                             <div className="flex items-center gap-2">
-                                <input type="date" value="2026-01-15" className="px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
-                                <input type="time" value="00:00" className="px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <input type="date" value="2026-01-15" className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
+                                <input type="time" value="00:00" className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
 
                             <label className="font-medium text-gray-700 ml-4">Type</label>
-                            <select className="px-2 py-1.5 border rounded outline-none bg-white w-32">
+                            <select className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white w-32">
                                 <option>All</option>
                             </select>
                         </div>
                         <div className="flex items-center gap-2">
-                            <label className="font-medium text-gray-700">Exclude Void Entries</label>
+                            <label className="font-medium text-slate-700 text-xs">Exclude Void Entries</label>
                             <input type="checkbox" className="w-4 h-4 check-box connection" />
                         </div>
                     </div>
                 );
             case 'Daily Extra Charge - Detail':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Date</label>
+                                <label className="font-medium text-slate-700 text-xs">Date</label>
                                 <div className="col-span-2 flex items-center gap-4">
                                     <label className="flex items-center gap-1"><input type="radio" name="dateType" defaultChecked /> Charge/Posting</label>
                                     <label className="flex items-center gap-1"><input type="radio" name="dateType" /> Departure</label>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Received By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Received By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Sort By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Sort By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Date</option>
                                 </select>
                             </div>
@@ -1322,30 +1332,30 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Transaction Date From</label>
+                                <label className="font-medium text-slate-700 text-xs">Transaction Date From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Extra Charge</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Extra Charge</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1354,24 +1364,24 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Housekeeping Summary':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -1382,34 +1392,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Maintenance Block':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Block From</label>
+                                <label className="font-medium text-slate-700 text-xs">Block From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1418,17 +1428,17 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Manager Report':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As on Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As on Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>$</option>
                                 </select>
                             </div>
@@ -1437,32 +1447,32 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Meal Plan':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As On Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As On Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Sort By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Sort By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Room No.</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Meal Plan</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Meal Plan</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1471,45 +1481,45 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Meal Planner':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As on Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As on Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                         </div>
                     </div>
                 );
             case 'Owner Statement':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Owner</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Owner</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>All</option>
                                 </select>
                             </div>
@@ -1518,26 +1528,26 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'PG - Authorize Capture':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Payment Gateway :</label>
+                                <label className="font-medium text-slate-700 text-xs">Payment Gateway :</label>
                                 <span className="col-span-2 text-gray-900">zeamster</span>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Transaction Date From :</label>
+                                <label className="font-medium text-slate-700 text-xs">Transaction Date From :</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-start">
                                 <label className="font-medium text-gray-700 pt-1">Show :</label>
                                 <div className="col-span-2 flex flex-col gap-1">
@@ -1551,34 +1561,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Rate Card':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Source</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Source</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Ignore Zero Rate</label>
+                                <label className="font-medium text-slate-700 text-xs">Ignore Zero Rate</label>
                                 <input type="checkbox" className="w-4 h-4 ml-1" />
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Rate Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Inclusive Tax</label>
+                                <label className="font-medium text-slate-700 text-xs">Inclusive Tax</label>
                                 <input type="checkbox" className="w-4 h-4 ml-1" />
                             </div>
                         </div>
@@ -1586,26 +1596,26 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Revenue By Rate Type':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As On Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As On Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Rate Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Rate Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1614,26 +1624,26 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Revenue By Room Type':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As On Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As On Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1641,46 +1651,46 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                     </div>
                 );
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Receipt From</label>
+                                <label className="font-medium text-slate-700 text-xs">Receipt From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Payment Method</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Payment Method</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Payment For</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Payment For</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Received By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Received By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1689,24 +1699,24 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Daily Receipt - Summary':
                 return (
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
                             <div className="flex items-center gap-2">
-                                <label className="font-medium text-gray-700">Payment From</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">Payment From</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                                 <span>To</span>
-                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                             <div className="flex items-center gap-2">
-                                <label className="font-medium text-gray-700">User</label>
-                                <select className="px-2 py-1.5 border rounded outline-none bg-white min-w-[150px]">
+                                <label className="font-medium text-slate-700 text-xs">User</label>
+                                <select className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white min-w-[150px]">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <label className="font-medium text-gray-700 w-24">Payment For</label>
-                            <select className="px-2 py-1.5 border rounded outline-none bg-white min-w-[200px]">
+                            <select className="h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white min-w-[200px]">
                                 <option>--Select--</option>
                             </select>
                         </div>
@@ -1714,31 +1724,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Daily Refund Report':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Receipt From</label>
+                                <label className="font-medium text-slate-700 text-xs">Receipt From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Payment Method</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Payment Method</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -1747,16 +1757,16 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Received By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Received By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1765,15 +1775,15 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Daily Revenue':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As On Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As On Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Daily Revenue By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Daily Revenue By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -1795,9 +1805,9 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -1808,33 +1818,33 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Detail Discount Report':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                             {/* Left Side */}
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">From</label>
+                                    <label className="font-medium text-slate-700 text-xs">From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Type</label>
+                                    <label className="font-medium text-slate-700 text-xs">Type</label>
                                     <div className="col-span-2 flex items-center gap-4">
                                         <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> Room Folio</label>
                                         <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> POS Folio</label>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Report Template</label>
+                                    <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                     <div className="col-span-2 flex gap-2">
-                                        <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                        <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                             <option>Default</option>
                                         </select>
                                         <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -1843,10 +1853,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             {/* Right Side */}
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">User</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">User</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
@@ -1856,12 +1866,12 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Detail Revenue Report':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                             {/* Left Column */}
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Date</label>
+                                    <label className="font-medium text-slate-700 text-xs">Date</label>
                                     <div className="col-span-2 flex items-center gap-4 text-sm">
                                         <label className="flex items-center gap-1"><input type="radio" name="revDate" defaultChecked /> Booking</label>
                                         <label className="flex items-center gap-1"><input type="radio" name="revDate" /> Stay</label>
@@ -1869,14 +1879,14 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">From</label>
+                                    <label className="font-medium text-slate-700 text-xs">From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
@@ -1887,16 +1897,16 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             </div>
 
                             {/* Right Column */}
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Business Source</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Business Source</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Room</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Room</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>--Select--</option>
                                     </select>
                                 </div>
@@ -1957,9 +1967,9 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                             <p className="text-sm mt-4 text-gray-800">NOTE : Nights will calculate on Primary(Master) folio. In second folio, Nights will show as '-'</p>
 
                             <div className="grid grid-cols-3 items-center mt-4">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-1 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -1970,31 +1980,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Expense Voucher':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Transaction Date From</label>
+                                <label className="font-medium text-slate-700 text-xs">Transaction Date From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Charges</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Charges</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">User</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">User</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -2003,32 +2013,32 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Financial Report':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                            <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Type</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Type</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Daily Financial Report</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">From</label>
+                                    <label className="font-medium text-slate-700 text-xs">From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Report Options</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Report Options</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Detailed - Room Order</option>
                                     </select>
                                 </div>
@@ -2038,11 +2048,11 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Folio List':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Date</label>
+                                <label className="font-medium text-slate-700 text-xs">Date</label>
                                 <div className="col-span-2 flex items-center gap-4 text-sm">
                                     <label className="flex items-center gap-1"><input type="radio" name="folioDate" defaultChecked /> Transaction</label>
                                     <label className="flex items-center gap-1"><input type="radio" name="folioDate" /> Arrival</label>
@@ -2050,15 +2060,15 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Status</label>
+                                <label className="font-medium text-slate-700 text-xs">Status</label>
                                 <div className="col-span-2 flex items-center gap-4">
                                     <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> Paid</label>
                                     <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> Unpaid</label>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Folio Mode</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Folio Mode</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Both</option>
                                 </select>
                             </div>
@@ -2076,15 +2086,15 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Business Source</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Business Source</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -2093,29 +2103,29 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Type</label>
+                                <label className="font-medium text-slate-700 text-xs">Type</label>
                                 <div className="col-span-2 flex items-center gap-4">
                                     <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> Room Folio</label>
                                     <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> POS Folio</label>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Sort By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Sort By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Folio No</option>
                                 </select>
                             </div>
@@ -2124,23 +2134,23 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Guest Ledger':
                 return (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                            <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Guest Ledger Date</label>
-                                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                    <label className="font-medium text-slate-700 text-xs">Guest Ledger Date</label>
+                                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Currency</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>$</option>
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Report Template</label>
+                                    <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                     <div className="col-span-2 flex gap-2">
-                                        <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                        <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                             <option>Default</option>
                                         </select>
                                         <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -2148,10 +2158,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Show Charges</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Show Charges</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Both</option>
                                     </select>
                                 </div>
@@ -2161,16 +2171,16 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'House Status':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                         {/* Left Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As On Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As On Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">House Keeper</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">House Keeper</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -2198,9 +2208,9 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -2209,10 +2219,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                         </div>
 
                         {/* Right Column */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Room Type</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Room Type</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -2220,7 +2230,7 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                 <div className="col-span-3">
                                     <label className="flex items-center gap-2 font-medium text-gray-700 justify-end"><span className="text-right w-full pr-12">Show Only Active Rooms</span><input type="checkbox" defaultChecked className="mr-auto" /></label>
                                     <div className="col-span-2 relative">
-                                        <select className="w-full px-2 py-1.5 border rounded outline-none bg-white h-24" multiple>
+                                        <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white h-24" multiple>
                                             <option value="All" selected>All</option>
                                             <option value="Chambre simple">Chambre simple</option>
                                             <option value="FAMILY ROOM">FAMILY ROOM</option>
@@ -2231,10 +2241,10 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                     <input type="checkbox" defaultChecked />
-                                    <label className="font-medium text-gray-700">Show Including Inactive Rooms</label>
+                                    <label className="font-medium text-slate-700 text-xs">Show Including Inactive Rooms</label>
                                 </div>
                             </div>
                         </div>
@@ -2244,31 +2254,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 return (
                     <div className="grid grid-cols-1 gap-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12">
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">From</label>
+                                    <label className="font-medium text-slate-700 text-xs">From</label>
                                     <div className="col-span-2 flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                         <span>To</span>
                                         <div className="relative flex-1">
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-2">
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Type of Data</label>
+                                    <label className="font-medium text-slate-700 text-xs">Type of Data</label>
                                     <div className="col-span-2 flex items-center gap-4">
                                         <label className="flex items-center gap-1"><input type="radio" name="type" defaultChecked /> Transaction Date</label>
                                         <label className="flex items-center gap-1"><input type="radio" name="type" /> Checkout/Cancel/No Show</label>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 items-center">
-                                    <label className="font-medium text-gray-700">Sort By</label>
-                                    <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <label className="font-medium text-slate-700 text-xs">Sort By</label>
+                                    <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Reservation No</option>
                                     </select>
                                 </div>
@@ -2293,45 +2303,45 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Travel Agent Commission - Detail':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Commission Plan</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Commission Plan</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Travel Agent</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Travel Agent</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Tax Inclusive Room Charges</label>
+                                <label className="font-medium text-slate-700 text-xs">Tax Inclusive Room Charges</label>
                                 <input type="checkbox" className="w-4 h-4 ml-1" />
                             </div>
                         </div>
@@ -2339,24 +2349,24 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Travel Agent Commission - Summary':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
@@ -2367,17 +2377,17 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Weekly Manager Report':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">As on Date</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">As on Date</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Currency</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Currency</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>$</option>
                                 </select>
                             </div>
@@ -2386,60 +2396,60 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Weekly Meal Plan Report':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full px-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                <label className="font-medium text-slate-700 text-xs">From</label>
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 focus:border-blue-500" />
                             </div>
                         </div>
                     </div>
                 );
             case 'Work Order List':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Entered On</label>
+                                <label className="font-medium text-slate-700 text-xs">Entered On</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Category</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Category</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Clean</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Status</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Status</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Assigned</option>
                                 </select>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Unit</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Unit</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>102</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Priority</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Priority</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>High</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Assigned To</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Assigned To</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>harry</option>
                                 </select>
                             </div>
@@ -2448,31 +2458,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Audit Trails':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">From</label>
+                                <label className="font-medium text-slate-700 text-xs">From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Operation</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Operation</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>All</option>
                                 </select>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">User</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">User</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -2481,34 +2491,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'IP Report':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Opened From</label>
+                                <label className="font-medium text-slate-700 text-xs">Opened From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Opened By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Opened By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -2517,40 +2527,40 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Void Charge':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Void From</label>
+                                <label className="font-medium text-slate-700 text-xs">Void From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Charge</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Charge</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Room Posting</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Void By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Void By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Abhishek</option>
                                 </select>
                             </div>
@@ -2559,40 +2569,40 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Void Payment':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Void From</label>
+                                <label className="font-medium text-slate-700 text-xs">Void From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Payment Method</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Payment Method</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>Select</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Void By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Void By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -2601,34 +2611,34 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 );
             case 'Void Transaction':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Void From</label>
+                                <label className="font-medium text-slate-700 text-xs">Void From</label>
                                 <div className="col-span-2 flex items-center gap-2">
                                     <div className="relative flex-1">
-                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                     <span>To</span>
                                     <div className="relative flex-1">
-                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full pl-2 pr-2 py-1.5 border rounded outline-none focus:border-blue-500" />
+                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Report Template</label>
+                                <label className="font-medium text-slate-700 text-xs">Report Template</label>
                                 <div className="col-span-2 flex gap-2">
-                                    <select className="w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                    <select className="w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                         <option>Default</option>
                                     </select>
                                     <button className="px-2 border rounded hover:bg-gray-50"><Edit size={14} /></button>
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <div className="grid grid-cols-3 items-center">
-                                <label className="font-medium text-gray-700">Void By</label>
-                                <select className="col-span-2 w-full px-2 py-1.5 border rounded outline-none bg-white">
+                                <label className="font-medium text-slate-700 text-xs">Void By</label>
+                                <select className="col-span-2 w-full h-7 px-2 py-0.5 text-xs border border-slate-200 rounded outline-none focus:border-blue-500 bg-white">
                                     <option>--Select--</option>
                                 </select>
                             </div>
@@ -3752,11 +3762,11 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         const config = REPORT_CONFIG[activeReport];
         if (!config) {
             return (
-                <div className="flex flex-col items-center justify-center p-12 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
-                    <p className="text-gray-500 font-medium text-lg">Report Configuration Not Found</p>
-                    <p className="text-gray-400 text-sm mt-1">Please configure {activeReport} in REPORT_CONFIG</p>
-                    <button onClick={() => setShowReport(false)} className="mt-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-medium text-sm transition-colors">
-                        Go Back
+                <div className="flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-lg shadow-2xs text-center m-4">
+                    <p className="text-slate-700 font-bold text-sm">Report Configuration Not Found</p>
+                    <p className="text-slate-400 text-xs mt-1">Please configure {activeReport} in REPORT_CONFIG</p>
+                    <button onClick={() => setShowReport(false)} className="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-semibold text-xs transition-colors">
+                        Go Back to Filters
                     </button>
                 </div>
             );
@@ -3783,15 +3793,22 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         if (pages.length === 0) pages.push([]);
 
         const ReportHeader = () => (
-            <div className="mb-6">
-                <div className="flex justify-between items-end border-b-2 border-slate-800 pb-2 mb-2">
-                    <h1 className="text-2xl font-bold text-slate-800">House of Dream</h1>
-                    <h2 className="text-xl font-bold text-red-600">{activeReport}</h2>
+            <div className="mb-3">
+                <div className="flex justify-between items-end border-b-2 border-slate-800 pb-1.5 mb-1.5">
+                    <div>
+                        <h1 className="text-lg font-bold text-slate-900 leading-tight">House of Dream</h1>
+                        <p className="text-[10px] text-slate-500 font-medium">Hotel Management System • Operational Report</p>
+                    </div>
+                    <div className="text-right">
+                        <h2 className="text-sm font-bold text-red-600 uppercase tracking-wider">{activeReport}</h2>
+                        <span className="text-[9px] text-slate-400 font-mono">Property Base Currency: USD ($)</span>
+                    </div>
                 </div>
-                <div className="flex flex-wrap gap-4 text-xs font-medium text-gray-700">
-                    <div>Date From <span className="font-normal">{startDate}</span></div>
-                    <div>To <span className="font-normal">{endDate}</span></div>
-                    <div>Total Records: <span className="font-normal">{filteredData.length}</span></div>
+                <div className="flex flex-wrap items-center gap-3 text-[10px] font-medium text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-200/60">
+                    <div><span className="text-slate-400">Date From:</span> <span className="font-semibold text-slate-800">{startDate}</span></div>
+                    <div><span className="text-slate-400">To:</span> <span className="font-semibold text-slate-800">{endDate}</span></div>
+                    <div><span className="text-slate-400">Total Records:</span> <span className="font-semibold text-blue-700">{filteredData.length}</span></div>
+                    <div className="ml-auto text-slate-400 font-mono text-[9px]">Generated: {new Date().toLocaleDateString()}</div>
                 </div>
             </div>
         );
@@ -3799,13 +3816,13 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
         const ReportPage = ({ pageData, pageNum }: { pageData: ReportRow[], pageNum: number }) => (
             <div
                 id={`report-page-${pageNum}`}
-                className="bg-white shadow-lg print:shadow-none transition-transform origin-top duration-200 ease-out relative overflow-hidden mx-auto"
+                className="bg-white shadow-md print:shadow-none transition-transform origin-top duration-200 ease-out relative overflow-hidden mx-auto border border-slate-200/70"
                 style={{
                     width: getPageDimensions().width,
                     minHeight: getPageDimensions().height,
-                    padding: '15mm',
-                    marginBottom: viewMode === 'continuous' ? '20px' : '0',
-                    transform: viewMode === 'multi' ? `scale(0.4)` : `scale(${zoomLevel / 100})`, // Force smaller scale in grid view
+                    padding: '12mm',
+                    marginBottom: viewMode === 'continuous' ? '12px' : '0',
+                    transform: viewMode === 'multi' ? `scale(0.38)` : `scale(${zoomLevel / 100})`,
                     transformOrigin: 'top center',
                     display: 'flex',
                     flexDirection: 'column'
@@ -3814,7 +3831,7 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 {/* Watermark Overlay */}
                 {showWatermark && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 overflow-hidden">
-                        <div className="transform -rotate-45 text-gray-100 font-bold whitespace-nowrap select-none" style={{ fontSize: '120px' }}>
+                        <div className="transform -rotate-45 text-slate-200/60 font-black whitespace-nowrap select-none" style={{ fontSize: '100px' }}>
                             {watermarkText}
                         </div>
                     </div>
@@ -3824,33 +3841,33 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                     <ReportHeader />
 
                     <div className="overflow-hidden flex-1">
-                        <table className="w-full text-[10px] leading-tight text-left border-collapse">
-                            <thead className="border-b-2 border-slate-800">
+                        <table className="w-full text-[9.5px] leading-tight text-left border-collapse">
+                            <thead className="border-b-2 border-slate-800 bg-slate-100/90">
                                 <tr>
                                     {config.columns.map((col, idx) => (
-                                        <th key={idx} className="py-1 font-bold text-gray-900 border-b border-gray-300 whitespace-nowrap px-1">{col}</th>
+                                        <th key={idx} className="py-1 px-1.5 font-bold text-slate-900 border-b border-slate-300 uppercase tracking-wider text-[9px] whitespace-nowrap">{col}</th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="">
+                            <tbody className="divide-y divide-slate-100">
                                 {pageData.map((row, idx) => (
-                                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                                         {config.columns.map((col, cIdx) => (
-                                            <td key={cIdx} className="py-1.5 align-top px-1">{row[col]}</td>
+                                            <td key={cIdx} className="py-1 px-1.5 align-middle text-slate-700 whitespace-nowrap font-normal">{row[col]}</td>
                                         ))}
                                     </tr>
                                 ))}
                                 {pageNum === totalPages && (
-                                    <tr className="border-t-2 border-black font-bold bg-gray-50/50">
-                                        <td className="py-2 px-1" colSpan={3}>Total Records ({filteredData.length})</td>
-                                        <td className="py-2 px-1 text-right" colSpan={config.columns.length - 3}></td>
+                                    <tr className="border-t-2 border-slate-900 font-bold bg-slate-100/80">
+                                        <td className="py-1.5 px-1.5 text-slate-900" colSpan={Math.min(3, config.columns.length)}>Total Records: {filteredData.length}</td>
+                                        <td className="py-1.5 px-1.5 text-right text-slate-900 font-mono text-[9px]" colSpan={Math.max(0, config.columns.length - 3)}>END OF REPORT</td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
 
-                    <div className="mt-auto pt-8 border-t flex justify-between text-[8px] text-gray-400 font-mono">
+                    <div className="mt-auto pt-3 border-t border-slate-200 flex justify-between text-[8px] text-slate-400 font-mono">
                         <div>Printed On {new Date().toLocaleString()}</div>
                         <div>Page {pageNum} of {totalPages}</div>
                     </div>
@@ -3858,249 +3875,257 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
             </div>
         );
 
-        if (activeReport === 'Arrival List') {
-            return (
-                <div className={`flex flex-col h-full bg-gray-100 ${isFullScreen ? 'fixed inset-0 z-[100]' : ''}`}>
-                    {/* Toolbar */}
-                    <div className="bg-[#f0f0f0] border-b border-gray-300 p-1 flex items-center gap-2 select-none sticky top-0 z-10 shadow-sm print:hidden">
-
-                        {/* Search Bar */}
-                        <div className="relative w-40">
-                            <Search className="absolute left-2 top-1.5 text-gray-400" size={12} />
-                            <input
-                                type="text"
-                                placeholder="Find in report..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-6 pr-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-
-                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                        {/* Settings Menu */}
-                        <div className="relative">
-                            <button
-                                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                                className={`p-1.5 rounded text-gray-700 hover:bg-gray-200 ${showSettingsMenu ? 'bg-gray-200' : ''}`}
-                                title="Page Settings"
-                            >
-                                <Settings size={16} />
-                            </button>
-                            {showSettingsMenu && (
-                                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 p-3 w-48 space-y-3">
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-600 block mb-1">Page Size</label>
-                                        <select
-                                            value={pageSize}
-                                            onChange={(e) => setPageSize(e.target.value as 'A4' | 'Letter' | 'Ledger')}
-                                            className="w-full text-xs border border-gray-300 rounded p-1"
-                                        >
-                                            <option value="A4">A4 (210 x 297 mm)</option>
-                                            <option value="Letter">Letter (216 x 279 mm)</option>
-                                            <option value="Ledger">Ledger (279 x 432 mm)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-600 block mb-1">Orientation</label>
-                                        <div className="flex bg-gray-100 rounded p-1">
-                                            <button
-                                                onClick={() => setOrientation('portrait')}
-                                                className={`flex-1 text-center text-xs py-1 rounded ${orientation === 'portrait' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}
-                                            >
-                                                Portrait
-                                            </button>
-                                            <button
-                                                onClick={() => setOrientation('landscape')}
-                                                className={`flex-1 text-center text-xs py-1 rounded ${orientation === 'landscape' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}
-                                            >
-                                                Landscape
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={showWatermark}
-                                                onChange={(e) => setShowWatermark(e.target.checked)}
-                                            />
-                                            Show Watermark
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="relative">
-                            <button
-                                onClick={() => setShowViewMenu(!showViewMenu)}
-                                className={`p-1.5 rounded text-gray-700 hover:bg-gray-200 ${showViewMenu ? 'bg-gray-200' : ''}`}
-                                title="View Mode"
-                            >
-                                <LayoutTemplate size={16} />
-                            </button>
-                            {showViewMenu && (
-                                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 py-1 w-32">
-                                    <button onClick={() => { setViewMode('single'); setShowViewMenu(false); }} className={`w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-xs text-gray-700 ${viewMode === 'single' ? 'bg-blue-50 text-blue-600' : ''}`}>
-                                        <FileText size={14} /> Single Page
-                                    </button>
-                                    <button onClick={() => { setViewMode('continuous'); setShowViewMenu(false); }} className={`w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-xs text-gray-700 ${viewMode === 'continuous' ? 'bg-blue-50 text-blue-600' : ''}`}>
-                                        <List size={14} /> Continuous
-                                    </button>
-                                    <button onClick={() => { setViewMode('multi'); setShowViewMenu(false); }} className={`w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-xs text-gray-700 ${viewMode === 'multi' ? 'bg-blue-50 text-blue-600' : ''}`}>
-                                        <Grid size={14} /> Grid / Multi
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                        <button onClick={handlePrint} className="p-1.5 hover:bg-gray-200 rounded text-gray-700" title="Print">
-                            <Printer size={16} />
-                        </button>
-
-                        <div className="relative">
-                            <button
-                                onClick={() => setShowExportMenu(!showExportMenu)}
-                                className={`p-1.5 hover:bg-gray-200 rounded text-gray-700 flex items-center gap-1 ${showExportMenu ? 'bg-gray-200' : ''}`}
-                                title="Save as"
-                            >
-                                <Save size={16} />
-                                <ChevronDown size={10} />
-                            </button>
-                            {showExportMenu && (
-                                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 py-1 w-32">
-                                    <button onClick={handleExportPDF} className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-xs text-gray-700">
-                                        <FileText size={14} className="text-red-500" /> PDF
-                                    </button>
-                                    <button onClick={handleExportExcel} className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-xs text-gray-700">
-                                        <FileSpreadsheet size={14} className="text-green-600" /> Excel
-                                    </button>
-                                    <button onClick={handleExportJPG} className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-xs text-gray-700">
-                                        <FileImage size={14} className="text-purple-600" /> JPG Image
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                        {/* Pagination Controls - Only enabled in Single View, or used to jump in Continuous */}
-                        <button
-                            onClick={() => setCurrentPage(1)}
-                            disabled={currentPage === 1}
-                            className={`p-1.5 rounded text-gray-700 hover:bg-gray-200 ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            title="First Page"
-                        >
-                            <ChevronsLeft size={16} />
-                        </button>
-                        <button
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className={`p-1.5 rounded text-gray-700 hover:bg-gray-200 ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            title="Previous Page"
-                        >
-                            <ChevronLeft size={16} />
-                        </button>
-                        <div className="flex items-center gap-1 bg-white border border-gray-300 rounded px-1.5 py-0.5">
-                            <input
-                                type="text"
-                                value={currentPage}
-                                readOnly
-                                className="w-8 text-center text-xs outline-none bg-transparent"
-                            />
-                            <span className="text-xs text-gray-500">of {totalPages}</span>
-                        </div>
-                        <button
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                            className={`p-1.5 rounded text-gray-700 hover:bg-gray-200 ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            title="Next Page"
-                        >
-                            <ChevronRight size={16} />
-                        </button>
-                        <button
-                            onClick={() => setCurrentPage(totalPages)}
-                            disabled={currentPage === totalPages}
-                            className={`p-1.5 rounded text-gray-700 hover:bg-gray-200 ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            title="Last Page"
-                        >
-                            <ChevronsRight size={16} />
-                        </button>
-
-                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                        <div className="flex items-center gap-1">
-                            <button onClick={handleZoomOut} className="p-1.5 hover:bg-gray-200 rounded text-gray-700">
-                                <ZoomOut size={16} />
-                            </button>
-                            <span className="text-xs text-gray-600 min-w-[30px] text-center">{zoomLevel}%</span>
-                            <button onClick={handleZoomIn} className="p-1.5 hover:bg-gray-200 rounded text-gray-700">
-                                <ZoomIn size={16} />
-                            </button>
-                        </div>
-                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                        <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-1.5 hover:bg-gray-200 rounded text-gray-700" title="Toggle Fullscreen">
-                            {isFullScreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                        </button>
-
-                        <div className="flex-1"></div>
-                        <button onClick={handleBackToFilters} className="px-3 py-1 bg-red-600 text-white text-xs font-semibold rounded hover:bg-red-700 transition">
-                            Close
-                        </button>
+        return (
+            <div className={`flex flex-col h-full bg-slate-100 ${isFullScreen ? 'fixed inset-0 z-[100]' : ''}`}>
+                {/* Compact Toolbar */}
+                <div className="bg-slate-100 border-b border-slate-200 px-2 py-1 flex items-center gap-1.5 select-none sticky top-0 z-10 shadow-2xs print:hidden h-8.5 text-xs">
+                    {/* Search Bar */}
+                    <div className="relative w-36 sm:w-44">
+                        <Search className="absolute left-2 top-1.5 text-slate-400" size={11} />
+                        <input
+                            type="text"
+                            placeholder="Find in report..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-6 pr-2 py-0.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white h-6.5"
+                        />
                     </div>
 
-                    {/* Content Area */}
-                    <div className={`flex-1 overflow-auto p-8 bg-gray-500/10 ${viewMode === 'multi' ? 'flex flex-wrap justify-center content-start gap-8' : 'flex flex-col items-center'}`}>
-                        {viewMode === 'single' ? (
-                            <ReportPage pageData={pages[currentPage - 1]} pageNum={currentPage} />
-                        ) : (
-                            pages.map((pageData, idx) => (
-                                <ReportPage key={idx} pageData={pageData} pageNum={idx + 1} />
-                            ))
+                    <div className="w-px h-4 bg-slate-300 mx-0.5"></div>
+
+                    {/* Settings Menu */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                            className={`h-6.5 px-1.5 rounded text-slate-700 hover:bg-slate-200 flex items-center gap-1 text-[11px] font-medium ${showSettingsMenu ? 'bg-slate-200' : ''}`}
+                            title="Page Settings"
+                        >
+                            <Settings size={13} />
+                            <span className="hidden md:inline">Layout</span>
+                        </button>
+                        {showSettingsMenu && (
+                            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 p-2.5 w-44 space-y-2 text-xs">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Page Size</label>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => setPageSize(e.target.value as 'A4' | 'Letter' | 'Ledger')}
+                                        className="w-full text-xs border border-slate-200 rounded p-1 h-7 bg-white"
+                                    >
+                                        <option value="A4">A4 (210 x 297 mm)</option>
+                                        <option value="Letter">Letter (216 x 279 mm)</option>
+                                        <option value="Ledger">Ledger (279 x 432 mm)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Orientation</label>
+                                    <div className="flex bg-slate-100 rounded p-0.5">
+                                        <button
+                                            onClick={() => setOrientation('portrait')}
+                                            className={`flex-1 text-center text-xs py-0.5 rounded ${orientation === 'portrait' ? 'bg-white shadow-2xs font-bold text-blue-600' : 'text-slate-600'}`}
+                                        >
+                                            Portrait
+                                        </button>
+                                        <button
+                                            onClick={() => setOrientation('landscape')}
+                                            className={`flex-1 text-center text-xs py-0.5 rounded ${orientation === 'landscape' ? 'bg-white shadow-2xs font-bold text-blue-600' : 'text-slate-600'}`}
+                                        >
+                                            Landscape
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer pt-1 border-t border-slate-100">
+                                        <input
+                                            type="checkbox"
+                                            checked={showWatermark}
+                                            onChange={(e) => setShowWatermark(e.target.checked)}
+                                            className="rounded border-slate-300 text-blue-600"
+                                        />
+                                        <span>Watermark</span>
+                                    </label>
+                                </div>
+                            </div>
                         )}
                     </div>
-                </div>
-            );
-        }
-        return <div className="p-8 text-center text-gray-500">Report preview not implemented for {activeReport} yet.</div>;
-    };
 
+                    {/* View Mode */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowViewMenu(!showViewMenu)}
+                            className={`h-6.5 px-1.5 rounded text-slate-700 hover:bg-slate-200 flex items-center gap-1 text-[11px] font-medium ${showViewMenu ? 'bg-slate-200' : ''}`}
+                            title="View Mode"
+                        >
+                            <LayoutTemplate size={13} />
+                            <span className="hidden md:inline">View</span>
+                        </button>
+                        {showViewMenu && (
+                            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 w-32 text-xs">
+                                <button onClick={() => { setViewMode('single'); setShowViewMenu(false); }} className={`w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 ${viewMode === 'single' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}>
+                                    <FileText size={12} /> Single
+                                </button>
+                                <button onClick={() => { setViewMode('continuous'); setShowViewMenu(false); }} className={`w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 ${viewMode === 'continuous' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}>
+                                    <List size={12} /> Continuous
+                                </button>
+                                <button onClick={() => { setViewMode('multi'); setShowViewMenu(false); }} className={`w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 ${viewMode === 'multi' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}>
+                                    <Grid size={12} /> Multi / Grid
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
+                    <div className="w-px h-4 bg-slate-300 mx-0.5"></div>
 
+                    {/* Print */}
+                    <button onClick={handlePrint} className="h-6.5 w-6.5 flex items-center justify-center hover:bg-slate-200 rounded text-slate-700" title="Print Document">
+                        <Printer size={13} />
+                    </button>
 
+                    {/* Export Menu */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            className={`h-6.5 px-2 hover:bg-slate-200 rounded text-slate-700 flex items-center gap-1 text-[11px] font-medium ${showExportMenu ? 'bg-slate-200' : ''}`}
+                            title="Export"
+                        >
+                            <Save size={13} />
+                            <span>Export</span>
+                            <ChevronDown size={10} />
+                        </button>
+                        {showExportMenu && (
+                            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 w-32 text-xs">
+                                <button onClick={handleExportPDF} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-2 text-slate-700">
+                                    <FileText size={13} className="text-red-500" /> PDF Document
+                                </button>
+                                <button onClick={handleExportExcel} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-2 text-slate-700">
+                                    <FileSpreadsheet size={13} className="text-emerald-600" /> Excel Sheet
+                                </button>
+                                <button onClick={handleExportJPG} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-2 text-slate-700">
+                                    <FileImage size={13} className="text-purple-600" /> JPG Image
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
-    return (
-        <div className="flex h-screen bg-gray-100 font-sans text-sm text-gray-700">
-            {/* Sidebar */}
-            <aside className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out z-30 shadow-sm`}>
-                <div className={`p-4 border-b flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} bg-[#1e293b] text-white min-h-[56px]`}>
-                    {!isSidebarCollapsed && <span className="font-bold text-base tracking-tight uppercase opacity-90">Report Center</span>}
+                    <div className="w-px h-4 bg-slate-300 mx-0.5"></div>
+
+                    {/* Pagination */}
                     <button
-                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                        className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors"
-                        title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className={`h-6.5 w-6 flex items-center justify-center rounded text-slate-700 hover:bg-slate-200 ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                        title="First Page"
                     >
-                        {isSidebarCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
+                        <ChevronsLeft size={13} />
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className={`h-6.5 w-6 flex items-center justify-center rounded text-slate-700 hover:bg-slate-200 ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                        title="Previous Page"
+                    >
+                        <ChevronLeft size={13} />
+                    </button>
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded px-1.5 h-6">
+                        <span className="text-[11px] font-semibold text-slate-800">{currentPage}</span>
+                        <span className="text-[10px] text-slate-400">/ {totalPages}</span>
+                    </div>
+                    <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className={`h-6.5 w-6 flex items-center justify-center rounded text-slate-700 hover:bg-slate-200 ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : ''}`}
+                        title="Next Page"
+                    >
+                        <ChevronRight size={13} />
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className={`h-6.5 w-6 flex items-center justify-center rounded text-slate-700 hover:bg-slate-200 ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : ''}`}
+                        title="Last Page"
+                    >
+                        <ChevronsRight size={13} />
+                    </button>
+
+                    <div className="w-px h-4 bg-slate-300 mx-0.5"></div>
+
+                    {/* Zoom Controls */}
+                    <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded px-1 h-6">
+                        <button onClick={handleZoomOut} className="hover:text-blue-600 text-slate-600" title="Zoom Out">
+                            <ZoomOut size={12} />
+                        </button>
+                        <span className="text-[10px] font-mono text-slate-600 min-w-[28px] text-center">{zoomLevel}%</span>
+                        <button onClick={handleZoomIn} className="hover:text-blue-600 text-slate-600" title="Zoom In">
+                            <ZoomIn size={12} />
+                        </button>
+                    </div>
+
+                    <button onClick={() => setIsFullScreen(!isFullScreen)} className="h-6.5 w-6.5 flex items-center justify-center hover:bg-slate-200 rounded text-slate-700" title="Toggle Fullscreen">
+                        {isFullScreen ? <Minimize size={13} /> : <Maximize size={13} />}
+                    </button>
+
+                    <div className="flex-1"></div>
+
+                    <button onClick={handleBackToFilters} className="h-6.5 px-2.5 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-semibold rounded flex items-center gap-1 shadow-2xs">
+                        <X size={12} /> Close Preview
                     </button>
                 </div>
 
-                {/* Search */}
-                <div className="p-3 border-b bg-gray-50/50">
+                {/* Content Area */}
+                <div id="report-content" className={`flex-1 overflow-auto p-4 bg-slate-300/40 ${viewMode === 'multi' ? 'flex flex-wrap justify-center content-start gap-4' : 'flex flex-col items-center'}`}>
+                    {viewMode === 'single' ? (
+                        <ReportPage pageData={pages[currentPage - 1]} pageNum={currentPage} />
+                    ) : (
+                        pages.map((pageData, idx) => (
+                            <ReportPage key={idx} pageData={pageData} pageNum={idx + 1} />
+                        ))
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="flex h-screen bg-slate-100 font-sans text-xs text-slate-700">
+            {/* Compact Sidebar */}
+            <aside className={`${isSidebarCollapsed ? 'w-14' : 'w-56'} bg-white border-r border-slate-200/80 flex flex-col flex-shrink-0 transition-all duration-200 ease-in-out z-30 shadow-2xs`}>
+                <div className={`px-3 border-b border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} bg-slate-900 text-white h-11 min-h-[44px]`}>
+                    {!isSidebarCollapsed && (
+                        <div className="flex items-center gap-1.5">
+                            <FileText size={15} className="text-blue-400" />
+                            <span className="font-bold text-xs tracking-wider uppercase text-slate-100">Report Center</span>
+                        </div>
+                    )}
+                    <button
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+                        title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    >
+                        {isSidebarCollapsed ? <Menu size={16} /> : <ChevronLeft size={16} />}
+                    </button>
+                </div>
+
+                {/* Quick Search */}
+                <div className="p-2 border-b border-slate-100 bg-slate-50/50">
                     <div className="relative">
-                        <Search className={`absolute ${isSidebarCollapsed ? 'left-1/2 -translate-x-1/2' : 'left-2.5'} top-2 text-gray-400`} size={14} />
+                        <Search className={`absolute ${isSidebarCollapsed ? 'left-1/2 -translate-x-1/2' : 'left-2.5'} top-2 text-slate-400`} size={12} />
                         {!isSidebarCollapsed && (
-                            <input type="text" placeholder="Search reports..." className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                            <input
+                                type="text"
+                                placeholder="Search reports..."
+                                value={sidebarSearch}
+                                onChange={(e) => setSidebarSearch(e.target.value)}
+                                className="w-full pl-7 pr-2 py-1 border border-slate-200 rounded-md text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white h-7 placeholder:text-slate-400"
+                            />
                         )}
-                        {isSidebarCollapsed && <div className="h-6"></div>}
+                        {isSidebarCollapsed && <div className="h-5"></div>}
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto no-scrollbar">
-                    {menuItems.map((menu, idx) => (
-                        <div key={idx} className="border-b border-gray-50 last:border-0">
+                {/* Menu list */}
+                <div className="flex-1 overflow-y-auto no-scrollbar py-1">
+                    {filteredMenuItems.map((menu, idx) => (
+                        <div key={idx} className="border-b border-slate-100/60 last:border-0">
                             <button
                                 onClick={() => {
                                     if (isSidebarCollapsed) {
@@ -4110,29 +4135,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                                         setExpandedMenu(expandedMenu === menu.title ? null : menu.title);
                                     }
                                 }}
-                                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center py-4' : 'justify-between px-4 py-3'} text-left font-medium hover:bg-gray-50 transition-all ${expandedMenu === menu.title && !isSidebarCollapsed ? 'bg-slate-800 text-white hover:bg-slate-700' : 'text-gray-700'}`}
+                                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center py-2.5' : 'justify-between px-3 py-1.5'} text-left font-medium hover:bg-slate-50 transition-colors ${expandedMenu === menu.title && !isSidebarCollapsed ? 'bg-slate-100/80 text-blue-700 font-bold' : 'text-slate-700'}`}
                                 title={isSidebarCollapsed ? menu.title : ""}
                             >
-                                <div className="flex items-center gap-3">
-                                    <span className={`${expandedMenu === menu.title && !isSidebarCollapsed ? 'text-blue-400' : 'text-gray-400'}`}>
+                                <div className="flex items-center gap-2">
+                                    <span className={`${expandedMenu === menu.title && !isSidebarCollapsed ? 'text-blue-600' : 'text-slate-400'}`}>
                                         {menu.icon}
                                     </span>
-                                    {!isSidebarCollapsed && <span className="text-[13px]">{menu.title}</span>}
+                                    {!isSidebarCollapsed && <span className="text-xs">{menu.title}</span>}
                                 </div>
                                 {!isSidebarCollapsed && menu.items.length > 0 && (
-                                    expandedMenu === menu.title ? <ChevronDown size={14} className="opacity-50" /> : <ChevronRight size={14} className="opacity-50" />
+                                    expandedMenu === menu.title ? <ChevronDown size={12} className="opacity-60" /> : <ChevronRight size={12} className="opacity-60" />
                                 )}
                             </button>
-                            {expandedMenu === menu.title && !isSidebarCollapsed && (
-                                <div className="bg-gray-50/50 py-1">
-                                    {menu.items.map((item, i) => (
+                            {(expandedMenu === menu.title || sidebarSearch) && !isSidebarCollapsed && (
+                                <div className="bg-slate-50/70 py-0.5 space-y-0.5">
+                                    {menu.items
+                                        .filter(item => !sidebarSearch || item.toLowerCase().includes(sidebarSearch.toLowerCase()))
+                                        .map((item, i) => (
                                         <div
                                             key={i}
                                             onClick={() => { setActiveReport(item); setShowReport(false); }}
-                                            className={`px-11 py-2 cursor-pointer flex items-center gap-2 hover:bg-blue-50 hover:text-blue-600 transition-colors text-[12px] ${activeReport === item ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-gray-500'}`}
+                                            className={`px-6 py-1 cursor-pointer flex items-center gap-2 hover:bg-blue-50 hover:text-blue-600 transition-colors text-[11px] ${activeReport === item ? 'text-blue-700 font-bold bg-blue-50 border-l-2 border-blue-600' : 'text-slate-600'}`}
                                         >
-                                            <div className={`w-1 h-1 rounded-full ${activeReport === item ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
-                                            {item}
+                                            <div className={`w-1 h-1 rounded-full ${activeReport === item ? 'bg-blue-600' : 'bg-slate-300'}`}></div>
+                                            <span className="truncate">{item}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -4142,28 +4169,38 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                 </div>
             </aside>
 
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="bg-white border-b px-6 py-4 flex justify-between items-center h-14 min-h-[56px] sticky top-0 z-40">
-                    <h1 className="text-xl font-bold text-slate-800">{activeReport}</h1>
-                    <div className="flex items-center gap-4">
+            {/* Main Area */}
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                {/* Compact Header */}
+                <div className="bg-white border-b border-slate-200/80 px-3.5 py-1.5 flex justify-between items-center h-11 min-h-[44px] sticky top-0 z-40 shadow-2xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <h1 className="text-sm font-bold text-slate-900 tracking-tight truncate">{activeReport}</h1>
+                        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                            Enterprise PMS
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
                         {showReport && (
-                            <button onClick={handleBackToFilters} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-xs font-medium mr-2">
-                                &larr; Back to Filters
+                            <button
+                                onClick={handleBackToFilters}
+                                className="h-7 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors text-xs font-medium flex items-center gap-1 border border-slate-200/80 shadow-2xs"
+                            >
+                                <ChevronLeft size={13} /> Back to Filters
                             </button>
                         )}
 
                         {/* User Profile */}
                         <div className="relative" ref={dropdownRef}>
                             <div
-                                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-1.5 rounded-lg transition-colors"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded-md transition-colors border border-transparent hover:border-slate-200"
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             >
-                                <div className="text-right hidden sm:block">
-                                    <p className="text-xs font-bold text-gray-800 leading-tight">{user?.name || 'Guest User'}</p>
-                                    <p className="text-[10px] text-gray-500 font-medium">{user?.role || 'Guest'}</p>
-                                    <p className="text-[10px] text-blue-800 font-medium">{user?.property || 'No Property'}</p>
+                                <div className="text-right hidden md:block">
+                                    <p className="text-xs font-bold text-slate-800 leading-tight">{user?.name || 'Manager'}</p>
+                                    <p className="text-[10px] text-slate-500 leading-tight">{user?.property || 'Grand Palace'}</p>
                                 </div>
-                                <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-200">
+                                <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden border border-slate-200">
                                     <img
                                         src={user?.image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}
                                         alt="User"
@@ -4174,31 +4211,31 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
 
                             {/* Dropdown Menu */}
                             {isDropdownOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 animate-in fade-in slide-in-from-top-2 z-50">
+                                <div className="absolute right-0 mt-1.5 w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 animate-in fade-in slide-in-from-top-1 z-50 text-xs">
                                     <button
-                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                        className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                                         onClick={() => setIsDropdownOpen(false)}
                                     >
-                                        <User size={16} className="text-gray-400" />
+                                        <User size={13} className="text-slate-400" />
                                         My Profile
                                     </button>
                                     <button
-                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                        className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                                         onClick={() => setIsDropdownOpen(false)}
                                     >
-                                        <Building2 size={16} className="text-gray-400" />
-                                        Switch Hotel
+                                        <Building2 size={13} className="text-slate-400" />
+                                        Switch Property
                                     </button>
-                                    <div className="h-px bg-gray-100 my-1"></div>
-                                    <div className="px-2 pb-1">
+                                    <div className="h-px bg-slate-100 my-1"></div>
+                                    <div className="px-1.5 pb-0.5">
                                         <button
-                                            className="w-full text-center px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-lg transition-all hover:shadow-sm flex items-center justify-center gap-2"
+                                            className="w-full text-center px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-all flex items-center justify-center gap-1.5"
                                             onClick={() => {
                                                 setIsDropdownOpen(false);
                                                 onLogout();
                                             }}
                                         >
-                                            <LogOut size={16} />
+                                            <LogOut size={13} />
                                             Logout
                                         </button>
                                     </div>
@@ -4208,37 +4245,72 @@ const Reports = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 bg-slate-50/60">
                     {showReport ? renderReportPreview() : (
                         <>
-                            <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+                            {/* Filter Card */}
+                            <div className="bg-white rounded-lg shadow-2xs border border-slate-200/80 p-3.5 mb-2.5">
+                                <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                                    <div className="flex items-center gap-2">
+                                        <FileText size={14} className="text-blue-600" />
+                                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Report Parameters & Filter Criteria</span>
+                                    </div>
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            setIsTemplateListModalOpen(true);
+                                        }}
+                                        className="h-6 px-2 text-[11px] font-medium text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-slate-200 rounded flex items-center gap-1 transition-colors"
+                                    >
+                                        <Settings size={11} /> Custom Templates
+                                    </button>
+                                </div>
+
                                 {renderFilters()}
-                                <div className="mt-8 pt-4 border-t">
-                                    <label className="font-medium text-gray-700 block mb-2">Select Column (Any 5)</label>
-                                    <div className="flex flex-wrap gap-4 text-xs text-gray-600">
-                                        <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> Res. No</label>
-                                        <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> Guest Name</label>
-                                        <label className="flex items-center gap-1"><input type="checkbox" defaultChecked /> Rate</label>
-                                        <label className="flex items-center gap-1"><input type="checkbox" /> Room</label>
-                                        <label className="flex items-center gap-1"><input type="checkbox" /> Arrival</label>
-                                        <label className="flex items-center gap-1"><input type="checkbox" /> Departure</label>
+
+                                <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-3">
+                                        <label className="font-semibold text-slate-700 text-xs">Visible Columns:</label>
+                                        <div className="flex flex-wrap gap-2.5 text-xs text-slate-600">
+                                            <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" defaultChecked className="rounded border-slate-300 text-blue-600" /> Res. No</label>
+                                            <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" defaultChecked className="rounded border-slate-300 text-blue-600" /> Guest Name</label>
+                                            <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" defaultChecked className="rounded border-slate-300 text-blue-600" /> Rate</label>
+                                            <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" className="rounded border-slate-300 text-blue-600" /> Room</label>
+                                            <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" className="rounded border-slate-300 text-blue-600" /> Arrival</label>
+                                            <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" className="rounded border-slate-300 text-blue-600" /> Departure</label>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 ml-auto">
+                                        <button
+                                            onClick={handleExportExcel}
+                                            className="h-7.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors"
+                                        >
+                                            <FileSpreadsheet size={13} /> Export Excel
+                                        </button>
+                                        <button
+                                            onClick={() => setShowReport(true)}
+                                            className="h-7.5 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors"
+                                        >
+                                            <Download size={13} /> Generate Report
+                                        </button>
+                                        <button
+                                            onClick={() => setShowReport(false)}
+                                            className="h-7.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-medium shadow-2xs flex items-center gap-1.5 transition-colors"
+                                        >
+                                            <RotateCcw size={13} /> Reset
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="mt-8 flex justify-end gap-2">
-                                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 transition-colors">
-                                        <FileText size={16} /> Export
-                                    </button>
-                                    <button onClick={() => setShowReport(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                                        <Download size={16} /> Report
-                                    </button>
-                                    <button onClick={() => setShowReport(false)} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
-                                        <RotateCcw size={16} /> Reset
-                                    </button>
+                            </div>
+
+                            {/* Help Guide */}
+                            {renderHelpGuide() && (
+                                <div className="bg-white rounded-lg shadow-2xs border border-slate-200/80 p-3.5 text-xs text-slate-600">
+                                    {renderHelpGuide()}
                                 </div>
-                            </div>
-                            <div className="bg-white rounded-lg shadow-sm border p-6">
-                                {renderHelpGuide()}
-                            </div>
+                            )}
                         </>
                     )}
                 </div>
