@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Users,
     Settings,
     ListOrdered,
     ChevronDown,
-    ChevronUp,
+    ChevronRight,
     UtensilsCrossed,
     ChevronLeft,
     Menu,
@@ -28,7 +28,6 @@ import {
     Info,
     FileText,
     Briefcase,
-    Circle,
     Utensils,
     Calendar,
     LayoutGrid,
@@ -41,7 +40,9 @@ import {
     Database,
     Moon,
     Ticket,
-    ShieldCheck
+    ShieldCheck,
+    Search,
+    X
 } from 'lucide-react';
 
 interface MenuItem {
@@ -61,9 +62,10 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: SidebarProps) => {
+    const [searchTerm, setSearchTerm] = useState('');
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
         posManagement: false,
-        frontOffice: false,
+        frontOffice: true, // front office open by default for hospitality front desk
         housekeeping: false,
         premiumOps: false,
         b2b: false,
@@ -86,203 +88,216 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
 
     const menuGroups: MenuItem[] = [
         {
-            key: 'posManagement',
-            label: 'POS Management',
-            icon: <UtensilsCrossed size={20} />,
+            key: 'frontOffice',
+            label: 'Front Desk',
+            icon: <BedDouble size={14} />,
             items: [
-                { id: 'pos-dashboard', label: 'POS Dashboard', icon: <LayoutDashboard size={16} /> },
-                { id: 'pos', label: 'POS / Billing', icon: <UtensilsCrossed size={16} /> },
+                { id: 'quick-reservation', label: 'Quick Reservation', icon: <Plus size={12} /> },
+                { id: 'folio-operations', label: 'Folio Operations', icon: <FileText size={12} /> },
+                { id: 'guest-profile', label: 'Guest Profile', icon: <User size={12} /> },
+                { id: 'room-rack', label: 'Room Rack', icon: <LayoutGrid size={12} /> },
+                { id: 'reservations', label: 'Reservations', icon: <Calendar size={12} /> },
+                { id: 'stay-view', label: 'Stay View', icon: <Calendar size={12} /> },
+                { id: 'floor-plan', label: 'Floor Plan', icon: <Map size={12} /> },
+                { id: 'occupancy-heatmap', label: 'Occupancy Heatmap', icon: <Grid3X3 size={12} /> },
+            ]
+        },
+        {
+            key: 'premiumOps',
+            label: 'Night Audit & Ops',
+            icon: <Sparkles size={14} />,
+            items: [
+                { id: 'night-audit', label: 'Night Audit Pipeline', icon: <Moon size={12} /> },
+                { id: 'service-vouchers', label: 'Digital Vouchers', icon: <Ticket size={12} /> },
+                { id: 'allowance-checker', label: 'Allowance Engine', icon: <ShieldCheck size={12} /> },
+            ]
+        },
+        {
+            key: 'housekeeping',
+            label: 'Housekeeping',
+            icon: <ClipboardList size={14} />,
+            items: [
+                { id: 'housekeeping', label: 'Housekeeping Grid', icon: <ClipboardList size={12} /> },
+                { id: 'maintenance', label: 'Maintenance Kanban', icon: <Settings size={12} /> },
+            ]
+        },
+        {
+            key: 'posManagement',
+            label: 'F&B POS & KDS',
+            icon: <UtensilsCrossed size={14} />,
+            items: [
+                { id: 'pos-dashboard', label: 'POS Dashboard', icon: <LayoutDashboard size={12} /> },
+                { id: 'pos', label: 'POS Terminal', icon: <UtensilsCrossed size={12} /> },
                 {
                     key: 'menuKey',
-                    label: 'Menu Management',
-                    icon: <ListOrdered size={16} />,
+                    label: 'Menu Config',
+                    icon: <ListOrdered size={12} />,
                     items: [
-                        { id: 'categories', label: 'Categories', icon: <Tags size={16} /> },
-                        { id: 'products', label: 'Products', icon: <Package size={16} /> },
-                        { id: 'addons', label: 'Addons', icon: <Layers size={16} /> },
-                        { id: 'units', label: 'Units', icon: <Scale size={16} /> },
+                        { id: 'categories', label: 'Categories', icon: <Tags size={12} /> },
+                        { id: 'products', label: 'Products', icon: <Package size={12} /> },
+                        { id: 'addons', label: 'Addons', icon: <Layers size={12} /> },
+                        { id: 'units', label: 'Units', icon: <Scale size={12} /> },
                     ]
                 },
                 {
                     key: 'setupKey',
                     label: 'Restaurant Setup',
-                    icon: <Settings size={16} />,
+                    icon: <Settings size={12} />,
                     items: [
-                        { id: 'tables', label: 'Tables', icon: <Grid3X3 size={16} /> },
-                        { id: 'floor', label: 'Floor Plan', icon: <Map size={16} /> },
-                        { id: 'front-desk', label: 'Front Desk', icon: <Monitor size={16} /> },
-                        { id: 'counters', label: 'Counters', icon: <Monitor size={16} /> },
-                        { id: 'kitchens', label: 'Kitchens', icon: <ChefHat size={16} /> },
+                        { id: 'tables', label: 'Tables', icon: <Grid3X3 size={12} /> },
+                        { id: 'floor', label: 'Floor Plan', icon: <Map size={12} /> },
+                        { id: 'front-desk', label: 'Front Counter', icon: <Monitor size={12} /> },
+                        { id: 'counters', label: 'Counters', icon: <Monitor size={12} /> },
+                        { id: 'kitchens', label: 'Kitchen KDS', icon: <ChefHat size={12} /> },
                     ]
                 },
                 {
                     key: 'staffKey',
-                    label: 'Staff & Users',
-                    icon: <Users size={16} />,
+                    label: 'Staff & Roles',
+                    icon: <Users size={12} />,
                     items: [
-                        { id: 'waiters', label: 'Waiters', icon: <User size={16} /> },
-                        { id: 'pos-users', label: 'POS Users', icon: <CreditCard size={16} /> },
-                        { id: 'admin-users', label: 'Admin Users', icon: <Shield size={16} /> },
+                        { id: 'waiters', label: 'Waiters', icon: <User size={12} /> },
+                        { id: 'pos-users', label: 'POS Cashiers', icon: <CreditCard size={12} /> },
+                        { id: 'admin-users', label: 'Admins', icon: <Shield size={12} /> },
                     ]
                 }
             ]
         },
         {
-            key: 'frontOffice',
-            label: 'Front Office',
-            icon: <BedDouble size={20} />,
+            key: 'rateKey',
+            label: 'Rate & Channel Master',
+            icon: <Percent size={14} />,
             items: [
-                { id: 'quick-reservation', label: 'Quick Reservation', icon: <Plus size={16} /> },
-                { id: 'folio-operations', label: 'Folio Operations', icon: <FileText size={16} /> },
-                { id: 'guest-profile', label: 'Guest Profile', icon: <User size={16} /> },
-                { id: 'room-rack', label: 'Room Rack', icon: <LayoutGrid size={16} /> },
-                { id: 'reservations', label: 'Reservations', icon: <Calendar size={16} /> },
-                { id: 'stay-view', label: 'Stay View', icon: <Calendar size={16} /> },
-                { id: 'floor-plan', label: 'Floor Plan', icon: <Map size={16} /> },
-                { id: 'occupancy-heatmap', label: 'Occupancy Heatmap', icon: <Grid3X3 size={16} /> },
-            ]
-        },
-        {
-            key: 'premiumOps',
-            label: 'Premium Operations',
-            icon: <Sparkles size={20} />,
-            items: [
-                { id: 'night-audit', label: 'Night Audit (Auto Posting)', icon: <Moon size={16} /> },
-                { id: 'service-vouchers', label: 'Digital Vouchers', icon: <Ticket size={16} /> },
-                { id: 'allowance-checker', label: 'Allowance Engine', icon: <ShieldCheck size={16} /> },
-            ]
-        },
-        {
-            key: 'housekeeping',
-            label: 'Housekeeping & Maintenance',
-            icon: <Sparkles size={20} />,
-            items: [
-                { id: 'housekeeping', label: 'Housekeeping Grid', icon: <ClipboardList size={16} /> },
-                { id: 'maintenance', label: 'Maintenance', icon: <Settings size={16} /> },
-            ]
-        },
-        {
-            key: 'propertyKey',
-            label: 'Property Management',
-            icon: <Building2 size={20} />,
-            items: [
-                { id: 'properties', label: 'Properties', icon: <Building2 size={16} /> },
-                { id: 'hotel-info', label: 'Hotel Info', icon: <Info size={16} /> },
+                { id: 'rate-plans', label: 'Rate Plans (L3)', icon: <Tags size={12} /> },
+                { id: 'package-builder', label: 'Packages (L2)', icon: <Package size={12} /> },
+                { id: 'meal-plans', label: 'Meal Plans (L1)', icon: <Utensils size={12} /> },
+                { id: 'service-master', label: 'Service Master (L1)', icon: <Sparkles size={12} /> },
+                { id: 'rate-calendar', label: 'Rate Calendar', icon: <Calendar size={12} /> },
             ]
         },
         {
             key: 'roomKey',
-            label: 'Room Management',
-            icon: <BedDouble size={20} />,
+            label: 'Room Inventory',
+            icon: <Layers size={14} />,
             items: [
-                { id: 'building-floor', label: 'Floors & Buildings', icon: <Building2 size={16} /> },
-                { id: 'manage-room-type', label: 'Room Types', icon: <Tags size={16} /> },
-                { id: 'manage-room', label: 'Rooms', icon: <BedDouble size={16} /> },
-                { id: 'joint-room', label: 'Connecting Rooms', icon: <Layers size={16} /> },
+                { id: 'building-floor', label: 'Floors & Buildings', icon: <Building2 size={12} /> },
+                { id: 'manage-room-type', label: 'Room Types', icon: <Tags size={12} /> },
+                { id: 'manage-room', label: 'Physical Rooms', icon: <BedDouble size={12} /> },
+                { id: 'joint-room', label: 'Connecting Rooms', icon: <Layers size={12} /> },
             ]
         },
         {
-            key: 'rateKey',
-            label: 'Rate Management',
-            icon: <Percent size={20} />,
+            key: 'propertyKey',
+            label: 'Properties',
+            icon: <Building2 size={14} />,
             items: [
-                { id: 'rate-plans', label: 'Rate Plans (Layer 3)', icon: <Tags size={16} /> },
-                { id: 'package-builder', label: 'Package Builder (Layer 2)', icon: <Package size={16} /> },
-                { id: 'meal-plans', label: 'Meal Plans (Layer 1)', icon: <Utensils size={16} /> },
-                { id: 'service-master', label: 'Service Master (Layer 1)', icon: <Sparkles size={16} /> },
-                { id: 'rate-calendar', label: 'Rate Calendar', icon: <Plus size={16} /> },
-            ]
-        },
-        {
-            key: 'userKey',
-            label: 'User Management',
-            icon: <UserCog size={20} />,
-            items: [
-                { id: 'user-management', label: 'Users', icon: <Users size={16} /> },
-            ]
-        },
-        {
-            key: 'settingsKey',
-            label: 'Settings',
-            icon: <Settings size={20} />,
-            items: [
-                { id: 'general-settings', label: 'General Settings', icon: <Settings size={16} /> },
-            ]
-        },
-        {
-            key: 'financeKey',
-            label: 'Finance',
-            icon: <BadgeDollarSign size={20} />,
-            items: [
-                { id: 'finance-overview', label: 'Overview', icon: <FileText size={16} /> },
-            ]
-        },
-        {
-            key: 'reportsKey',
-            label: 'Reports',
-            icon: <FileText size={20} />,
-            items: [
-                { id: 'reports', label: 'All Reports', icon: <ListOrdered size={16} />, newTab: true },
+                { id: 'properties', label: 'All Properties', icon: <Building2 size={12} /> },
+                { id: 'hotel-info', label: 'Hotel Profile', icon: <Info size={12} /> },
             ]
         },
         {
             key: 'b2b',
             label: 'B2B & Revenue',
-            icon: <TrendingUp size={20} />,
+            icon: <TrendingUp size={14} />,
             items: [
-                { id: 'corporate-profiles', label: 'Corporate Profiles', icon: <Building2 size={16} /> },
-                { id: 'business-origins', label: 'Business Origins', icon: <Target size={16} /> },
-                { id: 'advanced-reports', label: 'Advanced Reports', icon: <BarChart3 size={16} /> },
+                { id: 'corporate-profiles', label: 'Corporate Profiles', icon: <Building2 size={12} /> },
+                { id: 'business-origins', label: 'Business Origins', icon: <Target size={12} /> },
+                { id: 'advanced-reports', label: 'Advanced Analytics', icon: <BarChart3 size={12} /> },
+            ]
+        },
+        {
+            key: 'financeKey',
+            label: 'Finance & ERP',
+            icon: <BadgeDollarSign size={14} />,
+            items: [
+                { id: 'finance-overview', label: 'General Ledger', icon: <FileText size={12} /> },
+            ]
+        },
+        {
+            key: 'reportsKey',
+            label: 'Audit Reports',
+            icon: <FileText size={14} />,
+            items: [
+                { id: 'reports', label: 'Report Center', icon: <ListOrdered size={12} />, newTab: true },
             ]
         },
         {
             key: 'admin',
-            label: 'Admin & Security',
-            icon: <Shield size={20} />,
+            label: 'Security & Settings',
+            icon: <Shield size={14} />,
             items: [
-                { id: 'users', label: 'Users', icon: <Users size={16} /> },
-                { id: 'roles-permissions', label: 'Roles & Permissions', icon: <Shield size={16} /> },
-                { id: 'master-data', label: 'Master Data Config', icon: <Database size={16} /> },
-                { id: 'policy-management', label: 'Global Policy Settings', icon: <ShieldCheck size={16} /> },
+                { id: 'user-management', label: 'Users & Staff', icon: <UserCog size={12} /> },
+                { id: 'roles-permissions', label: 'Roles & RBAC', icon: <Shield size={12} /> },
+                { id: 'master-data', label: 'Master Data Config', icon: <Database size={12} /> },
+                { id: 'policy-management', label: 'Policy Settings', icon: <ShieldCheck size={12} /> },
+                { id: 'general-settings', label: 'System Settings', icon: <Settings size={12} /> },
             ]
         }
     ];
 
+    // Filter menu items if search is active
+    const filteredMenuGroups = useMemo(() => {
+        if (!searchTerm.trim()) return menuGroups;
+        const term = searchTerm.toLowerCase();
+
+        const filterItems = (items: MenuItem[]): MenuItem[] => {
+            const result: MenuItem[] = [];
+            for (const item of items) {
+                const matchesLabel = item.label.toLowerCase().includes(term);
+                if (item.items) {
+                    const matchedChildren = filterItems(item.items);
+                    if (matchesLabel || matchedChildren.length > 0) {
+                        result.push({
+                            ...item,
+                            items: matchedChildren.length > 0 ? matchedChildren : item.items
+                        });
+                    }
+                } else if (matchesLabel) {
+                    result.push(item);
+                }
+            }
+            return result;
+        };
+
+        return filterItems(menuGroups);
+    }, [searchTerm]);
+
     const renderMenuItem = (item: MenuItem, depth: number = 0) => {
-        const isOpen = item.key ? openMenus[item.key] : false;
+        const isOpen = item.key ? (openMenus[item.key] || searchTerm.trim().length > 0) : false;
         const hasChildren = item.items && item.items.length > 0;
         const isActive = item.id ? activePage === item.id : false;
 
-        // Indentation logic
-        const paddingLeft = depth * 12 + 12; // 12px per level + base 12px
-
         if (hasChildren) {
             return (
-                <div key={item.key || item.label} className="mt-1">
-                    <div
+                <div key={item.key || item.label} className="mt-0.5">
+                    <button
+                        type="button"
                         onClick={() => !isCollapsed && item.key && toggleMenu(item.key)}
-                        className={`flex items-center justify-between px-3 py-2 text-gray-700 text-sm font-medium hover:bg-gray-50 rounded-lg transition-colors cursor-pointer ${isCollapsed ? 'justify-center' : ''}`}
+                        className={`w-full flex items-center justify-between px-2 py-1.5 text-gray-700 text-[11.5px] font-semibold hover:bg-gray-100/70 rounded-md transition-colors cursor-pointer group select-none ${isCollapsed ? 'justify-center px-0' : ''}`}
                         title={isCollapsed ? item.label : ""}
-                        style={!isCollapsed ? { paddingLeft: `${paddingLeft}px` } : {}}
                     >
-                        <div className="flex items-center gap-3">
-                            <div className="text-gray-500 flex-shrink-0">{item.icon || <Circle size={6} />}</div>
-                            {!isCollapsed && <span>{item.label}</span>}
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0">
+                                {item.icon}
+                            </span>
+                            {!isCollapsed && (
+                                <span className="truncate text-left">{item.label}</span>
+                            )}
                         </div>
-                        {(!isCollapsed) && (
-                            isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+                        {!isCollapsed && (
+                            <span className="text-gray-400 group-hover:text-gray-600 transition-transform">
+                                {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                            </span>
                         )}
-                    </div>
+                    </button>
 
-                    {/* Render Children */}
-                    {
-                        (isOpen || (isCollapsed && depth === 0)) && (
-                            <div className={`${isCollapsed ? 'mt-1' : 'mt-1 space-y-1'}`}>
-                                {!isCollapsed && item.items?.map(child => renderMenuItem(child, depth + 1))}
-                            </div>
-                        )
-                    }
-                </div >
+                    {/* Render Children with sleek compact tree line */}
+                    {isOpen && !isCollapsed && item.items && (
+                        <div className={`mt-0.5 space-y-0.5 ${depth === 0 ? 'ml-3 pl-1.5 border-l border-gray-200/60' : 'ml-2 pl-1 border-l border-gray-100'}`}>
+                            {item.items.map(child => renderMenuItem(child, depth + 1))}
+                        </div>
+                    )}
+                </div>
             );
         }
 
@@ -299,74 +314,137 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                     }
                 }}
                 className={`
-                    flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-lg cursor-pointer transition-all
-                    ${isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}
-                    ${isCollapsed ? 'justify-center px-0' : ''}
+                    flex items-center gap-2 px-2 py-1 text-[11px] font-medium rounded-md cursor-pointer transition-all select-none
+                    ${isActive 
+                        ? 'bg-blue-50 text-blue-700 font-semibold shadow-xs' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'}
+                    ${isCollapsed ? 'justify-center px-0 py-1.5' : ''}
                 `}
                 title={isCollapsed ? item.label : ""}
-                style={!isCollapsed ? { paddingLeft: `${paddingLeft}px` } : {}}
             >
-                <div className="flex-shrink-0">{item.icon || <Circle size={6} />}</div>
-                {!isCollapsed && <span>{item.label}</span>}
-                {item.newTab && !isCollapsed && <span className="ml-auto text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">New Tab</span>}
+                <span className={`flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400'}`}>
+                    {item.icon}
+                </span>
+                {!isCollapsed && <span className="truncate flex-1">{item.label}</span>}
+                {item.newTab && !isCollapsed && (
+                    <span className="ml-auto text-[8px] uppercase tracking-wider bg-gray-100 text-gray-400 px-1 py-0.2 rounded font-semibold">
+                        Tab
+                    </span>
+                )}
             </div>
         );
     };
 
     return (
         <aside
-            className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 h-screen sticky top-0 flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 z-50`}
+            className={`${isCollapsed ? 'w-14' : 'w-56'} bg-white border-r border-gray-200/90 h-screen sticky top-0 flex flex-col transition-all duration-200 ease-in-out flex-shrink-0 z-50 select-none shadow-[1px_0_4px_rgba(0,0,0,0.02)]`}
         >
-            {/* Header / Logo Area */}
-            <div className={`p-4 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+            {/* Header / Brand Area */}
+            <div className={`h-11 px-2.5 flex items-center border-b border-gray-100 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
                 {!isCollapsed && (
-                    <div className="cursor-pointer flex items-center gap-2.5" onClick={() => setActivePage('dashboard')}>
-                        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm flex-shrink-0">
-                            <Building2 size={20} />
+                    <div 
+                        className="cursor-pointer flex items-center gap-2 min-w-0" 
+                        onClick={() => setActivePage('dashboard')}
+                        title="HotelManagementOS"
+                    >
+                        <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center text-white shadow-xs flex-shrink-0">
+                            <Building2 size={13} />
                         </div>
-                        <div className="flex flex-col">
-                            <h1 className="text-lg font-bold text-gray-900 tracking-tight leading-none">HotelOS</h1>
-                            <p className="text-[10px] text-gray-500 font-medium leading-none mt-1">Enterprise PMS</p>
+                        <div className="flex flex-col min-w-0">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none truncate">HotelOS</h1>
+                            <p className="text-[8px] text-gray-400 font-semibold uppercase tracking-wider leading-none mt-0.5">Enterprise</p>
                         </div>
                     </div>
                 )}
 
                 <button
                     onClick={toggleSidebar}
-                    className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+                    className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
+                    title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 >
-                    {isCollapsed ? <Menu size={24} /> : <ChevronLeft size={20} />}
+                    {isCollapsed ? <Menu size={16} /> : <ChevronLeft size={15} />}
                 </button>
             </div>
 
-            {/* Menu Items */}
-            <nav className="flex-1 px-3 space-y-2 pb-4 overflow-y-auto overflow-x-hidden scrollbar-thin">
+            {/* Quick Search (Expanded Only) */}
+            {!isCollapsed && (
+                <div className="px-2 pt-2 pb-1 border-b border-gray-50">
+                    <div className="relative flex items-center">
+                        <Search size={11} className="absolute left-2 text-gray-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Quick jump..."
+                            className="w-full text-[11px] bg-gray-50/80 hover:bg-gray-100/60 focus:bg-white border border-gray-200/70 focus:border-blue-400 rounded-md py-1 pl-6 pr-6 text-gray-700 placeholder-gray-400 focus:outline-none transition-all"
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-1.5 p-0.5 text-gray-400 hover:text-gray-600"
+                            >
+                                <X size={10} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
+            {/* Navigation Body */}
+            <nav className="flex-1 px-1.5 py-1.5 space-y-0.5 overflow-y-auto overflow-x-hidden scrollbar-thin">
                 {/* Global Dashboard Link */}
                 <div
                     onClick={() => setActivePage('dashboard')}
-                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors ${activePage === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'} ${isCollapsed ? 'justify-center' : ''}`}
-                    title={isCollapsed ? "Dashboard" : ""}
+                    className={`flex items-center gap-2 px-2 py-1 text-[11.5px] font-medium rounded-md cursor-pointer transition-colors ${activePage === 'dashboard' ? 'bg-blue-50 text-blue-700 font-semibold shadow-xs' : 'text-gray-700 hover:bg-gray-100/70'} ${isCollapsed ? 'justify-center px-0 py-1.5' : ''}`}
+                    title={isCollapsed ? "HMS Overview" : ""}
                 >
-                    <div className="flex-shrink-0"><LayoutDashboard size={20} /></div>
-                    {!isCollapsed && <span>HMS Overview</span>}
+                    <span className={`flex-shrink-0 ${activePage === 'dashboard' ? 'text-blue-600' : 'text-gray-400'}`}>
+                        <LayoutDashboard size={14} />
+                    </span>
+                    {!isCollapsed && <span className="truncate">HMS Overview</span>}
                 </div>
 
                 {/* Manager Dashboard Link */}
                 <div
                     onClick={() => setActivePage('manager-dashboard')}
-                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors ${activePage === 'manager-dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'} ${isCollapsed ? 'justify-center' : ''}`}
+                    className={`flex items-center gap-2 px-2 py-1 text-[11.5px] font-medium rounded-md cursor-pointer transition-colors ${activePage === 'manager-dashboard' ? 'bg-blue-50 text-blue-700 font-semibold shadow-xs' : 'text-gray-700 hover:bg-gray-100/70'} ${isCollapsed ? 'justify-center px-0 py-1.5' : ''}`}
                     title={isCollapsed ? "Manager Dashboard" : ""}
                 >
-                    <div className="flex-shrink-0"><Briefcase size={20} /></div>
-                    {!isCollapsed && <span>Manager Dashboard</span>}
+                    <span className={`flex-shrink-0 ${activePage === 'manager-dashboard' ? 'text-blue-600' : 'text-gray-400'}`}>
+                        <Briefcase size={14} />
+                    </span>
+                    {!isCollapsed && <span className="truncate">Manager KPIs</span>}
                 </div>
 
-                <div className="border-t border-gray-100 my-2"></div>
+                <div className="border-t border-gray-100 my-1"></div>
 
-                {menuGroups.map((group) => renderMenuItem(group, 0))}
+                {/* Group Accordions */}
+                {filteredMenuGroups.map((group) => renderMenuItem(group, 0))}
 
+                {filteredMenuGroups.length === 0 && (
+                    <div className="py-4 text-center text-gray-400 text-[10px]">
+                        No menu items found
+                    </div>
+                )}
             </nav>
+
+            {/* Footer / System Status indicator */}
+            <div className="h-8 px-2.5 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-400 bg-gray-50/50">
+                {!isCollapsed && (
+                    <>
+                        <span className="flex items-center gap-1.5 text-[9px] font-medium text-emerald-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Online
+                        </span>
+                        <span className="text-[9px] text-gray-400 font-mono">v4.0</span>
+                    </>
+                )}
+                {isCollapsed && (
+                    <div className="w-full flex justify-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="System Online"></span>
+                    </div>
+                )}
+            </div>
         </aside>
     );
 };
