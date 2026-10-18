@@ -1,128 +1,272 @@
-# NICE Property Management System (PMS)
+# HotelManagementOS
 
-A comprehensive Web-based Property Management System (PMS) designed for hotels and restaurants. This application provides tools for managing properties, rooms, rates, point of sale (POS), finance, and staff operations.
+<div align="center">
 
-![PMS Dashboard](public/logo.jpg)
+![HotelManagementOS Logo](public/logo.jpg)
 
-## 📖 Project Overview & Workflow
+### Next-Generation Cloud PMS, Real-Time Channel Manager & Hospitality ERP Suite
 
-The **NICE PMS** is designed to centralize hospitality operations, bridging the gap between hotel property management and restaurant point-of-sale systems.
+[![React](https://img.shields.io/badge/React-19.2-blue?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-7.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Specification](https://img.shields.io/badge/SRS-v4.0_Master_(IEEE_830)-success)](./Software_Requirements_Specification.md)
+[![Database](https://img.shields.io/badge/PostgreSQL-16_RLS-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-### 🔄 Typical Workflow
-1.  **Authentication**: Secure role-based login (Admin, Manager, Staff).
-2.  **Dashboard**: Immediate view of critical KPIs (Occupancy, Revenue, Notifications).
-3.  **Setup (One-time)**: configuration of Properties -> Buildings -> Rooms -> Rates.
-4.  **Daily Operations**:
-    *   **Front Desk**: Check-in guests, assign rooms, manage bookings.
-    *   **Restaurant**: seated service, KOT generation, and billing.
-5.  **Reporting**: End-of-day financial reconciliation.
-
----
-
-## 🧭 Sidebar Navigation & Roadmap
-
-Detailed breakdown of every module accessible via the sidebar, including current capabilities and the development roadmap.
-
-### 🏠 Main
-
-#### **HMS Overview**
-*   **Current Functionality**: Central dashboard displaying aggregated data such as Total Bookings, Check-ins, Check-outs, and Total Revenue.
-*   **Future Plan**: Implement date-range filtering, customizable widgets, and click-through analytics for deeper insights.
-
-#### **Manager Dashboard**
-*   **Current Functionality**: Specialized view for operational managers focusing on staff activity and active alerts.
-*   **Future Plan**: Add staff performance metrics, shift management integration, and approval workflows.
+</div>
 
 ---
 
-### 🍽️ POS Management (Restaurant)
+## 📌 Executive Overview
 
-#### **POS Dashboard**
-*   **Current Functionality**: Visual summary of restaurant performance (Top selling items, Daily sales count).
-*   **Future Plan**: Real-time sales graphs, hourly footfall heatmaps, and inventory depletion alerts.
+**HotelManagementOS** is an autonomous, enterprise-grade hospitality operating system architected to unify the fragmented software ecosystem of modern hotels and resorts. 
 
-#### **POS / Billing**
-*   **Current Functionality**: The core interface for taking orders. Features include table selection, category filtering, cart management, and receipt generation.
-*   **Future Plan**: Support for Split Bills, Table Merge, Mobile view for waiters, and Kitchen Display System (KDS) integration.
+Traditionally, hospitality operators are forced to stitch together 5+ disparate third-party tools:
+- **Property Management System (PMS):** OPERA / Cloudbeds
+- **Channel Manager:** SiteMinder / RateGain
+- **Restaurant POS:** Petpooja / Toast
+- **Accounting & ERP:** Tally / QuickBooks
+- **Staff & HR:** BambooHR
 
-#### **Menu Management**
-*   **Categories**:
-    *   *Current*: Create hierarchical categories (Food -> Fast Food).
-    *   *Future*: Drag-and-drop reordering, seasonal category scheduling.
-*   **Products**:
-    *   *Current*: Add items with prices, tax rules, and descriptions.
-    *   *Future*: Recipe management (ingredients), bundle offers, and happy hour pricing.
-*   **Addons**:
-    *   *Current*: Define modifiers (e.g., "Extra Cheese", "No Sugar").
-    *   *Future*: Conditional logic (only show "Steak Doneness" if Steak is selected).
-*   **Units**:
-    *   *Current*: Define measurement units (kg, plate, glass).
-    *   *Future*: Unit conversions for inventory tracking.
-
-#### **Restaurant Setup**
-*   **Tables**: Configure table names and capacities. (*Future: QR code generation for self-ordering*).
-*   **Floor Plan**: Map tables to physical zones. (*Future: Drag-and-drop visual layout editor*).
-*   **Kitchens**: Route items to specific printers/screens. (*Future: Multi-stage kitchen status tracking*).
-
-#### **Staff & Users**
-*   **Waiters**: Manage profiles and commission rates. (*Future: Tip tracking and payroll export*).
+**HotelManagementOS** replaces this fragmented landscape with a single, high-performance, multi-tenant platform featuring PostgreSQL 16 Row-Level Security (RLS), sub-second 2-way OTA distribution (Booking.com, Agoda, Expedia, Airbnb), overbooking-safe distributed locking (Redlock), and an integrated 5-digit ERP General Ledger.
 
 ---
 
-### 🏨 Property Management
+## 🌟 Core System Capabilities
 
-#### **Properties**
-*   **Current Functionality**: Add and configure multiple properties (Hotels, Resorts) with details like location, contact info, and tax rules.
-*   **Future Plan**: Multi-currency support and localized settings per property.
+### 1. Front Desk & Tape Chart Operations
+* **Stay View & Room Rack:** Visual interactive Gantt-style tape chart for room allocations, early check-ins, late check-outs, and room moves with instant folio reassignment.
+* **Quick Reservation Engine:** Rapid reservation modal supporting multi-room bookings, group reservations, dynamic price overrides, and promo codes.
+* **Guest 360° Profiles:** Comprehensive guest history tracking preferences, VIP statuses, corporate bill-to entities, ID verification records, and guest vouchers.
 
-#### **Hotel Info**
-*   **Current Functionality**: Read-only view of key property configurations (Policies, Bank Accounts).
-*   **Future Plan**: Direct edit capabilities and formatted PDF export of property details.
+### 2. Real-Time 2-Way Channel Manager
+* **Zero-Overbooking Guarantee:** Distributed concurrency control combining Redis 7 Redlock and database `SELECT FOR UPDATE` transaction isolation.
+* **Instant ARI Distribution:** Sub-second Availability, Rates, and Inventory (ARI) synchronization across top OTAs (Booking.com, Agoda, Expedia, Airbnb, Hotelbeds).
+* **Temporary Quote Holds:** 10-minute inventory reservations backed by Redis TTL keyspace notifications to prevent race conditions during web checkout.
+* **Rate Parity Auditing:** Automated background jobs detecting OTA undercut pricing and disparity violations.
 
----
+### 3. Food & Beverage POS & Kitchen Display System (KDS)
+* **Restaurant POS:** Table floor-plan mapping, guest seat management, split-bill capability, and fast receipt generation.
+* **Kitchen Display System (KDS):** Real-time order routing by kitchen prep station with multi-stage fulfillment tracking.
+* **Room Service & Folio Routing:** Direct posting of restaurant and minibar charges to the guest's hotel room folio with electronic signature validation.
 
-### 🛏️ Room Management
+### 4. Folio Accounting & ERP General Ledger
+* **Multi-Folio Billing:** Up to 4 isolated folios per reservation (Room & Taxes, Incidentals, Corporate/Master, Banquet).
+* **5-Digit Hospitality Chart of Accounts (COA):** Built-in accounting tree spanning Assets (1xxxx), Liabilities (2xxxx), Equity (3xxxx), Revenue (4xxxx), and Expenses (5xxxx).
+* **Statutory Tax Engine:** Country-specific cascading tax support including Bangladesh Mushak 6.3 (15% VAT + 10% Service Charge) and India GST (12%/18% slabs).
+* **Automated Night Audit:** 6-step sequential pipeline with automated room charge posting, tax computation, no-show processing, and zero-balance variance verification.
 
-#### **Floors & Buildings**
-*   **Current Functionality**: Define the physical hierarchy (e.g., Main Building -> Floor 1).
-*   **Future Plan**: Visual building map.
-
-#### **Room Types**
-*   **Current Functionality**: Create classes of rooms (Deluxe, Standard) with base amenities and default occupancy.
-*   **Future Plan**: Dynamic pricing rules based on room type demand.
-
-#### **Rooms**
-*   **Current Functionality**: Manage individual room inventory (Room 101, 102) and status.
-*   **Future Plan**: Bulk room creation wizard and housekeeping status app.
-
-#### **Connecting Rooms**
-*   **Current Functionality**: Link two physical rooms to be sold as a single unit or separately.
-*   **Future Plan**: Calendar availability sync for connected units.
+### 5. Housekeeping & Maintenance Kanban
+* **Housekeeping Grid:** Real-time room cleanliness states (`Clean`, `Dirty`, `Inspected`, `Out of Order`, `Out of Service`) synced directly with front desk check-in eligibility.
+* **Maintenance Kanban:** Work order ticketing system with priority tagging, maintenance technician assignments, and room out-of-order downtime tracking.
 
 ---
 
-### 🏷️ Rate Management
+## 📐 System Architecture & Specifications
 
-#### **Rate Plans**
-*   **Current Functionality**: Define pricing strategies (e.g., "Rack Rate", "Corporate").
-*   **Future Plan**: Channel manager integration (Booking.com, Expedia sync).
+The engineering baseline of **HotelManagementOS** is governed by extensive IEEE 830 / ISO/IEC/IEEE 29148 documentation available directly in the repository:
 
-#### **Meal Plans**
-*   **Current Functionality**: Set board types (EP, CP, MAP, AP).
-*   **Future Plan**: Integration with POS to auto-allow meal credits.
+* 📄 **[Software Requirements Specification (SRS v4.0)](./Software_Requirements_Specification.md)**: 2,000+ lines covering 36+ production DDL tables with PostgreSQL RLS, 4 finite-state machines (FSM), 9 core algorithms, 23 background cron jobs, and 4 SRE disaster recovery runbooks.
+* 🔍 **[Forensic Gap Analysis & Technical Audit](./HotelManagementOS_SRS_Gap_Analysis_Expert.md)**: Architectural evaluation matrix assessing system parity against global enterprise PMS standards.
+* 🗺️ **[Channel Manager Master Blueprint (Plan v7)](./Channel_Manager_Development_Plan_v7.md)**: Complete operational plan for OTA integration adapters, rate parity engines, and webhook distribution.
+
+```
+                           ┌─────────────────────────────┐
+                           │      HotelManagementOS      │
+                           │   Next.js / React 19 SPA    │
+                           └──────────────┬──────────────┘
+                                          │ HTTPS / WSS
+                                          ▼
+                           ┌─────────────────────────────┐
+                           │    NestJS API Gateway       │
+                           │ (JWT Auth, RBAC, Tenancy)   │
+                           └───────┬─────────────┬───────┘
+                                   │             │
+        ┌──────────────────────────┘             └──────────────────────────┐
+        ▼                                                                   ▼
+┌─────────────────────────────────┐                       ┌─────────────────────────────────┐
+│     PostgreSQL 16 Cluster       │                       │       Go Sync Engine / OTA      │
+│  - Multi-tenant RLS Isolation   │                       │  - OTA XML/JSON Adapter Bus     │
+│  - Monthly Table Partitioning   │                       │  - Rate Parity Scanner          │
+│  - Transactional Outbox Pattern │                       │  - RabbitMQ Queue Consumer      │
+└─────────────────────────────────┘                       └────────────────┬────────────────┘
+        ▲                                                                  │
+        │ Redis 7 Redlock & Caching                                        ▼
+┌────────────────────────────────────────────────────────┐ ┌─────────────────────────────────┐
+│ - 10-Minute Temporary Hold Keyspace Notifications       │ │ External Distribution:          │
+│ - Rate Plan & Daily Inventory Sub-Second Cache         │ │ Booking.com | Expedia | Agoda   │
+│ - Distributed Lock Manager for Overbooking Prevention  │ │ Airbnb | Hotelbeds             │
+└────────────────────────────────────────────────────────┘ └─────────────────────────────────┘
+```
 
 ---
 
-### 👥 User Management
-*   **Current Functionality**: Create system users and assign roles.
-*   **Future Plan**: Granular permission matrix (checkbox-based access control).
+## 💻 Tech Stack
 
-### ⚙️ Settings
-*   **General Settings**: Application-wide defaults.
-*   **Future Plan**: White-labeling options (custom logo/theme) and data backup tools.
+| Layer | Technologies |
+|---|---|
+| **Frontend Framework** | [React 19](https://react.dev/) + [TypeScript 5.9](https://www.typescriptlang.org/) |
+| **Build & Tooling** | [Vite 7](https://vitejs.dev/) + [PostCSS](https://postcss.org/) |
+| **Styling & Design** | [Tailwind CSS 3.4](https://tailwindcss.com/) + [Lucide React](https://lucide.dev/) |
+| **Document & Reports** | [jsPDF](https://github.com/parallax/jsPDF), [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), [XLSX](https://docs.sheetjs.com/), [html2canvas](https://html2canvas.hertzen.com/) |
+| **Date & Time Engine** | [date-fns 4.1](https://date-fns.org/) |
+| **Backend & Microservices** *(SRS v4.0)* | NestJS (API Gateway), Go (High-Throughput OTA Sync Service) |
+| **Database & Cache** *(SRS v4.0)* | PostgreSQL 16 (RLS, Range Partitioning), Redis 7 (Redlock, Key Invalidation) |
+| **Event Broker** *(SRS v4.0)* | RabbitMQ (Transactional Outbox Pattern, Channel Sync Queues) |
 
-### 💰 Finance
-*   **Overview**: Basic financial summary.
-*   **Future Plan**: Full General Ledger (GL) integration, Expense tracking, and Tax filing reports.
+---
 
- 
+## 📂 Project Directory Structure
+
+```text
+HotelManagementOS/
+├── .gemini/                                # Custom agent and development configurations
+├── public/                                 # Static public assets (logos, branding, favicons)
+│   ├── logo.jpg
+│   └── vite.svg
+├── src/
+│   ├── assets/                             # Image assets and graphics
+│   ├── components/                         # 50+ Modular PMS, POS, and ERP UI Components
+│   │   ├── AddProperty.tsx                 # Property onboarding & config
+│   │   ├── AdminSecurity.tsx               # Security, RBAC & audit log viewer
+│   │   ├── AdvancedReports.tsx             # Financial, tax & operational reports
+│   │   ├── BuildingManagement.tsx          # Physical property & building structure
+│   │   ├── Dashboard.tsx                   # Central operational executive dashboard
+│   │   ├── FloorPlan.tsx                   # Visual restaurant floor plan & table layout
+│   │   ├── FolioOperations.tsx             # Multi-folio billing & cashiering
+│   │   ├── FrontDesk.tsx                   # Daily check-in/out & guest lifecycle
+│   │   ├── GuestProfile360.tsx             # Unified guest profile management
+│   │   ├── HousekeepingGrid.tsx            # Room status & cleaning assignments
+│   │   ├── KitchenDisplay.tsx              # Kitchen Display System (KDS) order terminal
+│   │   ├── MaintenanceKanban.tsx           # Work orders & facility maintenance
+│   │   ├── ManagerDashboard.tsx            # Operational KPIs & shift management
+│   │   ├── MealPlanManagement.tsx          # EP, CP, MAP, AP board configurations
+│   │   ├── NightAuditAutomation.tsx        # Automated 6-step night audit runner
+│   │   ├── OccupancyHeatmap.tsx            # Visual room occupancy forecasting
+│   │   ├── PackageManagement.tsx           # Stay packages & dynamic inclusions
+│   │   ├── POSDashboard.tsx                # F&B revenue & item performance
+│   │   ├── POSPage.tsx                     # Restaurant point-of-sale terminal
+│   │   ├── QuickReservation.tsx            # 60-second reservation booking modal
+│   │   ├── RateCalendar.tsx                # Multi-channel ARI calendar matrix
+│   │   ├── RatePlanManagement.tsx          # Pricing policies & rate plans
+│   │   ├── RevenueDashboard.tsx            # RevPAR, ADR & occupancy metrics
+│   │   ├── RoomManagement.tsx              # Room inventory & operational states
+│   │   ├── RoomRack.tsx                    # Interactive room status rack
+│   │   ├── RoomTypeManagement.tsx          # Room classifications & amenities
+│   │   ├── ServiceManagement.tsx           # Ancillary services & extra charges
+│   │   └── StayView.tsx                    # Multi-day tape chart / Gantt visualizer
+│   ├── styles/                             # Global styling definitions
+│   ├── utils/                              # Export helpers, math, and date formatters
+│   ├── App.tsx                             # Master routing & module orchestration
+│   ├── index.css                           # Tailwind CSS directives
+│   └── main.tsx                            # React 19 entry point
+├── Channel_Manager_Development_Plan_v7.md  # 9,500+ Line Channel Manager Master Blueprint
+├── HotelManagementOS_SRS_Gap_Analysis_Expert.md # Forensic gap analysis re-audit report
+├── package.json                            # Package dependencies and npm scripts
+├── Software_Requirements_Specification.md  # Comprehensive IEEE 830 SRS Document (v4.0)
+├── tailwind.config.js                      # Tailwind CSS design system configuration
+├── tsconfig.json                           # TypeScript compiler configuration
+└── vite.config.ts                          # Vite bundler configuration
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Ensure you have the following installed on your machine:
+* **Node.js**: `v20.x` or higher
+* **npm**: `v10.x` or higher (or `pnpm` / `yarn`)
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/cmtimran/HotelMasnagementOS.git
+   cd HotelMasnagementOS
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Launch the development server:**
+   ```bash
+   npm run dev
+   ```
+   Open your browser and navigate to `http://localhost:5173`.
+
+4. **Build for production:**
+   ```bash
+   npm run build
+   ```
+
+5. **Run TypeScript linting:**
+   ```bash
+   npm run lint
+   ```
+
+---
+
+## 📊 Core Operational Workflows
+
+### Daily Guest Lifecycle
+```
+[Inquiry / Direct Booking / OTA]
+               │
+               ▼
+   [Temporary 10-Min Hold] ──(TTL Expired)──> [Inventory Released]
+               │
+          (Confirmed)
+               ▼
+   [Reservation Confirmed] ──> [Pre-Arrival Notification]
+               │
+               ▼
+     [Front Desk Check-In] ──> [Room Status: Occupied] ──> [Active Folio 80000+]
+               │
+               ├── (Incidentals: Restaurant POS, Minibar, Laundry)
+               │
+               ▼
+    [Front Desk Check-Out] ──> [Zero-Balance Folio Settlement]
+               │
+               ▼
+     [Housekeeping Alert] ──> [Room Status: Dirty] ──> [Cleaned & Inspected]
+```
+
+### Night Audit Sequence (02:00 AM Daily)
+```
+1. Trial Balance Audit ────> Check total Debits == total Credits
+2. Auto Room Post ─────────> Post nightly room rate + taxes to active folios
+3. F&B POS Reconciliation ─> Verify all restaurant checks closed/billed to room
+4. No-Show Processing ─────> Mark un-arrived reservations and apply cancellation policy
+5. Inventory Roll-Forward ─> Advance system business date (Audit Date + 1)
+6. Trial Balance Final ────> Lock business date and generate Manager Daily Report
+```
+
+---
+
+## 🛡️ Security & Compliance
+
+* **Tenant Isolation:** Enforced via PostgreSQL 16 Row-Level Security (`app.current_tenant_id`) ensuring zero cross-property data leakage.
+* **Audit Logging:** Every critical transaction (rate modifications, room status overrides, folio charge reversals) is immutably logged with timestamp, user ID, and IP address.
+* **Financial Integrity:** Zero hard deletes on financial postings. Adjustments are processed strictly as compensating debit/credit journal entries.
+
+---
+
+## 🤝 Contributing
+
+Contributions to **HotelManagementOS** are welcome! Please follow these steps:
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes using Conventional Commits (`git commit -m 'feat: add folio split-bill preview'`).
+4. Push to the branch (`git push origin feature/amazing-feature`).
+5. Open a Pull Request referencing the corresponding SRS section.
+
+---
+
+## 📄 License
+
+This software and its accompanying architectural documentation are proprietary. Unauthorized copying, distribution, or modification of this project is strictly prohibited. For licensing inquiries, contact the repository maintainers.
