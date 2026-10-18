@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, UserPlus } from 'lucide-react';
 
 interface Booking {
     id: number;
@@ -22,28 +22,26 @@ const StayView = () => {
     const [days, setDays] = useState(30);
 
     const [roomTypes, setRoomTypes] = useState<RoomType[]>([
-        { name: 'Standard Room', rooms: ['STD-101', 'STD-101', 'STD-101', 'STD-101'], expanded: true },
-        { name: 'Delux Room', rooms: ['DEL-101', 'DEL-101', 'DEL-101'], expanded: true },
-        { name: 'Double Deluxe Room', rooms: [], expanded: false },
-        { name: 'Super Deluxe Room', rooms: ['PRS-101', 'PRS-101'], expanded: true },
-        { name: 'Presidential Suite', rooms: ['PRS-101', 'PRS-101'], expanded: true },
+        { name: 'Standard Room', rooms: ['STD-101', 'STD-102', 'STD-103', 'STD-104'], expanded: true },
+        { name: 'Deluxe Room', rooms: ['DEL-201', 'DEL-202', 'DEL-203'], expanded: true },
+        { name: 'Double Deluxe Room', rooms: ['DDL-301', 'DDL-302'], expanded: false },
+        { name: 'Super Deluxe Room', rooms: ['SDR-401', 'SDR-402'], expanded: true },
+        { name: 'Presidential Suite', rooms: ['PRS-501', 'PRS-502'], expanded: true },
     ]);
 
-    // Mock bookings data
     const [bookings] = useState<Booking[]>([
         { id: 1, guestName: 'Foysal Ahmed', roomNumber: 'STD-101', checkIn: '2025-04-05', checkOut: '2025-04-08', status: 'occupied', color: '#059669' },
-        { id: 2, guestName: 'Sadik Hasan', roomNumber: 'STD-101', checkIn: '2025-04-06', checkOut: '2025-04-08', status: 'checkin', color: '#0891b2' },
-        { id: 3, guestName: 'Afifa Mahir Joy', roomNumber: 'STD-101', checkIn: '2025-04-11', checkOut: '2025-04-15', status: 'ota', color: '#dc2626' },
-        { id: 4, guestName: 'Mohammad Jaki', roomNumber: 'STD-101', checkIn: '2025-04-17', checkOut: '2025-04-19', status: 'expected', color: '#f97316' },
-        { id: 5, guestName: 'Afifa Mahir', roomNumber: 'STD-101', checkIn: '2025-04-08', checkOut: '2025-04-10', status: 'vip', color: '#3b82f6' },
-        { id: 6, guestName: 'Shahriar Hossain', roomNumber: 'STD-101', checkIn: '2025-04-10', checkOut: '2025-04-14', status: 'ota', color: '#dc2626' },
-        { id: 7, guestName: 'Rafiqul Islam', roomNumber: 'DEL-101', checkIn: '2025-04-07', checkOut: '2025-04-11', status: 'occupied', color: '#0891b2' },
-        { id: 8, guestName: 'Saikat Huda', roomNumber: 'DEL-101', checkIn: '2025-04-17', checkOut: '2025-04-22', status: 'expected', color: '#f97316' },
-        { id: 9, guestName: 'Hira John Baidda', roomNumber: 'PRS-101', checkIn: '2025-04-05', checkOut: '2025-04-09', status: 'vip', color: '#3b82f6' },
-        { id: 10, guestName: 'Faysal Ahmed', roomNumber: 'PRS-101', checkIn: '2025-04-19', checkOut: '2025-04-22', status: 'expected', color: '#f97316' },
+        { id: 2, guestName: 'Sadik Hasan', roomNumber: 'STD-102', checkIn: '2025-04-06', checkOut: '2025-04-08', status: 'checkin', color: '#0891b2' },
+        { id: 3, guestName: 'Afifa Mahir', roomNumber: 'STD-103', checkIn: '2025-04-11', checkOut: '2025-04-15', status: 'ota', color: '#dc2626' },
+        { id: 4, guestName: 'Mohammad Jaki', roomNumber: 'STD-104', checkIn: '2025-04-17', checkOut: '2025-04-19', status: 'expected', color: '#f97316' },
+        { id: 5, guestName: 'Afifa Mahir', roomNumber: 'DEL-201', checkIn: '2025-04-08', checkOut: '2025-04-10', status: 'vip', color: '#3b82f6' },
+        { id: 6, guestName: 'Shahriar Hossain', roomNumber: 'DEL-202', checkIn: '2025-04-10', checkOut: '2025-04-14', status: 'ota', color: '#dc2626' },
+        { id: 7, guestName: 'Rafiqul Islam', roomNumber: 'DEL-203', checkIn: '2025-04-07', checkOut: '2025-04-11', status: 'occupied', color: '#0891b2' },
+        { id: 8, guestName: 'Saikat Huda', roomNumber: 'SDR-401', checkIn: '2025-04-17', checkOut: '2025-04-22', status: 'expected', color: '#f97316' },
+        { id: 9, guestName: 'Hira John', roomNumber: 'PRS-501', checkIn: '2025-04-05', checkOut: '2025-04-09', status: 'vip', color: '#3b82f6' },
+        { id: 10, guestName: 'Faysal Ahmed', roomNumber: 'PRS-502', checkIn: '2025-04-19', checkOut: '2025-04-22', status: 'expected', color: '#f97316' },
     ]);
 
-    // Generate date range
     const generateDates = () => {
         const dates = [];
         const start = new Date(fromDate);
@@ -57,7 +55,6 @@ const StayView = () => {
 
     const dates = generateDates();
 
-    // Calculate booking position and width
     const getBookingStyle = (booking: Booking) => {
         const start = new Date(fromDate);
         const checkIn = new Date(booking.checkIn);
@@ -83,170 +80,136 @@ const StayView = () => {
         ));
     };
 
-    // Status indicators
     const statusIndicators = [
-        { label: 'Occupied', count: 18, color: '#dc2626', icon: '🔴' },
-        { label: 'T Check-in', count: 1, color: '#ec4899', icon: '🟣' },
-        { label: 'Back to Back', count: 1, color: '#8b5cf6', icon: '🟣' },
-        { label: 'House Use', count: 1, color: '#22c55e', icon: '🟢' },
-        { label: 'VIP', count: 1, color: '#3b82f6', icon: '🔵' },
-        { label: 'OTA', count: 1, color: '#6b7280', icon: '⚫' },
-        { label: 'Expected Departure', count: 1, color: '#ec4899', icon: '🟣' },
-        { label: 'Vacant Dirty', count: 1, color: '#eab308', icon: '🟡' },
-        { label: 'Expected Arrival', count: 0, color: '#f97316', icon: '🟠' },
-        { label: 'Expected Departure', count: 0, color: '#ec4899', icon: '🟣' },
-        { label: 'DA', count: 0, color: '#06b6d4', icon: '🔵' },
-        { label: 'OOO', count: 2, color: '#eab308', icon: '🟡' },
-        { label: 'OOS', count: 1, color: '#0891b2', icon: '🔵' },
-        { label: 'Vacant Clean', count: 1, color: '#22c55e', icon: '🟢' },
+        { label: 'Occupied', count: 18, color: '#dc2626' },
+        { label: 'Due In', count: 4, color: '#ec4899' },
+        { label: 'VIP', count: 2, color: '#3b82f6' },
+        { label: 'OTA', count: 6, color: '#6b7280' },
+        { label: 'Clean', count: 12, color: '#059669' },
+        { label: 'Dirty', count: 3, color: '#eab308' },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4">
-            {/* Header */}
-            <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-                <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-bold text-gray-900">STAY VIEW</h1>
-                    <button className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                        Assign Room
+        <div className="p-3 max-w-full mx-auto space-y-2 font-sans select-none">
+            {/* Header & Controls in One Compact Toolbar */}
+            <div className="bg-white p-2 rounded-lg border border-gray-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center text-white">
+                        <Calendar size={13} />
+                    </div>
+                    <div>
+                        <h1 className="text-xs font-bold text-gray-900 leading-none">STAY VIEW / TAPE CHART</h1>
+                        <span className="text-[9px] text-gray-400 font-medium">Gantt Allocation Matrix</span>
+                    </div>
+                </div>
+
+                {/* Date & Range Filter */}
+                <div className="flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-gray-500 font-semibold">Start:</span>
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="px-2 py-0.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-blue-500 bg-white"
+                        />
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-gray-500 font-semibold">View:</span>
+                        <select
+                            value={days}
+                            onChange={(e) => setDays(Number(e.target.value))}
+                            className="px-2 py-0.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-blue-500 bg-white font-medium"
+                        >
+                            <option value={7}>7 Days</option>
+                            <option value={14}>14 Days</option>
+                            <option value={30}>30 Days</option>
+                        </select>
+                    </div>
+                    <button className="h-6 px-2 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 transition-colors shadow-2xs flex items-center gap-1">
+                        <UserPlus size={11} />
+                        <span>Book Room</span>
                     </button>
                 </div>
 
-                {/* Status Indicators */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-lg">
-                        <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-                        <span className="text-xs font-medium">Today</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-lg">
-                        <div className="w-3 h-3 bg-pink-500 rounded-sm"></div>
-                        <span className="text-xs font-medium">Holiday</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-lg">
-                        <div className="w-3 h-3 bg-cyan-500 rounded-sm"></div>
-                        <span className="text-xs font-medium">Today & Holiday</span>
-                    </div>
-                </div>
-
-                {/* Status Count Badges */}
-                <div className="flex flex-wrap gap-2">
+                {/* Status Badges */}
+                <div className="hidden xl:flex items-center gap-1.5">
                     {statusIndicators.map((status, idx) => (
-                        <div key={idx} className="flex flex-col items-center">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md"
-                                style={{ backgroundColor: status.color }}
-                            >
-                                {status.count}
-                            </div>
-                            <span className="text-xs text-gray-600 mt-1 text-center max-w-[60px]">{status.label}</span>
+                        <div key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-50 border border-gray-200/70 text-[10px]">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
+                            <span className="text-gray-600 font-medium">{status.label}:</span>
+                            <strong className="text-gray-900">{status.count}</strong>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* Date Selector */}
-            <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm font-semibold text-gray-700">From Date:</label>
-                        <input
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm font-semibold text-gray-700">Days:</label>
-                        <select
-                            value={days}
-                            onChange={(e) => setDays(Number(e.target.value))}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value={7}>7 Days</option>
-                            <option value={14}>14 Days</option>
-                            <option value={30}>30 Days</option>
-                            <option value={60}>60 Days</option>
-                        </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm font-semibold text-gray-700">Room Type:</label>
-                        <select className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option>All</option>
-                            <option>Standard Room</option>
-                            <option>Delux Room</option>
-                            <option>Super Deluxe Room</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {/* Timeline Grid */}
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            {/* High-Density Gantt Timeline Grid */}
+            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto">
                     <div className="inline-block min-w-full">
-                        {/* Date Headers */}
-                        <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
-                            <div className="w-40 flex-shrink-0 border-r border-gray-200 p-2">
-                                <div className="text-xs font-bold text-gray-700">Bookings</div>
-                                <div className="text-xs text-gray-500">Iterations</div>
+                        {/* Date Header Row */}
+                        <div className="flex border-b border-gray-200 sticky top-0 bg-gray-50/90 backdrop-blur-xs z-10">
+                            <div className="w-32 flex-shrink-0 border-r border-gray-200 px-2 py-1 flex items-center justify-between text-[10px] font-bold text-gray-600 uppercase">
+                                <span>Room</span>
+                                <span>Type</span>
                             </div>
                             <div className="flex flex-1">
-                                {dates.map((date, idx) => (
-                                    <div key={idx} className="flex-1 min-w-[60px] border-r border-gray-200 p-2 text-center">
-                                        <div className="text-xs font-bold text-gray-700">
-                                            {date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
+                                {dates.map((date, idx) => {
+                                    const isWeekend = date.getDay() === 5 || date.getDay() === 6;
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className={`flex-1 min-w-[42px] border-r border-gray-200 py-1 text-center ${isWeekend ? 'bg-blue-50/40' : ''}`}
+                                        >
+                                            <div className="text-[9px] font-bold text-gray-500 uppercase leading-none">
+                                                {date.toLocaleDateString('en-US', { weekday: 'narrow' })}
+                                            </div>
+                                            <div className="text-xs font-bold text-gray-900 leading-tight mt-0.5">
+                                                {date.getDate()}
+                                            </div>
+                                            <div className="text-[8px] text-gray-400 uppercase leading-none">
+                                                {date.toLocaleDateString('en-US', { month: 'short' })}
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-gray-500">
-                                            {date.getDate()}
-                                        </div>
-                                        <div className="text-xs text-gray-500">
-                                            {date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
-                                        </div>
-                                        {/* Booking count badge */}
-                                        <div className="mt-1 inline-block px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
-                                            {(date.getDate() % 5) + 2}
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        {/* Room Rows */}
+                        {/* Room Categories & Rows */}
                         {roomTypes.map((roomType, rtIdx) => (
                             <div key={rtIdx}>
-                                {/* Room Type Header */}
+                                {/* Category Header */}
                                 <div
-                                    className="flex border-b border-gray-200 bg-gray-50 cursor-pointer hover:bg-gray-100"
+                                    className="flex border-b border-gray-200 bg-gray-100/70 cursor-pointer hover:bg-gray-100 px-2 py-1 items-center gap-1.5 transition-colors"
                                     onClick={() => toggleRoomType(rtIdx)}
                                 >
-                                    <div className="w-40 flex-shrink-0 border-r border-gray-200 p-2 flex items-center gap-2">
-                                        {roomType.expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                        <span className="text-sm font-bold text-gray-900">{roomType.name}</span>
-                                        <span className="text-xs text-gray-500">{roomType.rooms.length}</span>
+                                    <div className="text-gray-500">
+                                        {roomType.expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                     </div>
-                                    <div className="flex-1"></div>
+                                    <span className="text-[11px] font-bold text-gray-800">{roomType.name}</span>
+                                    <span className="text-[9px] text-gray-400 font-semibold px-1 py-0.2 bg-white rounded border border-gray-200">
+                                        {roomType.rooms.length} units
+                                    </span>
                                 </div>
 
                                 {/* Room Rows */}
                                 {roomType.expanded && roomType.rooms.map((room, roomIdx) => (
-                                    <div key={roomIdx} className="flex border-b border-gray-100 hover:bg-blue-50/30 relative group">
-                                        <div className="w-40 flex-shrink-0 border-r border-gray-200 p-2">
-                                            <div className="text-sm font-semibold text-gray-900">{room}</div>
-                                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                                                <span>15</span>
-                                                <Calendar size={12} />
-                                            </div>
+                                    <div key={roomIdx} className="flex border-b border-gray-100 hover:bg-gray-50/50 relative">
+                                        <div className="w-32 flex-shrink-0 border-r border-gray-200 px-2 py-1.5 flex items-center justify-between text-xs">
+                                            <span className="font-bold text-gray-900 text-[11px]">{room}</span>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Clean & Ready"></span>
                                         </div>
-                                        <div className="flex-1 relative h-12">
-                                            {/* Grid cells */}
-                                            <div className="absolute inset-0 flex">
+                                        <div className="flex-1 relative h-7">
+                                            {/* Column Guides */}
+                                            <div className="absolute inset-0 flex pointer-events-none">
                                                 {dates.map((_, idx) => (
-                                                    <div key={idx} className="flex-1 min-w-[60px] border-r border-gray-100"></div>
+                                                    <div key={idx} className="flex-1 min-w-[42px] border-r border-gray-100/80"></div>
                                                 ))}
                                             </div>
 
-                                            {/* Booking blocks */}
+                                            {/* Booking Gantt Blocks */}
                                             {bookings
                                                 .filter(b => b.roomNumber === room)
                                                 .map(booking => {
@@ -256,12 +219,13 @@ const StayView = () => {
                                                     return (
                                                         <div
                                                             key={booking.id}
-                                                            className="absolute top-1 bottom-1 rounded px-2 py-1 text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center"
+                                                            className="absolute top-0.5 bottom-0.5 rounded px-1.5 text-white text-[10px] font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center overflow-hidden z-1"
                                                             style={{
                                                                 left: style.left,
                                                                 width: style.width,
                                                                 backgroundColor: booking.color,
                                                             }}
+                                                            title={`${booking.guestName} (${booking.checkIn} - ${booking.checkOut})`}
                                                         >
                                                             <span className="truncate">{booking.guestName}</span>
                                                         </div>

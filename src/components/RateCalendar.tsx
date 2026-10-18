@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, DollarSign, TrendingUp, Save, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, TrendingUp, Save, RotateCcw, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 
 interface DayRate {
     date: string;
@@ -11,12 +11,11 @@ interface DayRate {
 }
 
 const RateCalendar = () => {
-    const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0)); // January 2026
+    const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0));
     const [selectedRoomType, setSelectedRoomType] = useState('Deluxe');
     const [editingDate, setEditingDate] = useState<string | null>(null);
     const [tempRate, setTempRate] = useState('');
 
-    // Mock data - replace with API
     const [rates, setRates] = useState<Record<string, DayRate>>({
         '2026-01-16': { date: '2026-01-16', rate: 5000, occupancy: 85, isWeekend: false, isHoliday: false },
         '2026-01-17': { date: '2026-01-17', rate: 6000, occupancy: 92, isWeekend: true, isHoliday: false },
@@ -34,12 +33,10 @@ const RateCalendar = () => {
 
         const days: (Date | null)[] = [];
 
-        // Add empty cells for days before month starts
         for (let i = 0; i < startingDayOfWeek; i++) {
             days.push(null);
         }
 
-        // Add all days in month
         for (let day = 1; day <= daysInMonth; day++) {
             days.push(new Date(year, month, day));
         }
@@ -73,15 +70,15 @@ const RateCalendar = () => {
     };
 
     const getRateColor = (rate: number) => {
-        if (rate >= 8000) return 'from-purple-500 to-purple-600';
-        if (rate >= 6000) return 'from-blue-500 to-blue-600';
-        if (rate >= 5000) return 'from-emerald-500 to-emerald-600';
-        return 'from-gray-400 to-gray-500';
+        if (rate >= 8000) return 'bg-purple-600 text-white';
+        if (rate >= 6000) return 'bg-blue-600 text-white';
+        if (rate >= 5000) return 'bg-emerald-600 text-white';
+        return 'bg-gray-500 text-white';
     };
 
     const getOccupancyColor = (occupancy: number) => {
-        if (occupancy >= 95) return 'bg-red-500';
-        if (occupancy >= 80) return 'bg-orange-500';
+        if (occupancy >= 95) return 'bg-rose-500';
+        if (occupancy >= 80) return 'bg-amber-500';
         if (occupancy >= 60) return 'bg-yellow-500';
         if (occupancy >= 40) return 'bg-emerald-500';
         return 'bg-gray-300';
@@ -127,93 +124,81 @@ const RateCalendar = () => {
     const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/20 to-gray-50 p-4 md:p-6 lg:p-8">
-            {/* Header */}
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg shadow-purple-600/30">
-                        <DollarSign size={24} className="text-white" />
+        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-2.5 font-sans select-none">
+            {/* Header & Controls Toolbar */}
+            <div className="bg-white p-2.5 rounded-lg border border-gray-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-purple-600 rounded-md flex items-center justify-center text-white shadow-xs">
+                        <DollarSign size={15} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Rate Calendar</h1>
-                        <p className="text-sm text-gray-500">Manage room rates and pricing strategy</p>
+                        <h1 className="text-base font-bold text-gray-900 tracking-tight leading-none">Rate & ARI Distribution Calendar</h1>
+                        <p className="text-[11px] text-gray-500 font-medium leading-none mt-1">Multi-channel daily rates, minimum stay & surge pricing</p>
                     </div>
                 </div>
-            </div>
 
-            {/* Controls */}
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border border-gray-200 shadow-lg mb-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <select
-                            value={selectedRoomType}
-                            onChange={(e) => setSelectedRoomType(e.target.value)}
-                            className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-sm bg-white shadow-sm font-semibold"
-                        >
-                            <option>Deluxe</option>
-                            <option>Suite</option>
-                            <option>Executive</option>
-                            <option>Standard</option>
-                        </select>
-                        <div className="flex items-center gap-2 bg-purple-50 px-4 py-2 rounded-xl border border-purple-200">
-                            <TrendingUp size={18} className="text-purple-600" />
-                            <span className="text-sm font-semibold text-purple-700">Dynamic Pricing Active</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
+                    <select
+                        value={selectedRoomType}
+                        onChange={(e) => setSelectedRoomType(e.target.value)}
+                        className="h-7 px-2 border border-gray-200 rounded-md text-xs font-semibold text-gray-700 bg-white"
+                    >
+                        <option>Deluxe</option>
+                        <option>Suite</option>
+                        <option>Executive</option>
+                        <option>Standard</option>
+                    </select>
+
+                    <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-md p-0.5">
                         <button
                             onClick={previousMonth}
-                            className="w-10 h-10 bg-white border border-gray-300 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all"
+                            className="p-1 hover:bg-white rounded text-gray-600 hover:shadow-xs transition-all"
                         >
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={13} />
                         </button>
-                        <span className="text-lg font-bold text-gray-900 min-w-[200px] text-center">{monthName}</span>
+                        <span className="text-xs font-bold text-gray-800 px-2 min-w-[120px] text-center">{monthName}</span>
                         <button
                             onClick={nextMonth}
-                            className="w-10 h-10 bg-white border border-gray-300 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all"
+                            className="p-1 hover:bg-white rounded text-gray-600 hover:shadow-xs transition-all"
                         >
-                            <ChevronRight size={20} />
+                            <ChevronRight size={13} />
                         </button>
                     </div>
+
+                    <button className="h-7 px-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold shadow-2xs flex items-center gap-1 transition-colors">
+                        <Calendar size={12} />
+                        <span>Bulk Update</span>
+                    </button>
                 </div>
             </div>
 
-            {/* Legend */}
-            <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-gray-200 shadow-lg mb-6">
-                <div className="flex items-center gap-6 text-sm">
-                    <span className="font-semibold text-gray-700">Rate Levels:</span>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-purple-500 to-purple-600 rounded"></div>
-                        <span className="text-gray-600">Premium (৳8000+)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded"></div>
-                        <span className="text-gray-600">High (৳6000-7999)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded"></div>
-                        <span className="text-gray-600">Standard (৳5000-5999)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-gray-400 to-gray-500 rounded"></div>
-                        <span className="text-gray-600">Low (&lt;৳5000)</span>
-                    </div>
+            {/* Compact Legend Bar */}
+            <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200/80 shadow-2xs flex flex-wrap items-center justify-between text-[11px] text-gray-500 gap-2">
+                <div className="flex items-center gap-4">
+                    <span className="font-bold text-gray-700 text-[10px] uppercase">Rate Tiers:</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-purple-600"></span> Premium (৳8k+)</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-blue-600"></span> High (৳6k-8k)</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-emerald-600"></span> Standard (৳5k-6k)</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-gray-500"></span> Base (&lt;৳5k)</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                    <TrendingUp size={11} />
+                    <span>Dynamic Pricing Engine Active</span>
                 </div>
             </div>
 
             {/* Calendar Grid */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
-                <div className="grid grid-cols-7 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs overflow-hidden">
+                <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider py-1.5">
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="p-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            {day}
-                        </div>
+                        <div key={day}>{day}</div>
                     ))}
                 </div>
-                <div className="grid grid-cols-7">
+
+                <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
                     {days.map((day, index) => {
                         if (!day) {
-                            return <div key={`empty-${index}`} className="aspect-square border border-gray-100 bg-gray-50" />;
+                            return <div key={`empty-${index}`} className="h-18 bg-gray-50/50" />;
                         }
 
                         const dayRate = getRateForDate(day);
@@ -225,26 +210,28 @@ const RateCalendar = () => {
                             <div
                                 key={dateStr}
                                 onClick={() => !isEditing && handleCellClick(day)}
-                                className={`aspect-square border border-gray-200 p-3 cursor-pointer transition-all hover:shadow-lg ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''
-                                    } ${dayRate.isHoliday ? 'bg-red-50' : 'bg-white hover:bg-gray-50'}`}
+                                className={`h-18 p-1.5 cursor-pointer transition-all hover:bg-blue-50/20 ${isToday ? 'bg-blue-50/30 ring-1 ring-blue-500 inset-0' : 'bg-white'}`}
                             >
                                 <div className="h-full flex flex-col justify-between">
-                                    <div className="flex items-start justify-between">
-                                        <span className={`text-sm font-bold ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>
+                                    <div className="flex items-center justify-between leading-none">
+                                        <span className={`text-xs font-bold ${isToday ? 'text-blue-600' : 'text-gray-800'}`}>
                                             {day.getDate()}
                                         </span>
                                         {dayRate.occupancy > 0 && (
-                                            <div className={`w-2 h-2 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
+                                            <span className="flex items-center gap-1 text-[9px] text-gray-400 font-medium">
+                                                <span className={`w-1.5 h-1.5 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
+                                                {dayRate.occupancy}%
+                                            </span>
                                         )}
                                     </div>
 
                                     {isEditing ? (
-                                        <div className="space-y-2">
+                                        <div className="space-y-1">
                                             <input
                                                 type="number"
                                                 value={tempRate}
                                                 onChange={(e) => setTempRate(e.target.value)}
-                                                className="w-full px-2 py-1 border border-purple-300 rounded text-sm font-bold focus:ring-2 focus:ring-purple-500 outline-none"
+                                                className="w-full px-1.5 py-0.5 border border-purple-400 rounded text-xs font-bold outline-none"
                                                 autoFocus
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter') handleSaveRate();
@@ -252,50 +239,29 @@ const RateCalendar = () => {
                                                 }}
                                             />
                                             <div className="flex gap-1">
-                                                <button
-                                                    onClick={handleSaveRate}
-                                                    className="flex-1 p-1 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700"
-                                                >
-                                                    <Save size={12} className="mx-auto" />
+                                                <button onClick={handleSaveRate} className="flex-1 py-0.5 bg-emerald-600 text-white rounded text-[9px] hover:bg-emerald-700">
+                                                    <Save size={10} className="mx-auto" />
                                                 </button>
-                                                <button
-                                                    onClick={() => setEditingDate(null)}
-                                                    className="flex-1 p-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
-                                                >
-                                                    <RotateCcw size={12} className="mx-auto" />
+                                                <button onClick={() => setEditingDate(null)} className="flex-1 py-0.5 bg-gray-200 text-gray-700 rounded text-[9px] hover:bg-gray-300">
+                                                    <RotateCcw size={10} className="mx-auto" />
                                                 </button>
                                             </div>
                                         </div>
                                     ) : (
-                                        <>
-                                            <div className={`px-2 py-1 bg-gradient-to-r ${getRateColor(dayRate.rate)} rounded-lg text-center`}>
-                                                <p className="text-xs font-bold text-white">৳{(dayRate.rate / 1000).toFixed(1)}K</p>
+                                        <div className="space-y-0.5">
+                                            <div className={`px-1.5 py-0.5 ${getRateColor(dayRate.rate)} rounded text-center shadow-2xs`}>
+                                                <p className="text-[10px] font-bold leading-none">৳{(dayRate.rate / 1000).toFixed(1)}k</p>
                                             </div>
                                             {dayRate.eventName && (
-                                                <p className="text-[10px] text-red-600 font-semibold truncate">{dayRate.eventName}</p>
+                                                <p className="text-[8px] text-rose-600 font-bold truncate leading-none">{dayRate.eventName}</p>
                                             )}
-                                            {dayRate.occupancy > 0 && (
-                                                <p className="text-[10px] text-gray-500 font-medium">{dayRate.occupancy}% occ</p>
-                                            )}
-                                        </>
+                                        </div>
                                     )}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="mt-6 flex gap-4">
-                <button className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition-all shadow-lg shadow-purple-600/30 flex items-center gap-2">
-                    <Calendar size={18} />
-                    Bulk Update Rates
-                </button>
-                <button className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all flex items-center gap-2">
-                    <TrendingUp size={18} />
-                    Apply Dynamic Pricing
-                </button>
             </div>
         </div>
     );

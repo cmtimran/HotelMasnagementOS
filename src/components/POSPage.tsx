@@ -507,11 +507,11 @@ const POSPage = () => {
             </div>
 
             {/* Right Side: Order Panel */}
-            <div className="w-[400px] bg-white border-l border-gray-200 flex flex-col h-full shadow-2xl z-10">
+            <div className="w-[330px] bg-white border-l border-gray-200 flex flex-col h-full shadow-lg z-10">
                 {/* Top Action Bar */}
-                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                <div className="p-2.5 border-b border-gray-100 flex items-center justify-between bg-white">
                     <div className="relative">
-                        <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-1 pl-2 pr-6 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                        <select className="appearance-none bg-white border border-gray-300 text-gray-700 py-1 pl-2 pr-6 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
                             <option>Dine In</option>
                             <option>Takeaway</option>
                             <option>Delivery</option>
@@ -521,15 +521,15 @@ const POSPage = () => {
 
                     <button
                         onClick={() => setIsAddTableOpen(true)}
-                        className="bg-blue-900 text-white px-2 py-1 rounded-md text-[10px] font-medium hover:bg-blue-800 transition-colors shadow-sm"
+                        className="bg-blue-900 text-white px-2 py-1 rounded text-[10px] font-medium hover:bg-blue-800 transition-colors shadow-2xs"
                     >
                         Add Table
                     </button>
                 </div>
 
                 {/* Selected Info */}
-                <div className="p-4 bg-gray-50 border-b border-gray-100">
-                    <div className="flex justify-between items-start mb-2">
+                <div className="p-2.5 bg-gray-50 border-b border-gray-100">
+                    <div className="flex justify-between items-start mb-1.5">
                         <div>
                             <span className="text-sm font-semibold text-gray-800 block">Selected Tables</span>
                             {selectedTable ? (
