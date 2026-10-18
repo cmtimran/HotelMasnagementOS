@@ -460,6 +460,17 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     minSubscriptionTier: 'starter',
     propertyScoped: true,
   },
+  {
+    id: 'edit-property',
+    slug: '/edit-property',
+    title: 'Edit Property',
+    panel: 'main',
+    category: 'Properties',
+    permission: 'properties.manage',
+    allowedRoles: ['super_admin', 'hotel_admin'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
 
   // B2B & Revenue
   {

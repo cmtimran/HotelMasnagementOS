@@ -317,7 +317,7 @@ function App() {
       case 'add-property':
         return <AddProperty onBack={() => setActivePage('dashboard')} />;
       case 'edit-property':
-        return <AddProperty onBack={() => setActivePage('hotel-info')} initialData={editingProperty} />;
+        return <AddProperty onBack={() => setActivePage('hotel-info')} initialData={editingProperty || propertiesData[0]} />;
       case 'properties':
         return (
           <>
