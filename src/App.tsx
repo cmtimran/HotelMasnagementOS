@@ -59,20 +59,43 @@ interface UserData {
 function App() {
   const { activePage, setActivePage } = useNavigation();
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  // Session Management: Synchronous initialization eliminates login screen flash/flicker on reload
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem('auth_token'));
+    } catch {
+      return false;
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserData | null>(() => {
+    try {
+      const storedUser = localStorage.getItem('user_data');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [viewingProperty, setViewingProperty] = useState<any>(null);
 
-  // Session Management: Check localStorage on mount
+  // Sync session across multiple browser tabs
   useEffect(() => {
-    const storedAuth = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('user_data');
-    if (storedAuth) {
-      setIsAuthenticated(true);
-      if (storedUser) {
-        setCurrentUser(JSON.parse(storedUser));
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'auth_token') {
+        setIsAuthenticated(Boolean(e.newValue));
       }
-    }
+      if (e.key === 'user_data') {
+        try {
+          setCurrentUser(e.newValue ? JSON.parse(e.newValue) : null);
+        } catch {
+          setCurrentUser(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Auto-Logout on Inactivity
