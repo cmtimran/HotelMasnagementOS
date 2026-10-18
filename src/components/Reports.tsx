@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical, LayoutDashboard, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical, LayoutDashboard, ArrowRight } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -4130,33 +4130,6 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
     const renderReportsOverview = () => {
         return (
             <div className="space-y-4 max-w-7xl mx-auto animate-in fade-in duration-200">
-                {/* Hero Banner */}
-                <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-xl p-5 text-white shadow-xs border border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1.5">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-blue-200 border border-white/10">
-                            <Sparkles size={11} className="text-blue-300" />
-                            Enterprise Business Intelligence & Audit Hub
-                        </div>
-                        <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
-                            Report Center & Operational Analytics
-                        </h1>
-                        <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                            Access over 50+ standardized hospitality reports across Front Office, Finance & Accounting, Reservations, Compliance Audits, and Yield BI.
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-start md:self-auto flex-shrink-0">
-                        <div className="bg-white/10 px-3 py-2 rounded-lg border border-white/10 text-center min-w-[70px]">
-                            <p className="text-[10px] text-slate-300 font-medium">Standard Reports</p>
-                            <p className="text-sm sm:text-base font-bold text-white">54</p>
-                        </div>
-                        <div className="bg-white/10 px-3 py-2 rounded-lg border border-white/10 text-center min-w-[70px]">
-                            <p className="text-[10px] text-slate-300 font-medium">Modules</p>
-                            <p className="text-sm sm:text-base font-bold text-emerald-300">5</p>
-                        </div>
-                    </div>
-                </div>
-
                 {/* 4 Metric Highlights */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
