@@ -1,6 +1,6 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical, Calendar, LayoutDashboard } from 'lucide-react';
+import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -4324,30 +4324,13 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                         );
                     })}
                 </div>
-
-                {/* Footer Section in Sidebar */}
-                <div className="p-2 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                    {!isSidebarCollapsed ? (
-                        <div className="flex items-center justify-between w-full text-[10px] text-gray-500 font-medium px-1">
-                            <span className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                BI Engine Active
-                            </span>
-                            <span className="text-gray-400 font-mono">v4.2</span>
-                        </div>
-                    ) : (
-                        <div className="w-full flex justify-center" title="BI Engine Active v4.2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        </div>
-                    )}
-                </div>
             </aside>
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                 {/* Modern Expert Topbar */}
                 <header className="h-11 bg-white border-b border-gray-200/90 flex items-center justify-between px-3 flex-shrink-0 z-30 sticky top-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
-                    {/* Left: Collapse Toggle + Breadcrumbs + Module Shortcuts */}
+                    {/* Left: Collapse Toggle + Breadcrumbs */}
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         {/* Hamburger toggle button */}
                         <button
@@ -4366,80 +4349,21 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                         <div className="flex items-center gap-1.5 text-xs min-w-0">
                             <span className="text-gray-400 font-medium hidden sm:inline">Reports</span>
                             <span className="text-gray-300 hidden sm:inline">/</span>
-                            <h1 className="font-bold text-gray-900 truncate tracking-tight text-xs sm:text-[13px] max-w-[150px] sm:max-w-[240px] md:max-w-[320px]">
+                            <h1 className="font-bold text-gray-900 truncate tracking-tight text-xs sm:text-[13px] max-w-[200px] sm:max-w-xs md:max-w-md">
                                 {activeReport}
                             </h1>
-                            <span className="hidden lg:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Live BI
-                            </span>
                         </div>
-
-                        {/* Module Shortcuts (Return to Overview / Front Desk / Analytics) */}
-                        {setActivePage && (
-                            <div className="hidden xl:flex items-center gap-1 ml-2 pl-2 border-l border-gray-200">
-                                <button
-                                    onClick={() => setActivePage('dashboard')}
-                                    className="h-6.5 px-2 rounded-md text-[10.5px] font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Return to Dashboard"
-                                >
-                                    <LayoutDashboard size={11} /> Overview
-                                </button>
-                                <button
-                                    onClick={() => setActivePage('front-desk')}
-                                    className="h-6.5 px-2 rounded-md text-[10.5px] font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Open Front Desk"
-                                >
-                                    <Monitor size={11} /> Front Desk
-                                </button>
-                                <button
-                                    onClick={() => setActivePage('advanced-reports')}
-                                    className="h-6.5 px-2 rounded-md text-[10.5px] font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Open Advanced Revenue BI"
-                                >
-                                    <BarChart2 size={11} /> Analytics
-                                </button>
-                            </div>
-                        )}
                     </div>
 
-                    {/* Right: Date Range Indicator, Actions, Property Badge & User Profile */}
+                    {/* Right: Actions, Property Badge & User Profile */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Compact Date Indicator */}
-                        <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-200/70 rounded-md text-[10.5px] text-gray-600 font-medium">
-                            <Calendar size={11} className="text-gray-400" />
-                            <span>{startDate}</span>
-                            <span className="text-gray-300">→</span>
-                            <span>{endDate}</span>
-                        </div>
-
-                        {/* Contextual Actions */}
-                        {showReport ? (
+                        {showReport && (
                             <button
                                 onClick={handleBackToFilters}
                                 className="h-7 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors text-xs font-medium flex items-center gap-1 border border-gray-200/80 shadow-2xs cursor-pointer"
                             >
                                 <ChevronLeft size={13} /> Back to Filters
                             </button>
-                        ) : (
-                            <div className="flex items-center gap-1.5">
-                                <button
-                                    onClick={handleExportExcel}
-                                    className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Export current report to Excel"
-                                >
-                                    <FileSpreadsheet size={12} />
-                                    <span className="hidden sm:inline">Export Excel</span>
-                                </button>
-                                <button
-                                    onClick={() => setShowReport(true)}
-                                    className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Generate Preview"
-                                >
-                                    <Download size={12} />
-                                    <span className="hidden sm:inline">Generate</span>
-                                </button>
-                            </div>
                         )}
 
                         {/* Active Property Badge */}
