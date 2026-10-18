@@ -328,19 +328,20 @@ function App() {
                 {
                   key: 'name',
                   header: 'Property',
-                  className: 'w-[40%]',
+                  className: 'w-[42%]',
                   render: (row) => (
-                    <div className="flex items-start gap-4">
-                      <img
-                        src={row.logo}
-                        alt={row.name}
-                        className="w-12 h-12 rounded-lg object-cover border border-gray-100 shadow-sm"
-                      />
-                      <div>
-                        <p className="font-bold text-gray-900 text-base">{row.name}</p>
-                        <p className="text-gray-500 text-xs mt-1 leading-relaxed">
-                          {row.address}<br />
-                          {row.city}, {row.country}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200/80 flex items-center justify-center text-slate-700 font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden">
+                        {row.logo && !row.logo.includes('placehold.co') ? (
+                          <img src={row.logo} alt={row.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{row.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 text-xs sm:text-[13px] leading-tight truncate">{row.name}</p>
+                        <p className="text-gray-500 text-[11px] mt-0.5 leading-tight truncate">
+                          {row.address}, {row.city}, {row.country}
                         </p>
                       </div>
                     </div>
@@ -349,11 +350,11 @@ function App() {
                 {
                   key: 'rooms',
                   header: 'Inventory',
-                  className: 'w-[15%]',
+                  className: 'w-[18%]',
                   render: (row) => (
                     <div className="flex flex-col">
-                      <span className="font-bold text-gray-900">{row.rooms} Rooms</span>
-                      <span className="text-xs text-gray-400 mt-0.5">Physical Units</span>
+                      <span className="font-bold text-gray-900 text-xs">{row.rooms} Rooms</span>
+                      <span className="text-[10px] text-gray-400">Physical Units</span>
                     </div>
                   )
                 },
@@ -362,8 +363,8 @@ function App() {
                   header: 'Grade',
                   className: 'w-[15%]',
                   render: (row) => (
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-50 text-yellow-700 rounded-full w-fit">
-                      <span className="text-xs font-bold uppercase tracking-wider">{row.grade}</span>
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/60 rounded-full">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">{row.grade}</span>
                     </div>
                   )
                 },
@@ -372,10 +373,11 @@ function App() {
                   header: 'Actions',
                   className: 'text-right',
                   render: (row) => (
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end">
                       <button
+                        type="button"
                         onClick={() => setViewingProperty(row)}
-                        className="flex items-center gap-2 text-gray-600 hover:text-blue-600 border border-gray-200 hover:border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                        className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-gray-700 hover:text-blue-600 bg-white hover:bg-blue-50/50 border border-gray-200/90 hover:border-blue-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
                       >
                         View Details
                       </button>
