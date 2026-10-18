@@ -102,7 +102,23 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   // Navigate to any specific report in Report Center
-  const navigateToReport = useCallback((reportNameOrSlug: string, options?: { newTab?: boolean }) => {
+  const navigateToReport = useCallback((reportNameOrSlug?: string, options?: { newTab?: boolean }) => {
+    if (!reportNameOrSlug || reportNameOrSlug === 'overview' || reportNameOrSlug === 'reports' || reportNameOrSlug === '/reports') {
+      if (options?.newTab) {
+        window.open('/reports', '_blank');
+        return;
+      }
+      pushNavigation('/reports', { title: 'Report Center Overview' });
+      setNavState((prev) => ({
+        ...prev,
+        currentSlug: '/reports',
+        activePanel: 'reports',
+        activePage: 'reports',
+        activeReport: 'overview',
+      }));
+      return;
+    }
+
     let reportTitle = reportNameOrSlug;
     let reportSlug = reportNameOrSlug;
 
@@ -159,7 +175,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         currentSlug: navState.currentSlug,
         activePanel: navState.activePanel,
         activePage: navState.activePage,
-        activeReport: navState.activeReport || 'Cancelled Reservation',
+        activeReport: navState.activeReport || 'overview',
         setActivePage,
         setActiveReport,
         navigateTo,

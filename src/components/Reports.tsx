@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext';
-import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical } from 'lucide-react';
+import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical, LayoutDashboard, ArrowRight, Sparkles } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -4125,6 +4125,145 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
         );
     };
 
+    const isOverview = !activeReport || activeReport === 'overview' || activeReport.toLowerCase() === 'report center';
+
+    const renderReportsOverview = () => {
+        return (
+            <div className="space-y-4 max-w-7xl mx-auto animate-in fade-in duration-200">
+                {/* Hero Banner */}
+                <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-xl p-5 text-white shadow-xs border border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-blue-200 border border-white/10">
+                            <Sparkles size={11} className="text-blue-300" />
+                            Enterprise Business Intelligence & Audit Hub
+                        </div>
+                        <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
+                            Report Center & Operational Analytics
+                        </h1>
+                        <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                            Access over 50+ standardized hospitality reports across Front Office, Finance & Accounting, Reservations, Compliance Audits, and Yield BI.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start md:self-auto flex-shrink-0">
+                        <div className="bg-white/10 px-3 py-2 rounded-lg border border-white/10 text-center min-w-[70px]">
+                            <p className="text-[10px] text-slate-300 font-medium">Standard Reports</p>
+                            <p className="text-sm sm:text-base font-bold text-white">54</p>
+                        </div>
+                        <div className="bg-white/10 px-3 py-2 rounded-lg border border-white/10 text-center min-w-[70px]">
+                            <p className="text-[10px] text-slate-300 font-medium">Modules</p>
+                            <p className="text-sm sm:text-base font-bold text-emerald-300">5</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 4 Metric Highlights */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <div className="flex items-center justify-between text-blue-600 mb-1.5">
+                            <span className="text-[10.5px] font-semibold text-gray-500 uppercase tracking-wider">Reservations</span>
+                            <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center">
+                                <ListOrdered size={13} />
+                            </div>
+                        </div>
+                        <p className="text-base font-bold text-gray-900">9 Reports</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Arrivals, cancellations & forecast</p>
+                    </div>
+
+                    <div className="bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <div className="flex items-center justify-between text-emerald-600 mb-1.5">
+                            <span className="text-[10.5px] font-semibold text-gray-500 uppercase tracking-wider">Front Office</span>
+                            <div className="w-6 h-6 rounded-md bg-emerald-50 flex items-center justify-center">
+                                <Monitor size={13} />
+                            </div>
+                        </div>
+                        <p className="text-base font-bold text-gray-900">12 Reports</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Room status, check-ins & tasks</p>
+                    </div>
+
+                    <div className="bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <div className="flex items-center justify-between text-amber-600 mb-1.5">
+                            <span className="text-[10.5px] font-semibold text-gray-500 uppercase tracking-wider">Back Office & GL</span>
+                            <div className="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center">
+                                <Building2 size={13} />
+                            </div>
+                        </div>
+                        <p className="text-base font-bold text-gray-900">33 Reports</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Revenue, debtors, vouchers & taxes</p>
+                    </div>
+
+                    <div className="bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <div className="flex items-center justify-between text-purple-600 mb-1.5">
+                            <span className="text-[10.5px] font-semibold text-gray-500 uppercase tracking-wider">Audit & Analytics</span>
+                            <div className="w-6 h-6 rounded-md bg-purple-50 flex items-center justify-center">
+                                <Shield size={13} />
+                            </div>
+                        </div>
+                        <p className="text-base font-bold text-gray-900">9 Reports</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Audit trails, IP logs & BI yield</p>
+                    </div>
+                </div>
+
+                {/* 5 Domain Hub Cards */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Functional Reporting Modules</h2>
+                        <span className="text-[11px] text-gray-400">Click any report to configure & generate</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        {menuItems.map((cat) => (
+                            <div
+                                key={cat.title}
+                                className="bg-white rounded-xl border border-gray-200/80 shadow-2xs hover:shadow-xs transition-all p-3.5 flex flex-col justify-between"
+                            >
+                                <div>
+                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`p-1.5 rounded-lg ${cat.color}`}>
+                                                {cat.icon}
+                                            </span>
+                                            <div>
+                                                <h3 className="font-bold text-xs text-gray-900 leading-tight">{cat.title}</h3>
+                                                <span className="text-[10px] text-gray-400 font-medium">{cat.items.length} Reports</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1 my-2">
+                                        {cat.items.slice(0, 5).map((item) => (
+                                            <button
+                                                key={item}
+                                                type="button"
+                                                onClick={() => navigateToReport(item)}
+                                                className="w-full text-left flex items-center justify-between px-2 py-1 rounded-md text-[11px] text-gray-600 hover:text-blue-600 hover:bg-blue-50/60 font-medium transition-colors cursor-pointer group"
+                                            >
+                                                <span className="truncate">{item}</span>
+                                                <ChevronRight size={11} className="text-gray-300 group-hover:text-blue-600 transition-colors flex-shrink-0" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setOpenCategories(prev => ({ ...prev, [cat.title]: true }));
+                                        if (cat.items[0]) navigateToReport(cat.items[0]);
+                                    }}
+                                    className="mt-2 pt-2 border-t border-gray-100 text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center justify-between cursor-pointer"
+                                >
+                                    <span>Browse all {cat.items.length} reports</span>
+                                    <ArrowRight size={12} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="flex h-screen bg-slate-100 font-sans text-xs text-slate-700 antialiased overflow-hidden">
             {/* Expert Collapsible Sidebar */}
@@ -4135,15 +4274,15 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                 <div className={`h-11 px-2.5 flex items-center border-b border-gray-100 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
                     {!isSidebarCollapsed && (
                         <div
-                            className="cursor-pointer flex items-center gap-2 min-w-0"
-                            onClick={() => setActivePage && setActivePage('dashboard')}
-                            title="HotelManagementOS"
+                            className="cursor-pointer flex items-center gap-2 min-w-0 group"
+                            onClick={() => navigateToReport('overview')}
+                            title="Report Center Overview"
                         >
-                            <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center text-white shadow-xs flex-shrink-0">
+                            <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center text-white shadow-xs flex-shrink-0 group-hover:bg-blue-700 transition-colors">
                                 <FileText size={13} />
                             </div>
                             <div className="flex flex-col min-w-0">
-                                <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none truncate">Reports OS</h1>
+                                <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none truncate group-hover:text-blue-600 transition-colors">Reports OS</h1>
                                 <p className="text-[8px] text-gray-400 font-semibold uppercase tracking-wider leading-none mt-0.5">Enterprise BI</p>
                             </div>
                         </div>
@@ -4203,6 +4342,21 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                     </div>
                 </div>
 
+                {/* Reports Overview Shortcut */}
+                <div className="px-1.5 pt-1.5 pb-1 border-b border-gray-100">
+                    <button
+                        type="button"
+                        onClick={() => navigateToReport('overview')}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer select-none ${isSidebarCollapsed ? 'justify-center p-2' : ''} ${isOverview ? 'bg-blue-50 text-blue-700 shadow-2xs border-l-2 border-blue-600' : 'text-gray-700 hover:bg-gray-100/70 hover:text-gray-900'}`}
+                        title={isSidebarCollapsed ? "Reports Overview" : undefined}
+                    >
+                        <span className={`p-0.5 rounded ${isOverview ? 'text-blue-600' : 'text-gray-400'}`}>
+                            <LayoutDashboard size={14} />
+                        </span>
+                        {!isSidebarCollapsed && <span>Reports Overview</span>}
+                    </button>
+                </div>
+
                 {/* Navigation Categories List */}
                 <div className="flex-1 overflow-y-auto no-scrollbar py-1 px-1.5 space-y-1">
                     {filteredMenuItems.map((menu) => {
@@ -4234,7 +4388,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                     className={`
                                         w-full flex items-center justify-between text-left text-[11.5px] font-semibold rounded-md transition-colors select-none cursor-pointer group
                                         ${isSidebarCollapsed ? 'justify-center p-2' : 'px-2 py-1.5'}
-                                        ${hasActiveChild ? 'bg-blue-50/60 text-blue-800' : 'text-gray-700 hover:bg-gray-100/70 hover:text-gray-900'}
+                                        ${hasActiveChild && !isOverview ? 'bg-blue-50/60 text-blue-800' : 'text-gray-700 hover:bg-gray-100/70 hover:text-gray-900'}
                                     `}
                                     title={isSidebarCollapsed ? `${menu.title} (${menu.items.length})` : undefined}
                                 >
@@ -4258,11 +4412,11 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                     )}
                                 </button>
 
-                                 {/* Expanded Children in Non-Collapsed Sidebar */}
+                                {/* Expanded Children in Non-Collapsed Sidebar */}
                                 {!isSidebarCollapsed && isCatOpen && (
                                     <div className="mt-0.5 ml-3 pl-2 border-l border-gray-200/70 space-y-0.5 py-0.5 animate-in fade-in duration-150">
                                         {menu.items.map((item) => {
-                                            const isSelected = activeReport === item;
+                                            const isSelected = activeReport === item && !isOverview;
                                             return (
                                                 <button
                                                     key={item}
@@ -4306,7 +4460,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                         </div>
                                         <div className="max-h-80 overflow-y-auto no-scrollbar p-1 space-y-0.5">
                                             {menu.items.map((item) => {
-                                                const isSelected = activeReport === item;
+                                                const isSelected = activeReport === item && !isOverview;
                                                 return (
                                                     <button
                                                         key={item}
@@ -4342,7 +4496,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                 {/* Modern Expert Topbar */}
                 <header className="h-11 bg-white border-b border-gray-200/90 flex items-center justify-between px-3 flex-shrink-0 z-30 sticky top-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
                     {/* Left: Collapse Toggle + Breadcrumbs */}
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                         {/* Hamburger toggle button */}
                         <button
                             type="button"
@@ -4356,19 +4510,38 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <Menu size={13} />
                         </button>
 
+                        {/* Return to Main Panel */}
+                        {setActivePage && (
+                            <button
+                                type="button"
+                                onClick={() => setActivePage('dashboard')}
+                                className="h-7 px-2.5 rounded-md border border-gray-200/80 bg-white hover:bg-gray-50 text-gray-600 hover:text-blue-600 hover:border-blue-200 text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                title="Return to Main HotelManagementOS Dashboard"
+                            >
+                                <ChevronLeft size={12} />
+                                <span className="hidden sm:inline">Main PMS</span>
+                            </button>
+                        )}
+
                         {/* Breadcrumbs */}
                         <div className="flex items-center gap-1.5 text-xs min-w-0">
-                            <span className="text-gray-400 font-medium hidden sm:inline">Reports</span>
+                            <button
+                                type="button"
+                                onClick={() => navigateToReport('overview')}
+                                className="text-gray-400 hover:text-blue-600 font-medium hidden sm:inline cursor-pointer transition-colors"
+                            >
+                                Reports
+                            </button>
                             <span className="text-gray-300 hidden sm:inline">/</span>
                             <h1 className="font-bold text-gray-900 truncate tracking-tight text-xs sm:text-[13px] max-w-[200px] sm:max-w-xs md:max-w-md">
-                                {activeReport}
+                                {isOverview ? 'Overview' : activeReport}
                             </h1>
                         </div>
                     </div>
 
                     {/* Right: Actions, Property Badge & User Profile */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        {showReport && (
+                        {!isOverview && showReport && (
                             <button
                                 onClick={handleBackToFilters}
                                 className="h-7 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors text-xs font-medium flex items-center gap-1 border border-gray-200/80 shadow-2xs cursor-pointer"
@@ -4444,30 +4617,39 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                 </header>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 bg-slate-50/60">
-                    {showReport ? renderReportPreview() : (
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-slate-50/70">
+                    {isOverview ? (
+                        renderReportsOverview()
+                    ) : showReport ? (
+                        renderReportPreview()
+                    ) : (
                         <>
-                            {/* Filter Card */}
-                            <div className="bg-white rounded-lg shadow-2xs border border-slate-200/80 p-3.5 mb-2.5">
-                                <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                            {/* Filter Card with Redesigned Buttons */}
+                            <div className="bg-white rounded-xl shadow-2xs border border-slate-200/80 p-4 mb-3">
+                                <div className="flex items-center justify-between pb-2.5 mb-3.5 border-b border-slate-100">
                                     <div className="flex items-center gap-2">
-                                        <FileText size={14} className="text-blue-600" />
+                                        <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
+                                            <FileText size={13} />
+                                        </div>
                                         <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Report Parameters & Filter Criteria</span>
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             setIsTemplateListModalOpen(true);
                                         }}
-                                        className="h-6 px-2 text-[11px] font-medium text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-slate-200 rounded flex items-center gap-1 transition-colors"
+                                        className="h-7 px-3 text-[11.5px] font-semibold text-gray-700 hover:text-blue-600 bg-white hover:bg-blue-50/50 border border-gray-200 hover:border-blue-300 rounded-lg shadow-2xs hover:shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                        title="Configure Custom Templates"
                                     >
-                                        <Settings size={11} /> Custom Templates
+                                        <Settings size={12} className="text-gray-400 group-hover:text-blue-600" />
+                                        <span>Custom Templates</span>
                                     </button>
                                 </div>
 
                                 {renderFilters()}
 
-                                <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                                <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
                                         <label className="font-semibold text-slate-700 text-xs">Visible Columns:</label>
                                         <div className="flex flex-wrap gap-2.5 text-xs text-slate-600">
@@ -4480,24 +4662,34 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-1.5 ml-auto">
+                                    {/* Expert Modernized Action Buttons */}
+                                    <div className="flex items-center gap-2 ml-auto">
                                         <button
+                                            type="button"
                                             onClick={handleExportExcel}
-                                            className="h-7.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors"
+                                            className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-2xs hover:shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
+                                            title="Export Filtered Data to Excel Spreadsheet"
                                         >
-                                            <FileSpreadsheet size={13} /> Export Excel
+                                            <FileSpreadsheet size={13} strokeWidth={2.2} />
+                                            <span>Export Excel</span>
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => setShowReport(true)}
-                                            className="h-7.5 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors"
+                                            className="h-8 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow-xs hover:shadow-md hover:shadow-blue-500/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
+                                            title="Generate Report Preview"
                                         >
-                                            <Download size={13} /> Generate Report
+                                            <Download size={13} strokeWidth={2.2} />
+                                            <span>Generate Report</span>
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => setShowReport(false)}
-                                            className="h-7.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md text-xs font-medium shadow-2xs flex items-center gap-1.5 transition-colors"
+                                            className="h-8 px-3 bg-white hover:bg-gray-50 active:bg-gray-100 border border-gray-200 text-gray-700 hover:text-gray-900 text-xs font-medium rounded-lg shadow-2xs hover:shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
+                                            title="Reset Parameters"
                                         >
-                                            <RotateCcw size={13} /> Reset
+                                            <RotateCcw size={12} className="text-gray-400" />
+                                            <span>Reset</span>
                                         </button>
                                     </div>
                                 </div>
@@ -4505,7 +4697,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
 
                             {/* Help Guide */}
                             {renderHelpGuide() && (
-                                <div className="bg-white rounded-lg shadow-2xs border border-slate-200/80 p-3.5 text-xs text-slate-600">
+                                <div className="bg-white rounded-xl shadow-2xs border border-slate-200/80 p-3.5 text-xs text-slate-600">
                                     {renderHelpGuide()}
                                 </div>
                             )}

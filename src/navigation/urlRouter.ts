@@ -23,7 +23,7 @@ export const parseLocation = (): NavigationState => {
           currentSlug: '/reports',
           activePanel: 'reports',
           activePage: 'reports',
-          activeReport: 'Cancelled Reservation',
+          activeReport: 'overview',
         };
       }
     }
@@ -42,7 +42,7 @@ export const parseLocation = (): NavigationState => {
       currentSlug: '/reports',
       activePanel: 'reports',
       activePage: 'reports',
-      activeReport: 'Cancelled Reservation',
+      activeReport: 'overview',
     };
   }
 
