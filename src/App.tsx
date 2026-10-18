@@ -46,6 +46,8 @@ import NightAuditAutomation from './components/NightAuditAutomation';
 import GuestVoucherSystem from './components/GuestVoucherSystem';
 import PolicyManagement from './components/PolicyManagement';
 
+import { useNavigation } from './context/NavigationContext';
+
 interface UserData {
   name: string;
   role: string;
@@ -55,7 +57,7 @@ interface UserData {
 }
 
 function App() {
-  const [activePage, setActivePage] = useState('dashboard');
+  const { activePage, setActivePage } = useNavigation();
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
@@ -63,13 +65,6 @@ function App() {
 
   // Session Management: Check localStorage on mount
   useEffect(() => {
-    // Check for Deep Link (e.g. ?page=reports)
-    const params = new URLSearchParams(window.location.search);
-    const pageParam = params.get('page');
-    if (pageParam) {
-      setActivePage(pageParam);
-    }
-
     const storedAuth = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('user_data');
     if (storedAuth) {

@@ -44,6 +44,7 @@ import {
     Search,
     X
 } from 'lucide-react';
+import { getRouteByPageId } from '../navigation/routesRegistry';
 
 interface MenuItem {
     id?: string;
@@ -307,7 +308,9 @@ const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: Side
                 onClick={() => {
                     if (item.id) {
                         if (item.newTab) {
-                            window.open(`?page=${item.id}`, '_blank');
+                            const byId = getRouteByPageId(item.id);
+                            const slug = byId ? byId.slug : `/${item.id}`;
+                            window.open(slug, '_blank');
                         } else {
                             setActivePage(item.id);
                         }

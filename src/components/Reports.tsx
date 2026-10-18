@@ -1,5 +1,6 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigation } from '../context/NavigationContext';
 import { Search, FileText, Download, RotateCcw, ChevronDown, ChevronRight, Edit, Printer, Save, ZoomIn, ZoomOut, ChevronLeft, ChevronsLeft, ChevronsRight, FileSpreadsheet, FileImage, Settings, Maximize, Minimize, Grid, List, LayoutTemplate, Menu, Building2, Monitor, Shield, BarChart2, ListOrdered, User, LogOut, X, Plus, Trash2, GripVertical } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -129,6 +130,7 @@ interface ReportsProps {
 }
 
 const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
+    const { activeReport, navigateToReport } = useNavigation();
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
         'Reservation Report': true,
@@ -138,7 +140,6 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
         'Analytics & BI': false,
     });
     const [flyoutCategory, setFlyoutCategory] = useState<string | null>(null);
-    const [activeReport, setActiveReport] = useState('Cancelled Reservation'); // Default to the one user requested
     const [startDate, setStartDate] = useState('2024-06-11');
     const [endDate, setEndDate] = useState('2024-06-11');
     const [sidebarSearch, setSidebarSearch] = useState('');
@@ -262,6 +263,16 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
             items: menu.items.filter(item => item.toLowerCase().includes(q))
         })).filter(menu => menu.items.length > 0 || menu.title.toLowerCase().includes(q));
     }, [sidebarSearch, menuItems]);
+
+    // Automatically expand the accordion containing the active report
+    useEffect(() => {
+        if (activeReport) {
+            const foundCat = menuItems.find(m => m.items.includes(activeReport));
+            if (foundCat) {
+                setOpenCategories(prev => ({ ...prev, [foundCat.title]: true }));
+            }
+        }
+    }, [activeReport, menuItems]);
 
     // Template Creation State
     const [newTemplateName, setNewTemplateName] = useState('New Report');
@@ -4247,7 +4258,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                     )}
                                 </button>
 
-                                {/* Expanded Children in Non-Collapsed Sidebar */}
+                                 {/* Expanded Children in Non-Collapsed Sidebar */}
                                 {!isSidebarCollapsed && isCatOpen && (
                                     <div className="mt-0.5 ml-3 pl-2 border-l border-gray-200/70 space-y-0.5 py-0.5 animate-in fade-in duration-150">
                                         {menu.items.map((item) => {
@@ -4257,7 +4268,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                                     key={item}
                                                     type="button"
                                                     onClick={() => {
-                                                        setActiveReport(item);
+                                                        navigateToReport(item);
                                                         setShowReport(false);
                                                     }}
                                                     className={`
@@ -4301,7 +4312,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                                         key={item}
                                                         type="button"
                                                         onClick={() => {
-                                                            setActiveReport(item);
+                                                            navigateToReport(item);
                                                             setShowReport(false);
                                                             setFlyoutCategory(null);
                                                         }}
