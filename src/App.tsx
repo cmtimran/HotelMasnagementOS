@@ -41,7 +41,7 @@ import TableLayout from './components/TableLayout';
 import CorporateProfileManagement from './components/CorporateProfileManagement';
 import BusinessOriginManagement from './components/BusinessOriginManagement';
 import AdvancedReports from './components/AdvancedReports';
-import QuickReservation from './components/QuickReservation';
+import AddReservation from './components/AddReservation';
 import FolioOperations from './components/FolioOperations';
 import GuestProfile from './components/GuestProfile';
 import PackageManagement from './components/PackageManagement';
@@ -551,8 +551,9 @@ function App() {
         return <BusinessOriginManagement />;
       case 'advanced-reports':
         return <AdvancedReports />;
+      case 'add-reservation':
       case 'quick-reservation':
-        return <QuickReservation />;
+        return <AddReservation />;
       case 'folio-operations':
       case 'allowance-checker':
         return <FolioOperations />;

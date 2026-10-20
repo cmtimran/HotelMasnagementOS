@@ -108,7 +108,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             items: [
                 { id: 'front-desk', label: 'Front Desk Dashboard', icon: <Monitor size={12} /> },
                 { id: 'stay-view', label: 'Stay View Calendar', icon: <Calendar size={12} /> },
-                { id: 'quick-reservation', label: 'Quick Reservation', icon: <Plus size={12} /> },
+                { id: 'add-reservation', label: 'Add Reservation', icon: <Plus size={12} /> },
                 { id: 'reservations', label: 'Reservations List', icon: <Calendar size={12} /> },
                 { id: 'reservations-sleep-out', label: 'Sleep Out List', icon: <Moon size={12} /> },
                 { id: 'reservations-hold', label: 'Reservation Hold', icon: <Clock size={12} /> },

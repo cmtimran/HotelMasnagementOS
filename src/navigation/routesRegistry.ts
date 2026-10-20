@@ -42,9 +42,9 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     propertyScoped: true,
   },
   {
-    id: 'quick-reservation',
-    slug: '/quick-reservation',
-    title: 'Quick Reservation',
+    id: 'add-reservation',
+    slug: '/add-reservation',
+    title: 'Add Reservation',
     panel: 'main',
     category: 'Front Desk',
     permission: 'reservation.create',
@@ -914,6 +914,15 @@ if (cancelRoute) {
 const stayViewRoute = SLUG_TO_ROUTE_MAP.get('/stay-view');
 if (stayViewRoute) {
   SLUG_TO_ROUTE_MAP.set('/dashboard/stay-view', stayViewRoute);
+}
+
+// Add Reservation Aliases
+const addResRoute = SLUG_TO_ROUTE_MAP.get('/add-reservation');
+if (addResRoute) {
+  SLUG_TO_ROUTE_MAP.set('/quick-reservation', addResRoute);
+  SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/add', addResRoute);
+  SLUG_TO_ROUTE_MAP.set('/reservations/add', addResRoute);
+  SLUG_TO_ROUTE_MAP.set('/add-new-reservation', addResRoute);
 }
 
 for (const report of REPORT_PANEL_ROUTES) {
