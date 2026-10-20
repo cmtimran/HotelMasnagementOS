@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Calendar as CalendarIcon,
     ChevronDown,
@@ -20,7 +21,11 @@ interface TimelineBooking {
     startIndex: number;
     endIndex: number;
     status: 'arrived' | 'stayover' | 'confirmed' | 'hold' | 'due-out' | 'checked-out' | 'day-use' | 'out-of-order';
-    vip?: boolean;
+    // 4 Key Indicators requested by User:
+    isGroupOwner?: boolean;      // 1. Group Owner (👑)
+    isGroupBooking?: boolean;    // 2. Group Booking (👥)
+    isPaymentDue?: boolean;      // 3. Payment Due ($)
+    isVipOrSingleLady?: boolean; // 4. VIP or Single Lady (⭐)
     indicator?: string;
 }
 
@@ -140,7 +145,7 @@ export const StayView: React.FC = () => {
     } | null>(null);
 
     // =========================================================================
-    // ASSIGN ROOMS DRAWER STATE
+    // ASSIGN ROOMS DRAWER STATE (SLIM & COMPACT)
     // =========================================================================
     const [isAssignRoomsOpen, setIsAssignRoomsOpen] = useState(false);
     const [modalDateStartIndex, setModalDateStartIndex] = useState(0);
@@ -271,13 +276,87 @@ export const StayView: React.FC = () => {
         return list;
     }, [roomTree]);
 
-    // Seed bookings on the timeline
+    // Seed bookings on the timeline with 4 key indicators matching screenshot media_1792539010302_6a232440.png
     const [bookings, setBookings] = useState<TimelineBooking[]>([
-        { id: 'b1', reservationNumber: 'RES-109281', guestName: 'A. Rahman', roomNumber: '101', startIndex: 1, endIndex: 4, status: 'stayover', vip: true, indicator: '⭐' },
-        { id: 'b2', reservationNumber: 'RES-109282', guestName: 'S. Chowdhury', roomNumber: '103', startIndex: 0, endIndex: 2, status: 'arrived', indicator: '👑' },
-        { id: 'b3', reservationNumber: 'RES-109283', guestName: 'T. Hasan (Hold)', roomNumber: '104', startIndex: 3, endIndex: 6, status: 'hold', indicator: '$' },
-        { id: 'b4', reservationNumber: 'RES-109284', guestName: 'F. Kabir', roomNumber: '201', startIndex: 5, endIndex: 8, status: 'confirmed', indicator: '👥' },
-        { id: 'b5', reservationNumber: 'RES-109285', guestName: 'Dr. Jean Dupont', roomNumber: '203', startIndex: 2, endIndex: 5, status: 'stayover', vip: true, indicator: '⭐' }
+        {
+            id: 'b1',
+            reservationNumber: 'RES-109281',
+            guestName: 'Tonmoy',
+            roomNumber: '101',
+            startIndex: 1,
+            endIndex: 3,
+            status: 'arrived',
+            isGroupBooking: true,
+            isPaymentDue: true
+        },
+        {
+            id: 'b2',
+            reservationNumber: 'RES-109282',
+            guestName: 'S. Chowdhury',
+            roomNumber: '103',
+            startIndex: 0,
+            endIndex: 2,
+            status: 'arrived',
+            isGroupOwner: true
+        },
+        {
+            id: 'b3',
+            reservationNumber: 'RES-109283',
+            guestName: 'T. Hasan (Hold)',
+            roomNumber: '104',
+            startIndex: 3,
+            endIndex: 6,
+            status: 'hold',
+            isPaymentDue: true
+        },
+        {
+            id: 'b4',
+            reservationNumber: 'RES-109284',
+            guestName: 'Karim',
+            roomNumber: '201',
+            startIndex: 1,
+            endIndex: 3,
+            status: 'arrived',
+            isGroupBooking: true,
+            isPaymentDue: true,
+            isVipOrSingleLady: true
+        },
+        {
+            id: 'b5',
+            reservationNumber: 'RES-109285',
+            guestName: 'BNNN',
+            roomNumber: '202',
+            startIndex: 1,
+            endIndex: 4,
+            status: 'arrived',
+            isGroupOwner: true,
+            isPaymentDue: true
+        },
+        {
+            id: 'b6',
+            reservationNumber: 'RES-109286',
+            guestName: 'Mokter',
+            roomNumber: '203',
+            startIndex: 2,
+            endIndex: 5,
+            status: 'confirmed',
+            isGroupOwner: true,
+            isGroupBooking: true,
+            isPaymentDue: true
+        },
+        {
+            id: 'b7',
+            reservationNumber: 'RES-109287',
+            guestName: 'Imran (VIP Leader)',
+            roomNumber: '501',
+            startIndex: 1,
+            endIndex: 7,
+            status: 'confirmed',
+            isGroupOwner: true,
+            isGroupBooking: true,
+            isPaymentDue: true,
+            isVipOrSingleLady: true
+        }
     ]);
 
     // Check available rooms for an unassigned reservation during its stay dates
@@ -314,7 +393,7 @@ export const StayView: React.FC = () => {
             startIndex: startIdx,
             endIndex: endIdx,
             status: 'confirmed',
-            indicator: '👑'
+            isPaymentDue: false
         };
 
         setBookings(prev => [...prev, newBooking]);
@@ -437,7 +516,7 @@ export const StayView: React.FC = () => {
 
             {/* Header Controls Bar */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-2.5 py-1.5 flex items-center justify-between gap-2 flex-shrink-0">
-                {/* Left Title */}
+                {/* Left Title - Clean without extra badges as requested */}
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="w-6 h-6 rounded bg-[#1e3a8a] text-white flex items-center justify-center shadow-2xs flex-shrink-0">
                         <CalendarIcon size={13} />
@@ -520,7 +599,7 @@ export const StayView: React.FC = () => {
                             {isInfoPopoverOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setIsInfoPopoverOpen(false)}></div>
-                                    <div className="absolute right-0 top-8 z-50 w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs animate-in fade-in zoom-in-95">
+                                    <div className="absolute right-0 top-8 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs animate-in fade-in zoom-in-95">
                                         <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 font-bold text-gray-800 text-[11.5px]">
                                             <span>Legend &amp; Color Coding</span>
                                             <button onClick={() => setIsInfoPopoverOpen(false)} className="text-gray-400 hover:text-gray-600">
@@ -529,7 +608,27 @@ export const StayView: React.FC = () => {
                                         </div>
 
                                         <div className="space-y-3">
+                                            {/* Floor Counters Info */}
                                             <div>
+                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Floor Daily Counters [1][3][1]</div>
+                                                <div className="grid grid-cols-3 gap-1 text-[10px]">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#00cc00] text-white flex items-center justify-center font-bold text-[8.5px]">A</span>
+                                                        <span className="text-gray-700">Available</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#1e3a8a] text-white flex items-center justify-center font-bold text-[8.5px]">B</span>
+                                                        <span className="text-gray-700">Assigned</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#ff3333] text-white flex items-center justify-center font-bold text-[8.5px]">U</span>
+                                                        <span className="text-gray-700">Unassigned</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Booking Status Colors */}
+                                            <div className="pt-2 border-t border-gray-100">
                                                 <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Reservation Status</div>
                                                 <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                                                     <div className="flex items-center gap-1.5">
@@ -567,24 +666,25 @@ export const StayView: React.FC = () => {
                                                 </div>
                                             </div>
 
+                                            {/* Booking Floating Indicators */}
                                             <div className="pt-2 border-t border-gray-100">
-                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Indicator Icons</div>
+                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">4 Booking Floating Icons</div>
                                                 <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="text-blue-600 font-bold">👥</span>
-                                                        <span className="text-gray-700">Group Reservation</span>
+                                                        <span className="w-4 h-4 rounded-full bg-amber-400 text-gray-900 border border-white flex items-center justify-center text-[8.5px]">👑</span>
+                                                        <span className="text-gray-700">Group Owner</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="text-amber-500 font-bold">👑</span>
-                                                        <span className="text-gray-700">VIP Guest</span>
+                                                        <span className="w-4 h-4 rounded-full bg-rose-500 text-white border border-white flex items-center justify-center text-[8px]">👥</span>
+                                                        <span className="text-gray-700">Group Booking</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="text-emerald-600 font-bold">⭐</span>
-                                                        <span className="text-gray-700">Complimentary</span>
+                                                        <span className="w-4 h-4 rounded-full bg-red-600 text-white border border-white flex items-center justify-center text-[9px] font-black">$</span>
+                                                        <span className="text-gray-700">Payment Due</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="text-red-500 font-bold">$</span>
-                                                        <span className="text-gray-700">Pending Payment</span>
+                                                        <span className="w-4 h-4 rounded-full bg-amber-500 text-white border border-white flex items-center justify-center text-[8.5px]">⭐</span>
+                                                        <span className="text-gray-700">VIP / Single Lady</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -621,7 +721,7 @@ export const StayView: React.FC = () => {
                         </button>
                     </div>
 
-                    {/* ASSIGN ROOMS BUTTON (Replaces Add Reservation as requested) */}
+                    {/* ASSIGN ROOMS BUTTON */}
                     <button
                         type="button"
                         onClick={() => setIsAssignRoomsOpen(true)}
@@ -699,19 +799,73 @@ export const StayView: React.FC = () => {
                                     {/* Floors and Rooms */}
                                     {expandedNodes[building.id] && building.floors.map(floor => (
                                         <React.Fragment key={floor.id}>
-                                            {/* Floor Header Row */}
-                                            <div className="flex bg-gray-50/60 border-b border-gray-100 text-gray-600 font-semibold">
+                                            {/* Floor Header Row with Daily Breakdown Counters [Available][Assigned][Unassigned] */}
+                                            <div className="flex bg-gray-50/80 border-b border-gray-100 text-gray-700 font-semibold">
                                                 <div
                                                     onClick={() => toggleNode(floor.id)}
                                                     className="w-44 px-2 py-0.5 pl-4 border-r border-gray-200 flex items-center gap-1 cursor-pointer hover:bg-gray-100 transition-colors sticky left-0 z-20 bg-gray-50/90 flex-shrink-0"
                                                 >
                                                     {expandedNodes[floor.id] ? <ChevronDown size={11} className="text-gray-400" /> : <ChevronRight size={11} className="text-gray-400" />}
-                                                    <span className="text-[10px] text-gray-500 tracking-tight">{floor.name}</span>
+                                                    <span className="text-[10.5px] font-bold text-gray-700 tracking-tight">{floor.name}</span>
                                                 </div>
+
+                                                {/* Floor Daily Breakdown Badges: [Available] [Assigned] [Unassigned] */}
                                                 <div className="flex flex-1">
-                                                    {days.map(d => (
-                                                        <div key={d.index} className="w-16 border-r border-gray-100/60 bg-gray-50/20 flex-shrink-0"></div>
-                                                    ))}
+                                                    {days.map(d => {
+                                                        const floorRooms = floor.rooms;
+                                                        const assignedCount = floorRooms.filter(r =>
+                                                            bookings.some(b => b.roomNumber === r.roomNumber && d.index >= b.startIndex && d.index <= b.endIndex)
+                                                        ).length;
+                                                        const availableCount = Math.max(0, floorRooms.length - assignedCount);
+
+                                                        // Unassigned on this day matching floor's room types
+                                                        const floorRoomTypes = new Set(floorRooms.map(r => r.type));
+                                                        const unassignedCount = unassignedList.filter(u => {
+                                                            const matchesType = floorRoomTypes.has(u.roomType) || u.roomType.includes(floor.name) || floorRooms.some(r => u.roomType.includes(r.type));
+                                                            if (!matchesType) return false;
+                                                            const startIdx = days.findIndex(x => x.date === u.checkIn);
+                                                            const s = startIdx >= 0 ? startIdx : 0;
+                                                            const e = s + u.nights;
+                                                            return d.index >= s && d.index < e;
+                                                        }).length;
+
+                                                        return (
+                                                            <div
+                                                                key={d.index}
+                                                                className="w-16 px-0.5 border-r border-gray-100 flex items-center justify-center flex-shrink-0 min-h-[22px] bg-gray-50/30"
+                                                            >
+                                                                <div className="flex items-center gap-0.5">
+                                                                    {/* 1. Available Badge (Green) */}
+                                                                    {availableCount > 0 && (
+                                                                        <span
+                                                                            className="min-w-[14px] h-3.5 px-0.5 rounded-xs bg-[#00cc00] text-white font-black text-[8.5px] flex items-center justify-center leading-none shadow-2xs"
+                                                                            title={`${floor.name}: ${availableCount} Available`}
+                                                                        >
+                                                                            {availableCount}
+                                                                        </span>
+                                                                    )}
+                                                                    {/* 2. Assigned Badge (Blue) */}
+                                                                    {assignedCount > 0 && (
+                                                                        <span
+                                                                            className="min-w-[14px] h-3.5 px-0.5 rounded-xs bg-[#1e3a8a] text-white font-black text-[8.5px] flex items-center justify-center leading-none shadow-2xs"
+                                                                            title={`${floor.name}: ${assignedCount} Assigned`}
+                                                                        >
+                                                                            {assignedCount}
+                                                                        </span>
+                                                                    )}
+                                                                    {/* 3. Unassigned Badge (Red) */}
+                                                                    {unassignedCount > 0 && (
+                                                                        <span
+                                                                            className="min-w-[14px] h-3.5 px-0.5 rounded-xs bg-[#ff3333] text-white font-black text-[8.5px] flex items-center justify-center leading-none shadow-2xs"
+                                                                            title={`${floor.name}: ${unassignedCount} Unassigned`}
+                                                                        >
+                                                                            {unassignedCount}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
 
@@ -768,11 +922,11 @@ export const StayView: React.FC = () => {
                                                             ></div>
                                                         ))}
 
-                                                        {/* Render Booking Bars on this Room */}
+                                                        {/* Render Booking Bars with Exact Floating Indicators */}
                                                         {bookings
                                                             .filter(b => b.roomNumber === room.roomNumber)
                                                             .map(booking => {
-                                                                const colWidth = 64; // 16 * 4 (w-16 is 4rem = 64px)
+                                                                const colWidth = 64; // w-16 is 64px
                                                                 const start = Math.max(0, booking.startIndex);
                                                                 const end = Math.min(daysWindow - 1, booking.endIndex);
                                                                 if (start > daysWindow - 1 || end < 0) return null;
@@ -788,8 +942,43 @@ export const StayView: React.FC = () => {
                                                                         className={`absolute top-1 bottom-1 ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 truncate cursor-pointer hover:brightness-105 transition-all`}
                                                                         title={`${booking.guestName} (${booking.reservationNumber}) • Status: ${booking.status.toUpperCase()}`}
                                                                     >
+                                                                        {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] */}
+                                                                        <div className="flex items-center -space-x-0.5 absolute -top-2 left-2 z-20 pointer-events-auto">
+                                                                            {booking.isGroupOwner && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-amber-400 text-gray-900 border border-white flex items-center justify-center text-[8.5px] font-bold shadow-xs"
+                                                                                    title="Group Owner / Leader"
+                                                                                >
+                                                                                    👑
+                                                                                </span>
+                                                                            )}
+                                                                            {booking.isGroupBooking && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-rose-500 text-white border border-white flex items-center justify-center text-[8px] font-bold shadow-xs"
+                                                                                    title="Group Booking"
+                                                                                >
+                                                                                    👥
+                                                                                </span>
+                                                                            )}
+                                                                            {booking.isPaymentDue && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-red-600 text-white border border-white flex items-center justify-center text-[9px] font-black shadow-xs"
+                                                                                    title="Payment Due / Pending"
+                                                                                >
+                                                                                    $
+                                                                                </span>
+                                                                            )}
+                                                                            {booking.isVipOrSingleLady && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-amber-500 text-white border border-white flex items-center justify-center text-[8.5px] font-bold shadow-xs"
+                                                                                    title="VIP / Single Lady"
+                                                                                >
+                                                                                    ⭐
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+
                                                                         <div className="flex items-center gap-1 min-w-0 truncate">
-                                                                            {booking.vip && <span className="text-[10px]">⭐</span>}
                                                                             <span className="truncate">{booking.guestName}</span>
                                                                         </div>
                                                                         {booking.indicator && (
@@ -846,50 +1035,50 @@ export const StayView: React.FC = () => {
             </div>
 
             {/* ========================================================================= */}
-            {/* EXACT REFERENCE: ASSIGN ROOMS DRAWER (Matching Screenshot media_1792538543532_7f2971a3.png) */}
+            {/* COMPACT & SLIM ASSIGN ROOMS DRAWER (PORTAL TO DOCUMENT.BODY WITH 0px TOP GAP) */}
             {/* ========================================================================= */}
-            {isAssignRoomsOpen && (
-                <div className="fixed inset-0 z-50 overflow-hidden select-none">
-                    {/* Backdrop Overlay */}
+            {isAssignRoomsOpen && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[99999] overflow-hidden select-none">
+                    {/* Backdrop Overlay covering entire viewport */}
                     <div
-                        className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity animate-in fade-in"
+                        className="fixed inset-0 bg-black/40 backdrop-blur-[1px] transition-opacity animate-in fade-in"
                         onClick={() => setIsAssignRoomsOpen(false)}
                     />
 
-                    {/* Right-Side Modal Panel */}
-                    <div className="absolute inset-y-0 right-0 w-full sm:w-[450px] bg-white shadow-2xl flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-250 z-50">
-                        {/* Drawer Header */}
-                        <div className="p-4 sm:p-5 pb-3 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
-                            <div className="flex items-center gap-2.5">
-                                <h2 className="text-base font-bold text-gray-900 tracking-tight">Assign Rooms</h2>
+                    {/* Right-Side Slim Drawer - Exact Full Viewport Height top-0 bottom-0 with 0px gap */}
+                    <div className="fixed top-0 bottom-0 right-0 w-full sm:w-[370px] bg-white shadow-2xl flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200 z-[100000]">
+                        {/* Drawer Header - Compact & Slim */}
+                        <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-[13.5px] font-bold text-gray-900 tracking-tight">Assign Rooms</h2>
                                 <button
                                     type="button"
-                                    className="w-7 h-7 rounded border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-2xs"
+                                    className="w-6 h-6 rounded border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-2xs"
                                     title="System Calendar Date"
                                 >
-                                    <CalendarIcon size={14} />
+                                    <CalendarIcon size={12} />
                                 </button>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsAssignRoomsOpen(false)}
-                                className="text-gray-400 hover:text-gray-700 p-1 rounded-md transition-colors cursor-pointer"
+                                className="text-gray-400 hover:text-gray-700 p-0.5 rounded-md transition-colors cursor-pointer"
                                 title="Close"
                             >
-                                <X size={18} />
+                                <X size={16} />
                             </button>
                         </div>
 
-                        {/* Date Carousel Bar (Exact Match with < > and 7 Days) */}
-                        <div className="flex items-stretch border-b border-gray-200/90 h-[68px] bg-white flex-shrink-0">
+                        {/* Date Carousel Bar - Slim Height 52px */}
+                        <div className="flex items-stretch border-b border-gray-200/90 h-[52px] bg-white flex-shrink-0">
                             {/* Left Carousel Arrow */}
                             <button
                                 type="button"
                                 onClick={() => setModalDateStartIndex(prev => Math.max(0, prev - 1))}
                                 disabled={modalDateStartIndex === 0}
-                                className="w-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-r border-gray-100 transition-colors"
+                                className="w-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-r border-gray-100 transition-colors"
                             >
-                                <ChevronLeft size={16} />
+                                <ChevronLeft size={14} />
                             </button>
 
                             {/* 7 Visible Date Items */}
@@ -911,15 +1100,15 @@ export const StayView: React.FC = () => {
                                         >
                                             {/* Blue dot indicator for unassigned items */}
                                             {hasUnassignedOnDate && (
-                                                <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] absolute top-1.5"></span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] absolute top-1"></span>
                                             )}
-                                            <span className={`text-[11px] font-semibold leading-none ${isActive ? 'text-[#3b82f6]' : 'text-gray-500'}`}>
+                                            <span className={`text-[9.5px] font-semibold leading-none ${isActive ? 'text-[#3b82f6]' : 'text-gray-500'}`}>
                                                 {d.dayName}
                                             </span>
-                                            <span className={`text-sm font-extrabold leading-none my-1 ${isActive ? 'text-[#3b82f6]' : 'text-gray-900'}`}>
+                                            <span className={`text-xs font-black leading-none my-0.5 ${isActive ? 'text-[#3b82f6]' : 'text-gray-900'}`}>
                                                 {d.num}
                                             </span>
-                                            <span className={`text-[9.5px] leading-none ${isActive ? 'text-[#3b82f6]' : 'text-gray-400'}`}>
+                                            <span className={`text-[8.5px] leading-none ${isActive ? 'text-[#3b82f6]' : 'text-gray-400'}`}>
                                                 {d.monthShort}
                                             </span>
                                         </div>
@@ -932,14 +1121,14 @@ export const StayView: React.FC = () => {
                                 type="button"
                                 onClick={() => setModalDateStartIndex(prev => Math.min(modalDays.length - 7, prev + 1))}
                                 disabled={modalDateStartIndex >= modalDays.length - 7}
-                                className="w-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-l border-gray-100 transition-colors"
+                                className="w-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-l border-gray-100 transition-colors"
                             >
-                                <ChevronRight size={16} />
+                                <ChevronRight size={14} />
                             </button>
                         </div>
 
                         {/* Drawer Body: Unassigned Reservations for Selected Date */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#fafafa]">
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-[#fafafa]">
                             {unassignedForSelectedDate.length > 0 ? (
                                 unassignedForSelectedDate.map(item => {
                                     const isExpanded = expandedAccordions[item.id] !== false;
@@ -947,114 +1136,112 @@ export const StayView: React.FC = () => {
                                     const isAssigning = activeAssigningId === item.id;
 
                                     return (
-                                        <div key={item.id} className="bg-[#f8fafc] border border-gray-200/80 rounded-xl overflow-hidden shadow-2xs">
+                                        <div key={item.id} className="bg-white border border-gray-200/90 rounded-lg overflow-hidden shadow-2xs">
                                             {/* Accordion Header */}
                                             <div
                                                 onClick={() => toggleAccordion(item.id)}
-                                                className="px-3.5 py-2.5 flex items-center justify-between cursor-pointer hover:bg-gray-100/70 transition-colors"
+                                                className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
                                             >
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5">
                                                     {isExpanded ? (
-                                                        <ChevronDown size={14} className="text-gray-600" />
+                                                        <ChevronDown size={13} className="text-gray-500" />
                                                     ) : (
-                                                        <ChevronRight size={14} className="text-gray-600" />
+                                                        <ChevronRight size={13} className="text-gray-500" />
                                                     )}
-                                                    <span className="font-bold text-[12px] text-gray-900 tracking-tight">
+                                                    <span className="font-bold text-[11px] text-gray-900 tracking-tight">
                                                         Reservation Number : {item.reservationNumber}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            {/* Reservation Card Details (Matching Screenshot) */}
+                                            {/* Reservation Card Details */}
                                             {isExpanded && (
-                                                <div className="p-3.5 pt-0">
-                                                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            {/* Dates Left Column */}
-                                                            <div className="flex flex-col items-center justify-between text-center min-w-[40px] pr-2.5 border-r border-gray-100">
-                                                                <div>
-                                                                    <span className="text-sm font-extrabold text-gray-800 leading-tight block">
-                                                                        {formatDayNum(item.checkIn)}
-                                                                    </span>
-                                                                    <span className="text-[9.5px] font-semibold text-gray-400 uppercase block">
-                                                                        {formatMonth(item.checkIn)}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="w-px h-3 bg-gray-200 my-1"></div>
-                                                                <div>
-                                                                    <span className="text-sm font-extrabold text-gray-800 leading-tight block">
-                                                                        {formatDayNum(item.checkOut)}
-                                                                    </span>
-                                                                    <span className="text-[9.5px] font-semibold text-gray-400 uppercase block">
-                                                                        {formatMonth(item.checkOut)}
-                                                                    </span>
-                                                                </div>
+                                                <div className="p-2.5">
+                                                    <div className="flex items-start justify-between gap-2.5">
+                                                        {/* Dates Left Column */}
+                                                        <div className="flex flex-col items-center justify-between text-center min-w-[34px] pr-2 border-r border-gray-100">
+                                                            <div>
+                                                                <span className="text-xs font-black text-gray-800 leading-tight block">
+                                                                    {formatDayNum(item.checkIn)}
+                                                                </span>
+                                                                <span className="text-[8.5px] font-semibold text-gray-400 uppercase block">
+                                                                    {formatMonth(item.checkIn)}
+                                                                </span>
                                                             </div>
-
-                                                            {/* Center Information */}
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className="text-[13px] font-bold text-gray-900 leading-tight truncate">
-                                                                    {item.guestName}
-                                                                </h4>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">
-                                                                    Total Rooms: {item.totalRooms || 1}
-                                                                </p>
-
-                                                                <div className="mt-2.5">
-                                                                    <span className="text-[10px] text-gray-400 font-medium block">Room Type</span>
-                                                                    <span className="text-[11.5px] font-bold text-gray-800 block truncate">
-                                                                        {item.roomType}
-                                                                    </span>
-                                                                </div>
+                                                            <div className="w-px h-2.5 bg-gray-200 my-1"></div>
+                                                            <div>
+                                                                <span className="text-xs font-black text-gray-800 leading-tight block">
+                                                                    {formatDayNum(item.checkOut)}
+                                                                </span>
+                                                                <span className="text-[8.5px] font-semibold text-gray-400 uppercase block">
+                                                                    {formatMonth(item.checkOut)}
+                                                                </span>
                                                             </div>
+                                                        </div>
 
-                                                            {/* Right Action Column */}
-                                                            <div className="flex flex-col items-end flex-shrink-0">
-                                                                <span className="text-[10px] text-gray-400 font-medium mb-1">Room</span>
+                                                        {/* Center Information */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="text-xs font-bold text-gray-900 leading-tight truncate">
+                                                                {item.guestName}
+                                                            </h4>
+                                                            <p className="text-[9.5px] text-gray-400 font-medium mt-0.5">
+                                                                Total Rooms: {item.totalRooms || 1}
+                                                            </p>
 
-                                                                {isAssigning ? (
-                                                                    <div className="flex flex-col items-end gap-1.5 animate-in fade-in">
-                                                                        <select
-                                                                            value={selectedRoomNumber || availableRooms[0]?.roomNumber || ''}
-                                                                            onChange={(e) => setSelectedRoomNumber(e.target.value)}
-                                                                            className="h-7 px-2 border border-blue-500 rounded text-[11px] font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[130px]"
-                                                                        >
-                                                                            {availableRooms.map(r => (
-                                                                                <option key={r.roomNumber} value={r.roomNumber}>
-                                                                                    Room {r.roomNumber} ({r.type.split(' ')[0]})
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <div className="flex items-center gap-1">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleConfirmAssign(item)}
-                                                                                className="h-6 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[10px] font-bold cursor-pointer transition-colors"
-                                                                            >
-                                                                                Confirm
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setActiveAssigningId(null)}
-                                                                                className="h-6 px-1.5 text-gray-500 hover:text-gray-700 text-[10px] font-semibold cursor-pointer"
-                                                                            >
-                                                                                Cancel
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setActiveAssigningId(item.id);
-                                                                            setSelectedRoomNumber(availableRooms[0]?.roomNumber || '102');
-                                                                        }}
-                                                                        className="h-7 px-3 border border-gray-300 hover:border-gray-400 rounded-md bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer select-none active:scale-[0.98]"
+                                                            <div className="mt-1.5">
+                                                                <span className="text-[9px] text-gray-400 font-medium block">Room Type</span>
+                                                                <span className="text-[10.5px] font-bold text-gray-800 block truncate">
+                                                                    {item.roomType}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Right Action Column */}
+                                                        <div className="flex flex-col items-end flex-shrink-0">
+                                                            <span className="text-[9.5px] text-gray-400 font-medium mb-1">Room</span>
+
+                                                            {isAssigning ? (
+                                                                <div className="flex flex-col items-end gap-1 animate-in fade-in">
+                                                                    <select
+                                                                        value={selectedRoomNumber || availableRooms[0]?.roomNumber || ''}
+                                                                        onChange={(e) => setSelectedRoomNumber(e.target.value)}
+                                                                        className="h-6 px-1.5 border border-blue-500 rounded text-[10.5px] font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[120px]"
                                                                     >
-                                                                        Assign Room
-                                                                    </button>
-                                                                )}
-                                                            </div>
+                                                                        {availableRooms.map(r => (
+                                                                            <option key={r.roomNumber} value={r.roomNumber}>
+                                                                                Room {r.roomNumber} ({r.type.split(' ')[0]})
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleConfirmAssign(item)}
+                                                                            className="h-5 px-2 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[9.5px] font-bold cursor-pointer transition-colors"
+                                                                        >
+                                                                            Confirm
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setActiveAssigningId(null)}
+                                                                            className="h-5 px-1 text-gray-500 hover:text-gray-700 text-[9.5px] font-semibold cursor-pointer"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setActiveAssigningId(item.id);
+                                                                        setSelectedRoomNumber(availableRooms[0]?.roomNumber || '102');
+                                                                    }}
+                                                                    className="h-6 px-2.5 border border-gray-300 hover:border-gray-400 rounded bg-white hover:bg-gray-50 text-gray-700 text-[10.5px] font-semibold shadow-2xs transition-colors cursor-pointer select-none active:scale-[0.98]"
+                                                                >
+                                                                    Assign Room
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1064,12 +1251,12 @@ export const StayView: React.FC = () => {
                                 })
                             ) : (
                                 /* Empty state matching reference */
-                                <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-6 text-gray-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 opacity-30 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                                <div className="h-full min-h-[220px] flex flex-col items-center justify-center text-center p-4 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 opacity-30 mb-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                     </svg>
-                                    <span className="text-sm font-semibold text-gray-500">No Unassigned Bookings</span>
-                                    <p className="text-[11px] text-gray-400 mt-1">
+                                    <span className="text-xs font-semibold text-gray-500">No Unassigned Bookings</span>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">
                                         No unassigned rooms for {selectedDateObj?.dayName} {selectedDateObj?.num} {selectedDateObj?.monthShort}.
                                     </p>
                                     {unassignedList.length > 0 && (
@@ -1083,16 +1270,17 @@ export const StayView: React.FC = () => {
                                                     setModalDateStartIndex(Math.max(0, Math.min(modalDays.length - 7, targetIdx)));
                                                 }
                                             }}
-                                            className="mt-3 px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] rounded-md transition-colors border border-blue-200 cursor-pointer"
+                                            className="mt-2.5 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[10px] rounded transition-colors border border-blue-200 cursor-pointer"
                                         >
-                                            Jump to next unassigned ({unassignedList[0]?.reservationNumber})
+                                            Jump to next ({unassignedList[0]?.reservationNumber})
                                         </button>
                                     )}
                                 </div>
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Quick Reservation Modal */}
