@@ -104,165 +104,181 @@ export const ReservationsView: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4 animate-in fade-in duration-150">
-            {/* Top Control Bar */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <Calendar size={22} />
+        <div className="p-3 sm:p-4 max-w-full space-y-2.5 animate-in fade-in duration-150 text-xs">
+            {/* Compact Header Bar */}
+            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center flex-shrink-0">
+                        <Calendar size={18} />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-sm font-bold text-gray-900 tracking-tight truncate">
                                 Reservations Master Registry
                             </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200">
                                 Live PMS Folios
                             </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Comprehensive reservation ledger: Arrivals, In-House, Departures, Checked Out, and Pending Folio Balances.
+                        <p className="text-[11px] text-gray-500 truncate">
+                            All arrivals, in-house guests, departures, and pending balances.
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                         type="button"
                         onClick={exportCSV}
-                        className="h-8 px-3 text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="h-7 px-2.5 text-[11px] font-semibold bg-white border border-gray-200 hover:bg-gray-50 rounded text-gray-700 flex items-center gap-1 shadow-2xs cursor-pointer"
                     >
-                        <Download size={13} />
+                        <Download size={12} />
                         <span>Export CSV</span>
                     </button>
                     <button
                         type="button"
                         onClick={() => setIsAddModalOpen(true)}
-                        className="h-8 px-3.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="h-7 px-3 text-[11px] font-bold bg-[#1e3a8a] hover:bg-blue-900 text-white rounded shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
                     >
-                        <Plus size={14} />
-                        <span>+ Add New Reservation</span>
+                        <Plus size={13} />
+                        <span>Add Reservation</span>
                     </button>
                 </div>
             </div>
 
-            {/* Tabs Row */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-2xs p-2 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Compact Tabs & Search Row */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs px-3 py-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-1 flex-wrap">
                     {[
-                        { id: 'all', label: 'All Reservations', count: reservations.length },
-                        { id: 'arrivals', label: 'Expected Arrivals', count: reservations.filter(r => r.status === 'arriving').length },
-                        { id: 'in-house', label: 'Currently In-House', count: reservations.filter(r => r.status === 'in-house').length },
-                        { id: 'departures', label: 'Due Out Departures', count: reservations.filter(r => r.status === 'departing').length },
+                        { id: 'all', label: 'All', count: reservations.length },
+                        { id: 'arrivals', label: 'Arrivals', count: reservations.filter(r => r.status === 'arriving').length },
+                        { id: 'in-house', label: 'In-House', count: reservations.filter(r => r.status === 'in-house').length },
+                        { id: 'departures', label: 'Departures', count: reservations.filter(r => r.status === 'departing').length },
                         { id: 'checked-out', label: 'Checked Out', count: reservations.filter(r => r.status === 'checked-out').length },
                     ].map(tab => (
                         <button
                             key={tab.id}
                             type="button"
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-2xs' : 'text-gray-600 hover:bg-gray-100'}`}
+                            className={`h-6 px-2.5 rounded text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                activeTab === tab.id
+                                    ? 'bg-[#1e3a8a] text-white shadow-2xs'
+                                    : 'text-gray-600 hover:bg-gray-100'
+                            }`}
                         >
                             <span>{tab.label}</span>
-                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === tab.id ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                                activeTab === tab.id ? 'bg-blue-900 text-white' : 'bg-gray-200 text-gray-700'
+                            }`}>
                                 {tab.count}
                             </span>
                         </button>
                     ))}
                 </div>
 
-                {/* Search Bar */}
+                {/* Compact Search Bar */}
                 <div className="relative">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
                         placeholder="Search guest, res #, room..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        className="h-8 pl-8 pr-3 text-xs border border-gray-200 rounded-lg bg-white outline-none w-56 lg:w-64 focus:border-blue-500"
+                        className="h-7 pl-7 pr-2.5 text-[11px] border border-gray-200 rounded-md bg-white outline-none w-52 sm:w-60 focus:border-blue-500"
                     />
                 </div>
             </div>
 
-            {/* Table View */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden text-xs">
+            {/* Compact Table View */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left min-w-[950px]">
+                    <table className="w-full text-left min-w-[900px] border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
-                                <th className="px-3.5 py-2.5">Res Number</th>
-                                <th className="px-3.5 py-2.5">Guest Name</th>
-                                <th className="px-3.5 py-2.5">Room</th>
-                                <th className="px-3.5 py-2.5">Stay Dates</th>
-                                <th className="px-3.5 py-2.5">Source</th>
-                                <th className="px-3.5 py-2.5">Total Tariff</th>
-                                <th className="px-3.5 py-2.5">Due Balance</th>
-                                <th className="px-3.5 py-2.5">Status</th>
-                                <th className="px-3.5 py-2.5 text-right">Actions</th>
+                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                                <th className="px-3 py-2">Res #</th>
+                                <th className="px-3 py-2">Guest Name</th>
+                                <th className="px-3 py-2">Room</th>
+                                <th className="px-3 py-2">Stay Dates</th>
+                                <th className="px-3 py-2">Source</th>
+                                <th className="px-3 py-2">Total Tariff</th>
+                                <th className="px-3 py-2">Due Balance</th>
+                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-100 text-[11.5px]">
                             {filteredReservations.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan={9} className="px-4 py-6 text-center text-gray-400">
                                         No reservations found matching your criteria.
                                     </td>
                                 </tr>
                             ) : (
                                 filteredReservations.map(r => (
                                     <tr key={r.id} className="hover:bg-blue-50/20 transition-colors">
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-blue-700">
+                                        <td className="px-3 py-1.5 font-mono font-bold text-blue-700">
                                             {r.reservationNumber}
                                         </td>
-                                        <td className="px-3.5 py-2.5">
+                                        <td className="px-3 py-1.5">
                                             <div className="flex items-center gap-1.5">
                                                 <span className="font-semibold text-gray-900">{r.guestName}</span>
                                                 {r.vip && r.vip !== 'None' && (
-                                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                                    <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                                                         {r.vip}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="text-[10px] text-gray-400 font-mono mt-0.5">{r.phone}</div>
+                                            <div className="text-[10px] text-gray-400 font-mono">{r.phone}</div>
                                         </td>
-                                        <td className="px-3.5 py-2.5">
-                                            <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded font-bold font-mono">
+                                        <td className="px-3 py-1.5">
+                                            <span className="px-1.5 py-0.2 bg-blue-50 text-blue-800 rounded font-bold font-mono">
                                                 {r.roomNumber}
                                             </span>
-                                            <div className="text-[10px] text-gray-500 mt-0.5">{r.roomType}</div>
+                                            <div className="text-[10px] text-gray-500">{r.roomType}</div>
                                         </td>
-                                        <td className="px-3.5 py-2.5">
+                                        <td className="px-3 py-1.5 whitespace-nowrap">
                                             <div className="font-medium text-gray-800">
                                                 {r.checkIn} → {r.checkOut}
                                             </div>
-                                            <div className="text-[10px] text-gray-400 mt-0.5">{r.nights} Night{r.nights > 1 ? 's' : ''}</div>
+                                            <div className="text-[10px] text-gray-400">{r.nights} Night{r.nights > 1 ? 's' : ''}</div>
                                         </td>
-                                        <td className="px-3.5 py-2.5 text-gray-600 font-medium">
+                                        <td className="px-3 py-1.5 text-gray-600 font-medium">
                                             {r.source}
                                         </td>
-                                        <td className="px-3.5 py-2.5 font-bold text-gray-900">
+                                        <td className="px-3 py-1.5 font-bold text-gray-900 font-mono">
                                             ৳ {r.totalAmount.toLocaleString()}
                                         </td>
-                                        <td className="px-3.5 py-2.5 font-bold">
+                                        <td className="px-3 py-1.5 font-mono font-bold">
                                             {r.dueAmount > 0 ? (
-                                                <span className="text-rose-600 font-bold">৳ {r.dueAmount.toLocaleString()}</span>
+                                                <span className="text-rose-600">৳ {r.dueAmount.toLocaleString()}</span>
                                             ) : (
                                                 <span className="text-emerald-600 font-semibold flex items-center gap-1">
                                                     <Check size={11} /> Settled
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-3.5 py-2.5">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${r.status === 'in-house' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : r.status === 'arriving' ? 'bg-blue-50 text-blue-700 border border-blue-200' : r.status === 'departing' ? 'bg-amber-50 text-amber-700 border border-amber-200' : r.status === 'checked-out' ? 'bg-gray-100 text-gray-600' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}>
+                                        <td className="px-3 py-1.5">
+                                            <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase ${
+                                                r.status === 'in-house'
+                                                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                    : r.status === 'arriving'
+                                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                    : r.status === 'departing'
+                                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                    : r.status === 'checked-out'
+                                                    ? 'bg-gray-100 text-gray-600'
+                                                    : 'bg-purple-50 text-purple-700 border border-purple-200'
+                                            }`}>
                                                 {r.status}
                                             </span>
                                         </td>
-                                        <td className="px-3.5 py-2.5 text-right">
+                                        <td className="px-3 py-1.5 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 {r.status === 'arriving' && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleStatusChange(r.id, 'in-house')}
-                                                        className="h-6 px-2 text-[10.5px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
+                                                        className="h-5 px-2 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
                                                         title="Check In Guest"
                                                     >
                                                         Check In
@@ -272,7 +288,7 @@ export const ReservationsView: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleStatusChange(r.id, 'checked-out')}
-                                                        className="h-6 px-2 text-[10.5px] font-bold bg-blue-700 hover:bg-blue-800 text-white rounded cursor-pointer"
+                                                        className="h-5 px-2 text-[10px] font-bold bg-blue-700 hover:bg-blue-800 text-white rounded cursor-pointer"
                                                         title="Check Out Guest"
                                                     >
                                                         Check Out

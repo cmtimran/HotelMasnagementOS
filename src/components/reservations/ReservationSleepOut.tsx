@@ -47,34 +47,24 @@ export const ReservationSleepOut: React.FC = () => {
         localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(sleepOuts));
     }, [sleepOuts]);
 
+    // Modal Form State
     const [form, setForm] = useState({
         reservationNumber: '',
         guestName: '',
-        reason: '',
-        roomType: 'Deluxe Double',
         roomNumber: '101',
+        roomType: 'Deluxe Double',
         contact: '',
         startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]
+        endDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        reason: ''
     });
 
-    const handleOpenAdd = () => {
-        setForm({
-            reservationNumber: `RES-${Date.now().toString().slice(-6)}`,
-            guestName: '',
-            reason: '',
-            roomType: 'Deluxe Double',
-            roomNumber: '101',
-            contact: '',
-            startDate: new Date().toISOString().split('T')[0],
-            endDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleSave = (e: React.FormEvent) => {
+    const handleCreateSleepOut = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.guestName || !form.reason) return;
+        if (!form.guestName || !form.reservationNumber) {
+            alert('Please provide guest name and reservation number.');
+            return;
+        }
 
         const newItem: SleepOutItem = {
             id: Date.now(),
@@ -117,124 +107,136 @@ export const ReservationSleepOut: React.FC = () => {
     );
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4 animate-in fade-in duration-150">
+        <div className="p-3 sm:p-4 max-w-full space-y-2.5 animate-in fade-in duration-150 text-xs">
             {toastMessage && (
-                <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle2 size={16} className="text-emerald-400" />
+                <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-400" />
                     <span>{toastMessage}</span>
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-700 to-purple-800 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <Moon size={22} />
+            {/* Compact Header Bar */}
+            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center flex-shrink-0">
+                        <Moon size={18} />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-sm font-bold text-gray-900 tracking-tight truncate">
                                 Sleep Out Registry (Guest Absence Tracker)
                             </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                                Night Audit Safety
+                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-purple-50 text-purple-700 border border-purple-200">
+                                Night Safety
                             </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Keep track of in-house guests who have notified reception that they will sleep outside the property tonight to ensure accurate headcount during emergency audits.
+                        <p className="text-[11px] text-gray-500 truncate">
+                            Track checked-in guests spending the night off property for duty-of-care.
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                         type="button"
-                        onClick={handleOpenAdd}
-                        className="h-8 px-3.5 text-xs font-bold bg-purple-700 hover:bg-purple-800 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        onClick={() => setIsModalOpen(true)}
+                        className="h-7 px-3 text-[11px] font-bold bg-[#1e3a8a] hover:bg-blue-900 text-white rounded shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
                     >
-                        <Plus size={14} />
-                        <span>+ Log Sleep Out</span>
+                        <Plus size={13} />
+                        <span>Log Sleep Out</span>
                     </button>
                 </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-2xs p-3 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-700">
-                    Showing {filtered.length} of {sleepOuts.length} Recorded Sleep Outs
-                </span>
+            {/* Compact Controls Bar */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs px-3 py-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="text-gray-500 font-medium text-[11px]">Active Away:</span>
+                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold font-mono text-[11px]">
+                        {sleepOuts.filter(s => s.status === 'Sleeping Out').length} Guests
+                    </span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-gray-500 font-medium text-[11px]">Returned:</span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold font-mono text-[11px]">
+                        {sleepOuts.filter(s => s.status === 'Returned').length}
+                    </span>
+                </div>
+
                 <div className="relative">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
                         placeholder="Search guest, room, reason..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        className="h-8 pl-8 pr-3 text-xs border border-gray-200 rounded-lg bg-white outline-none w-56 lg:w-64 focus:border-purple-500"
+                        className="h-7 pl-7 pr-2.5 text-[11px] border border-gray-200 rounded-md bg-white outline-none w-52 sm:w-60 focus:border-purple-500"
                     />
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden text-xs">
+            {/* Compact Table View */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left min-w-[950px]">
+                    <table className="w-full text-left min-w-[900px] border-collapse">
                         <thead>
-                            <tr className="bg-purple-900 text-white text-[10.5px] font-bold uppercase tracking-wider">
-                                <th className="px-3.5 py-3">Reservation Number</th>
-                                <th className="px-3.5 py-3">Guest Name</th>
-                                <th className="px-3.5 py-3">Reason For Absence</th>
-                                <th className="px-3.5 py-3">Room Type</th>
-                                <th className="px-3.5 py-3">Room No</th>
-                                <th className="px-3.5 py-3">Contact</th>
-                                <th className="px-3.5 py-3">Absence Period</th>
-                                <th className="px-3.5 py-3">Status</th>
-                                <th className="px-3.5 py-3 text-right">Actions</th>
+                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                                <th className="px-3 py-2">Res #</th>
+                                <th className="px-3 py-2">Guest Name</th>
+                                <th className="px-3 py-2">Room</th>
+                                <th className="px-3 py-2">Emergency Contact</th>
+                                <th className="px-3 py-2">Absence Dates</th>
+                                <th className="px-3 py-2">Reason / Itinerary</th>
+                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-100 text-[11.5px]">
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                                        No sleep-out records logged today.
+                                    <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
+                                        No sleep out records found.
                                     </td>
                                 </tr>
                             ) : (
                                 filtered.map(s => (
                                     <tr key={s.id} className="hover:bg-purple-50/20 transition-colors">
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-purple-700">
+                                        <td className="px-3 py-1.5 font-mono font-bold text-purple-800">
                                             {s.reservationNumber}
                                         </td>
-                                        <td className="px-3.5 py-2.5 font-semibold text-gray-900">
+                                        <td className="px-3 py-1.5 font-semibold text-gray-900">
                                             {s.guestName}
                                         </td>
-                                        <td className="px-3.5 py-2.5 text-gray-600 max-w-xs">
-                                            <div className="truncate" title={s.reason}>{s.reason}</div>
+                                        <td className="px-3 py-1.5">
+                                            <span className="px-1.5 py-0.2 bg-purple-50 text-purple-800 rounded font-bold font-mono">
+                                                {s.roomNumber}
+                                            </span>
+                                            <span className="text-[10px] text-gray-500 ml-1.5">{s.roomType}</span>
                                         </td>
-                                        <td className="px-3.5 py-2.5 text-gray-700">
-                                            {s.roomType}
-                                        </td>
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-blue-700">
-                                            {s.roomNumber}
-                                        </td>
-                                        <td className="px-3.5 py-2.5 font-mono text-gray-600">
+                                        <td className="px-3 py-1.5 font-mono text-gray-600">
                                             {s.contact}
                                         </td>
-                                        <td className="px-3.5 py-2.5 font-medium text-gray-800">
+                                        <td className="px-3 py-1.5 whitespace-nowrap text-gray-700">
                                             {s.startDate} → {s.endDate}
                                         </td>
-                                        <td className="px-3.5 py-2.5">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${s.status === 'Sleeping Out' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                                        <td className="px-3 py-1.5 text-gray-600 max-w-xs truncate" title={s.reason}>
+                                            {s.reason}
+                                        </td>
+                                        <td className="px-3 py-1.5">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                s.status === 'Sleeping Out'
+                                                    ? 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse'
+                                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                            }`}>
                                                 {s.status}
                                             </span>
                                         </td>
-                                        <td className="px-3.5 py-2.5 text-right">
+                                        <td className="px-3 py-1.5 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 {s.status === 'Sleeping Out' && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleMarkReturned(s.id)}
-                                                        className="h-6 px-2 text-[10.5px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
+                                                        className="h-5 px-2 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
                                                         title="Mark Guest Returned"
                                                     >
                                                         Mark Returned
@@ -243,7 +245,7 @@ export const ReservationSleepOut: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDelete(s.id)}
-                                                    className="p-1 text-gray-400 hover:text-rose-600 rounded"
+                                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded cursor-pointer"
                                                     title="Delete Record"
                                                 >
                                                     <Trash2 size={13} />
@@ -258,112 +260,115 @@ export const ReservationSleepOut: React.FC = () => {
                 </div>
             </div>
 
-            {/* Modal: Log Sleep Out */}
+            {/* Log Sleep Out Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
-                    <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-purple-900 text-white">
-                            <h3 className="text-xs font-bold flex items-center gap-2">
-                                <Moon size={15} />
-                                <span>Log Guest Sleep-Out Notification</span>
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+                        <div className="px-4 py-3 bg-[#1e3a8a] text-white flex items-center justify-between">
+                            <h3 className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                <Moon size={14} />
+                                <span>Record Guest Sleep Out</span>
                             </h3>
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="text-white/70 hover:text-white">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="text-white/80 hover:text-white p-0.5 rounded"
+                            >
                                 <X size={16} />
                             </button>
                         </div>
-                        <form onSubmit={handleSave} className="p-4 space-y-3.5 text-xs">
+
+                        <form onSubmit={handleCreateSleepOut} className="p-4 space-y-3 text-xs">
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Reservation Number *</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Res Number *</label>
                                     <input
                                         type="text"
                                         required
+                                        placeholder="RES-009..."
                                         value={form.reservationNumber}
                                         onChange={e => setForm({ ...form, reservationNumber: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-mono font-bold"
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-mono"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Room Number *</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Guest Name *</label>
                                     <input
                                         type="text"
                                         required
-                                        value={form.roomNumber}
-                                        onChange={e => setForm({ ...form, roomNumber: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-mono font-bold text-blue-700"
+                                        placeholder="Full Name"
+                                        value={form.guestName}
+                                        onChange={e => setForm({ ...form, guestName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-semibold"
                                     />
                                 </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="font-semibold text-gray-700">Guest Name *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={form.guestName}
-                                    onChange={e => setForm({ ...form, guestName: e.target.value })}
-                                    placeholder="e.g. Tariqul Islam"
-                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-medium"
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="font-semibold text-gray-700">Emergency Contact Number</label>
-                                <input
-                                    type="text"
-                                    value={form.contact}
-                                    onChange={e => setForm({ ...form, contact: e.target.value })}
-                                    placeholder="+880 17xx-xxxxxx"
-                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-mono"
-                                />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Out Date *</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Room Number</label>
                                     <input
-                                        type="date"
-                                        required
-                                        value={form.startDate}
-                                        onChange={e => setForm({ ...form, startDate: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none"
+                                        type="text"
+                                        value={form.roomNumber}
+                                        onChange={e => setForm({ ...form, roomNumber: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-bold"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Expected Return *</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Contact Number</label>
                                     <input
-                                        type="date"
-                                        required
-                                        value={form.endDate}
-                                        onChange={e => setForm({ ...form, endDate: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none"
+                                        type="text"
+                                        value={form.contact}
+                                        onChange={e => setForm({ ...form, contact: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
                                     />
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="font-semibold text-gray-700">Reason For Overnight Absence *</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="font-semibold text-gray-700">Start Date</label>
+                                    <input
+                                        type="date"
+                                        value={form.startDate}
+                                        onChange={e => setForm({ ...form, startDate: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Expected Return</label>
+                                    <input
+                                        type="date"
+                                        value={form.endDate}
+                                        onChange={e => setForm({ ...form, endDate: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="font-semibold text-gray-700">Reason / Temporary Destination</label>
                                 <textarea
                                     required
                                     rows={2}
+                                    placeholder="Explain travel purpose, emergency trip, or location..."
                                     value={form.reason}
                                     onChange={e => setForm({ ...form, reason: e.target.value })}
-                                    placeholder="e.g. Overnight travel to factory, returning tomorrow morning."
-                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none text-xs"
+                                    className="w-full p-2 border border-gray-300 rounded text-xs mt-1 outline-none resize-none"
                                 />
                             </div>
 
-                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="h-8 px-3.5 border border-gray-200 rounded-lg font-semibold hover:bg-gray-50 text-gray-700 cursor-pointer"
+                                    className="h-7 px-3 border border-gray-300 text-gray-600 rounded text-xs font-semibold cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="h-8 px-4 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-semibold shadow-2xs cursor-pointer"
+                                    className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-xs font-bold cursor-pointer"
                                 >
                                     Save Record
                                 </button>

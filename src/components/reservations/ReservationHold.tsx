@@ -49,34 +49,20 @@ export const ReservationHold: React.FC = () => {
         localStorage.setItem('hotel_holds_v2', JSON.stringify(holds));
     }, [holds]);
 
+    // Form Modal State
     const [form, setForm] = useState({
-        reservationNumber: '',
+        reservationNumber: `RES-${String(Math.floor(100000000000 + Math.random() * 900000000000))}`,
         guestName: '',
         holdStartDate: new Date().toISOString().split('T')[0],
         holdEndDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-        reason: '',
         checkInDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-        checkOutDate: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0],
+        checkOutDate: new Date(Date.now() + 86400000 * 8).toISOString().split('T')[0],
         roomType: 'Deluxe Double',
-        estimatedAmount: 7000
+        estimatedAmount: 10500,
+        reason: ''
     });
 
-    const handleOpenAdd = () => {
-        setForm({
-            reservationNumber: `RES-${Date.now().toString().slice(-8)}`,
-            guestName: '',
-            holdStartDate: new Date().toISOString().split('T')[0],
-            holdEndDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-            reason: '',
-            checkInDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-            checkOutDate: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0],
-            roomType: 'Deluxe Double',
-            estimatedAmount: 7000
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleSave = (e: React.FormEvent) => {
+    const handleCreateHold = (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.guestName || !form.reason) return;
 
@@ -121,125 +107,138 @@ export const ReservationHold: React.FC = () => {
     );
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4 animate-in fade-in duration-150">
+        <div className="p-3 sm:p-4 max-w-full space-y-2.5 animate-in fade-in duration-150 text-xs">
             {toastMessage && (
-                <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle2 size={16} className="text-emerald-400" />
+                <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-400" />
                     <span>{toastMessage}</span>
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <Clock size={22} />
+            {/* Compact Header Bar */}
+            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                        <Clock size={18} />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
-                                Reservation Hold Registry
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-sm font-bold text-gray-900 tracking-tight truncate">
+                                Tentative Reservation Hold List
                             </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                                Tentative Bookings
+                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                Auto-Release Guard
                             </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Manage tentative room blocks with hold expiration deadlines to prevent dead inventory and auto-release expired locks.
+                        <p className="text-[11px] text-gray-500 truncate">
+                            Track tentative room blocks awaiting payment or confirmation with auto-release deadlines.
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                         type="button"
-                        onClick={handleOpenAdd}
-                        className="h-8 px-3.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        onClick={() => setIsModalOpen(true)}
+                        className="h-7 px-3 text-[11px] font-bold bg-[#1e3a8a] hover:bg-blue-900 text-white rounded shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
                     >
-                        <Plus size={14} />
-                        <span>+ New Hold Booking</span>
+                        <Plus size={13} />
+                        <span>Create Hold</span>
                     </button>
                 </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-2xs p-3 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-700">
-                    Showing {filtered.length} of {holds.length} Tentative Hold Bookings
-                </span>
+            {/* Compact Controls Bar */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs px-3 py-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="text-gray-500 font-medium text-[11px]">Active Holds:</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold font-mono text-[11px]">
+                        {holds.filter(h => h.status === 'Hold').length} Pending
+                    </span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-gray-500 font-medium text-[11px]">Confirmed:</span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold font-mono text-[11px]">
+                        {holds.filter(h => h.status === 'Confirmed').length}
+                    </span>
+                </div>
+
                 <div className="relative">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Search hold by guest, res #..."
+                        placeholder="Search guest, res #, reason..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        className="h-8 pl-8 pr-3 text-xs border border-gray-200 rounded-lg bg-white outline-none w-56 lg:w-64 focus:border-amber-500"
+                        className="h-7 pl-7 pr-2.5 text-[11px] border border-gray-200 rounded-md bg-white outline-none w-52 sm:w-60 focus:border-amber-500"
                     />
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden text-xs">
+            {/* Compact Table View */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left min-w-[950px]">
+                    <table className="w-full text-left min-w-[900px] border-collapse">
                         <thead>
-                            <tr className="bg-amber-800 text-white text-[10.5px] font-bold uppercase tracking-wider">
-                                <th className="px-3.5 py-3">Reservation Number</th>
-                                <th className="px-3.5 py-3">Guest / Corporate Name</th>
-                                <th className="px-3.5 py-3">Status</th>
-                                <th className="px-3.5 py-3">Hold Expiration</th>
-                                <th className="px-3.5 py-3">Reason For Hold</th>
-                                <th className="px-3.5 py-3">Stay Dates</th>
-                                <th className="px-3.5 py-3">Room Type</th>
-                                <th className="px-3.5 py-3">Est. Tariff</th>
-                                <th className="px-3.5 py-3 text-right">Actions</th>
+                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                                <th className="px-3 py-2">Hold Res #</th>
+                                <th className="px-3 py-2">Guest / Entity</th>
+                                <th className="px-3 py-2">Room Type</th>
+                                <th className="px-3 py-2">Planned Stay</th>
+                                <th className="px-3 py-2">Hold Expiration Window</th>
+                                <th className="px-3 py-2">Hold Reason & Notes</th>
+                                <th className="px-3 py-2">Est. Tariff</th>
+                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-100 text-[11.5px]">
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                                        No tentative hold bookings registered.
+                                    <td colSpan={9} className="px-4 py-6 text-center text-gray-400">
+                                        No hold reservations found.
                                     </td>
                                 </tr>
                             ) : (
                                 filtered.map(h => (
                                     <tr key={h.id} className="hover:bg-amber-50/20 transition-colors">
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-amber-800">
+                                        <td className="px-3 py-1.5 font-mono font-bold text-amber-800">
                                             {h.reservationNumber}
                                         </td>
-                                        <td className="px-3.5 py-2.5 font-semibold text-gray-900">
+                                        <td className="px-3 py-1.5 font-semibold text-gray-900">
                                             {h.guestName}
                                         </td>
-                                        <td className="px-3.5 py-2.5">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${h.status === 'Hold' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'}`}>
+                                        <td className="px-3 py-1.5 text-gray-700">
+                                            {h.roomType}
+                                        </td>
+                                        <td className="px-3 py-1.5 whitespace-nowrap text-gray-600">
+                                            {h.checkInDate} → {h.checkOutDate}
+                                        </td>
+                                        <td className="px-3 py-1.5 whitespace-nowrap font-mono text-[10.5px] text-amber-900 font-semibold">
+                                            {h.holdStartDate} → {h.holdEndDate}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-gray-600 max-w-xs truncate" title={h.reason}>
+                                            {h.reason}
+                                        </td>
+                                        <td className="px-3 py-1.5 font-mono font-bold text-gray-900 whitespace-nowrap">
+                                            ৳ {h.estimatedAmount.toLocaleString()}
+                                        </td>
+                                        <td className="px-3 py-1.5">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                h.status === 'Hold'
+                                                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                            }`}>
                                                 {h.status}
                                             </span>
                                         </td>
-                                        <td className="px-3.5 py-2.5 font-medium text-rose-700">
-                                            {h.holdEndDate}
-                                        </td>
-                                        <td className="px-3.5 py-2.5 text-gray-600 max-w-xs">
-                                            <div className="truncate" title={h.reason}>{h.reason}</div>
-                                        </td>
-                                        <td className="px-3.5 py-2.5 text-gray-800 font-medium">
-                                            {h.checkInDate} → {h.checkOutDate}
-                                        </td>
-                                        <td className="px-3.5 py-2.5 text-gray-700 font-medium">
-                                            {h.roomType}
-                                        </td>
-                                        <td className="px-3.5 py-2.5 font-bold text-gray-900">
-                                            ৳ {h.estimatedAmount.toLocaleString()}
-                                        </td>
-                                        <td className="px-3.5 py-2.5 text-right">
+                                        <td className="px-3 py-1.5 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 {h.status === 'Hold' && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleConfirmBooking(h.id)}
-                                                        className="h-6 px-2 text-[10.5px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
-                                                        title="Confirm & Convert to Booking"
+                                                        className="h-5 px-2 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
+                                                        title="Convert to Confirmed Reservation"
                                                     >
                                                         Confirm
                                                     </button>
@@ -247,7 +246,7 @@ export const ReservationHold: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDelete(h.id)}
-                                                    className="p-1 text-gray-400 hover:text-rose-600 rounded"
+                                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded cursor-pointer"
                                                     title="Release Hold"
                                                 >
                                                     <Trash2 size={13} />
@@ -262,125 +261,116 @@ export const ReservationHold: React.FC = () => {
                 </div>
             </div>
 
-            {/* Modal: Add Hold Booking */}
+            {/* Create Hold Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
-                    <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-amber-600 text-white">
-                            <h3 className="text-xs font-bold flex items-center gap-2">
-                                <Clock size={15} />
-                                <span>Create Tentative Hold Reservation</span>
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+                        <div className="px-4 py-3 bg-[#1e3a8a] text-white flex items-center justify-between">
+                            <h3 className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                <Clock size={14} />
+                                <span>Create Tentative Reservation Hold</span>
                             </h3>
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="text-white/70 hover:text-white">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="text-white/80 hover:text-white p-0.5 rounded"
+                            >
                                 <X size={16} />
                             </button>
                         </div>
-                        <form onSubmit={handleSave} className="p-4 space-y-3.5 text-xs">
-                            <div className="space-y-1">
-                                <label className="font-semibold text-gray-700">Guest or Corporate Group Name *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={form.guestName}
-                                    onChange={e => setForm({ ...form, guestName: e.target.value })}
-                                    placeholder="e.g. Beximco Pharma VIP Delegation"
-                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-medium"
-                                />
-                            </div>
 
+                        <form onSubmit={handleCreateHold} className="p-4 space-y-3 text-xs">
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Hold Start Date *</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Guest Name / Entity *</label>
                                     <input
-                                        type="date"
+                                        type="text"
                                         required
-                                        value={form.holdStartDate}
-                                        onChange={e => setForm({ ...form, holdStartDate: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none"
+                                        placeholder="Full Name / Company"
+                                        value={form.guestName}
+                                        onChange={e => setForm({ ...form, guestName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-semibold"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Hold Expiration Deadline *</label>
-                                    <input
-                                        type="date"
-                                        required
-                                        value={form.holdEndDate}
-                                        onChange={e => setForm({ ...form, holdEndDate: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-bold text-rose-700"
-                                    />
+                                <div>
+                                    <label className="font-semibold text-gray-700">Room Category</label>
+                                    <select
+                                        value={form.roomType}
+                                        onChange={e => setForm({ ...form, roomType: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                    >
+                                        <option value="Deluxe Double">Deluxe Double</option>
+                                        <option value="Executive Suite">Executive Suite</option>
+                                        <option value="Superior King">Superior King</option>
+                                    </select>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Expected Check-In</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Planned Check-In</label>
                                     <input
                                         type="date"
                                         value={form.checkInDate}
                                         onChange={e => setForm({ ...form, checkInDate: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none"
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Expected Check-Out</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Planned Check-Out</label>
                                     <input
                                         type="date"
                                         value={form.checkOutDate}
                                         onChange={e => setForm({ ...form, checkOutDate: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none"
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
                                     />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Room Type</label>
-                                    <select
-                                        value={form.roomType}
-                                        onChange={e => setForm({ ...form, roomType: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none bg-white font-medium"
-                                    >
-                                        <option value="Deluxe Double">Deluxe Double</option>
-                                        <option value="Superior King">Superior King</option>
-                                        <option value="Executive Suite">Executive Suite</option>
-                                        <option value="Presidential Suite">Presidential Suite</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="font-semibold text-gray-700">Estimated Total (BDT ৳)</label>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Hold Active From</label>
                                     <input
-                                        type="number"
-                                        min={0}
-                                        value={form.estimatedAmount}
-                                        onChange={e => setForm({ ...form, estimatedAmount: Number(e.target.value) })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-bold"
+                                        type="date"
+                                        value={form.holdStartDate}
+                                        onChange={e => setForm({ ...form, holdStartDate: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-semibold text-gray-700">Release Deadline</label>
+                                    <input
+                                        type="date"
+                                        value={form.holdEndDate}
+                                        onChange={e => setForm({ ...form, holdEndDate: e.target.value })}
+                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-bold text-amber-700"
                                     />
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="font-semibold text-gray-700">Reason For Hold *</label>
+                            <div>
+                                <label className="font-semibold text-gray-700">Hold Reason & Justification *</label>
                                 <textarea
                                     required
                                     rows={2}
+                                    placeholder="Explain why room is held without deposit (e.g. government clearance, PO pending)..."
                                     value={form.reason}
                                     onChange={e => setForm({ ...form, reason: e.target.value })}
-                                    placeholder="e.g. Awaiting flight confirmation / corporate purchase order."
-                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none text-xs"
+                                    className="w-full p-2 border border-gray-300 rounded text-xs mt-1 outline-none resize-none"
                                 />
                             </div>
 
-                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="h-8 px-3.5 border border-gray-200 rounded-lg font-semibold hover:bg-gray-50 text-gray-700 cursor-pointer"
+                                    className="h-7 px-3 border border-gray-300 text-gray-600 rounded text-xs font-semibold cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="h-8 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold shadow-2xs cursor-pointer"
+                                    className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-xs font-bold cursor-pointer"
                                 >
                                     Create Hold Lock
                                 </button>
