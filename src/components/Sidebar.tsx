@@ -441,7 +441,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             className={`${isCollapsed ? 'w-14' : 'w-56'} bg-white border-r border-gray-200/90 h-screen sticky top-0 flex flex-col transition-all duration-200 ease-in-out flex-shrink-0 z-50 select-none shadow-[1px_0_4px_rgba(0,0,0,0.02)]`}
         >
             {/* Header / Brand Area */}
-            <div className={`h-12 px-2.5 flex items-center border-b border-gray-100 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+            <div className={`h-11 px-2.5 flex items-center border-b border-gray-100 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
                 {!isCollapsed && (
                     <div 
                         className="cursor-pointer flex items-center gap-2 min-w-0" 
