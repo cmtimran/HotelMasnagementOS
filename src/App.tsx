@@ -543,9 +543,9 @@ function App() {
       case 'service-vouchers':
         return <GuestVoucherSystem />;
       case 'users':
-        return <AdminSecurity initialTab="users" />;
+        return <AdminSecurity initialTab="users" onNavigate={setActivePage} />;
       case 'roles-permissions':
-        return <AdminSecurity initialTab="roles" />;
+        return <AdminSecurity initialTab="roles" onNavigate={setActivePage} />;
       case 'occupancy-heatmap':
         return <OccupancyHeatmap />;
       case 'master-data':
