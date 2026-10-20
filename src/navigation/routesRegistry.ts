@@ -738,6 +738,36 @@ for (const route of MAIN_PANEL_ROUTES) {
   ID_TO_MAIN_ROUTE_MAP.set(route.id, route);
 }
 
+// Aliases for resilient direct URL access across all settings sub-modules
+const userRoute = SLUG_TO_ROUTE_MAP.get('/users');
+if (userRoute) {
+  SLUG_TO_ROUTE_MAP.set('/user-management', userRoute);
+  SLUG_TO_ROUTE_MAP.set('/staff', userRoute);
+}
+
+const rolesRoute = SLUG_TO_ROUTE_MAP.get('/roles-permissions');
+if (rolesRoute) {
+  SLUG_TO_ROUTE_MAP.set('/roles', rolesRoute);
+  SLUG_TO_ROUTE_MAP.set('/permissions', rolesRoute);
+}
+
+const masterDataRoute = SLUG_TO_ROUTE_MAP.get('/master-data');
+if (masterDataRoute) {
+  SLUG_TO_ROUTE_MAP.set('/master-data-config', masterDataRoute);
+}
+
+const policyRoute = SLUG_TO_ROUTE_MAP.get('/policy-settings');
+if (policyRoute) {
+  SLUG_TO_ROUTE_MAP.set('/policy-management', policyRoute);
+  SLUG_TO_ROUTE_MAP.set('/policies', policyRoute);
+}
+
+const generalRoute = SLUG_TO_ROUTE_MAP.get('/general-settings');
+if (generalRoute) {
+  SLUG_TO_ROUTE_MAP.set('/system-settings', generalRoute);
+  SLUG_TO_ROUTE_MAP.set('/settings', generalRoute);
+}
+
 for (const report of REPORT_PANEL_ROUTES) {
   SLUG_TO_ROUTE_MAP.set(report.slug, report);
   TITLE_TO_REPORT_MAP.set(report.title.toLowerCase(), report);

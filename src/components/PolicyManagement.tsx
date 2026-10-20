@@ -11,8 +11,11 @@ import {
     Plus,
     Edit2,
     Trash2,
-    X
+    X,
+    Info,
+    Check
 } from 'lucide-react';
+import SecuritySettingsHubNav from './SecuritySettingsHubNav';
 
 interface PolicyManagementProps {
     onNavigate?: (page: string) => void;
@@ -29,7 +32,7 @@ interface PolicyRule {
     isActive: boolean;
 }
 
-export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
+export const PolicyManagement: React.FC<PolicyManagementProps> = ({ onNavigate }) => {
     const [activeTab, setActiveTab] = useState<'cancellation' | 'checkin' | 'deposits' | 'occupancy' | 'damages'>('cancellation');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -281,6 +284,33 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                     <span>{toastMessage}</span>
                 </div>
             )}
+
+            {/* Security & Settings Suite Unified Navigation */}
+            <SecuritySettingsHubNav activeHub="policy" onNavigate={onNavigate} />
+
+            {/* Informative Micro-guide for Front Desk & Management */}
+            <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                        <Info size={16} />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900">Hotel Policy Automation Engine</span>
+                            <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Live Active</span>
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-0.5">
+                            এখানকার রুলস অনুযায়ী গেস্টদের ক্যান্সেলেশন ফি, আর্লি চেক-ইন এবং লেট চেক-আউট পেনাল্টি অটোমেটিক্যালি বিল ফোলিওতে যোগ হবে।
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-gray-600 flex-shrink-0 font-medium">
+                    <span className="inline-flex items-center gap-1 text-blue-700 bg-white px-2 py-1 rounded-md border border-blue-200 shadow-2xs">
+                        <Check size={11} className="text-emerald-600" />
+                        <span>Zero Manual Calculation</span>
+                    </span>
+                </div>
+            </div>
 
             {/* Elevated Header Card */}
             <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">

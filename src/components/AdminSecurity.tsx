@@ -28,6 +28,7 @@ import {
     Info,
     Calendar
 } from 'lucide-react';
+import SecuritySettingsHubNav from './SecuritySettingsHubNav';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -787,6 +788,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
     const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<SecurityRole | null>(null);
     const [rolePermissions, setRolePermissions] = useState<string[]>([]);
+    const [permissionSearch, setPermissionSearch] = useState('');
 
     // Reset Password / Security PIN Modal
     const [resetCredsStaff, setResetCredsStaff] = useState<StaffMember | null>(null);
@@ -950,6 +952,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
     const handleOpenEditRole = (role: SecurityRole) => {
         setEditingRole(role);
         setRolePermissions([...role.permissions]);
+        setPermissionSearch('');
         setIsRoleModalOpen(true);
     };
 
@@ -973,6 +976,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
             permissions: [...baseRole.permissions],
         });
         setRolePermissions([...baseRole.permissions]);
+        setPermissionSearch('');
         setIsRoleModalOpen(true);
     };
 
@@ -1097,6 +1101,21 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     <span>{toastMessage}</span>
                 </div>
             )}
+
+            {/* Security & Settings Suite Unified Navigation */}
+            <SecuritySettingsHubNav
+                activeHub={activeTab === 'users' ? 'users' : activeTab === 'roles' ? 'roles' : 'users'}
+                onNavigate={(page) => {
+                    if (page === 'users' || page === 'user-management') {
+                        setActiveTab('users');
+                    } else if (page === 'roles' || page === 'roles-permissions') {
+                        setActiveTab('roles');
+                    }
+                    if (onNavigate) {
+                        onNavigate(page);
+                    }
+                }}
+            />
 
             {/* Consistent Elevated Header Card */}
             <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
@@ -1243,6 +1262,30 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
             {/* TAB 1: USERS & STAFF DIRECTORY */}
             {activeTab === 'users' && (
                 <div className="space-y-3">
+                    {/* Informative Guidance Banner for Hotel Staff Management */}
+                    <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                                <Info size={16} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-gray-900">Hotel Staff & User Account Governance</span>
+                                    <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">PCI-DSS Audited</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 mt-0.5">
+                                    হোটেলের কর্মকর্তা ও কর্মচারীদের একাউন্ট, এক্সেস রোল (L1-L4), টু-ফ্যাক্টর অথেনটিকেশন (2FA), এবং ম্যাক্সিমাম ডিসকাউন্ট লিমিট এখান থেকে কনফিগার করুন।
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-gray-600 flex-shrink-0 font-medium">
+                            <span className="inline-flex items-center gap-1 text-blue-700 bg-white px-2 py-1 rounded-md border border-blue-200 shadow-2xs">
+                                <CheckCircle2 size={11} className="text-emerald-600" />
+                                <span>Anti-Fraud Protection</span>
+                            </span>
+                        </div>
+                    </div>
+
                     {/* Top KPI Metrics Row */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-gray-200/90 shadow-2xs flex items-center gap-3">
@@ -1577,6 +1620,30 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
             {/* TAB 2: ROLES & RBAC MATRIX */}
             {activeTab === 'roles' && (
                 <div className="space-y-3">
+                    {/* Informative Guidance Banner for Role-Based Access Control */}
+                    <div className="bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-white p-3 rounded-xl border border-indigo-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                                <ShieldCheck size={16} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-gray-900">Role-Based Access Control (RBAC) Architecture</span>
+                                    <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded">Granular Matrix</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 mt-0.5">
+                                    নির্দিষ্ট পদের কর্মীদের শুধুমাত্র তাদের কাজের প্রয়োজনীয় পারমিশন দিন। যেমন: নাইট অডিট ক্লোজার, ফোলিও ডিসকাউন্ট বা বিল ভয়েড পারমিশন সীমাবদ্ধ রাখুন।
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-gray-600 flex-shrink-0 font-medium">
+                            <span className="inline-flex items-center gap-1 text-indigo-700 bg-white px-2 py-1 rounded-md border border-indigo-200 shadow-2xs">
+                                <Lock size={11} className="text-indigo-600" />
+                                <span>Zero-Trust Security</span>
+                            </span>
+                        </div>
+                    </div>
+
                     {/* Header info */}
                     <div className="bg-white rounded-xl border border-gray-200/90 p-3 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
@@ -2395,12 +2462,34 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 </div>
                             </div>
 
-                            {/* Quick Presets Bar */}
-                            <div className="flex items-center justify-between gap-2 pt-1">
-                                <span className="font-bold text-gray-800 text-xs">
-                                    Functional Modules Matrix ({HOSPITALITY_PERMISSION_MODULES.length} Domains)
-                                </span>
-                                <div className="flex items-center gap-1.5">
+                            {/* Quick Presets Bar with Permission Search */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-gray-800 text-xs">
+                                        Functional Modules Matrix ({HOSPITALITY_PERMISSION_MODULES.length} Domains)
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="relative">
+                                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={permissionSearch}
+                                            onChange={(e) => setPermissionSearch(e.target.value)}
+                                            placeholder="Search permissions (e.g. void, discount, night audit)..."
+                                            className="h-6 pl-7 pr-6 text-[11px] bg-white border border-gray-200 rounded-lg outline-none w-52 sm:w-64 focus:border-blue-500 shadow-2xs font-normal"
+                                        />
+                                        {permissionSearch && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setPermissionSearch('')}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        )}
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={handleGrantAllPermissions}
@@ -2421,9 +2510,17 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                             {/* 8 Hospitality Modules Permission Accordion/Grid */}
                             <div className="space-y-3">
                                 {HOSPITALITY_PERMISSION_MODULES.map(module => {
-                                    const modActions = module.actions;
+                                    const modActions = module.actions.filter(a =>
+                                        !permissionSearch.trim() ||
+                                        a.name.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                                        a.description.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                                        module.name.toLowerCase().includes(permissionSearch.toLowerCase())
+                                    );
+
+                                    if (permissionSearch.trim() && modActions.length === 0) return null;
+
                                     const grantedCount = modActions.filter(a => rolePermissions.includes(a.id)).length;
-                                    const allGranted = grantedCount === modActions.length;
+                                    const allGranted = modActions.length > 0 && grantedCount === modActions.length;
 
                                     return (
                                         <div

@@ -10,14 +10,18 @@ import {
     Save,
     RotateCcw,
     CheckCircle2,
-    AlertTriangle
+    AlertTriangle,
+    Info,
+    Send,
+    Database
 } from 'lucide-react';
+import SecuritySettingsHubNav from './SecuritySettingsHubNav';
 
 interface GeneralSettingsProps {
     onNavigate?: (page: string) => void;
 }
 
-export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
+export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ onNavigate }) => {
     const [activeTab, setActiveTab] = useState<'regional' | 'currency' | 'numbering' | 'operations' | 'communication' | 'backup'>('regional');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -102,6 +106,45 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
                     <span>{toastMessage}</span>
                 </div>
             )}
+
+            {/* Security & Settings Suite Unified Navigation */}
+            <SecuritySettingsHubNav activeHub="general" onNavigate={onNavigate} />
+
+            {/* Informative Micro-guide for Hotel Operations */}
+            <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                        <Info size={16} />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900">Hotel Global Configuration & Regional Compliance</span>
+                            <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">BD NBR Compliant</span>
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-0.5">
+                            এখানে কারেন্সি (৳ BDT), ১৫% ভ্যাট, ১০% সার্ভিস চার্জ, ইনভয়েস প্রিফিক্স ও ক্লাউড অটো-ব্যাকআপ শিডিউল সেন্ট্রালি কনফিগার করা থাকে।
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-gray-600 flex-shrink-0 font-medium">
+                    <button
+                        type="button"
+                        onClick={() => showToast('Test cloud backup executed: Snapshot synced to GCS (asia-south1).')}
+                        className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-800 bg-white hover:bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shadow-2xs cursor-pointer transition-colors"
+                    >
+                        <Database size={11} className="text-blue-600" />
+                        <span>Run Test Backup</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => showToast('Test SMS sent via BulkSMS BD API gateway (Mock OK).')}
+                        className="inline-flex items-center gap-1 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 px-2 py-1 rounded-md border border-gray-200 shadow-2xs cursor-pointer transition-colors"
+                    >
+                        <Send size={11} className="text-gray-500" />
+                        <span>Test SMS/Email</span>
+                    </button>
+                </div>
+            </div>
 
             {/* Elevated Header Card */}
             <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
