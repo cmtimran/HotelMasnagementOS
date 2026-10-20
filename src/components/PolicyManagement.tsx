@@ -1,334 +1,548 @@
-import { useState } from 'react';
-import { 
-    Settings, XCircle, CreditCard, 
-    EyeOff, LogOut, LogIn, User,
-    BedDouble, ShieldCheck, Save, Info,
-    Calendar, Users, Zap, Heart,
-    Ban, FileText,
-    ChevronRight, DollarSign, Percent,
-    Briefcase, ShieldAlert,
-    Download, Plus, Trash2, 
-    AlertCircle, History
+import React, { useState } from 'react';
+import {
+    ShieldCheck,
+    Calendar,
+    Clock,
+    CreditCard,
+    Users,
+    AlertTriangle,
+    Save,
+    CheckCircle2,
+    Plus,
+    Edit2,
+    Trash2,
+    X
 } from 'lucide-react';
 
-const PolicyManagement = () => {
-    const [activeTab, setActiveTab] = useState('booking');
-    const [activeSubTab, setActiveSubTab] = useState('cancellation');
-    const [showApprovalCenter, setShowApprovalCenter] = useState(false);
+interface PolicyManagementProps {
+    onNavigate?: (page: string) => void;
+}
 
-    // --- State for Dynamic Rules ---
-    const [rules] = useState<any[]>([
-        { id: 1, type: 'cancellation', name: 'Flexible Rule', conditions: { days_before: 30 }, action: { type: 'REFUND', value: 100 }, priority: 1 },
-        { id: 2, type: 'cancellation', name: 'Standard Rule', conditions: { days_before: 14 }, action: { type: 'REFUND', value: 50 }, priority: 2 },
-    ]);
+interface PolicyRule {
+    id: string;
+    title: string;
+    category: 'cancellation' | 'checkin' | 'deposits' | 'occupancy' | 'damages';
+    condition: string;
+    action: string;
+    penaltyAmount: string;
+    requiresApproval: boolean;
+    isActive: boolean;
+}
 
-    const Utensils = ({ size }: any) => <Zap size={size} />; // Defined before usage in categories
+export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
+    const [activeTab, setActiveTab] = useState<'cancellation' | 'checkin' | 'deposits' | 'occupancy' | 'damages'>('cancellation');
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-    const categories = [
-        { id: 'booking', label: 'Booking & Cancel', icon: <Calendar size={18} /> },
-        { id: 'stay', label: 'Front Desk & Stay', icon: <BedDouble size={18} /> },
-        { id: 'finance', label: 'Finance & Controls', icon: <DollarSign size={18} /> },
-        { id: 'outlets', label: 'Services & Outlets', icon: <Utensils size={18} /> },
-        { id: 'ops', label: 'Internal Ops', icon: <Settings size={18} /> },
-    ];
-
-    const subTabs: Record<string, { id: string; label: string; icon: any }[]> = {
-        booking: [
-            { id: 'cancellation', label: 'Cancellation Policy', icon: <XCircle size={16} /> },
-            { id: 'no-show', label: 'No-Show Strategy', icon: <EyeOff size={16} /> },
-            { id: 'overbooking', label: 'Overbooking/Waitlist', icon: <AlertCircle size={16} /> },
-            { id: 'group', label: 'Group Booking Rules', icon: <Users size={16} /> },
-        ],
-        stay: [
-            { id: 'checkin-early', label: 'Early Check-in', icon: <LogIn size={16} /> },
-            { id: 'checkout-early', label: 'Early Departure', icon: <LogOut size={16} /> },
-            { id: 'age-policy', label: 'Age & Child Extra Bed', icon: <User size={16} /> },
-            { id: 'smoking', label: 'Smoking & Penalties', icon: <Ban size={16} /> },
-        ],
-        finance: [
-            { id: 'deposit', label: 'Security & Incidental', icon: <CreditCard size={16} /> },
-            { id: 'refund', label: 'Refund Workflow', icon: <History size={16} /> },
-            { id: 'adjustment', label: 'Adjustment & Void', icon: <Percent size={16} /> },
-            { id: 'currency', label: 'Currency/Exchange', icon: <DollarSign size={16} /> },
-        ],
-        outlets: [
-            { id: 'meal-plan', label: 'Meal Plan Policy', icon: <FileText size={16} /> },
-            { id: 'parking', label: 'Parking Management', icon: <Zap size={16} /> },
-            { id: 'res-booking', label: 'Gym/Spa Resources', icon: <History size={16} /> },
-            { id: 'minibar', label: 'Minibar Restock', icon: <ShieldAlert size={16} /> },
-        ],
-        ops: [
-            { id: 'loyalty', label: 'Loyalty & Agents', icon: <Heart size={16} /> },
-            { id: 'house-use', label: 'Comp/House Use', icon: <Briefcase size={16} /> },
-            { id: 'maintenance', label: 'Maintenance Blocking', icon: <Settings size={16} /> },
-            { id: 'legal', label: 'Security & Legal', icon: <ShieldCheck size={16} /> },
-        ]
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3500);
     };
 
-    const SectionTitle = ({ title, sub }: { title: string, sub: string }) => (
-        <div className="mb-10">
-            <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase italic">{title}</h1>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">{sub}</p>
-        </div>
-    );
+    // Pre-configured Hotel Operational Policy Rules
+    const [policies, setPolicies] = useState<PolicyRule[]>([
+        // Cancellation
+        {
+            id: 'pol-101',
+            title: 'Standard Transient Flexible Cancellation',
+            category: 'cancellation',
+            condition: 'Cancellation received > 48 Hours before 14:00 check-in',
+            action: 'Full 100% Refund of advance payment, Zero Penalty',
+            penaltyAmount: '0%',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-102',
+            title: 'Late Notice Cancellation Window (24 - 48 Hours)',
+            category: 'cancellation',
+            condition: 'Cancellation received between 24h and 48h prior to arrival',
+            action: 'Charge 50% of the first night room tariff + taxes',
+            penaltyAmount: '50% First Night',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-103',
+            title: 'Same-Day Cancellation & Guest No-Show Penalty',
+            category: 'cancellation',
+            condition: 'Cancellation < 24 Hours or Guest fails to arrive by 23:59',
+            action: 'Full 100% forfeiture of 1st night room charge; release room rack',
+            penaltyAmount: '100% 1st Night',
+            requiresApproval: true,
+            isActive: true,
+        },
+        {
+            id: 'pol-104',
+            title: 'Non-Refundable Promotional Rate Rule',
+            category: 'cancellation',
+            condition: 'Bookings tagged with "PROMO-NONREF" or "FLASH-SALE"',
+            action: '100% Non-refundable under all circumstances',
+            penaltyAmount: '100% Full Stay',
+            requiresApproval: true,
+            isActive: true,
+        },
 
-    const RuleCard = ({ rule }: any) => (
-        <div className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-sm hover:shadow-xl transition-all group">
-            <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black">
-                        #{rule.priority}
+        // Check-in & Check-out
+        {
+            id: 'pol-201',
+            title: 'Early Arrival Morning Slot (06:00 - 10:00 AM)',
+            category: 'checkin',
+            condition: 'Guest arrives between 06:00 and 10:00 AM',
+            action: 'Apply Early Check-In Surcharge of 50% room tariff (Subject to clean room)',
+            penaltyAmount: '50% Room Rate',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-202',
+            title: 'Mid-Day Courtesy Check-in (10:00 AM - 14:00 PM)',
+            category: 'checkin',
+            condition: 'Guest arrives between 10:00 AM and standard 14:00 PM',
+            action: 'Complimentary early access granted if room is inspected & vacant',
+            penaltyAmount: '৳ 0 (Complimentary)',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-203',
+            title: 'Afternoon Late Check-Out (12:00 - 15:00 PM)',
+            category: 'checkin',
+            condition: 'Guest requests departure extension up to 15:00 PM',
+            action: 'Charge 25% of prevailing daily room tariff',
+            penaltyAmount: '25% Room Rate',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-204',
+            title: 'Evening Extended Stay Check-Out (15:00 - 18:00 PM)',
+            category: 'checkin',
+            condition: 'Guest requests departure extension up to 18:00 PM',
+            action: 'Charge 50% of room tariff; blocks room for evening turnaround',
+            penaltyAmount: '50% Room Rate',
+            requiresApproval: true,
+            isActive: true,
+        },
+        {
+            id: 'pol-205',
+            title: 'Late Night Departure (> 18:00 PM)',
+            category: 'checkin',
+            condition: 'Guest departs hotel after 18:00 PM',
+            action: 'Full 100% additional 1-night room charge automatically billed',
+            penaltyAmount: '100% Full Night',
+            requiresApproval: false,
+            isActive: true,
+        },
+
+        // Deposits & Guarantees
+        {
+            id: 'pol-301',
+            title: 'Incidental Security Deposit Requirement',
+            category: 'deposits',
+            condition: 'Mandatory upon check-in registration for all transient guests',
+            action: 'Collect ৳ 5,000 / $50 per room via Card Pre-Auth or Cash Float',
+            penaltyAmount: '৳ 5,000 / night',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-302',
+            title: 'Credit Limit Threshold & Auto-Folio Suspension',
+            category: 'deposits',
+            condition: 'Guest room charges exceed ৳ 35,000 / $300 without interim payment',
+            action: 'Suspends further room service / POS posting until payment top-up',
+            penaltyAmount: 'Limit ৳ 35,000',
+            requiresApproval: false,
+            isActive: true,
+        },
+
+        // Occupancy & Extra Beds
+        {
+            id: 'pol-401',
+            title: 'Infant & Child Policy (< 6 Years)',
+            category: 'occupancy',
+            condition: 'Up to 2 children under 6 years sharing existing adult bedding',
+            action: 'Complimentary stay and complimentary buffet breakfast',
+            penaltyAmount: 'Free',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-402',
+            title: 'Junior Child Extra Bed & Breakfast (6 - 12 Years)',
+            category: 'occupancy',
+            condition: 'Children aged 6 to 12 requiring rollaway bed',
+            action: 'Billed at ৳ 1,500 + tax per night inclusive of breakfast',
+            penaltyAmount: '৳ 1,500 / night',
+            requiresApproval: false,
+            isActive: true,
+        },
+        {
+            id: 'pol-403',
+            title: 'Adult Extra Person Surcharge (> 12 Years)',
+            category: 'occupancy',
+            condition: 'Third adult in King or Twin Room category',
+            action: 'Rollaway extra bed and full breakfast package provided',
+            penaltyAmount: '৳ 2,500 / night',
+            requiresApproval: false,
+            isActive: true,
+        },
+
+        // Damages & Minibar
+        {
+            id: 'pol-501',
+            title: 'Strict Non-Smoking Room Violation Penalty',
+            category: 'damages',
+            condition: 'Evidence of smoking, vaping or incense in non-smoking suites',
+            action: 'Automated ৳ 25,000 / $250 deep cleaning and ozone sanitization fee',
+            penaltyAmount: '৳ 25,000',
+            requiresApproval: true,
+            isActive: true,
+        },
+        {
+            id: 'pol-502',
+            title: 'Linen & Property Asset Staining / Damage',
+            category: 'damages',
+            condition: 'Irreparable damage or missing linen, bathrobes, or electronics',
+            action: 'Charged at statutory standard master replacement asset price + 20%',
+            penaltyAmount: 'Cost + 20%',
+            requiresApproval: true,
+            isActive: true,
+        },
+    ]);
+
+    // Modal State for New Rule
+    const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
+    const [editingRule, setEditingRule] = useState<PolicyRule | null>(null);
+
+    const toggleRuleStatus = (ruleId: string) => {
+        setPolicies(prev =>
+            prev.map(p => {
+                if (p.id === ruleId) {
+                    const next = !p.isActive;
+                    showToast(`Policy "${p.title}" ${next ? 'activated' : 'deactivated'}.`);
+                    return { ...p, isActive: next };
+                }
+                return p;
+            })
+        );
+    };
+
+    const handleDeleteRule = (ruleId: string) => {
+        setPolicies(prev => prev.filter(p => p.id !== ruleId));
+        showToast('Policy rule removed.');
+    };
+
+    const handleSaveRule = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const title = formData.get('title') as string;
+        const condition = formData.get('condition') as string;
+        const action = formData.get('action') as string;
+        const penaltyAmount = formData.get('penaltyAmount') as string;
+        const requiresApproval = formData.get('requiresApproval') === 'on';
+
+        if (editingRule) {
+            setPolicies(prev =>
+                prev.map(p =>
+                    p.id === editingRule.id
+                        ? { ...p, title, condition, action, penaltyAmount, requiresApproval }
+                        : p
+                )
+            );
+            showToast(`Policy "${title}" updated successfully.`);
+        } else {
+            const newRule: PolicyRule = {
+                id: `pol-${Date.now().toString().slice(-3)}`,
+                title,
+                category: activeTab,
+                condition,
+                action,
+                penaltyAmount,
+                requiresApproval,
+                isActive: true,
+            };
+            setPolicies(prev => [newRule, ...prev]);
+            showToast(`New policy "${title}" added.`);
+        }
+
+        setIsAddRuleOpen(false);
+        setEditingRule(null);
+    };
+
+    const currentPolicies = policies.filter(p => p.category === activeTab);
+
+    return (
+        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
+            {/* Toast Notification */}
+            {toastMessage && (
+                <div className="fixed bottom-4 right-4 z-[120] bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200 border border-gray-700">
+                    <CheckCircle2 size={16} className="text-emerald-400" />
+                    <span>{toastMessage}</span>
+                </div>
+            )}
+
+            {/* Elevated Header Card */}
+            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-sm shadow-2xs flex-shrink-0">
+                            <ShieldCheck size={22} className="text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight truncate">
+                                    Hotel Operations & Guest Policy Governance
+                                </h1>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
+                                    Automated Rules Engine
+                                </span>
+                                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                    {policies.filter(p => p.isActive).length} Active Rules
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
+                                <span className="flex items-center gap-1">
+                                    <Calendar size={11} className="text-gray-400" />
+                                    <span>Free Cancel: 48h Window</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <Clock size={11} className="text-gray-400" />
+                                    <span>Standard Check-in: 14:00 | Out: 12:00</span>
+                                </span>
+                                <span className="hidden sm:flex items-center gap-1">
+                                    <CreditCard size={11} className="text-gray-400" />
+                                    <span>Incidental Deposit: ৳ 5,000 / Night</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 className="font-black text-gray-900 uppercase italic tracking-tight">{rule.name}</h4>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Rule ID: {rule.id}</p>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setEditingRule(null);
+                                setIsAddRuleOpen(true);
+                            }}
+                            className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        >
+                            <Plus size={13} />
+                            <span>+ Add Policy Rule</span>
+                        </button>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <button className="p-2 text-gray-300 hover:text-indigo-600 transition-colors"><Settings size={16} /></button>
-                    <button className="p-2 text-gray-300 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
-                </div>
-            </div>
-            
-            <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-2xl border border-dashed border-gray-200">
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Conditions (IF)</p>
-                    <div className="flex flex-wrap gap-2">
-                        {Object.entries(rule.conditions).map(([key, val]) => (
-                            <span key={key} className="px-3 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-600">
-                                {key.replace('_', ' ')}: <span className="text-indigo-600">{val as string}</span>
-                            </span>
+
+                {/* Segmented Navigation Tabs */}
+                <div className="px-3 sm:px-4 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center gap-1 sm:gap-1.5">
+                        {[
+                            { id: 'cancellation', label: 'Booking & Cancellation', icon: Calendar, count: policies.filter(p => p.category === 'cancellation').length },
+                            { id: 'checkin', label: 'Check-In / Out & Early/Late', icon: Clock, count: policies.filter(p => p.category === 'checkin').length },
+                            { id: 'deposits', label: 'Incidental Deposits & Credit', icon: CreditCard, count: policies.filter(p => p.category === 'deposits').length },
+                            { id: 'occupancy', label: 'Children, Extra Beds & Pax', icon: Users, count: policies.filter(p => p.category === 'occupancy').length },
+                            { id: 'damages', label: 'Smoking, Minibar & Damages', icon: AlertTriangle, count: policies.filter(p => p.category === 'damages').length },
+                        ].map(t => (
+                            <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setActiveTab(t.id as any)}
+                                className={`h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === t.id
+                                    ? 'bg-white text-blue-700 shadow-2xs border border-gray-200 font-bold'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                                    }`}
+                            >
+                                <t.icon size={13} />
+                                <span>{t.label}</span>
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                    {t.count}
+                                </span>
+                            </button>
                         ))}
                     </div>
                 </div>
-                <div className="bg-indigo-600 p-4 rounded-2xl text-white">
-                    <p className="text-[9px] font-black text-indigo-200 uppercase tracking-widest mb-2">Action (THEN)</p>
-                    <p className="text-xs font-black uppercase italic tracking-wider">Apply {rule.action.type}: {rule.action.value}%</p>
-                </div>
             </div>
-        </div>
-    );
 
-    const ApprovalItem = ({ request }: any) => (
-        <div className="bg-white border border-gray-100 rounded-3xl p-6 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-6">
-                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
-                    <ShieldAlert size={28} />
-                </div>
-                <div>
-                    <h4 className="text-sm font-black text-gray-900 uppercase italic leading-tight">{request.type} Request</h4>
-                    <p className="text-xs text-gray-500 font-bold mt-1">Requested by {request.staff} • <span className="text-amber-600">${request.amount}</span></p>
-                </div>
-            </div>
-            <div className="flex gap-3">
-                <button className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all">Reject</button>
-                <button className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition-all">Approve</button>
-            </div>
-        </div>
-    );
-
-    return (
-        <div className="min-h-screen bg-[#fcfcfd] flex animate-fadeIn font-sans selection:bg-indigo-100 selection:text-indigo-900">
-            {/* Sidebar */}
-            <div className="w-80 bg-white border-r border-gray-100 flex flex-col shadow-sm fixed h-full z-10">
-                <div className="p-8 border-b border-gray-50 bg-gradient-to-br from-indigo-50/50 to-white">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
-                            <ShieldCheck size={28} />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black text-gray-900 tracking-tighter uppercase italic leading-none">Control</h2>
-                            <p className="text-[9px] text-indigo-500 font-bold uppercase tracking-widest mt-1">Global Policy Hub</p>
-                        </div>
-                    </div>
-
-                    <button 
-                        onClick={() => setShowApprovalCenter(!showApprovalCenter)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-all ${showApprovalCenter ? 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-600/30' : 'bg-white border-amber-100 text-amber-600 hover:bg-amber-50'}`}
+            {/* Policy Rules List */}
+            <div className="space-y-2.5">
+                {currentPolicies.map((rule, index) => (
+                    <div
+                        key={rule.id}
+                        className={`bg-white rounded-xl border p-3.5 shadow-2xs transition-all space-y-2.5 ${rule.isActive ? 'border-gray-200/90 hover:border-blue-200' : 'border-gray-200/60 opacity-60 bg-gray-50/50'}`}
                     >
-                        <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
-                            <ShieldAlert size={16} />
-                            <span>Approval Center</span>
-                        </div>
-                        {!showApprovalCenter && <span className="w-5 h-5 bg-amber-600 text-white flex items-center justify-center rounded-full text-[10px] font-black animate-pulse">3</span>}
-                    </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
-                    {!showApprovalCenter ? categories.map((cat) => (
-                        <div key={cat.id} className="space-y-1">
-                            <button
-                                onClick={() => {
-                                    setActiveTab(cat.id);
-                                    setActiveSubTab(subTabs[cat.id]?.[0]?.id || '');
-                                }}
-                                className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all ${
-                                    activeTab === cat.id 
-                                    ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/30 translate-x-1' 
-                                    : 'text-gray-500 hover:bg-gray-50 font-bold'
-                                }`}
-                            >
-                                <div className="flex items-center gap-4 text-xs tracking-widest uppercase font-black">
-                                    {cat.icon}
-                                    <span>{cat.label}</span>
-                                </div>
-                                {activeTab === cat.id && <ChevronRight size={16} className="text-indigo-200" />}
-                            </button>
-
-                            {activeTab === cat.id && (
-                                <div className="ml-8 space-y-1 p-2 animate-slideDown">
-                                    {subTabs[cat.id]?.map((sub) => (
-                                        <button
-                                            key={sub.id}
-                                            onClick={() => setActiveSubTab(sub.id)}
-                                            className={`w-full text-left px-4 py-3 rounded-xl text-[11px] font-black tracking-wide capitalize transition-all ${
-                                                activeSubTab === sub.id 
-                                                ? 'bg-indigo-50 text-indigo-700' 
-                                                : 'text-gray-400 hover:text-gray-600'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                {sub.icon}
-                                                {sub.label}
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )) : (
-                        <div className="p-4 bg-gray-50 rounded-3xl border border-gray-100">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Quick Stats</p>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center text-xs font-bold">
-                                    <span className="text-gray-600">Avg. Delay</span>
-                                    <span className="text-amber-600">12m</span>
-                                </div>
-                                <div className="flex justify-between items-center text-xs font-bold">
-                                    <span className="text-gray-600">Reject Rate</span>
-                                    <span className="text-red-500">4.2%</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div className="p-6 border-t border-gray-50 bg-gray-50/50">
-                    <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-3 hover:bg-black transition-all">
-                        <Save size={16} className="text-indigo-400" /> 
-                        Deploy System Wide
-                    </button>
-                </div>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="flex-1 ml-80 overflow-y-auto p-12 lg:p-20 bg-white min-h-screen">
-                <div className="max-w-5xl mx-auto">
-                    
-                    {showApprovalCenter ? (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <SectionTitle title="Gatekeeper Queue" sub="Verification Layer / Manager Override" />
-                            
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="bg-amber-50 h-10 px-6 rounded-full flex items-center gap-3 border border-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-widest mb-4">
-                                    <AlertCircle size={14} />
-                                    Sensitive transactions detected above staff threshold ($10.00)
-                                </div>
-                                
-                                <ApprovalItem request={{ type: 'Folio Adjustment', staff: 'Rashedul (Front Desk)', amount: 250, id: 'REQ-01' }} />
-                                <ApprovalItem request={{ type: 'Refund Request', staff: 'Mim (Accounts)', amount: 1500, id: 'REQ-02' }} />
-                                <ApprovalItem request={{ type: 'Waive Late Fee', staff: 'Tanvir (Duty Mgr)', amount: 45, id: 'REQ-03' }} />
-                                
-                                <div className="mt-12 p-8 border border-dashed border-gray-200 rounded-[3rem] text-center">
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">End of Pending Queue</p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="animate-in fade-in duration-500">
-                            <div className="flex items-center justify-between mb-16">
-                                <div className="flex items-center gap-6">
-                                    <div className="w-20 h-20 bg-gray-50 rounded-[2rem] flex items-center justify-center text-gray-900 border border-gray-100 shadow-sm relative rotate-3 transition-transform hover:rotate-0">
-                                        {categories.find(c => c.id === activeTab)?.icon}
-                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 rounded-full border-4 border-white animate-pulse" />
-                                    </div>
-                                    <SectionTitle title={activeSubTab.replace('-', ' ')} sub={`Operational Protocol / ${activeTab}`} />
-                                </div>
-                                <div className="flex gap-4">
-                                    <button className="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-100 transition-all">
-                                        <History size={16} /> Audit Logs
-                                    </button>
-                                    <button className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition-all">
-                                        <Plus size={16} /> Add New Rule
-                                    </button>
-                                </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] flex items-center justify-center font-mono">
+                                    #{index + 1}
+                                </span>
+                                <h3 className="text-xs font-bold text-gray-900">{rule.title}</h3>
+                                {rule.requiresApproval && (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                        Manager Override Req.
+                                    </span>
+                                )}
                             </div>
 
-                            {/* Active Module Logic Shell */}
-                            <div className="space-y-12">
-                                {/* Rule Engine Display */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {rules.filter(r => r.type === activeSubTab).map(rule => (
-                                        <RuleCard key={rule.id} rule={rule} />
-                                    ))}
-                                    
-                                    <div className="border-2 border-dashed border-indigo-50 rounded-[2rem] p-12 flex flex-col items-center justify-center text-center group cursor-pointer hover:border-indigo-200 hover:bg-indigo-50/30 transition-all">
-                                        <div className="w-16 h-16 bg-indigo-50 text-indigo-400 rounded-full flex items-center justify-center mb-6 border border-indigo-100 group-hover:scale-110 transition-transform">
-                                            <Plus size={32} />
-                                        </div>
-                                        <h4 className="text-xl font-black text-indigo-900 uppercase italic mb-2">Create Global Override</h4>
-                                        <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest max-w-[200px]">Define a new automated policy for this module.</p>
-                                    </div>
-                                </div>
-
-                                {/* Placeholder for Detailed Inputs based on activeSubTab */}
-                                <div className="p-16 bg-gray-900 rounded-[4rem] text-white relative overflow-hidden">
-                                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
-                                        <div className="flex-1 space-y-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg"><Zap size={20} /></div>
-                                                <h3 className="text-3xl font-black uppercase italic tracking-tighter">AI Rule Evaluator</h3>
-                                            </div>
-                                            <p className="text-sm text-gray-400 font-medium leading-relaxed">
-                                                The current <span className="text-indigo-400">"{activeSubTab}"</span> state is being evaluated against the enterprise rule engine. 
-                                                All triggers will respond within <span className="text-white">12ms</span> across your global property network.
-                                            </p>
-                                            <div className="flex gap-4">
-                                                <button className="px-6 py-3 bg-white text-gray-900 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all">Test Simulation</button>
-                                                <button className="px-6 py-3 bg-gray-800 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-gray-700 hover:text-white transition-all">View Schema</button>
-                                            </div>
-                                        </div>
-                                        <div className="w-full md:w-80 h-80 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-[3rem] border border-white/10 p-8 flex flex-col justify-center gap-4">
-                                            {[1, 2, 3].map(i => (
-                                                <div key={i} className="h-12 bg-white/5 rounded-2xl border border-white/10 animate-pulse flex items-center px-4">
-                                                    <div className="w-2 h-2 rounded-full bg-indigo-500 mr-4" />
-                                                    <div className="h-2 w-32 bg-white/10 rounded-full" />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <Zap size={300} className="absolute -right-20 -bottom-20 text-white/[0.03] rotate-12" />
-                                </div>
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-gray-100 text-gray-800 border border-gray-200">
+                                    {rule.penaltyAmount}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleRuleStatus(rule.id)}
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${rule.isActive
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                >
+                                    {rule.isActive ? 'Active' : 'Disabled'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingRule(rule);
+                                        setIsAddRuleOpen(true);
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                                    title="Edit Rule"
+                                >
+                                    <Edit2 size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteRule(rule.id)}
+                                    className="p-1 text-gray-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                    title="Delete Rule"
+                                >
+                                    <Trash2 size={13} />
+                                </button>
                             </div>
                         </div>
-                    )}
 
-                    <div className="mt-24 pt-12 border-t border-gray-100 flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-gray-300">
-                            <Info size={16} />
-                            <p className="text-[10px] uppercase font-black tracking-widest leading-none">Security Protocol: SHA-256 Policy Encryption Active</p>
-                        </div>
-                        <div className="flex gap-4">
-                            <button className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm">
-                                <Download size={20} />
-                            </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                            <div className="p-2.5 bg-gray-50/70 border border-gray-200/70 rounded-lg space-y-1">
+                                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Trigger Condition (IF):</span>
+                                <p className="font-medium text-gray-800">{rule.condition}</p>
+                            </div>
+                            <div className="p-2.5 bg-blue-50/40 border border-blue-200/70 rounded-lg space-y-1">
+                                <span className="text-[10px] uppercase font-bold text-blue-500 tracking-wider">Automated Consequence (THEN):</span>
+                                <p className="font-medium text-blue-900">{rule.action}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
+                ))}
             </div>
+
+            {/* ADD / EDIT POLICY RULE MODAL */}
+            {isAddRuleOpen && (
+                <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-xs z-[100] flex items-center justify-center p-3 sm:p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200 text-xs">
+                        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50/80">
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck size={16} className="text-blue-600" />
+                                <h3 className="font-bold text-gray-900">
+                                    {editingRule ? `Edit Rule: ${editingRule.title}` : 'Define New Operational Policy'}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsAddRuleOpen(false);
+                                    setEditingRule(null);
+                                }}
+                                className="p-1 hover:bg-gray-200 rounded text-gray-400"
+                            >
+                                <X size={15} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveRule} className="p-4 space-y-3">
+                            <div className="space-y-1">
+                                <label className="font-semibold text-gray-700">Policy Title <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    name="title"
+                                    required
+                                    defaultValue={editingRule?.title || ''}
+                                    placeholder="e.g. 7-Day Group Booking Non-Refundable Rule"
+                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs font-semibold"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="font-semibold text-gray-700">Trigger Condition (When to apply) <span className="text-red-500">*</span></label>
+                                <textarea
+                                    name="condition"
+                                    required
+                                    rows={2}
+                                    defaultValue={editingRule?.condition || ''}
+                                    placeholder="e.g. Cancellation requested between 48h and 7 days prior to check-in"
+                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none text-xs resize-none"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="font-semibold text-gray-700">Consequence / Enforcement Action <span className="text-red-500">*</span></label>
+                                <textarea
+                                    name="action"
+                                    required
+                                    rows={2}
+                                    defaultValue={editingRule?.action || ''}
+                                    placeholder="e.g. Surcharge 50% room rent; return remaining 50% to guest payment method"
+                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none text-xs resize-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Fee / Penalty Formula</label>
+                                    <input
+                                        type="text"
+                                        name="penaltyAmount"
+                                        defaultValue={editingRule?.penaltyAmount || '50% Room Rate'}
+                                        placeholder="e.g. 50% or ৳ 2,500"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs font-mono font-bold"
+                                    />
+                                </div>
+
+                                <div className="space-y-2 pt-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            name="requiresApproval"
+                                            defaultChecked={editingRule?.requiresApproval ?? false}
+                                            className="w-4 h-4 accent-blue-600 rounded"
+                                        />
+                                        <span className="font-semibold text-gray-700">Requires Manager PIN Override</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="pt-2 flex items-center justify-end gap-2 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsAddRuleOpen(false);
+                                        setEditingRule(null);
+                                    }}
+                                    className="h-8 px-3 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                >
+                                    <Save size={13} />
+                                    <span>{editingRule ? 'Update Rule' : 'Save Rule'}</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default PolicyManagement;
-

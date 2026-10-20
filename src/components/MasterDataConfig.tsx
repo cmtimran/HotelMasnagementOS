@@ -1,19 +1,16 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Coins,
-    Globe,
     TrendingUp,
     Target,
-    Users,
-    Truck,
     Percent,
     Plus,
-    ArrowLeft,
-    Save,
-    Tag,
-    AlertCircle,
-    Edit,
-    Trash2
+    Trash2,
+    Database,
+    CheckCircle2,
+    X,
+    Receipt,
+    RefreshCw
 } from 'lucide-react';
 
 type TabType = 'currency' | 'source' | 'charges' | 'discounts' | 'revenue';
@@ -23,9 +20,8 @@ interface RevenueGroup {
     code: string;
     description: string;
     department: 'F&B' | 'Rooms' | 'Laundry' | 'Transport' | 'Other';
-    glCode: string; // General Ledger Code
+    glCode: string;
 }
-
 
 interface Currency {
     id: number;
@@ -34,7 +30,7 @@ interface Currency {
     symbol: string;
     isBase: boolean;
     acceptPayment: boolean;
-    denominations: string; // e.g., "100, 50, 20, 10"
+    denominations: string;
 }
 
 interface ExchangeRate {
@@ -63,15 +59,6 @@ interface BusinessSource {
     linkedRatePlan: string;
 }
 
-interface CorporateAgent {
-    id: number;
-    name: string;
-    contact: string;
-    creditLimit: string;
-    paymentTerm: string;
-    contractRates: string;
-}
-
 interface ExtraCharge {
     id: number;
     name: string;
@@ -89,173 +76,106 @@ interface Discount {
     type: string;
     value: string;
     maxLimit: string;
-    applicableOn: string[]; // ['Room Rent', 'Food', 'Beverage', 'Other Services']
+    applicableOn: string[];
     requiresAuth: boolean;
     reasonRequired: boolean;
     active: boolean;
 }
 
-const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType }) => {
+interface MasterDataConfigProps {
+    initialTab?: TabType;
+    onNavigate?: (page: string) => void;
+}
+
+export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
+    initialTab = 'currency',
+}) => {
     const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-    // Currency States
-    const [currencies, setCurrencies] = useState<Currency[]>([
-        { id: 1, name: 'Bangladeshi Taka', code: 'BDT', symbol: '৳', isBase: true, acceptPayment: true, denominations: '1000, 500, 100, 50, 20, 10' },
-        { id: 2, name: 'US Dollar', code: 'USD', symbol: '$', isBase: false, acceptPayment: true, denominations: '100, 50, 20, 10, 5, 1' }
-    ]);
-    const [currencyForm, setCurrencyForm] = useState({ name: '', code: '', symbol: '', isBase: false, acceptPayment: false, denominations: '' });
-    const [showCurrencyForm, setShowCurrencyForm] = useState(false);
-
-    // Exchange Rate States
-    const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([
-        { id: 1, currencyCode: 'USD', currencyName: 'US Dollar', buyingRate: '110.00', sellingRate: '112.50', effectiveDate: '2026-01-16 09:00', autoUpdate: false },
-        { id: 2, currencyCode: 'EUR', currencyName: 'Euro', buyingRate: '120.40', sellingRate: '123.00', effectiveDate: '2026-01-16 09:00', autoUpdate: true },
-        { id: 3, currencyCode: 'GBP', currencyName: 'British Pound', buyingRate: '140.10', sellingRate: '144.00', effectiveDate: '2026-01-15 17:30', autoUpdate: false }
-    ]);
-    const [editingRate, setEditingRate] = useState<ExchangeRate | null>(null);
-
-    // Market Code States
-    const [marketCodes, setMarketCodes] = useState<MarketCode[]>([
-        { id: 1, code: 'CORP', description: 'Corporate Accounts', reportGroup: 'Transient View' },
-        { id: 2, code: 'OTA', description: 'Online Travel Agents', reportGroup: 'Transient View' },
-        { id: 3, code: 'GRP', description: 'Group Bookings', reportGroup: 'Group / Event' }
-    ]);
-    const [marketForm, setMarketForm] = useState({ code: '', description: '', reportGroup: 'Transient View' });
-
-    // Business Source States
-    const [businessSources, setBusinessSources] = useState<BusinessSource[]>([
-        { id: 1, name: 'Booking.com', type: 'OTA', commission: '15%', active: true, linkedRatePlan: 'OTA Rate' },
-        { id: 2, name: 'Direct Website', type: 'Website', commission: '0%', active: true, linkedRatePlan: 'BAR' },
-        { id: 3, name: 'Grameenphone', type: 'Corporate', commission: '0%', active: true, linkedRatePlan: 'Corp Rate' },
-        { id: 4, name: 'Expedia', type: 'OTA', commission: '18%', active: false, linkedRatePlan: 'OTA Rate' }
-    ]);
-    const [sourceForm, setSourceForm] = useState({ name: '', type: 'OTA', commission: '0', linkedRatePlan: 'BAR' });
-    const [showSourceForm, setShowSourceForm] = useState(false);
-
-    // Corporate Agent States
-    const [corporateAgents, setCorporateAgents] = useState<CorporateAgent[]>([
-        { id: 1, name: 'Unilever Bangladesh', contact: 'HR / Admin', creditLimit: '৳ 5,00,000', paymentTerm: 'Net 30', contractRates: 'Negotiated Rate A' },
-        { id: 2, name: 'Grameenphone Ltd', contact: 'Business Dev', creditLimit: '৳ 10,00,000', paymentTerm: 'Net 15', contractRates: 'Corporate Rate B' }
-    ]);
-    const [agentForm, setAgentForm] = useState({ name: '', contact: '', creditLimit: '', paymentTerm: 'Net 30', contractRates: '' });
-    const [showAgentForm, setShowAgentForm] = useState(false);
-
-    // Extra Charge States
-    const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([
-        { id: 1, name: 'Airport Pickup', code: 'TRN-01', price: '1,500', rule: 'Flat Amount', taxApplicable: true, serviceCharge: false, revenueLedger: 'Transport Income' },
-        { id: 2, name: 'Extra Bed', code: 'HSK-EB', price: '2,500', rule: 'Per Night', taxApplicable: true, serviceCharge: true, revenueLedger: 'Room Service' },
-        { id: 3, name: 'Early Check-in', code: 'FO-ECI', price: '25%', rule: 'Room Rate %', taxApplicable: false, serviceCharge: false, revenueLedger: 'Room Revenue' }
-    ]);
-    const [chargeForm, setChargeForm] = useState({ name: '', code: '', price: '', rule: 'Flat Amount', taxApplicable: false, serviceCharge: false, revenueLedger: 'Other Income' });
-    const [showChargeForm, setShowChargeForm] = useState(false);
-
-    // Discount States
-    const [discounts, setDiscounts] = useState<Discount[]>([
-        { id: 1, name: 'Staff Meal', type: 'Percentage (%)', value: '100', maxLimit: '5000', applicableOn: ['Food', 'Beverage'], requiresAuth: false, reasonRequired: false, active: true },
-        { id: 2, name: 'Manager Discount', type: 'Percentage (%)', value: '20', maxLimit: '10000', applicableOn: ['Room Rent', 'Food', 'Beverage'], requiresAuth: true, reasonRequired: true, active: true },
-        { id: 3, name: 'Happy Hour', type: 'Percentage (%)', value: '15', maxLimit: '3000', applicableOn: ['Beverage'], requiresAuth: false, reasonRequired: false, active: false }
-    ]);
-    const [discountForm, setDiscountForm] = useState({ name: '', type: 'Percentage (%)', value: '', requiresAuth: false, reasonRequired: false, maxLimit: '2000', applicableOn: [] as string[] });
-    const [showDiscountForm, setShowDiscountForm] = useState(false);
-
-    // Revenue States
-    const [revenueGroups] = useState<RevenueGroup[]>([
-        { id: 1, code: 'REV-FB-BRK', description: 'Breakfast Sales', department: 'F&B', glCode: '40010' },
-        { id: 2, code: 'REV-ROOM-FIT', description: 'Room Rent - Transient', department: 'Rooms', glCode: '10010' },
-        { id: 3, code: 'REV-TRANS-GUEST', description: 'Guest Transportation', department: 'Transport', glCode: '50020' },
-        { id: 4, code: 'REV-LND-VALET', description: 'Valet Laundry Service', department: 'Laundry', glCode: '60010' }
-    ]);
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3500);
+    };
 
     useEffect(() => {
         setActiveTab(initialTab);
     }, [initialTab]);
 
-    const tabs = [
-        { id: 'currency', label: 'Multi-Currency', icon: <Coins size={18} /> },
-        { id: 'source', label: 'Source & Market', icon: <Target size={18} /> },
-        { id: 'charges', label: 'Extra Charges', icon: <Plus size={18} /> },
-        { id: 'discounts', label: 'Global Discounts', icon: <Percent size={18} /> },
-        { id: 'revenue', label: 'Finance & Revenue', icon: <TrendingUp size={18} /> },
-    ];
+    // Currency States
+    const [currencies, setCurrencies] = useState<Currency[]>([
+        { id: 1, name: 'Bangladeshi Taka', code: 'BDT', symbol: '৳', isBase: true, acceptPayment: true, denominations: '1000, 500, 100, 50, 20, 10' },
+        { id: 2, name: 'US Dollar', code: 'USD', symbol: '$', isBase: false, acceptPayment: true, denominations: '100, 50, 20, 10, 5, 1' },
+        { id: 3, name: 'Euro', code: 'EUR', symbol: '€', isBase: false, acceptPayment: true, denominations: '500, 200, 100, 50, 20, 10' },
+        { id: 4, name: 'British Pound', code: 'GBP', symbol: '£', isBase: false, acceptPayment: true, denominations: '50, 20, 10, 5' }
+    ]);
+    const [currencyForm, setCurrencyForm] = useState({ name: '', code: '', symbol: '', isBase: false, acceptPayment: true, denominations: '' });
+    const [showCurrencyForm, setShowCurrencyForm] = useState(false);
 
-    // Currency Handlers
+    // Exchange Rate States
+    const [exchangeRates] = useState<ExchangeRate[]>([
+
+        { id: 1, currencyCode: 'USD', currencyName: 'US Dollar', buyingRate: '121.50', sellingRate: '123.00', effectiveDate: '2026-01-20 09:00 AM', autoUpdate: true },
+        { id: 2, currencyCode: 'EUR', currencyName: 'Euro', buyingRate: '131.20', sellingRate: '133.50', effectiveDate: '2026-01-20 09:00 AM', autoUpdate: true },
+        { id: 3, currencyCode: 'GBP', currencyName: 'British Pound', buyingRate: '154.10', sellingRate: '157.00', effectiveDate: '2026-01-20 09:00 AM', autoUpdate: false }
+    ]);
+
+    // Market Codes
+    const [marketCodes] = useState<MarketCode[]>([
+
+        { id: 1, code: 'CORP', description: 'Corporate Multinational Accounts', reportGroup: 'Commercial Transient' },
+        { id: 2, code: 'OTA', description: 'Online Travel Agencies (Expedia, Booking.com)', reportGroup: 'Wholesale / OTA' },
+        { id: 3, code: 'GRP', description: 'MICE & Group Conventions', reportGroup: 'Group / Banquet' },
+        { id: 4, code: 'DIR', description: 'Direct Hotel Walk-in & Web Booking', reportGroup: 'Retail Direct' }
+    ]);
+
+    // Business Sources
+    const [businessSources] = useState<BusinessSource[]>([
+
+        { id: 1, name: 'Booking.com Direct XML', type: 'OTA', commission: '15%', active: true, linkedRatePlan: 'OTA Standard' },
+        { id: 2, name: 'Official Hotel Web Engine', type: 'Direct Web', commission: '0%', active: true, linkedRatePlan: 'Best Available Rate (BAR)' },
+        { id: 3, name: 'Standard Chartered Corporate', type: 'Corporate', commission: '0%', active: true, linkedRatePlan: 'Negotiated Corp-A' },
+        { id: 4, name: 'Agoda YCS v4', type: 'OTA', commission: '18%', active: true, linkedRatePlan: 'OTA Standard' }
+    ]);
+
+    // Extra Charges
+    const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([
+        { id: 1, name: 'VIP Airport Limousine Transfer', code: 'TRN-LIMO', price: '3,500', rule: 'Flat Amount', taxApplicable: true, serviceCharge: false, revenueLedger: '40030 - Transport Revenue' },
+        { id: 2, name: 'Rollaway Extra Bed & Bedding', code: 'HSK-EXBED', price: '2,500', rule: 'Per Night', taxApplicable: true, serviceCharge: true, revenueLedger: '10020 - Room Extra Revenue' },
+        { id: 3, name: 'Early Morning Check-In (06:00-10:00)', code: 'FO-EARLY', price: '50%', rule: 'Room Rate %', taxApplicable: true, serviceCharge: false, revenueLedger: '10010 - Room Tariff' },
+        { id: 4, name: 'High-Speed Business Dedicated Internet', code: 'IT-FIBER', price: '800', rule: 'Per 24h', taxApplicable: true, serviceCharge: false, revenueLedger: '60040 - Guest IT Revenue' }
+    ]);
+    const [chargeForm, setChargeForm] = useState({ name: '', code: '', price: '', rule: 'Flat Amount', taxApplicable: true, serviceCharge: false, revenueLedger: '10020 - Room Extra Revenue' });
+    const [showChargeForm, setShowChargeForm] = useState(false);
+
+    // Discounts
+    const [discounts, setDiscounts] = useState<Discount[]>([
+        { id: 1, name: 'Staff & Family Meal Allowance', type: 'Percentage (%)', value: '100%', maxLimit: '5000', applicableOn: ['Food', 'Beverage'], requiresAuth: false, reasonRequired: false, active: true },
+        { id: 2, name: 'Manager Goodwill Courtesy Rebate', type: 'Percentage (%)', value: '25%', maxLimit: '15000', applicableOn: ['Room Rent', 'Food', 'Beverage'], requiresAuth: true, reasonRequired: true, active: true },
+        { id: 3, name: 'Happy Hour Beverage Promotion', type: 'Percentage (%)', value: '20%', maxLimit: '4000', applicableOn: ['Beverage'], requiresAuth: false, reasonRequired: false, active: true }
+    ]);
+
+    // Revenue Groups (GL Mapped)
+    const [revenueGroups] = useState<RevenueGroup[]>([
+        { id: 1, code: 'REV-ROOM-FIT', description: 'Transient & Suite Room Revenue', department: 'Rooms', glCode: '10010' },
+        { id: 2, code: 'REV-FB-DINE', description: 'Restaurant, Bar & Room Service Dining', department: 'F&B', glCode: '20010' },
+        { id: 3, code: 'REV-LND-VALET', description: 'Guest Valet & Dry Cleaning Service', department: 'Laundry', glCode: '30010' },
+        { id: 4, code: 'REV-TRN-FLEET', description: 'Airport Transfers & Chauffeur Services', department: 'Transport', glCode: '40010' },
+        { id: 5, code: 'REV-SPA-WELL', description: 'Luxury Spa & Wellness Treatments', department: 'Other', glCode: '50010' }
+    ]);
+
     const handleAddCurrency = () => {
         if (!currencyForm.name || !currencyForm.code) return;
-        const newCurrency: Currency = {
+        const newCurr: Currency = {
             id: Date.now(),
             ...currencyForm
         };
-        setCurrencies([...currencies, newCurrency]);
-        setCurrencyForm({ name: '', code: '', symbol: '', isBase: false, acceptPayment: false, denominations: '' });
+        setCurrencies([...currencies, newCurr]);
+        setCurrencyForm({ name: '', code: '', symbol: '', isBase: false, acceptPayment: true, denominations: '' });
         setShowCurrencyForm(false);
+        showToast(`Currency ${newCurr.code} added successfully.`);
     };
 
-    const handleDeleteCurrency = (id: number) => {
-        setCurrencies(currencies.filter(c => c.id !== id));
-    };
-
-    // Exchange Rate Handlers
-    const handleUpdateRate = (rate: ExchangeRate) => {
-        setExchangeRates(exchangeRates.map(r => r.id === rate.id ? rate : r));
-        setEditingRate(null);
-    };
-
-    // Market Code Handlers
-    const handleAddMarketCode = () => {
-        if (!marketForm.code) return;
-        const newMarket: MarketCode = {
-            id: Date.now(),
-            ...marketForm
-        };
-        setMarketCodes([...marketCodes, newMarket]);
-        setMarketForm({ code: '', description: '', reportGroup: 'Transient View' });
-    };
-
-    const handleDeleteMarketCode = (id: number) => {
-        setMarketCodes(marketCodes.filter(m => m.id !== id));
-    };
-
-    // Business Source Handlers
-    const toggleSourceActive = (id: number) => {
-        setBusinessSources(businessSources.map(s => s.id === id ? { ...s, active: !s.active } : s));
-    };
-
-    const handleAddSource = () => {
-        if (!sourceForm.name) return;
-        const newSource: BusinessSource = {
-            id: Date.now(),
-            name: sourceForm.name,
-            type: sourceForm.type,
-            commission: sourceForm.commission + '%',
-            linkedRatePlan: sourceForm.linkedRatePlan,
-            active: true
-        };
-        setBusinessSources([...businessSources, newSource]);
-        setSourceForm({ name: '', type: 'OTA', commission: '0', linkedRatePlan: 'BAR' });
-        setShowSourceForm(false);
-    };
-
-    const handleDeleteSource = (id: number) => {
-        setBusinessSources(businessSources.filter(s => s.id !== id));
-    };
-
-    // Corporate Agent Handlers
-    const handleAddAgent = () => {
-        if (!agentForm.name) return;
-        const newAgent: CorporateAgent = {
-            id: Date.now(),
-            ...agentForm
-        };
-        setCorporateAgents([...corporateAgents, newAgent]);
-        setAgentForm({ name: '', contact: '', creditLimit: '', paymentTerm: 'Net 30', contractRates: '' });
-        setShowAgentForm(false);
-    };
-
-    const handleDeleteAgent = (id: number) => {
-        setCorporateAgents(corporateAgents.filter(a => a.id !== id));
-    };
-
-    // Extra Charge Handlers
     const handleAddCharge = () => {
         if (!chargeForm.name || !chargeForm.code) return;
         const newCharge: ExtraCharge = {
@@ -263,854 +183,510 @@ const MasterDataConfig = ({ initialTab = 'currency' }: { initialTab?: TabType })
             ...chargeForm
         };
         setExtraCharges([...extraCharges, newCharge]);
-        setChargeForm({ name: '', code: '', price: '', rule: 'Flat Amount', taxApplicable: false, serviceCharge: false, revenueLedger: 'Other Income' });
+        setChargeForm({ name: '', code: '', price: '', rule: 'Flat Amount', taxApplicable: true, serviceCharge: false, revenueLedger: '10020 - Room Extra Revenue' });
         setShowChargeForm(false);
+        showToast(`Extra Charge ${newCharge.name} registered.`);
     };
 
     const handleDeleteCharge = (id: number) => {
         setExtraCharges(extraCharges.filter(c => c.id !== id));
-    };
-
-    // Discount Handlers
-    const handleAddDiscount = () => {
-        if (!discountForm.name || !discountForm.value) return;
-        const newDiscount: Discount = {
-            id: Date.now(),
-            name: discountForm.name,
-            type: discountForm.type,
-            value: discountForm.value,
-            maxLimit: discountForm.maxLimit,
-            applicableOn: discountForm.applicableOn,
-            requiresAuth: discountForm.requiresAuth,
-            reasonRequired: discountForm.reasonRequired,
-            active: true
-        };
-        setDiscounts([...discounts, newDiscount]);
-        setDiscountForm({ name: '', type: 'Percentage (%)', value: '', requiresAuth: false, reasonRequired: false, maxLimit: '2000', applicableOn: [] as string[] });
-        setShowDiscountForm(false);
+        showToast('Charge deleted.');
     };
 
     const toggleDiscountActive = (id: number) => {
         setDiscounts(discounts.map(d => d.id === id ? { ...d, active: !d.active } : d));
     };
 
-    const handleDeleteDiscount = (id: number) => {
-        setDiscounts(discounts.filter(d => d.id !== id));
-    };
-
-    const renderCurrencyTab = () => (
-        <div className="space-y-6">
-            {/* Currency Setup section */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-800">Currency Setup</h3>
-                        <p className="text-gray-500 text-xs mt-1">One-time configuration for accepted payment currencies.</p>
-                    </div>
-                    <button
-                        onClick={() => setShowCurrencyForm(!showCurrencyForm)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 text-sm font-medium"
-                    >
-                        <Plus size={18} /> Add Currency
-                    </button>
+    return (
+        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
+            {/* Toast Notification */}
+            {toastMessage && (
+                <div className="fixed bottom-4 right-4 z-[120] bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200 border border-gray-700">
+                    <CheckCircle2 size={16} className="text-emerald-400" />
+                    <span>{toastMessage}</span>
                 </div>
+            )}
 
-                {showCurrencyForm && (
-                    <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Currency Name *</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. US Dollar"
-                                    value={currencyForm.name}
-                                    onChange={(e) => setCurrencyForm({ ...currencyForm, name: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm transition-all"
-                                />
+            {/* Elevated Header Card */}
+            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-sm shadow-2xs flex-shrink-0">
+                            <Database size={22} className="text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight truncate">
+                                    Master Data & Financial Configuration
+                                </h1>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
+                                    ERP Core Master
+                                </span>
+                                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                    GL Ledger Mapped
+                                </span>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Currency Code *</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. USD"
-                                    value={currencyForm.code}
-                                    onChange={(e) => setCurrencyForm({ ...currencyForm, code: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm transition-all"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Symbol</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. $"
-                                    value={currencyForm.symbol}
-                                    onChange={(e) => setCurrencyForm({ ...currencyForm, symbol: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm transition-all"
-                                />
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
+                                <span className="flex items-center gap-1">
+                                    <Coins size={11} className="text-gray-400" />
+                                    <span>Base: BDT (৳) + {currencies.length - 1} Foreign Currencies</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <Target size={11} className="text-gray-400" />
+                                    <span>{marketCodes.length} Market Codes</span>
+                                </span>
+                                <span className="hidden sm:flex items-center gap-1">
+                                    <Receipt size={11} className="text-gray-400" />
+                                    <span>{extraCharges.length} Extra Folio Add-ons</span>
+                                </span>
                             </div>
                         </div>
-                        <div className="flex gap-4 mb-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={currencyForm.isBase}
-                                    onChange={(e) => setCurrencyForm({ ...currencyForm, isBase: e.target.checked })}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm font-medium text-gray-700">Base Currency</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={currencyForm.acceptPayment}
-                                    onChange={(e) => setCurrencyForm({ ...currencyForm, acceptPayment: e.target.checked })}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm font-medium text-gray-700">Accept Payments</span>
-                            </label>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={handleAddCurrency} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-                                Save Currency
-                            </button>
-                            <button onClick={() => setShowCurrencyForm(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">
-                                Cancel
-                            </button>
-                        </div>
                     </div>
-                )}
 
-                {/* Currency List */}
-                <div className="space-y-3">
-                    {currencies.map(currency => (
-                        <div key={currency.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold">
-                                    {currency.symbol || currency.code}
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-semibold text-gray-900">{currency.name}</h4>
-                                    <p className="text-xs text-gray-500">{currency.code}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                {currency.isBase && <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">Base</span>}
-                                {currency.acceptPayment && <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">Accepts Payment</span>}
-                                <button
-                                    onClick={() => handleDeleteCurrency(currency.id)}
-                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Daily Exchange Rates section */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-800">Daily Exchange Rates</h3>
-                        <p className="text-gray-500 text-xs mt-1">Updates for front desk currency conversions.</p>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
-                        <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-pulse" />
-                        Live API: Active
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    {exchangeRates.map(rate => (
-                        <div key={rate.id}>
-                            {editingRate?.id === rate.id ? (
-                                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                    <div className="grid grid-cols-2 gap-4 mb-3">
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-700 block mb-1">Buying Rate</label>
-                                            <input
-                                                type="number"
-                                                value={editingRate.buyingRate}
-                                                onChange={(e) => setEditingRate({ ...editingRate, buyingRate: e.target.value })}
-                                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-700 block mb-1">Selling Rate</label>
-                                            <input
-                                                type="number"
-                                                value={editingRate.sellingRate}
-                                                onChange={(e) => setEditingRate({ ...editingRate, sellingRate: e.target.value })}
-                                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleUpdateRate(editingRate)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">
-                                            Save
-                                        </button>
-                                        <button onClick={() => setEditingRate(null)} className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-white border border-gray-200 hover:border-blue-200 transition-all group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center font-bold text-gray-700 shadow-sm border border-gray-200">
-                                            {rate.currencyCode}
-                                        </div>
-                                        <div>
-                                            <h4 className="text-sm font-semibold text-gray-900">{rate.currencyName}</h4>
-                                            <p className="text-xs text-gray-500">Valid From: {rate.effectiveDate}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-8 text-right">
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-500 uppercase">Buying Rate</p>
-                                            <p className="text-sm font-bold text-emerald-600">৳ {rate.buyingRate}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-500 uppercase">Selling Rate</p>
-                                            <p className="text-sm font-bold text-rose-600">৳ {rate.sellingRate}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => setEditingRate(rate)}
-                                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                        >
-                                            <Edit size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderSourceTab = () => (
-        <div className="space-y-6">
-            {/* Market Codes section */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-800">Market Segmentation</h3>
-                        <p className="text-gray-500 text-xs mt-1">Categorize guest types for statistical reporting and pie charts.</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-gray-700">Market Code *</label>
-                        <input
-                            type="text"
-                            placeholder="e.g. CORP"
-                            value={marketForm.code}
-                            onChange={(e) => setMarketForm({ ...marketForm, code: e.target.value })}
-                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-gray-700">Description</label>
-                        <input
-                            type="text"
-                            placeholder="e.g. Corporate Accounts"
-                            value={marketForm.description}
-                            onChange={(e) => setMarketForm({ ...marketForm, description: e.target.value })}
-                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-gray-700">Report Group</label>
-                        <select
-                            value={marketForm.reportGroup}
-                            onChange={(e) => setMarketForm({ ...marketForm, reportGroup: e.target.value })}
-                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setShowCurrencyForm(true)}
+                            className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                         >
-                            <option>Transient View</option>
-                            <option>Group / Event</option>
-                            <option>Complimentary</option>
-                        </select>
+                            <Plus size={12} className="text-blue-600" />
+                            <span>+ Currency</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowChargeForm(true)}
+                            className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        >
+                            <Plus size={13} />
+                            <span>+ Add Charge</span>
+                        </button>
                     </div>
                 </div>
-                <button onClick={handleAddMarketCode} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-                    Add Market Code
-                </button>
 
-                {/* Market Code List */}
-                <div className="mt-4 space-y-2">
-                    {marketCodes.map(market => (
-                        <div key={market.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div>
-                                <span className="font-semibold text-gray-900 text-sm">{market.code}</span>
-                                <span className="text-gray-500 text-sm ml-2">- {market.description}</span>
-                                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">{market.reportGroup}</span>
-                            </div>
+                {/* Segmented Navigation Tabs */}
+                <div className="px-3 sm:px-4 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center gap-1 sm:gap-1.5">
+                        {[
+                            { id: 'currency', label: 'Currencies & FX Rates', icon: Coins, count: currencies.length },
+                            { id: 'source', label: 'Market Codes & Business Sources', icon: Target, count: businessSources.length },
+                            { id: 'charges', label: 'Extra Charges & Add-ons', icon: Receipt, count: extraCharges.length },
+                            { id: 'discounts', label: 'Global Discounts & Rebates', icon: Percent, count: discounts.length },
+                            { id: 'revenue', label: 'Revenue Groups & GL Ledger', icon: TrendingUp, count: revenueGroups.length },
+                        ].map(t => (
                             <button
-                                onClick={() => handleDeleteMarketCode(market.id)}
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                key={t.id}
+                                type="button"
+                                onClick={() => setActiveTab(t.id as TabType)}
+                                className={`h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === t.id
+                                    ? 'bg-white text-blue-700 shadow-2xs border border-gray-200 font-bold'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                                    }`}
                             >
-                                <Trash2 size={14} />
+                                <t.icon size={13} />
+                                <span>{t.label}</span>
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                    {t.count}
+                                </span>
                             </button>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* Business Source section */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-800">Business Origins (OTAs)</h3>
-                    <button
-                        onClick={() => setShowSourceForm(!showSourceForm)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 text-sm font-medium"
-                    >
-                        <Plus size={18} /> Add Source
-                    </button>
-                </div>
-
-                {showSourceForm && (
-                    <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Source Name *</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Agoda"
-                                    value={sourceForm.name}
-                                    onChange={(e) => setSourceForm({ ...sourceForm, name: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                />
+            {/* TAB 1: CURRENCY & FX RATES */}
+            {activeTab === 'currency' && (
+                <div className="space-y-3">
+                    {/* Add Currency Modal/Drawer */}
+                    {showCurrencyForm && (
+                        <div className="bg-white p-3.5 rounded-xl border border-blue-200 shadow-2xs space-y-3">
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                                    <Coins size={14} className="text-blue-600" />
+                                    <span>Register New Settlement Currency</span>
+                                </h3>
+                                <button type="button" onClick={() => setShowCurrencyForm(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X size={15} />
+                                </button>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Source Type</label>
-                                <select
-                                    value={sourceForm.type}
-                                    onChange={(e) => setSourceForm({ ...sourceForm, type: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                >
-                                    <option>OTA</option>
-                                    <option>Corporate</option>
-                                    <option>Travel Agent</option>
-                                    <option>Website</option>
-                                </select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Commission %</label>
-                                <input
-                                    type="number"
-                                    placeholder="15"
-                                    value={sourceForm.commission}
-                                    onChange={(e) => setSourceForm({ ...sourceForm, commission: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Linked Rate Plan</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. OTA Rate"
-                                    value={sourceForm.linkedRatePlan}
-                                    onChange={(e) => setSourceForm({ ...sourceForm, linkedRatePlan: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={handleAddSource} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-                                Save Source
-                            </button>
-                            <button onClick={() => setShowSourceForm(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {businessSources.map(src => (
-                        <div key={src.id} className={`p-4 rounded-lg border flex items-center justify-between transition-all ${src.active ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
-                            <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${src.active ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-                                    <Globe size={16} />
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-semibold text-gray-800">{src.name}</h4>
-                                    <p className="text-xs text-gray-500 font-medium uppercase">{src.type}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="text-right">
-                                    <p className="text-sm font-semibold text-gray-900">{src.commission} Commission</p>
-                                    <p className="text-xs text-blue-600 font-medium">{src.linkedRatePlan}</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Currency Name *</label>
                                     <input
-                                        type="checkbox"
-                                        checked={src.active}
-                                        onChange={() => toggleSourceActive(src.id)}
-                                        className="sr-only peer"
+                                        type="text"
+                                        placeholder="e.g. Australian Dollar"
+                                        value={currencyForm.name}
+                                        onChange={e => setCurrencyForm({ ...currencyForm, name: e.target.value })}
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs"
                                     />
-                                    <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                </label>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Currency Code *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. AUD"
+                                        value={currencyForm.code}
+                                        onChange={e => setCurrencyForm({ ...currencyForm, code: e.target.value.toUpperCase() })}
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs font-mono font-bold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Symbol</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. A$"
+                                        value={currencyForm.symbol}
+                                        onChange={e => setCurrencyForm({ ...currencyForm, symbol: e.target.value })}
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs font-bold"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
                                 <button
-                                    onClick={() => handleDeleteSource(src.id)}
-                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    type="button"
+                                    onClick={() => setShowCurrencyForm(false)}
+                                    className="h-7 px-3 border border-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-50"
                                 >
-                                    <Trash2 size={16} />
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleAddCurrency}
+                                    className="h-7 px-3 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
+                                >
+                                    Save Currency
                                 </button>
                             </div>
                         </div>
-                    ))}
-                </div>
-            </div>
+                    )}
 
-            {/* Business Agents section */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <Users size={18} className="text-blue-600" /> Corporate Profiles (City Ledger)
-                    </h3>
-                    <button
-                        onClick={() => setShowAgentForm(!showAgentForm)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 text-sm font-medium"
-                    >
-                        <Plus size={18} /> Add Company
-                    </button>
-                </div>
-
-                {showAgentForm && (
-                    <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Company Name *</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. BRAC Bank Ltd"
-                                    value={agentForm.name}
-                                    onChange={(e) => setAgentForm({ ...agentForm, name: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Contact Person</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. HR Manager"
-                                    value={agentForm.contact}
-                                    onChange={(e) => setAgentForm({ ...agentForm, contact: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Credit Limit</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. ৳ 3,00,000"
-                                    value={agentForm.creditLimit}
-                                    onChange={(e) => setAgentForm({ ...agentForm, creditLimit: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-gray-700">Payment Term</label>
-                                <select
-                                    value={agentForm.paymentTerm}
-                                    onChange={(e) => setAgentForm({ ...agentForm, paymentTerm: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                >
-                                    <option>Net 7</option>
-                                    <option>Net 15</option>
-                                    <option>Net 30</option>
-                                    <option>Net 45</option>
-                                    <option>Net 60</option>
-                                </select>
-                            </div>
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-xs font-medium text-gray-700">Contract Rates</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Corporate Rate A"
-                                    value={agentForm.contractRates}
-                                    onChange={(e) => setAgentForm({ ...agentForm, contractRates: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                />
-                            </div>
+                    {/* Currencies Table */}
+                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                                Accepted Hotel Settlement Currencies
+                            </h3>
+                            <span className="text-[11px] text-gray-400">Base Currency: BDT (৳)</span>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={handleAddAgent} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-                                Save Company
-                            </button>
-                            <button onClick={() => setShowAgentForm(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">
-                                Cancel
-                            </button>
+                        <div className="overflow-x-auto no-scrollbar">
+                            <table className="w-full text-left text-xs min-w-[700px]">
+                                <thead>
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 py-2">Currency Name</th>
+                                        <th className="px-3 py-2">Code</th>
+                                        <th className="px-3 py-2">Symbol</th>
+                                        <th className="px-3 py-2">Base Currency</th>
+                                        <th className="px-3 py-2">Front Desk Acceptance</th>
+                                        <th className="px-3 py-2">Standard Banknotes</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {currencies.map(c => (
+                                        <tr key={c.id} className="hover:bg-blue-50/20">
+                                            <td className="px-3 py-2 font-semibold text-gray-800">{c.name}</td>
+                                            <td className="px-3 py-2 font-mono font-bold text-gray-900">{c.code}</td>
+                                            <td className="px-3 py-2 font-bold text-blue-600 text-sm">{c.symbol}</td>
+                                            <td className="px-3 py-2">
+                                                {c.isBase ? (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                        Primary Base Currency
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400 text-[11px]">Secondary FX</span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                    Payment Accepted
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2 font-mono text-[11px] text-gray-400">{c.denominations}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                )}
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-700">
-                            <tr>
-                                <th className="px-6 py-3">Company Name</th>
-                                <th className="px-6 py-3">Credit Limit</th>
-                                <th className="px-6 py-3">Payment Term</th>
-                                <th className="px-6 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {corporateAgents.map(corp => (
-                                <tr key={corp.id} className="hover:bg-gray-50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="font-semibold text-gray-800">{corp.name}</div>
-                                        <div className="text-xs text-gray-500">{corp.contact}</div>
-                                    </td>
-                                    <td className="px-6 py-4 font-medium text-gray-700">{corp.creditLimit}</td>
-                                    <td className="px-6 py-4 text-gray-600">{corp.paymentTerm} Days</td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <span className="text-xs text-gray-500">{corp.contractRates}</span>
-                                            <button
-                                                onClick={() => handleDeleteAgent(corp.id)}
-                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
 
-    const renderChargesTab = () => (
-        <div className="space-y-6">
-            <div className="bg-blue-600 rounded-lg p-8 text-white relative overflow-hidden shadow-sm">
-                <div className="relative z-10 max-w-lg">
-                    <h3 className="text-2xl font-bold mb-2">Ancillary Revenue Rules</h3>
-                    <p className="text-blue-100 text-sm leading-relaxed">Configure automatic charges for services like airport transfers, extra bedding, or early check-in fees. These post directly to guest folios.</p>
-                </div>
-                <Truck className="absolute -right-8 -bottom-8 w-48 h-48 text-blue-500/30 rotate-12" />
-            </div>
-
-            {showChargeForm && (
-                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                    <h4 className="text-lg font-bold text-gray-800 mb-4">Add New Charge</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-gray-700">Charge Name *</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. Late Checkout"
-                                value={chargeForm.name}
-                                onChange={(e) => setChargeForm({ ...chargeForm, name: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-gray-700">Charge Code *</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. FO-LC"
-                                value={chargeForm.code}
-                                onChange={(e) => setChargeForm({ ...chargeForm, code: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-gray-700">Price</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. 1500 or 25%"
-                                value={chargeForm.price}
-                                onChange={(e) => setChargeForm({ ...chargeForm, price: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-gray-700">Calculation Rule</label>
-                            <select
-                                value={chargeForm.rule}
-                                onChange={(e) => setChargeForm({ ...chargeForm, rule: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    {/* Exchange Rates Live Board */}
+                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <TrendingUp size={14} className="text-emerald-600" />
+                                <span>Front Desk FX Currency Board (Exchange Rates vs BDT)</span>
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => showToast('Exchange rates synced with Bangladesh Bank live feed.')}
+                                className="h-6 px-2 text-[11px] bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded font-semibold flex items-center gap-1 cursor-pointer"
                             >
-                                <option>Flat Amount</option>
-                                <option>Per Night</option>
-                                <option>Room Rate %</option>
-                                <option>Per Person</option>
-                            </select>
+                                <RefreshCw size={11} /> Sync Rates
+                            </button>
                         </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={handleAddCharge} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-                            Save Charge
-                        </button>
-                        <button onClick={() => setShowChargeForm(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">
-                            Cancel
-                        </button>
+                        <div className="overflow-x-auto no-scrollbar">
+                            <table className="w-full text-left text-xs min-w-[700px]">
+                                <thead>
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 py-2">Currency Pair</th>
+                                        <th className="px-3 py-2">Buying Rate (Buy from Guest)</th>
+                                        <th className="px-3 py-2">Selling Rate (Sell to Guest)</th>
+                                        <th className="px-3 py-2">Effective Timestamp</th>
+                                        <th className="px-3 py-2">Auto-Feed</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {exchangeRates.map(r => (
+                                        <tr key={r.id} className="hover:bg-gray-50/50">
+                                            <td className="px-3 py-2 font-bold text-gray-900">
+                                                {r.currencyCode} / BDT <span className="font-normal text-gray-400 text-[11px]">({r.currencyName})</span>
+                                            </td>
+                                            <td className="px-3 py-2 font-mono font-bold text-emerald-700">৳ {r.buyingRate}</td>
+                                            <td className="px-3 py-2 font-mono font-bold text-blue-700">৳ {r.sellingRate}</td>
+                                            <td className="px-3 py-2 font-mono text-gray-500 text-[11px]">{r.effectiveDate}</td>
+                                            <td className="px-3 py-2">
+                                                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${r.autoUpdate ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {r.autoUpdate ? 'Live API Sync' : 'Manual Lock'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {extraCharges.map(charge => (
-                    <div key={charge.id} className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:border-blue-300 transition-all group cursor-pointer relative overflow-hidden">
-                        <button
-                            onClick={() => handleDeleteCharge(charge.id)}
-                            className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                        <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                            <TrendingUp size={20} />
+            {/* TAB 2: MARKET CODES & BUSINESS SOURCES */}
+            {activeTab === 'source' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Market Codes Card */}
+                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Market Segmentation Codes</h3>
+                            <span className="text-[10px] font-bold text-gray-400">USALI Reporting</span>
                         </div>
-                        <h4 className="font-bold text-gray-800">{charge.name}</h4>
-                        <p className="text-xs text-gray-500 font-medium mb-3 uppercase">{charge.code}</p>
-                        <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-100">
-                            <div>
-                                <span className="text-gray-500 block mb-0.5 text-xs">Price / Logic</span>
-                                <span className="font-bold text-gray-900">৳ {charge.price}</span>
-                            </div>
-                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded font-medium uppercase text-xs">{charge.rule}</span>
+                        <div className="divide-y divide-gray-100 text-xs">
+                            {marketCodes.map(m => (
+                                <div key={m.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
+                                    <div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="px-1.5 py-0.2 rounded font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 text-[10px]">
+                                                {m.code}
+                                            </span>
+                                            <span className="font-bold text-gray-800">{m.description}</span>
+                                        </div>
+                                        <span className="text-[10.5px] text-gray-400 block mt-0.5">{m.reportGroup}</span>
+                                    </div>
+                                    <span className="text-[10px] text-emerald-600 font-bold uppercase">Active</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                ))}
-            </div>
-        </div>
-    );
 
-    const renderDiscountsTab = () => (
-        <div className="space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                    <Percent size={20} className="text-blue-600" />
-                    <h3 className="text-lg font-bold text-gray-800">Standard Discount Policies</h3>
+                    {/* Business Sources Card */}
+                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Business Origin & OTA Channels</h3>
+                            <span className="text-[10px] font-bold text-gray-400">Commission Mapped</span>
+                        </div>
+                        <div className="divide-y divide-gray-100 text-xs">
+                            {businessSources.map(s => (
+                                <div key={s.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
+                                    <div>
+                                        <div className="font-bold text-gray-900">{s.name}</div>
+                                        <div className="text-[10.5px] text-gray-500 mt-0.5">
+                                            Type: <strong>{s.type}</strong> • Comm: <strong className="text-rose-600">{s.commission}</strong> • Rate: {s.linkedRatePlan}
+                                        </div>
+                                    </div>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        Live
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
+            )}
 
-                <div className="space-y-6">
-                    {showDiscountForm ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 bg-blue-50 rounded-lg border border-blue-100">
-                            <div className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-gray-700">Discount Name *</label>
+            {/* TAB 3: EXTRA CHARGES & ADD-ONS */}
+            {activeTab === 'charges' && (
+                <div className="space-y-3">
+                    {showChargeForm && (
+                        <div className="bg-white p-3.5 rounded-xl border border-blue-200 shadow-2xs space-y-3 text-xs">
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                <h3 className="font-bold text-gray-900 flex items-center gap-1.5">
+                                    <Receipt size={14} className="text-blue-600" />
+                                    <span>Create New Extra Folio Charge Code</span>
+                                </h3>
+                                <button type="button" onClick={() => setShowChargeForm(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X size={15} />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Charge Title *</label>
                                     <input
                                         type="text"
-                                        placeholder="e.g. Manager Appreciation"
-                                        value={discountForm.name}
-                                        onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                        placeholder="e.g. Airport Limousine Drop"
+                                        value={chargeForm.name}
+                                        onChange={e => setChargeForm({ ...chargeForm, name: e.target.value })}
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs"
                                     />
                                 </div>
-                                <div className="flex gap-4">
-                                    <div className="flex-1 space-y-1.5">
-                                        <label className="text-xs font-medium text-gray-700">Type</label>
-                                        <select
-                                            value={discountForm.type}
-                                            onChange={(e) => setDiscountForm({ ...discountForm, type: e.target.value })}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg outline-none font-medium text-sm"
-                                        >
-                                            <option>Percentage (%)</option>
-                                            <option>Flat Amount</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex-1 space-y-1.5">
-                                        <label className="text-xs font-medium text-gray-700">Value</label>
-                                        <input
-                                            type="text"
-                                            placeholder="20"
-                                            value={discountForm.value}
-                                            onChange={(e) => setDiscountForm({ ...discountForm, value: e.target.value })}
-                                            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg outline-none font-medium text-sm"
-                                        />
-                                    </div>
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Charge Code *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. TRN-AIRDROP"
+                                        value={chargeForm.code}
+                                        onChange={e => setChargeForm({ ...chargeForm, code: e.target.value.toUpperCase() })}
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs font-mono font-bold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Price / Tariff (৳ or %)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 2,000"
+                                        value={chargeForm.price}
+                                        onChange={e => setChargeForm({ ...chargeForm, price: e.target.value })}
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-xs font-bold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="font-semibold text-gray-700">Calculation Rule</label>
+                                    <select
+                                        value={chargeForm.rule}
+                                        onChange={e => setChargeForm({ ...chargeForm, rule: e.target.value })}
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none text-xs cursor-pointer"
+                                    >
+                                        <option value="Flat Amount">Flat Amount</option>
+                                        <option value="Per Night">Per Night</option>
+                                        <option value="Room Rate %">Room Rate %</option>
+                                        <option value="Per Person">Per Person</option>
+                                    </select>
                                 </div>
                             </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                <button type="button" onClick={() => setShowChargeForm(false)} className="h-7 px-3 border border-gray-200 rounded-lg font-semibold hover:bg-gray-50">
+                                    Cancel
+                                </button>
+                                <button type="button" onClick={handleAddCharge} className="h-7 px-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                                    Save Charge
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
-                            <div className="space-y-6">
-                                <div className="space-y-3">
-                                    <label className="text-xs font-medium text-gray-700 block">Policy Controls</label>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <label className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={discountForm.requiresAuth}
-                                                onChange={(e) => setDiscountForm({ ...discountForm, requiresAuth: e.target.checked })}
-                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-sm font-medium text-gray-700">Requires Auth</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={discountForm.reasonRequired}
-                                                onChange={(e) => setDiscountForm({ ...discountForm, reasonRequired: e.target.checked })}
-                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-sm font-medium text-gray-700">Reason Req</span>
-                                        </label>
-                                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 col-span-2">
-                                            <AlertCircle size={14} className="text-blue-600" />
-                                            <span className="text-sm font-medium text-gray-700">Max Limit: ৳ {discountForm.maxLimit}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                        {extraCharges.map(charge => (
+                            <div
+                                key={charge.id}
+                                className="bg-white p-3.5 rounded-xl border border-gray-200/90 shadow-2xs hover:border-blue-200 transition-all flex flex-col justify-between space-y-2 group relative"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteCharge(charge.id)}
+                                    className="absolute top-2 right-2 p-1 text-gray-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                                >
+                                    <Trash2 size={13} />
+                                </button>
+                                <div>
+                                    <span className="font-mono text-[10px] font-bold text-blue-600 uppercase bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                                        {charge.code}
+                                    </span>
+                                    <h4 className="font-bold text-gray-900 mt-1">{charge.name}</h4>
+                                    <div className="text-[10px] text-gray-400 mt-0.5">{charge.revenueLedger}</div>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                    <span className="font-bold text-gray-900 text-sm">৳ {charge.price}</span>
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-gray-100 text-gray-700">
+                                        {charge.rule}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 4: DISCOUNTS & REBATES */}
+            {activeTab === 'discounts' && (
+                <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden text-xs">
+                    <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <Percent size={14} className="text-blue-600" />
+                            <span>Standard Pre-configured Discount Policies</span>
+                        </h3>
+                        <span className="text-[11px] text-gray-400">Capped by Staff Security Tier Limits</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                        {discounts.map(disc => (
+                            <div key={disc.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs">
+                                        %
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-gray-900">{disc.name}</div>
+                                        <div className="text-[10.5px] text-gray-500 mt-0.5">
+                                            Value: <strong className="text-blue-700">{disc.value}</strong> • Applicable: {disc.applicableOn.join(', ')} • Max Limit: ৳ {disc.maxLimit}
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleAddDiscount}
-                                        className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium text-sm shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
-                                    >
-                                        Add Policy Code
-                                    </button>
-                                    <button
-                                        onClick={() => setShowDiscountForm(false)}
-                                        className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-300 transition-all"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setShowDiscountForm(true)}
-                            className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 font-medium text-sm transition-all flex items-center justify-center gap-2"
-                        >
-                            <Plus size={18} /> Add New Discount Policy
-                        </button>
-                    )}
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {discounts.map(disc => (
-                            <div key={disc.id} className={`p-4 rounded-lg border flex justify-between items-center ${disc.active ? 'bg-white border-gray-200' : 'bg-gray-50 opacity-60'}`}>
-                                <div className="flex items-center gap-3">
-                                    <Tag className={disc.active ? 'text-blue-600' : 'text-gray-400'} size={18} />
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-gray-800">{disc.name}</h4>
-                                        <p className="text-xs font-medium text-gray-500 uppercase">{disc.value} Benefit</p>
-                                    </div>
-                                </div>
                                 <div className="flex items-center gap-2">
-                                    {disc.requiresAuth && <span className="px-2 py-0.5 bg-rose-50 text-rose-600 text-xs font-medium rounded uppercase">Needs Auth</span>}
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={disc.active}
-                                            onChange={() => toggleDiscountActive(disc.id)}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                    </label>
+                                    {disc.requiresAuth && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            Manager PIN Required
+                                        </span>
+                                    )}
                                     <button
-                                        onClick={() => handleDeleteDiscount(disc.id)}
-                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                        type="button"
+                                        onClick={() => toggleDiscountActive(disc.id)}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer ${disc.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                                     >
-                                        <Trash2 size={14} />
+                                        {disc.active ? 'Active' : 'Inactive'}
                                     </button>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
-            </div>
-        </div>
-    );
-    const renderRevenueTab = () => (
-        <div className="p-6 space-y-6">
-            <div className="bg-gray-900 rounded-xl p-8 text-white relative overflow-hidden shadow-lg border border-gray-800">
-                <div className="relative z-10 max-w-xl">
-                    <h3 className="text-2xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 font-sans tracking-tight">Financial Blueprint</h3>
-                    <p className="text-gray-400 text-sm leading-relaxed font-medium">Link service departments to General Ledger (GL) codes. This provides the <span className="text-blue-400 font-black">NICE HMS Allowance Engine</span> with the logic needed for automated department balancing.</p>
-                </div>
-                <TrendingUp className="absolute -right-8 -bottom-8 w-48 h-48 text-blue-500/10 rotate-12" />
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 gap-3">
-                {revenueGroups.map(group => (
-                    <div key={group.id} className="bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between hover:border-blue-300 transition-all group shadow-sm">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center font-black text-blue-600 text-[10px] border border-gray-100 uppercase">
-                                {group.department}
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-gray-900 text-sm tracking-tight">{group.description}</h4>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-[10px] font-black px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-md border border-blue-100 uppercase tracking-tighter">{group.code}</span>
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">GL: {group.glCode}</span>
+            {/* TAB 5: REVENUE GROUPS & GL CODES */}
+            {activeTab === 'revenue' && (
+                <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden text-xs">
+                    <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <TrendingUp size={14} className="text-emerald-600" />
+                            <span>Revenue Centers & General Ledger (GL) Code Mappings</span>
+                        </h3>
+                        <span className="text-[11px] text-gray-400">Automated Daily Night Audit Reconciliation</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                        {revenueGroups.map(group => (
+                            <div key={group.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
+                                <div className="flex items-center gap-3">
+                                    <span className="w-12 h-6 rounded bg-gray-100 text-gray-700 font-bold text-[10px] flex items-center justify-center uppercase font-mono">
+                                        {group.department}
+                                    </span>
+                                    <div>
+                                        <div className="font-bold text-gray-900">{group.description}</div>
+                                        <span className="font-mono text-[10.5px] text-gray-400 font-semibold">{group.code}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded font-mono text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                        GL: {group.glCode}
+                                    </span>
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button className="p-2 text-gray-400 hover:text-blue-600 rounded-lg transition-all">
-                                <Edit size={16} />
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'currency': return renderCurrencyTab();
-            case 'source': return renderSourceTab();
-            case 'charges': return renderChargesTab();
-            case 'discounts': return renderDiscountsTab();
-            case 'revenue': return renderRevenueTab();
-            default: return renderCurrencyTab();
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-100/50 text-gray-800 font-sans">
-            <header className="bg-white border-b sticky top-0 z-10 px-6 py-4 flex justify-between items-center shadow-sm">
-                <div className="flex items-center gap-4">
-                    <button className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors border border-gray-100">
-                        <ArrowLeft size={20} />
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-black text-gray-900 tracking-tight">System Master Data</h1>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Finance, Ops & Localization</p>
+                        ))}
                     </div>
                 </div>
-                <div className="flex gap-3">
-                    <button className="px-5 py-2.5 bg-gray-900 text-white rounded-xl hover:bg-blue-600 transition-all font-bold text-sm shadow-lg shadow-gray-900/10 flex items-center gap-2">
-                        <Save size={18} />
-                        Update Infrastructure
-                    </button>
-                </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto p-8">
-                <div className="flex flex-col md:flex-row gap-8">
-                    <div className="w-full md:w-64 flex-shrink-0">
-                        <nav className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 sticky top-28 space-y-1">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id as TabType)}
-                                    className={`flex items-center gap-3 px-4 py-3 text-xs font-black transition-all w-full text-left rounded-xl uppercase tracking-widest ${activeTab === tab.id
-                                        ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
-                                        : 'text-gray-400 hover:bg-gray-50 hover:text-gray-900'
-                                        }`}
-                                >
-                                    {tab.icon}
-                                    <span>{tab.label}</span>
-                                </button>
-                            ))}
-                        </nav>
-                    </div>
-                    <div className="flex-1 min-w-0 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        {renderContent()}
-                    </div>
-                </div>
-            </main>
+            )}
         </div>
     );
 };

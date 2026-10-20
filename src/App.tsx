@@ -45,6 +45,7 @@ import ServiceManagement from './components/ServiceManagement';
 import NightAuditAutomation from './components/NightAuditAutomation';
 import GuestVoucherSystem from './components/GuestVoucherSystem';
 import PolicyManagement from './components/PolicyManagement';
+import GeneralSettings from './components/GeneralSettings';
 
 import { useNavigation } from './context/NavigationContext';
 
@@ -542,16 +543,23 @@ function App() {
         return <NightAuditAutomation />;
       case 'service-vouchers':
         return <GuestVoucherSystem />;
+      case 'user-management':
       case 'users':
         return <AdminSecurity initialTab="users" onNavigate={setActivePage} />;
       case 'roles-permissions':
+      case 'roles':
         return <AdminSecurity initialTab="roles" onNavigate={setActivePage} />;
       case 'occupancy-heatmap':
         return <OccupancyHeatmap />;
       case 'master-data':
-        return <MasterDataConfig />;
+      case 'master-data-config':
+        return <MasterDataConfig onNavigate={setActivePage} />;
       case 'policy-management':
-        return <PolicyManagement />;
+      case 'policy-settings':
+        return <PolicyManagement onNavigate={setActivePage} />;
+      case 'general-settings':
+      case 'system-settings':
+        return <GeneralSettings onNavigate={setActivePage} />;
       default:
         return <Dashboard />;
     }
