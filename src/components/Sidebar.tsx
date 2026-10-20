@@ -59,6 +59,7 @@ export interface MenuItem {
     newTab?: boolean;
     badge?: string;
     badgeColor?: string;
+    sectionHeader?: string;
 }
 
 interface SidebarProps {
@@ -71,20 +72,17 @@ interface SidebarProps {
 export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: SidebarProps) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
-        frontOffice: true, // front office open by default for hospitality operations
-        premiumOps: false,
+        frontOffice: true, // front office open by default for reception
         housekeeping: false,
+        maintenanceMod: false,
         posManagement: false,
         menuKey: false,
         setupKey: false,
-        staffKey: false,
-        rateKey: false,
-        roomKey: false,
-        financeKey: false,
-        b2b: false,
-        propertyKey: false,
-        reportsKey: false,
-        admin: false,
+        accountingMod: false,
+        hrmMod: false,
+        inventoryMod: false,
+        reportsMod: false,
+        settingsMod: false,
     });
 
     const toggleMenu = (key: string) => {
@@ -92,14 +90,19 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
     };
 
     // ========================================================================
-    // COMPLETE EXPERT MENU ARCHITECTURE (USALI & 5-STAR PMS STANDARD)
+    // MODULE-WISE EXPERT HOSPITALITY ERP SIDEBAR ARCHITECTURE
     // ========================================================================
     const menuGroups: MenuItem[] = [
-        // 1. Front Desk & Reception Operations
+        // ====================================================================
+        // SECTION 1: OPERATIONS
+        // ====================================================================
+        
+        // MODULE: FRONT OFFICE
         {
             key: 'frontOffice',
-            label: 'Front Desk',
+            label: 'Front Office',
             icon: <BedDouble size={14} />,
+            sectionHeader: 'Operations',
             items: [
                 { id: 'front-desk', label: 'Front Desk Dashboard', icon: <Monitor size={12} /> },
                 { id: 'quick-reservation', label: 'Quick Reservation', icon: <Plus size={12} /> },
@@ -110,75 +113,50 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
                 { id: 'guest-profile', label: 'Guest Profiles 360', icon: <User size={12} /> },
                 { id: 'floor-plan', label: 'Floor Plan View', icon: <Map size={12} /> },
                 { id: 'occupancy-heatmap', label: 'Occupancy Heatmap', icon: <Grid3X3 size={12} /> },
-            ]
-        },
-
-        // 2. Night Audit & Front Office Governance
-        {
-            key: 'premiumOps',
-            label: 'Night Audit & Ops',
-            icon: <Sparkles size={14} />,
-            items: [
                 { id: 'night-audit', label: 'Night Audit Pipeline', icon: <Moon size={12} />, badge: 'EOD', badgeColor: 'bg-purple-100 text-purple-700' },
                 { id: 'service-vouchers', label: 'Digital Guest Vouchers', icon: <Ticket size={12} /> },
-                { id: 'allowance-checker', label: 'Allowance & Credit Check', icon: <ShieldCheck size={12} /> },
+                { id: 'allowance-checker', label: 'Credit & Allowance', icon: <ShieldCheck size={12} /> },
             ]
         },
 
-        // 3. Housekeeping & Engineering
+        // MODULE: HOUSEKEEPING
         {
             key: 'housekeeping',
             label: 'Housekeeping',
             icon: <ClipboardList size={14} />,
             items: [
-                { id: 'housekeeping', label: 'Room Cleanliness Grid', icon: <ClipboardList size={12} /> },
-                { id: 'maintenance', label: 'Maintenance Kanban', icon: <Wrench size={12} /> },
+                { id: 'housekeeping', label: 'Room Cleanliness Grid', icon: <ClipboardList size={12} />, badge: 'Live', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                { id: 'service-master', label: 'Linen & Laundry Valet', icon: <Sparkles size={12} /> },
+                { id: 'addons', label: 'Room Amenities & Minibar', icon: <Layers size={12} /> },
             ]
         },
 
-        // 4. Rate & Distribution Master
+        // MODULE: MAINTENANCE & ENGINEERING
         {
-            key: 'rateKey',
-            label: 'Rate & Channel Master',
-            icon: <Percent size={14} />,
+            key: 'maintenanceMod',
+            label: 'Maintenance',
+            icon: <Wrench size={14} />,
             items: [
-                { id: 'rate-plans', label: 'Rate Plans (BAR & Corp)', icon: <Tags size={12} /> },
-                { id: 'package-builder', label: 'Package Master (L2)', icon: <Package size={12} /> },
-                { id: 'meal-plans', label: 'Meal Plans (EP, CP, MAP)', icon: <Utensils size={12} /> },
-                { id: 'service-master', label: 'Service Master (L1)', icon: <Sparkles size={12} /> },
-                { id: 'rate-calendar', label: 'Rate & Availability Board', icon: <Calendar size={12} /> },
-                { id: 'discounts', label: 'Discount Policies', icon: <Percent size={12} /> },
+                { id: 'maintenance', label: 'Work Orders Kanban', icon: <Wrench size={12} />, badge: 'Tickets', badgeColor: 'bg-amber-100 text-amber-700' },
+                { id: 'building-floor', label: 'Plant & Floor Facilities', icon: <Building2 size={12} /> },
             ]
         },
 
-        // 5. Room Inventory & Physical Units
-        {
-            key: 'roomKey',
-            label: 'Room Inventory',
-            icon: <Layers size={14} />,
-            items: [
-                { id: 'manage-room-type', label: 'Room Types & Classes', icon: <Tags size={12} /> },
-                { id: 'manage-room', label: 'Physical Rooms Master', icon: <BedDouble size={12} /> },
-                { id: 'joint-room', label: 'Connecting Rooms', icon: <Layers size={12} /> },
-                { id: 'building-floor', label: 'Floors & Buildings', icon: <Building2 size={12} /> },
-            ]
-        },
-
-        // 6. Food & Beverage POS & KDS
+        // MODULE: F&B POS & KDS
         {
             key: 'posManagement',
-            label: 'F&B POS & KDS',
+            label: 'F&B POS & Dining',
             icon: <UtensilsCrossed size={14} />,
             items: [
                 { id: 'pos-dashboard', label: 'POS Terminal Overview', icon: <LayoutDashboard size={12} /> },
                 { id: 'pos', label: 'Cashier Terminal', icon: <UtensilsCrossed size={12} /> },
                 {
                     key: 'menuKey',
-                    label: 'Menu Configuration',
+                    label: 'Menu Master',
                     icon: <ListOrdered size={12} />,
                     items: [
                         { id: 'categories', label: 'Food Categories', icon: <Tags size={12} /> },
-                        { id: 'products', label: 'Menu Items & Pricing', icon: <Package size={12} /> },
+                        { id: 'products', label: 'Menu Items & Recipes', icon: <Package size={12} /> },
                         { id: 'addons', label: 'Modifiers & Addons', icon: <Layers size={12} /> },
                         { id: 'units', label: 'Portion Units', icon: <Scale size={12} /> },
                     ]
@@ -195,82 +173,102 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
                         { id: 'kitchens', label: 'Kitchen Stations', icon: <ChefHat size={12} /> },
                         { id: 'floor', label: 'Dining Areas & Zones', icon: <Map size={12} /> },
                     ]
-                },
-                {
-                    key: 'staffKey',
-                    label: 'F&B Service Staff',
-                    icon: <Users size={12} />,
-                    items: [
-                        { id: 'waiters', label: 'Waiters & Captains', icon: <User size={12} /> },
-                        { id: 'pos-users', label: 'POS Cashiers', icon: <CreditCard size={12} /> },
-                        { id: 'admin-users', label: 'F&B Supervisors', icon: <Shield size={12} /> },
-                    ]
                 }
             ]
         },
 
-        // 7. Finance, Banking & USALI ERP
+        // ====================================================================
+        // SECTION 2: FINANCE & USALI ERP
+        // ====================================================================
+        
+        // MODULE: ADVANCE ACCOUNTING
         {
-            key: 'financeKey',
-            label: 'Finance & USALI ERP',
+            key: 'accountingMod',
+            label: 'Advance Accounting',
             icon: <Landmark size={14} />,
+            sectionHeader: 'Finance & ERP',
             items: [
-                { id: 'revenue-dashboard', label: 'Revenue KPIs (ADR/RevPAR)', icon: <TrendingUp size={12} /> },
-                { id: 'master-data', label: 'Master Data & GL Mapping', icon: <Database size={12} />, badge: 'ERP', badgeColor: 'bg-blue-100 text-blue-700' },
-                { id: 'revenue-heads', label: 'Revenue Heads & Groups', icon: <TrendingUp size={12} />, badge: 'USALI', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                { id: 'revenue-dashboard', label: 'Financial Revenue KPIs', icon: <TrendingUp size={12} />, badge: 'RevPAR', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'master-data', label: 'USALI Chart of Accounts', icon: <Database size={12} />, badge: 'USALI', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                { id: 'revenue-heads', label: 'Revenue Heads & Groups', icon: <TrendingUp size={12} /> },
                 { id: 'banking', label: 'Bank Accounts & MFS', icon: <Wallet size={12} />, badge: 'MFS', badgeColor: 'bg-indigo-100 text-indigo-700' },
                 { id: 'extra-charges', label: 'Extra Charges & Add-ons', icon: <Plus size={12} /> },
                 { id: 'discounts', label: 'Discounts & Rebates (GL-4990)', icon: <Percent size={12} /> },
-                { id: 'finance-overview', label: 'General Ledger Accounts', icon: <FileText size={12} /> },
+                { id: 'corporate-profiles', label: 'City Ledger (Accounts Receivable)', icon: <Building2 size={12} /> },
+                { id: 'finance-overview', label: 'General Ledger & Trial Balance', icon: <FileText size={12} /> },
             ]
         },
 
-        // 8. B2B Corporate & Revenue
+        // ====================================================================
+        // SECTION 3: HUMAN RESOURCES (HRM)
+        // ====================================================================
+        
+        // MODULE: HRM (HUMAN RESOURCE MANAGEMENT)
         {
-            key: 'b2b',
-            label: 'B2B & Sales Accounts',
-            icon: <TrendingUp size={14} />,
+            key: 'hrmMod',
+            label: 'HRM (Human Resources)',
+            icon: <Users size={14} />,
+            sectionHeader: 'Personnel & Governance',
             items: [
-                { id: 'corporate-profiles', label: 'Corporate Accounts (City Ledger)', icon: <Building2 size={12} /> },
+                { id: 'user-management', label: 'Staff & Employee Directory', icon: <UserCog size={12} /> },
+                { id: 'departments', label: 'Department Management', icon: <Building2 size={12} />, badge: 'Cost Centers', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'shifts', label: '24/7 Work Shifts & Handover', icon: <Clock size={12} />, badge: 'Shifts', badgeColor: 'bg-purple-100 text-purple-700' },
+                { id: 'roles-permissions', label: 'Roles & RBAC Access Matrix', icon: <Shield size={12} /> },
+                { id: 'waiters', label: 'Waiters & Service Captains', icon: <User size={12} /> },
+                { id: 'pos-users', label: 'POS Cashiers & Operators', icon: <CreditCard size={12} /> },
+            ]
+        },
+
+        // ====================================================================
+        // SECTION 4: COMMERCIAL & ROOMS DISTRIBUTION
+        // ====================================================================
+        
+        // MODULE: ROOMS & RATES
+        {
+            key: 'inventoryMod',
+            label: 'Rooms & Rates',
+            icon: <Layers size={14} />,
+            sectionHeader: 'Commercial & Distribution',
+            items: [
+                { id: 'rate-plans', label: 'Rate Plans (BAR & Corp)', icon: <Tags size={12} /> },
+                { id: 'package-builder', label: 'Package Builder (L2)', icon: <Package size={12} /> },
+                { id: 'meal-plans', label: 'Meal Plans (EP, CP, MAP)', icon: <Utensils size={12} /> },
+                { id: 'rate-calendar', label: 'Rate & Availability Board', icon: <Calendar size={12} /> },
+                { id: 'manage-room-type', label: 'Room Types & Categories', icon: <Tags size={12} /> },
+                { id: 'manage-room', label: 'Physical Rooms Master', icon: <BedDouble size={12} /> },
+                { id: 'joint-room', label: 'Connecting & Adjoining Rooms', icon: <Layers size={12} /> },
+            ]
+        },
+
+        // MODULE: B2B & AUDIT REPORTS
+        {
+            key: 'reportsMod',
+            label: 'B2B & Reports',
+            icon: <FileText size={14} />,
+            items: [
+                { id: 'corporate-profiles', label: 'Corporate Accounts (B2B)', icon: <Building2 size={12} /> },
                 { id: 'business-origins', label: 'Business Origins & Sources', icon: <Target size={12} /> },
                 { id: 'advanced-reports', label: 'Advanced Analytics', icon: <BarChart3 size={12} /> },
+                { id: 'reports', label: 'Report Center & Audit Packs', icon: <ListOrdered size={12} />, newTab: true, badge: 'Packs', badgeColor: 'bg-gray-100 text-gray-700' },
             ]
         },
 
-        // 9. Properties & Locations
+        // ====================================================================
+        // SECTION 5: SETTINGS & GOVERNANCE
+        // ====================================================================
+        
+        // MODULE: SETTINGS & GOVERNANCE
         {
-            key: 'propertyKey',
-            label: 'Properties & Chain',
-            icon: <Building2 size={14} />,
+            key: 'settingsMod',
+            label: 'Settings & Governance',
+            icon: <Settings size={14} />,
+            sectionHeader: 'System & Configuration',
             items: [
+                { id: 'policy-management', label: 'Hotel Policy Governance', icon: <ShieldCheck size={12} />, badge: 'Rules', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                { id: 'general-settings', label: 'System Configuration', icon: <Settings size={12} /> },
                 { id: 'properties', label: 'All Hotel Properties', icon: <Building2 size={12} /> },
                 { id: 'hotel-info', label: 'Property Profile & Info', icon: <Info size={12} /> },
                 { id: 'property-create', label: 'Register New Property', icon: <Plus size={12} /> },
-            ]
-        },
-
-        // 10. Audit Reports Center
-        {
-            key: 'reportsKey',
-            label: 'Audit & Reports',
-            icon: <FileText size={14} />,
-            items: [
-                { id: 'reports', label: 'Report Center & Packs', icon: <ListOrdered size={12} />, newTab: true, badge: 'Packs', badgeColor: 'bg-gray-100 text-gray-700' },
-            ]
-        },
-
-        // 11. Organization, Staff & Security Settings
-        {
-            key: 'admin',
-            label: 'Security & Settings',
-            icon: <Shield size={14} />,
-            items: [
-                { id: 'user-management', label: 'Users & Staff Directory', icon: <UserCog size={12} /> },
-                { id: 'roles-permissions', label: 'Roles & RBAC Matrix', icon: <Shield size={12} /> },
-                { id: 'departments', label: 'Department Management', icon: <Building2 size={12} /> },
-                { id: 'shifts', label: '24/7 Work Shifts', icon: <Clock size={12} /> },
-                { id: 'policy-management', label: 'Policy Engine & Rules', icon: <ShieldCheck size={12} /> },
-                { id: 'general-settings', label: 'System Configuration', icon: <Settings size={12} /> },
             ]
         }
     ];
@@ -351,6 +349,13 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
         if (hasChildren) {
             return (
                 <div key={item.key || item.label} className="mt-0.5">
+                    {/* Section Header (if present and top depth) */}
+                    {item.sectionHeader && !isCollapsed && depth === 0 && (
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 px-2 pt-3 pb-1 select-none">
+                            {item.sectionHeader}
+                        </div>
+                    )}
+
                     <button
                         type="button"
                         onClick={() => !isCollapsed && item.key && toggleMenu(item.key)}
@@ -523,9 +528,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
                     )}
                 </div>
 
-                <div className="border-t border-gray-100 my-1"></div>
-
-                {/* Group Accordions */}
+                {/* Module-Wise Accordions */}
                 {filteredMenuGroups.map((group) => renderMenuItem(group, 0))}
 
                 {filteredMenuGroups.length === 0 && (
@@ -543,7 +546,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             Online (ERP Core)
                         </span>
-                        <span className="text-[9px] text-gray-400 font-mono">v4.2</span>
+                        <span className="text-[9px] text-gray-400 font-mono">v4.3</span>
                     </>
                 )}
                 {isCollapsed && (
