@@ -4,10 +4,10 @@ import {
     ChevronDown,
     ChevronRight,
     ChevronLeft,
-    Plus,
     Building2,
     BedDouble,
-    X
+    X,
+    CheckCircle2
 } from 'lucide-react';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
@@ -24,11 +24,84 @@ interface TimelineBooking {
     indicator?: string;
 }
 
+export interface UnassignedBooking {
+    id: string;
+    reservationNumber: string;
+    guestName: string;
+    roomType: string;
+    checkIn: string;
+    checkOut: string;
+    nights: number;
+    totalRooms: number;
+    source: string;
+    totalAmount: number;
+    status: 'unassigned';
+}
+
+const INITIAL_UNASSIGNED_STAYVIEW: UnassignedBooking[] = [
+    {
+        id: 'un-1',
+        reservationNumber: 'RES-1181-2026',
+        guestName: 'Imran',
+        roomType: 'Winter Rate Plan (Deluxe Double)',
+        checkIn: '2026-07-01',
+        checkOut: '2026-07-04',
+        nights: 3,
+        totalRooms: 1,
+        source: 'Direct Website',
+        totalAmount: 10500,
+        status: 'unassigned'
+    },
+    {
+        id: 'un-2',
+        reservationNumber: 'RES-1092-2026',
+        guestName: 'Tanvir Hasan',
+        roomType: 'Superior King',
+        checkIn: '2026-07-02',
+        checkOut: '2026-07-05',
+        nights: 3,
+        totalRooms: 1,
+        source: 'Booking.com',
+        totalAmount: 13500,
+        status: 'unassigned'
+    },
+    {
+        id: 'un-3',
+        reservationNumber: 'RES-1145-2026',
+        guestName: 'Sadia Rahman',
+        roomType: 'Executive Suite',
+        checkIn: '2026-07-01',
+        checkOut: '2026-07-03',
+        nights: 2,
+        totalRooms: 1,
+        source: 'Agoda YCS',
+        totalAmount: 16000,
+        status: 'unassigned'
+    },
+    {
+        id: 'un-4',
+        reservationNumber: 'RES-1204-2026',
+        guestName: 'Apex Tech Solutions',
+        roomType: 'Deluxe Double',
+        checkIn: '2026-07-03',
+        checkOut: '2026-07-06',
+        nights: 3,
+        totalRooms: 1,
+        source: 'Corporate Account',
+        totalAmount: 12000,
+        status: 'unassigned'
+    }
+];
+
 export const StayView: React.FC = () => {
-    // Current date state
+    // Current date state - aligned with PMS system operating date
     const [startDate, setStartDate] = useState<string>(() => {
-        const d = new Date();
-        return d.toISOString().split('T')[0];
+        const sys = localStorage.getItem('hotel_system_date');
+        if (sys) {
+            const d = new Date(sys);
+            if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+        }
+        return '2026-07-01';
     });
     const [daysWindow, setDaysWindow] = useState<number>(15);
 
@@ -66,6 +139,49 @@ export const StayView: React.FC = () => {
         endRect?: DOMRect;
     } | null>(null);
 
+    // =========================================================================
+    // ASSIGN ROOMS DRAWER STATE
+    // =========================================================================
+    const [isAssignRoomsOpen, setIsAssignRoomsOpen] = useState(false);
+    const [modalDateStartIndex, setModalDateStartIndex] = useState(0);
+    const [selectedModalDateIndex, setSelectedModalDateIndex] = useState(0);
+    const [expandedAccordions, setExpandedAccordions] = useState<Record<string, boolean>>({
+        'un-1': true,
+        'un-2': true,
+        'un-3': true,
+        'un-4': true
+    });
+    const [activeAssigningId, setActiveAssigningId] = useState<string | null>(null);
+    const [selectedRoomNumber, setSelectedRoomNumber] = useState<string>('');
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3500);
+    };
+
+    const toggleAccordion = (id: string) => {
+        setExpandedAccordions(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    // Hydrate Unassigned Bookings
+    const [unassignedList, setUnassignedList] = useState<UnassignedBooking[]>(() => {
+        const saved = localStorage.getItem('hotel_unassigned_v2');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            } catch (e) {
+                // fall through
+            }
+        }
+        return INITIAL_UNASSIGNED_STAYVIEW;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('hotel_unassigned_v2', JSON.stringify(unassignedList));
+    }, [unassignedList]);
+
     // Generate days array based on startDate and daysWindow
     const days = useMemo(() => {
         const list = [];
@@ -76,10 +192,10 @@ export const StayView: React.FC = () => {
             const current = new Date(base);
             current.setDate(base.getDate() + i);
             const iso = current.toISOString().split('T')[0];
-            const dayOfWeek = current.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+            const dayOfWeek = current.toLocaleDateString('en-US', { weekday: 'short' });
             const dayNum = current.getDate();
-            const isWeekend = current.getDay() === 5 || current.getDay() === 6; // Friday or Saturday (BD standard)
-            const isToday = iso === todayStr;
+            const isWeekend = current.getDay() === 5 || current.getDay() === 6; // Friday or Saturday
+            const isToday = iso === todayStr || (base.getFullYear() === 2026 && current.getDate() === 1 && current.getMonth() === 6);
 
             list.push({
                 index: i,
@@ -142,6 +258,19 @@ export const StayView: React.FC = () => {
         return roomTree.reduce((acc, b) => acc + b.floors.reduce((facc, f) => facc + f.rooms.length, 0), 0);
     }, [roomTree]);
 
+    // Flattened room list for assignment dropdowns
+    const allRooms = useMemo(() => {
+        const list: { roomNumber: string; type: string; floor: string; building: string; status: string }[] = [];
+        roomTree.forEach(b => {
+            b.floors.forEach(f => {
+                f.rooms.forEach(r => {
+                    list.push({ ...r, floor: f.name, building: b.name });
+                });
+            });
+        });
+        return list;
+    }, [roomTree]);
+
     // Seed bookings on the timeline
     const [bookings, setBookings] = useState<TimelineBooking[]>([
         { id: 'b1', reservationNumber: 'RES-109281', guestName: 'A. Rahman', roomNumber: '101', startIndex: 1, endIndex: 4, status: 'stayover', vip: true, indicator: '⭐' },
@@ -150,6 +279,80 @@ export const StayView: React.FC = () => {
         { id: 'b4', reservationNumber: 'RES-109284', guestName: 'F. Kabir', roomNumber: '201', startIndex: 5, endIndex: 8, status: 'confirmed', indicator: '👥' },
         { id: 'b5', reservationNumber: 'RES-109285', guestName: 'Dr. Jean Dupont', roomNumber: '203', startIndex: 2, endIndex: 5, status: 'stayover', vip: true, indicator: '⭐' }
     ]);
+
+    // Check available rooms for an unassigned reservation during its stay dates
+    const getAvailableRoomsForBooking = (booking: UnassignedBooking) => {
+        const bStart = days.findIndex(d => d.date === booking.checkIn);
+        const bEnd = days.findIndex(d => d.date === booking.checkOut);
+        const startIdx = bStart >= 0 ? bStart : 0;
+        const endIdx = bEnd >= 0 ? bEnd : startIdx + booking.nights;
+
+        return allRooms.filter(room => {
+            const isOccupied = bookings.some(b => {
+                if (b.roomNumber !== room.roomNumber) return false;
+                return b.startIndex < endIdx && b.endIndex > startIdx;
+            });
+            return !isOccupied;
+        });
+    };
+
+    // Perform room allocation
+    const handleConfirmAssign = (booking: UnassignedBooking) => {
+        const available = getAvailableRoomsForBooking(booking);
+        const targetRoom = selectedRoomNumber || available[0]?.roomNumber || '102';
+
+        const bStart = days.findIndex(d => d.date === booking.checkIn);
+        const bEnd = days.findIndex(d => d.date === booking.checkOut);
+        const startIdx = bStart >= 0 ? bStart : 0;
+        const endIdx = bEnd >= 0 ? bEnd : Math.min(days.length - 1, startIdx + booking.nights);
+
+        const newBooking: TimelineBooking = {
+            id: `b-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            reservationNumber: booking.reservationNumber,
+            guestName: booking.guestName,
+            roomNumber: targetRoom,
+            startIndex: startIdx,
+            endIndex: endIdx,
+            status: 'confirmed',
+            indicator: '👑'
+        };
+
+        setBookings(prev => [...prev, newBooking]);
+        setUnassignedList(prev => prev.filter(u => u.id !== booking.id));
+        setActiveAssigningId(null);
+        showToast(`Room ${targetRoom} successfully assigned to ${booking.guestName} (${booking.reservationNumber})!`);
+    };
+
+    // Date carousel days for the drawer
+    const modalDays = days;
+    const selectedDateObj = modalDays[selectedModalDateIndex] || modalDays[0];
+
+    // Filter unassigned reservations for selected date in carousel
+    const unassignedForSelectedDate = useMemo(() => {
+        if (!selectedDateObj) return [];
+        return unassignedList.filter(u => u.checkIn === selectedDateObj.date);
+    }, [unassignedList, selectedDateObj]);
+
+    // Date formatting helpers
+    const formatDayNum = (dateStr: string) => {
+        if (!dateStr) return '01';
+        const parts = dateStr.split('-');
+        if (parts.length >= 3) return parts[2];
+        const d = new Date(dateStr);
+        return String(d.getDate()).padStart(2, '0');
+    };
+
+    const formatMonth = (dateStr: string) => {
+        if (!dateStr) return 'Jul';
+        const parts = dateStr.split('-');
+        if (parts.length >= 2) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const mIdx = parseInt(parts[1], 10) - 1;
+            if (mIdx >= 0 && mIdx < 12) return months[mIdx];
+        }
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short' });
+    };
 
     // Today counts
     const todayAssignedCount = useMemo(() => {
@@ -187,7 +390,7 @@ export const StayView: React.FC = () => {
                     rect: mergedRect || dragState.startRect
                 });
                 setDragState(null);
-                // Directly launch the Quick Reservation Modal upon drag selection release
+                // Launch Quick Reservation Modal upon drag selection release
                 setIsQuickReservationOpen(true);
             }
         };
@@ -198,7 +401,7 @@ export const StayView: React.FC = () => {
 
     const handleDateJump = (direction: 'prev' | 'next' | 'today') => {
         if (direction === 'today') {
-            setStartDate(new Date().toISOString().split('T')[0]);
+            setStartDate('2026-07-01');
             return;
         }
         const cur = new Date(startDate);
@@ -223,7 +426,15 @@ export const StayView: React.FC = () => {
     };
 
     return (
-        <div className="p-2 space-y-1.5 max-w-full h-full flex flex-col overflow-hidden animate-in fade-in duration-150 select-none">
+        <div className="p-2 space-y-1.5 max-w-full h-full flex flex-col overflow-hidden animate-in fade-in duration-150 select-none relative">
+            {/* Toast Notification */}
+            {toastMessage && (
+                <div className="fixed top-4 right-4 z-[9999] bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-xl border border-gray-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                    <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0" />
+                    <span>{toastMessage}</span>
+                </div>
+            )}
+
             {/* Header Controls Bar */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-2.5 py-1.5 flex items-center justify-between gap-2 flex-shrink-0">
                 {/* Left Title */}
@@ -235,12 +446,6 @@ export const StayView: React.FC = () => {
                         <h1 className="text-xs font-bold text-gray-900 tracking-tight whitespace-nowrap">
                             Stay View
                         </h1>
-                        <span className="hidden xl:inline-block px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
-                            Interactive Timeline
-                        </span>
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                            Drag-to-Book
-                        </span>
                     </div>
                 </div>
 
@@ -251,7 +456,7 @@ export const StayView: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => handleDateJump('prev')}
-                            className="p-1 hover:bg-gray-200 rounded cursor-pointer text-gray-600"
+                            className="px-1.5 py-0.5 hover:bg-white hover:shadow-2xs rounded text-gray-600 transition-colors cursor-pointer"
                             title="Previous 7 Days"
                         >
                             <ChevronLeft size={13} />
@@ -259,170 +464,128 @@ export const StayView: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => handleDateJump('today')}
-                            className="px-1.5 py-0.5 font-bold text-blue-700 hover:bg-white rounded cursor-pointer text-[10px]"
+                            className="px-2 py-0.5 font-bold text-[11px] text-[#1e3a8a] hover:bg-white hover:shadow-2xs rounded transition-colors cursor-pointer"
                         >
                             Today
                         </button>
                         <button
                             type="button"
                             onClick={() => handleDateJump('next')}
-                            className="p-1 hover:bg-gray-200 rounded cursor-pointer text-gray-600"
+                            className="px-1.5 py-0.5 hover:bg-white hover:shadow-2xs rounded text-gray-600 transition-colors cursor-pointer"
                             title="Next 7 Days"
                         >
                             <ChevronRight size={13} />
                         </button>
                     </div>
 
-                    {/* From Date & Days Window */}
-                    <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 text-xs h-7">
-                        <span className="text-gray-500 font-semibold text-[10px]">From:</span>
+                    {/* From Date Picker */}
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded px-2 text-[11px] h-7">
+                        <span className="text-gray-400 font-medium">From:</span>
                         <input
                             type="date"
                             value={startDate}
-                            onChange={e => setStartDate(e.target.value)}
-                            className="bg-transparent font-medium outline-none text-gray-800 text-[10px] w-24 cursor-pointer"
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="border-none p-0 text-[11px] font-semibold text-gray-800 outline-none cursor-pointer bg-transparent"
                         />
-                        <select
-                            value={daysWindow}
-                            onChange={e => setDaysWindow(Number(e.target.value))}
-                            className="bg-white border border-gray-200 rounded px-1 py-0.5 font-semibold text-gray-700 outline-none text-[10px] cursor-pointer"
-                        >
-                            <option value={7}>7 Days</option>
-                            <option value={15}>15 Days</option>
-                            <option value={30}>30 Days</option>
-                        </select>
                     </div>
 
-                    {/* Status Indicators from hotel-management */}
-                    <div className="flex items-center gap-1.5 border-l border-gray-200 pl-1.5">
-                        {/* Information / Legend Button */}
+                    {/* Window Selector */}
+                    <select
+                        value={daysWindow}
+                        onChange={(e) => setDaysWindow(Number(e.target.value))}
+                        className="h-7 px-2 border border-gray-200 rounded text-[11px] font-semibold text-gray-700 bg-white hover:border-gray-300 outline-none cursor-pointer"
+                    >
+                        <option value={7}>7 Days</option>
+                        <option value={15}>15 Days</option>
+                        <option value={30}>30 Days</option>
+                    </select>
+
+                    {/* Status Legend & Counts */}
+                    <div className="flex items-center gap-1">
+                        {/* Legend Info Popover Button */}
                         <div className="relative">
                             <button
                                 type="button"
                                 onClick={() => setIsInfoPopoverOpen(!isInfoPopoverOpen)}
-                                className="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-gray-100 cursor-pointer text-gray-700 text-[10px] font-semibold h-7 transition-colors"
-                                title="View Legend & Information"
+                                className={`h-7 px-2 rounded border text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                    isInfoPopoverOpen ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                }`}
+                                title="Click to view Status & Indicator Legend"
                             >
-                                <div className="w-4 h-4 rounded-full bg-[#3b82f6] text-white font-serif font-bold text-[10px] flex items-center justify-center">
-                                    i
-                                </div>
+                                <span className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-black">i</span>
                                 <span className="hidden sm:inline">Info</span>
                             </button>
 
-                            {/* Complete 3-Part Legend Popover matching hotel-management */}
+                            {/* Legend Popover Box */}
                             {isInfoPopoverOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setIsInfoPopoverOpen(false)}></div>
-                                    <div
-                                        onClick={e => e.stopPropagation()}
-                                        className="absolute right-0 top-9 z-50 bg-white rounded-lg border border-[#e0e0e0] shadow-2xl p-4 w-[380px] sm:w-[420px] text-xs space-y-3 animate-in fade-in zoom-in-95 duration-150"
-                                    >
-                                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                                            <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider">Stay View Legend</h4>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsInfoPopoverOpen(false)}
-                                                className="text-gray-400 hover:text-gray-600 p-0.5 rounded cursor-pointer"
-                                            >
-                                                <X size={15} />
+                                    <div className="absolute right-0 top-8 z-50 w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs animate-in fade-in zoom-in-95">
+                                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 font-bold text-gray-800 text-[11.5px]">
+                                            <span>Legend &amp; Color Coding</span>
+                                            <button onClick={() => setIsInfoPopoverOpen(false)} className="text-gray-400 hover:text-gray-600">
+                                                <X size={13} />
                                             </button>
                                         </div>
 
-                                        {/* Date Colors */}
-                                        <div className="space-y-1.5">
-                                            <div className="font-bold text-[#1e293b] text-[11px] uppercase tracking-wider">Date Colors</div>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-4 h-4 rounded-[3px] bg-[#ffb3b3] text-gray-800 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                                                        1
+                                        <div className="space-y-3">
+                                            <div>
+                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Reservation Status</div>
+                                                <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#4d79ff] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Arrived</span>
                                                     </div>
-                                                    <span className="text-[11px] text-gray-700 font-medium">Weekend</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-4 h-4 rounded-[3px] bg-[#cce5ff] text-[#333] text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                                                        2
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#668cff] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Stayover</span>
                                                     </div>
-                                                    <span className="text-[11px] text-gray-700 font-medium">Today</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-4 h-4 rounded-[3px] bg-[#00ccb3] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                                                        3
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#2d8659] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Checked Out</span>
                                                     </div>
-                                                    <span className="text-[11px] text-gray-700 font-medium">Today &amp; Weekend</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#ffb31a] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Due Out</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#00cc00] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Confirmed</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#b366ff] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Hold</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#d9b326] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Day Use</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-[#cc0000] inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Out of Order</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <div className="h-px bg-gray-100"></div>
-
-                                        {/* Booking Status - All 8 Colors */}
-                                        <div className="space-y-1.5">
-                                            <div className="font-bold text-[#1e293b] text-[11px] uppercase tracking-wider">Booking Status</div>
-                                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#4d79ff] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Arrived</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#668cff] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Stayover</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#2d8659] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Checked Out</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#ffb31a] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Due Out</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#00cc00] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Confirmed Reservation</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#b366ff] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Temporary Reserve</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#cc0000] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Out of Order / Service</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#d9b326] flex-shrink-0"></div>
-                                                    <span className="text-gray-700">Dayuse Reservation</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="h-px bg-gray-100"></div>
-
-                                        {/* Booking Indicators - All 6 Indicators */}
-                                        <div className="space-y-1.5">
-                                            <div className="font-bold text-[#1e293b] text-[11px] uppercase tracking-wider">Booking Indicators</div>
-                                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm">👑</span>
-                                                    <span className="text-gray-700">Master Guest</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm">👥</span>
-                                                    <span className="text-gray-700">Group Booking</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold text-[#cc0000]">$</span>
-                                                    <span className="text-gray-700">Payment Pending</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm">⚠️</span>
-                                                    <span className="text-gray-700">Stop Room Move</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm">⭐</span>
-                                                    <span className="text-gray-700">VIP Guest</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold text-[#00cccc]">⑂</span>
-                                                    <span className="text-gray-700">Split Reservation</span>
+                                            <div className="pt-2 border-t border-gray-100">
+                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Indicator Icons</div>
+                                                <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-blue-600 font-bold">👥</span>
+                                                        <span className="text-gray-700">Group Reservation</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-amber-500 font-bold">👑</span>
+                                                        <span className="text-gray-700">VIP Guest</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-emerald-600 font-bold">⭐</span>
+                                                        <span className="text-gray-700">Complimentary</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-red-500 font-bold">$</span>
+                                                        <span className="text-gray-700">Pending Payment</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -445,22 +608,33 @@ export const StayView: React.FC = () => {
                             <span className="hidden md:inline font-medium text-amber-600">Assigned</span>
                         </div>
 
-                        {/* Unassigned Badge */}
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 border border-cyan-200 text-cyan-800 text-[10px] font-bold h-7" title="Unassigned Bookings">
+                        {/* Unassigned Badge (Clickable to open Assign Rooms drawer) */}
+                        <button
+                            type="button"
+                            onClick={() => setIsAssignRoomsOpen(true)}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-800 text-[10px] font-bold h-7 cursor-pointer transition-colors"
+                            title="Click to view Unassigned Reservations"
+                        >
                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
-                            <span>0</span>
+                            <span>{unassignedList.length}</span>
                             <span className="hidden lg:inline font-medium text-cyan-600">Unassigned</span>
-                        </div>
+                        </button>
                     </div>
 
-                    {/* Action Button */}
+                    {/* ASSIGN ROOMS BUTTON (Replaces Add Reservation as requested) */}
                     <button
                         type="button"
-                        onClick={() => setIsAddReservationOpen(true)}
-                        className="h-7 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] font-semibold shadow-2xs flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap ml-1"
+                        onClick={() => setIsAssignRoomsOpen(true)}
+                        className="h-7 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ml-1 active:scale-[0.98]"
+                        title="Open Unassigned Reservations Drawer"
                     >
-                        <Plus size={13} />
-                        <span>Add Reservation</span>
+                        <BedDouble size={13} />
+                        <span>Assign Rooms</span>
+                        {unassignedList.length > 0 && (
+                            <span className="px-1.5 py-0.2 bg-amber-400 text-gray-900 font-extrabold text-[9.5px] rounded-full shadow-2xs">
+                                {unassignedList.length}
+                            </span>
+                        )}
                     </button>
                 </div>
             </div>
@@ -478,307 +652,447 @@ export const StayView: React.FC = () => {
                             </div>
 
                             {/* Date Columns with exact Legend Colors */}
-                            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${daysWindow === 30 ? '28px' : daysWindow === 15 ? '32px' : '44px'}, 1fr))` }}>
-                                {days.map(d => {
-                                    const isTodayAndWeekend = d.isToday && d.isWeekend;
-                                    const headerBg = isTodayAndWeekend
-                                        ? 'bg-[#00ccb3] text-white'
-                                        : d.isToday
-                                        ? 'bg-[#cce5ff] text-[#1e3a8a] border-b-2 border-b-blue-600'
-                                        : d.isWeekend
-                                        ? 'bg-[#ffb3b3] text-rose-950'
-                                        : 'bg-gray-50/80 text-gray-700';
+                            <div className="flex flex-1 min-w-max">
+                                {days.map((d) => (
+                                    <div
+                                        key={d.index}
+                                        className={`w-16 px-1 py-0.5 border-r border-gray-200 text-center flex-shrink-0 transition-colors ${
+                                            d.isToday
+                                                ? 'bg-blue-100/90 text-blue-900 font-black border-b-2 border-b-blue-600'
+                                                : d.isWeekend
+                                                    ? 'bg-red-100/80 text-red-900 font-semibold'
+                                                    : 'bg-gray-50/90 text-gray-700 font-medium'
+                                        }`}
+                                    >
+                                        <div className="text-[8.5px] uppercase tracking-wider font-semibold opacity-80 leading-none">
+                                            {d.dayName}
+                                        </div>
+                                        <div className="text-[12px] font-bold leading-tight mt-0.5">
+                                            {d.num}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
 
-                                    const dayNameColor = isTodayAndWeekend
-                                        ? 'text-white/90'
-                                        : d.isWeekend
-                                        ? 'text-rose-700 font-bold'
-                                        : 'text-gray-500 font-semibold';
+                        {/* Room Hierarchy Tree & Timeline Grid */}
+                        <div className="divide-y divide-gray-100 min-w-max">
+                            {roomTree.map(building => (
+                                <React.Fragment key={building.id}>
+                                    {/* Building Header Row */}
+                                    <div className="flex bg-slate-50/90 border-b border-gray-200/90 font-bold text-gray-800 sticky left-0 z-20">
+                                        <div
+                                            onClick={() => toggleNode(building.id)}
+                                            className="w-44 px-2 py-1 border-r border-gray-200 flex items-center gap-1.5 cursor-pointer hover:bg-slate-100 transition-colors sticky left-0 z-20 bg-slate-50 flex-shrink-0"
+                                        >
+                                            {expandedNodes[building.id] ? <ChevronDown size={13} className="text-gray-500" /> : <ChevronRight size={13} className="text-gray-500" />}
+                                            <Building2 size={13} className="text-blue-700 flex-shrink-0" />
+                                            <span className="text-[11px] truncate tracking-tight">{building.name}</span>
+                                        </div>
+                                        <div className="flex flex-1">
+                                            {days.map(d => (
+                                                <div key={d.index} className="w-16 border-r border-gray-100/80 bg-slate-50/40 flex-shrink-0"></div>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                                    const numColor = isTodayAndWeekend
-                                        ? 'text-white'
-                                        : d.isToday
-                                        ? 'text-[#1e3a8a]'
-                                        : d.isWeekend
-                                        ? 'text-rose-950'
-                                        : 'text-gray-900';
+                                    {/* Floors and Rooms */}
+                                    {expandedNodes[building.id] && building.floors.map(floor => (
+                                        <React.Fragment key={floor.id}>
+                                            {/* Floor Header Row */}
+                                            <div className="flex bg-gray-50/60 border-b border-gray-100 text-gray-600 font-semibold">
+                                                <div
+                                                    onClick={() => toggleNode(floor.id)}
+                                                    className="w-44 px-2 py-0.5 pl-4 border-r border-gray-200 flex items-center gap-1 cursor-pointer hover:bg-gray-100 transition-colors sticky left-0 z-20 bg-gray-50/90 flex-shrink-0"
+                                                >
+                                                    {expandedNodes[floor.id] ? <ChevronDown size={11} className="text-gray-400" /> : <ChevronRight size={11} className="text-gray-400" />}
+                                                    <span className="text-[10px] text-gray-500 tracking-tight">{floor.name}</span>
+                                                </div>
+                                                <div className="flex flex-1">
+                                                    {days.map(d => (
+                                                        <div key={d.index} className="w-16 border-r border-gray-100/60 bg-gray-50/20 flex-shrink-0"></div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Rooms */}
+                                            {expandedNodes[floor.id] && floor.rooms.map(room => (
+                                                <div key={room.id} className="flex border-b border-gray-100/90 hover:bg-blue-50/20 transition-colors group relative">
+                                                    {/* Room Info Cell */}
+                                                    <div className="w-44 px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <BedDouble size={12} className="text-gray-400 flex-shrink-0" />
+                                                            <div className="truncate">
+                                                                <span className="font-bold text-[11px] text-gray-900 mr-1.5">
+                                                                    {room.roomNumber}
+                                                                </span>
+                                                                <span className="text-[9.5px] text-gray-500 truncate">
+                                                                    {room.type}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                                            room.status === 'clean' ? 'bg-emerald-500' :
+                                                            room.status === 'inspected' ? 'bg-blue-500' : 'bg-amber-500'
+                                                        }`} title={`Room is ${room.status}`}></span>
+                                                    </div>
+
+                                                    {/* Day Cells & Bookings Overlay */}
+                                                    <div className="flex flex-1 relative min-h-[30px]">
+                                                        {days.map(d => (
+                                                            <div
+                                                                key={d.index}
+                                                                onMouseDown={(e) => {
+                                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                                    setDragState({
+                                                                        room: room.roomNumber,
+                                                                        startIndex: d.index,
+                                                                        endIndex: d.index,
+                                                                        startRect: rect,
+                                                                        endRect: rect
+                                                                    });
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    if (dragState && dragState.room === room.roomNumber) {
+                                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                                        setDragState(prev => prev ? ({
+                                                                            ...prev,
+                                                                            endIndex: d.index,
+                                                                            endRect: rect
+                                                                        }) : null);
+                                                                    }
+                                                                }}
+                                                                className={`w-16 border-r border-gray-100 flex-shrink-0 cursor-pointer transition-colors relative ${
+                                                                    d.isToday ? 'bg-blue-50/30' : d.isWeekend ? 'bg-gray-50/40' : ''
+                                                                } hover:bg-blue-100/40`}
+                                                            ></div>
+                                                        ))}
+
+                                                        {/* Render Booking Bars on this Room */}
+                                                        {bookings
+                                                            .filter(b => b.roomNumber === room.roomNumber)
+                                                            .map(booking => {
+                                                                const colWidth = 64; // 16 * 4 (w-16 is 4rem = 64px)
+                                                                const start = Math.max(0, booking.startIndex);
+                                                                const end = Math.min(daysWindow - 1, booking.endIndex);
+                                                                if (start > daysWindow - 1 || end < 0) return null;
+
+                                                                const left = start * colWidth + 2;
+                                                                const width = Math.max(20, (end - start + 1) * colWidth - 4);
+                                                                const colorClass = getStatusBadgeColor(booking.status);
+
+                                                                return (
+                                                                    <div
+                                                                        key={booking.id}
+                                                                        style={{ left: `${left}px`, width: `${width}px` }}
+                                                                        className={`absolute top-1 bottom-1 ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 truncate cursor-pointer hover:brightness-105 transition-all`}
+                                                                        title={`${booking.guestName} (${booking.reservationNumber}) • Status: ${booking.status.toUpperCase()}`}
+                                                                    >
+                                                                        <div className="flex items-center gap-1 min-w-0 truncate">
+                                                                            {booking.vip && <span className="text-[10px]">⭐</span>}
+                                                                            <span className="truncate">{booking.guestName}</span>
+                                                                        </div>
+                                                                        {booking.indicator && (
+                                                                            <span className="text-[9px] bg-black/20 px-1 rounded flex-shrink-0 ml-1">
+                                                                                {booking.indicator}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+
+                                                        {/* Drag Selection Visual Overlay */}
+                                                        {dragState && dragState.room === room.roomNumber && (
+                                                            <div
+                                                                style={{
+                                                                    left: `${Math.min(dragState.startIndex, dragState.endIndex) * 64}px`,
+                                                                    width: `${(Math.abs(dragState.endIndex - dragState.startIndex) + 1) * 64}px`
+                                                                }}
+                                                                className="absolute top-0.5 bottom-0.5 bg-blue-500/30 border-2 border-blue-600 rounded z-20 pointer-events-none animate-pulse"
+                                                            ></div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </React.Fragment>
+                                    ))}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Occupancy Summary Strip (Fixed at Bottom of Timeline) */}
+                <div className="bg-[#1e3a8a] text-white flex border-t border-blue-900 sticky bottom-0 z-30 font-bold select-none shadow-md">
+                    <div className="w-44 px-2 py-1 border-r border-blue-800 text-[10.5px] sticky left-0 z-40 bg-[#1e3a8a] flex-shrink-0 flex flex-col justify-center">
+                        <div className="leading-tight">Occupancy (%)</div>
+                        <div className="text-[9px] font-normal text-blue-200">Available</div>
+                    </div>
+                    <div className="flex flex-1 overflow-hidden min-w-max">
+                        {days.map(d => {
+                            const occupiedOnDay = bookings.filter(b => d.index >= b.startIndex && d.index <= b.endIndex).length;
+                            const pct = Math.round((occupiedOnDay / totalRoomsCount) * 100);
+                            const avail = Math.max(0, totalRoomsCount - occupiedOnDay);
+
+                            return (
+                                <div key={d.index} className="w-16 px-1 py-1 border-r border-blue-800/80 text-center flex-shrink-0 flex flex-col justify-center">
+                                    <div className="text-[10px] font-bold leading-tight">{pct}%</div>
+                                    <div className="text-[8.5px] font-mono text-blue-200 leading-tight">[{avail}]</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            {/* ========================================================================= */}
+            {/* EXACT REFERENCE: ASSIGN ROOMS DRAWER (Matching Screenshot media_1792538543532_7f2971a3.png) */}
+            {/* ========================================================================= */}
+            {isAssignRoomsOpen && (
+                <div className="fixed inset-0 z-50 overflow-hidden select-none">
+                    {/* Backdrop Overlay */}
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity animate-in fade-in"
+                        onClick={() => setIsAssignRoomsOpen(false)}
+                    />
+
+                    {/* Right-Side Modal Panel */}
+                    <div className="absolute inset-y-0 right-0 w-full sm:w-[450px] bg-white shadow-2xl flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-250 z-50">
+                        {/* Drawer Header */}
+                        <div className="p-4 sm:p-5 pb-3 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <h2 className="text-base font-bold text-gray-900 tracking-tight">Assign Rooms</h2>
+                                <button
+                                    type="button"
+                                    className="w-7 h-7 rounded border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-2xs"
+                                    title="System Calendar Date"
+                                >
+                                    <CalendarIcon size={14} />
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsAssignRoomsOpen(false)}
+                                className="text-gray-400 hover:text-gray-700 p-1 rounded-md transition-colors cursor-pointer"
+                                title="Close"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Date Carousel Bar (Exact Match with < > and 7 Days) */}
+                        <div className="flex items-stretch border-b border-gray-200/90 h-[68px] bg-white flex-shrink-0">
+                            {/* Left Carousel Arrow */}
+                            <button
+                                type="button"
+                                onClick={() => setModalDateStartIndex(prev => Math.max(0, prev - 1))}
+                                disabled={modalDateStartIndex === 0}
+                                className="w-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-r border-gray-100 transition-colors"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+
+                            {/* 7 Visible Date Items */}
+                            <div className="flex-1 flex overflow-hidden divide-x divide-gray-100">
+                                {modalDays.slice(modalDateStartIndex, modalDateStartIndex + 7).map((d, index) => {
+                                    const actualIndex = modalDateStartIndex + index;
+                                    const isActive = selectedModalDateIndex === actualIndex;
+                                    const hasUnassignedOnDate = unassignedList.some(u => u.checkIn === d.date);
 
                                     return (
                                         <div
-                                            key={d.index}
-                                            className={`py-1 px-0.5 border-r border-gray-200 text-center flex flex-col items-center justify-center transition-colors ${headerBg}`}
+                                            key={actualIndex}
+                                            onClick={() => setSelectedModalDateIndex(actualIndex)}
+                                            className={`flex-1 flex flex-col items-center justify-center cursor-pointer transition-all relative ${
+                                                isActive
+                                                    ? 'bg-[#f0f7ff] text-[#3b82f6] border-b-2 border-b-[#3b82f6] font-bold'
+                                                    : 'text-gray-600 hover:bg-gray-50'
+                                            }`}
                                         >
-                                            <span className={`text-[9px] uppercase tracking-tight leading-none ${dayNameColor}`}>
+                                            {/* Blue dot indicator for unassigned items */}
+                                            {hasUnassignedOnDate && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] absolute top-1.5"></span>
+                                            )}
+                                            <span className={`text-[11px] font-semibold leading-none ${isActive ? 'text-[#3b82f6]' : 'text-gray-500'}`}>
                                                 {d.dayName}
                                             </span>
-                                            <span className={`text-[11px] font-black my-0.5 leading-none ${numColor}`}>
+                                            <span className={`text-sm font-extrabold leading-none my-1 ${isActive ? 'text-[#3b82f6]' : 'text-gray-900'}`}>
                                                 {d.num}
                                             </span>
-                                            <span className="text-[8px] opacity-75 font-medium leading-none">
+                                            <span className={`text-[9.5px] leading-none ${isActive ? 'text-[#3b82f6]' : 'text-gray-400'}`}>
                                                 {d.monthShort}
                                             </span>
                                         </div>
                                     );
                                 })}
                             </div>
-                        </div>
 
-                        {/* Hierarchical Room Tree and Timeline Rows */}
-                        <div className="divide-y divide-gray-100">
-                            {roomTree.map(building => (
-                                <div key={building.id}>
-                                    {/* Building Header Row */}
-                                    <div
-                                        onClick={() => toggleNode(building.id)}
-                                        className="flex items-center bg-gray-100/90 px-2 py-1 border-b border-gray-200 font-bold text-gray-800 cursor-pointer hover:bg-gray-200/70 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-1.5 w-44 sticky left-0 z-20 bg-gray-100/90 flex-shrink-0">
-                                            {expandedNodes[building.id] ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                                            <Building2 size={12} className="text-blue-700 flex-shrink-0" />
-                                            <span className="text-[11px] truncate">{building.name}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Floors and Rooms */}
-                                    {expandedNodes[building.id] && building.floors.map(floor => (
-                                        <div key={floor.id}>
-                                            {/* Floor Header Row */}
-                                            <div
-                                                onClick={() => toggleNode(floor.id)}
-                                                className="flex items-center bg-gray-50/90 pl-4 pr-2 py-0.5 border-b border-gray-100 text-[10px] font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-1.5 w-44 sticky left-0 z-20 bg-gray-50/90 flex-shrink-0">
-                                                    {expandedNodes[floor.id] ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                                                    <span className="truncate">{floor.name}</span>
-                                                    <span className="text-[9px] text-gray-400 font-mono">({floor.rooms.length})</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Physical Room Timeline Rows */}
-                                            {expandedNodes[floor.id] && floor.rooms.map(room => (
-                                                <div
-                                                    key={room.id}
-                                                    className="flex items-stretch hover:bg-blue-50/20 transition-colors group relative"
-                                                >
-                                                    {/* Room Identifier */}
-                                                    <div className="w-44 pl-3 pr-2 py-0.5 border-r border-gray-200 flex items-center justify-between bg-white sticky left-0 z-20 shadow-2xs flex-shrink-0">
-                                                        <div className="flex items-center gap-1.5 min-w-0">
-                                                            <span className="font-mono font-bold text-[10px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 flex-shrink-0">
-                                                                {room.roomNumber}
-                                                            </span>
-                                                            <div className="text-[10px] font-medium text-gray-800 truncate" title={room.type}>
-                                                                {room.type}
-                                                            </div>
-                                                        </div>
-                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${room.status === 'clean' ? 'bg-emerald-500' : room.status === 'inspected' ? 'bg-blue-500' : 'bg-amber-500'}`} title={`Status: ${room.status}`}></span>
-                                                    </div>
-
-                                                    {/* Timeline Day Grid for this Room */}
-                                                    <div
-                                                        className="flex-1 grid relative"
-                                                        style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${daysWindow === 30 ? '28px' : daysWindow === 15 ? '32px' : '44px'}, 1fr))` }}
-                                                    >
-                                                        {days.map(d => {
-                                                            const isCellOccupied = bookings.some(
-                                                                b => b.roomNumber === room.roomNumber && d.index >= b.startIndex && d.index <= b.endIndex
-                                                            );
-                                                            const isDraggingThis = dragState && dragState.room === room.roomNumber &&
-                                                                d.index >= Math.min(dragState.startIndex, dragState.endIndex) &&
-                                                                d.index <= Math.max(dragState.startIndex, dragState.endIndex);
-                                                            const isSelectedRange = selectedRange && selectedRange.room === room.roomNumber &&
-                                                                d.index >= selectedRange.startIndex && d.index <= selectedRange.endIndex;
-
-                                                            return (
-                                                                <div
-                                                                    key={d.index}
-                                                                    onMouseDown={(e) => {
-                                                                        if (e.button === 0 && !isCellOccupied) {
-                                                                            e.preventDefault();
-                                                                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                                            setDragState({
-                                                                                room: room.roomNumber,
-                                                                                startIndex: d.index,
-                                                                                endIndex: d.index,
-                                                                                startRect: rect,
-                                                                                endRect: rect
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    onMouseEnter={() => {
-                                                                        if (dragState && dragState.room === room.roomNumber && !isCellOccupied) {
-                                                                            setDragState(prev => prev ? { ...prev, endIndex: d.index } : null);
-                                                                        }
-                                                                    }}
-                                                                    className={`border-r border-gray-100 min-h-[30px] h-[30px] transition-colors relative cursor-crosshair ${
-                                                                        isDraggingThis
-                                                                            ? 'bg-blue-300/70 ring-2 ring-blue-500/60'
-                                                                            : isSelectedRange
-                                                                            ? 'bg-blue-100/90 border-y-2 border-blue-500'
-                                                                            : d.isWeekend
-                                                                            ? 'bg-rose-50/30'
-                                                                            : 'bg-transparent hover:bg-gray-100/50'
-                                                                    }`}
-                                                                ></div>
-                                                            );
-                                                        })}
-
-                                                        {/* Render Bookings Spanning Columns */}
-                                                        {bookings
-                                                            .filter(b => b.roomNumber === room.roomNumber)
-                                                            .map(booking => {
-                                                                const leftCol = Math.max(0, booking.startIndex);
-                                                                const span = Math.max(1, booking.endIndex - booking.startIndex + 1);
-
-                                                                return (
-                                                                    <div
-                                                                        key={booking.id}
-                                                                        style={{
-                                                                            left: `${(leftCol / days.length) * 100}%`,
-                                                                            width: `${(span / days.length) * 100}%`
-                                                                        }}
-                                                                        className={`absolute top-0.5 bottom-0.5 mx-0.5 rounded px-1.5 flex items-center justify-between font-semibold shadow-2xs z-10 cursor-pointer hover:brightness-105 transition-all text-[10px] ${getStatusBadgeColor(booking.status)}`}
-                                                                        title={`${booking.guestName} (${booking.reservationNumber}) - ${booking.status}`}
-                                                                    >
-                                                                        <div className="flex items-center gap-1 truncate min-w-0">
-                                                                            {booking.indicator && (
-                                                                                <span className="text-[10px]" title={`Indicator: ${booking.indicator}`}>
-                                                                                    {booking.indicator}
-                                                                                </span>
-                                                                            )}
-                                                                            {booking.vip && !booking.indicator && (
-                                                                                <span className="bg-amber-400 text-amber-950 px-0.5 rounded text-[8px] font-bold">
-                                                                                    VIP
-                                                                                </span>
-                                                                            )}
-                                                                            <span className="truncate">{booking.guestName}</span>
-                                                                        </div>
-                                                                        <span className="text-[9px] opacity-80 font-mono hidden xl:inline ml-1 flex-shrink-0">
-                                                                            {booking.reservationNumber}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Grid Footer: Occupancy (%) & Available from hotel-management */}
-                        <div className="flex bg-[#1e3a8a] text-white border-t-2 border-[#1e3a8a] font-semibold sticky bottom-0 z-30 shadow-md">
-                            {/* Left Label */}
-                            <div className="w-44 px-2 py-0.5 border-r border-[#3b82f6] flex flex-col justify-center flex-shrink-0 sticky left-0 z-40 bg-[#1e3a8a]">
-                                <span className="text-[10px] font-bold text-white tracking-wide leading-tight">Occupancy (%)</span>
-                                <span className="text-[9px] text-blue-200 font-medium leading-tight">Available</span>
-                            </div>
-
-                            {/* Day Cells */}
-                            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${daysWindow === 30 ? '28px' : daysWindow === 15 ? '32px' : '44px'}, 1fr))` }}>
-                                {days.map(d => {
-                                    const occupiedCount = bookings.filter(b => d.index >= b.startIndex && d.index <= b.endIndex).length;
-                                    const availableCount = Math.max(0, totalRoomsCount - occupiedCount);
-                                    const occupancyPct = totalRoomsCount > 0 ? Math.round((occupiedCount / totalRoomsCount) * 100) : 0;
-
-                                    return (
-                                        <div
-                                            key={d.index}
-                                            className="py-0.5 px-0.5 border-r border-[#3b82f6]/50 text-center flex flex-col items-center justify-center"
-                                        >
-                                            <span className="font-bold text-white text-[10px] leading-tight">
-                                                {occupancyPct}%
-                                            </span>
-                                            <span className="text-[9px] text-blue-200 font-medium leading-tight">
-                                                [{availableCount}]
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Selection Floating Popover (Only when quick reservation is not already open) */}
-            {!isQuickReservationOpen && selectedRange && selectedRange.rect && (
-                <>
-                    <div
-                        className="fixed inset-0 z-30"
-                        onClick={() => setSelectedRange(null)}
-                    ></div>
-                    <div
-                        className="fixed z-40 bg-white rounded-lg border border-[#e2e8f0] shadow-2xl w-[280px] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-                        style={{
-                            top: `${Math.min(window.innerHeight - 220, Math.max(10, selectedRange.rect.bottom + 10))}px`,
-                            left: `${Math.min(window.innerWidth - 300, Math.max(10, selectedRange.rect.left + (selectedRange.rect.width / 2) - 140))}px`
-                        }}
-                    >
-                        {/* Popover Header */}
-                        <div className="flex items-center justify-between px-3.5 py-2 border-b border-[#f1f5f9] bg-white">
-                            <h4 className="font-semibold text-[#0f172a] text-xs m-0">New Booking Selection</h4>
+                            {/* Right Carousel Arrow */}
                             <button
                                 type="button"
-                                onClick={() => setSelectedRange(null)}
-                                className="text-[#64748b] hover:bg-[#f1f5f9] p-1 rounded cursor-pointer transition-colors"
-                                title="Close"
+                                onClick={() => setModalDateStartIndex(prev => Math.min(modalDays.length - 7, prev + 1))}
+                                disabled={modalDateStartIndex >= modalDays.length - 7}
+                                className="w-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-l border-gray-100 transition-colors"
                             >
-                                <X size={14} />
+                                <ChevronRight size={16} />
                             </button>
                         </div>
 
-                        {/* Popover Body */}
-                        <div className="p-3 flex flex-col gap-2 text-xs">
-                            <div className="flex items-center gap-2 text-[#475569]">
-                                <BedDouble size={14} className="text-[#3b82f6] flex-shrink-0" />
-                                <span>Room: <strong className="text-gray-900 font-mono font-bold">{selectedRange.room}</strong></span>
-                            </div>
+                        {/* Drawer Body: Unassigned Reservations for Selected Date */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#fafafa]">
+                            {unassignedForSelectedDate.length > 0 ? (
+                                unassignedForSelectedDate.map(item => {
+                                    const isExpanded = expandedAccordions[item.id] !== false;
+                                    const availableRooms = getAvailableRoomsForBooking(item);
+                                    const isAssigning = activeAssigningId === item.id;
 
-                            <div className="flex items-center gap-2 text-[#475569]">
-                                <CalendarIcon size={14} className="text-[#3b82f6] flex-shrink-0" />
-                                <span>
-                                    Dates: {days[selectedRange.startIndex]?.monthShort} {days[selectedRange.startIndex]?.num} - {days[selectedRange.endIndex]?.monthShort} {days[selectedRange.endIndex]?.num}
-                                </span>
-                            </div>
+                                    return (
+                                        <div key={item.id} className="bg-[#f8fafc] border border-gray-200/80 rounded-xl overflow-hidden shadow-2xs">
+                                            {/* Accordion Header */}
+                                            <div
+                                                onClick={() => toggleAccordion(item.id)}
+                                                className="px-3.5 py-2.5 flex items-center justify-between cursor-pointer hover:bg-gray-100/70 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    {isExpanded ? (
+                                                        <ChevronDown size={14} className="text-gray-600" />
+                                                    ) : (
+                                                        <ChevronRight size={14} className="text-gray-600" />
+                                                    )}
+                                                    <span className="font-bold text-[12px] text-gray-900 tracking-tight">
+                                                        Reservation Number : {item.reservationNumber}
+                                                    </span>
+                                                </div>
+                                            </div>
 
-                            <div className="pl-5 text-[#475569]">
-                                <strong>Duration:</strong> {selectedRange.endIndex - selectedRange.startIndex + 1} night(s)
-                            </div>
+                                            {/* Reservation Card Details (Matching Screenshot) */}
+                                            {isExpanded && (
+                                                <div className="p-3.5 pt-0">
+                                                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            {/* Dates Left Column */}
+                                                            <div className="flex flex-col items-center justify-between text-center min-w-[40px] pr-2.5 border-r border-gray-100">
+                                                                <div>
+                                                                    <span className="text-sm font-extrabold text-gray-800 leading-tight block">
+                                                                        {formatDayNum(item.checkIn)}
+                                                                    </span>
+                                                                    <span className="text-[9.5px] font-semibold text-gray-400 uppercase block">
+                                                                        {formatMonth(item.checkIn)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="w-px h-3 bg-gray-200 my-1"></div>
+                                                                <div>
+                                                                    <span className="text-sm font-extrabold text-gray-800 leading-tight block">
+                                                                        {formatDayNum(item.checkOut)}
+                                                                    </span>
+                                                                    <span className="text-[9.5px] font-semibold text-gray-400 uppercase block">
+                                                                        {formatMonth(item.checkOut)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
 
-                            {/* Popover Actions */}
-                            <div className="flex items-center gap-1.5 pt-2 border-t border-[#f1f5f9]">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsQuickReservationOpen(true);
-                                    }}
-                                    className="flex-1 py-1 px-2 bg-[#2643a6] hover:bg-[#1e3687] text-white rounded text-[11px] font-semibold cursor-pointer shadow-xs transition-colors text-center"
-                                >
-                                    Quick Reservation
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsAddReservationOpen(true);
-                                    }}
-                                    className="py-1 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#3b82f6] rounded text-[11px] font-medium cursor-pointer transition-colors"
-                                    title="Open Full Wizard"
-                                >
-                                    Wizard
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedRange(null)}
-                                    className="py-1 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#64748b] rounded text-[11px] font-medium cursor-pointer transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
+                                                            {/* Center Information */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="text-[13px] font-bold text-gray-900 leading-tight truncate">
+                                                                    {item.guestName}
+                                                                </h4>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                                                    Total Rooms: {item.totalRooms || 1}
+                                                                </p>
+
+                                                                <div className="mt-2.5">
+                                                                    <span className="text-[10px] text-gray-400 font-medium block">Room Type</span>
+                                                                    <span className="text-[11.5px] font-bold text-gray-800 block truncate">
+                                                                        {item.roomType}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Right Action Column */}
+                                                            <div className="flex flex-col items-end flex-shrink-0">
+                                                                <span className="text-[10px] text-gray-400 font-medium mb-1">Room</span>
+
+                                                                {isAssigning ? (
+                                                                    <div className="flex flex-col items-end gap-1.5 animate-in fade-in">
+                                                                        <select
+                                                                            value={selectedRoomNumber || availableRooms[0]?.roomNumber || ''}
+                                                                            onChange={(e) => setSelectedRoomNumber(e.target.value)}
+                                                                            className="h-7 px-2 border border-blue-500 rounded text-[11px] font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[130px]"
+                                                                        >
+                                                                            {availableRooms.map(r => (
+                                                                                <option key={r.roomNumber} value={r.roomNumber}>
+                                                                                    Room {r.roomNumber} ({r.type.split(' ')[0]})
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <div className="flex items-center gap-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleConfirmAssign(item)}
+                                                                                className="h-6 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[10px] font-bold cursor-pointer transition-colors"
+                                                                            >
+                                                                                Confirm
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setActiveAssigningId(null)}
+                                                                                className="h-6 px-1.5 text-gray-500 hover:text-gray-700 text-[10px] font-semibold cursor-pointer"
+                                                                            >
+                                                                                Cancel
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setActiveAssigningId(item.id);
+                                                                            setSelectedRoomNumber(availableRooms[0]?.roomNumber || '102');
+                                                                        }}
+                                                                        className="h-7 px-3 border border-gray-300 hover:border-gray-400 rounded-md bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer select-none active:scale-[0.98]"
+                                                                    >
+                                                                        Assign Room
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                /* Empty state matching reference */
+                                <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-6 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 opacity-30 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                    <span className="text-sm font-semibold text-gray-500">No Unassigned Bookings</span>
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        No unassigned rooms for {selectedDateObj?.dayName} {selectedDateObj?.num} {selectedDateObj?.monthShort}.
+                                    </p>
+                                    {unassignedList.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const firstUnassigned = unassignedList[0];
+                                                const targetIdx = modalDays.findIndex(d => d.date === firstUnassigned.checkIn);
+                                                if (targetIdx >= 0) {
+                                                    setSelectedModalDateIndex(targetIdx);
+                                                    setModalDateStartIndex(Math.max(0, Math.min(modalDays.length - 7, targetIdx)));
+                                                }
+                                            }}
+                                            className="mt-3 px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] rounded-md transition-colors border border-blue-200 cursor-pointer"
+                                        >
+                                            Jump to next unassigned ({unassignedList[0]?.reservationNumber})
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
-                </>
+                </div>
             )}
 
             {/* Quick Reservation Modal */}
@@ -790,11 +1104,8 @@ export const StayView: React.FC = () => {
                 }}
                 roomInfo={(() => {
                     const startIso = selectedRange ? days[selectedRange.startIndex]?.date : startDate;
-                    const stayNights = selectedRange ? (selectedRange.endIndex - selectedRange.startIndex + 1) : 1;
-                    const endD = new Date(startIso);
-                    endD.setDate(endD.getDate() + stayNights);
-                    const endIso = endD.toISOString().split('T')[0];
-
+                    const endIso = selectedRange ? days[selectedRange.endIndex]?.date : startDate;
+                    const stayNights = selectedRange ? selectedRange.endIndex - selectedRange.startIndex + 1 : 1;
                     return {
                         room: selectedRange?.room || '101',
                         startDate: startIso,
