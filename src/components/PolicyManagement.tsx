@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     ShieldCheck,
     Calendar,
@@ -19,11 +19,15 @@ import {
     Sparkles,
     FileText,
     DollarSign,
-    Lock
+    Lock,
+    Sliders,
+    ArrowRight,
+    RotateCcw,
+    SlidersHorizontal
 } from 'lucide-react';
 
 // ============================================================================
-// ENTERPRISE HOTEL POLICY TYPES (Full REST / GraphQL Schema)
+// DYNAMIC POLICY TYPES (Computational REST / GraphQL Schema)
 // ============================================================================
 
 export type PolicyCategory =
@@ -39,6 +43,16 @@ export type PolicyCategory =
 export type PolicyScope = 'ALL_ROOMS' | 'SUITES_ONLY' | 'NON_REF_RATES' | 'CORPORATE_ONLY' | 'VIP_TIER';
 export type ChargeType = 'PERCENT_FIRST_NIGHT' | 'PERCENT_TOTAL_STAY' | 'FLAT_BDT' | 'FULL_NIGHT' | 'COMPLIMENTARY' | 'CUSTOM';
 export type SupervisorTier = 'None' | 'L1 Executive' | 'L2 Operations';
+export type PolicyStrategyPreset = 'standard_flexible' | 'strict_peak_season' | 'corporate_priority';
+
+export interface DynamicPolicyParams {
+    hoursThreshold?: number;         // e.g., 48, 24, 72 hours
+    feePercentage?: number;          // e.g., 0, 25, 50, 100%
+    flatAmountBDT?: number;          // e.g., 1500, 2500, 5000, 25000, 35000
+    timeWindowStart?: string;        // e.g., "06:00", "12:00", "15:00"
+    timeWindowEnd?: string;          // e.g., "10:00", "15:00", "18:00"
+    ageThreshold?: number;           // e.g., 6, 12 years
+}
 
 export interface HotelPolicyRule {
     id: string;
@@ -46,10 +60,8 @@ export interface HotelPolicyRule {
     title: string;
     category: PolicyCategory;
     scope: PolicyScope;
-    applicableRoomTypes?: string[];
-    condition: string;
-    action: string;
-    chargeAmount: string;
+    conditionSummary: string;
+    actionSummary: string;
     chargeType: ChargeType;
     glAccountCode: string;
     requiresApproval: boolean;
@@ -61,6 +73,8 @@ export interface HotelPolicyRule {
     priorityOrder: number;
     lastAuditDate: string;
     updatedBy: string;
+    // COMPUTATIONAL DYNAMIC PARAMETERS
+    params: DynamicPolicyParams;
 }
 
 interface PolicyManagementProps {
@@ -68,73 +82,82 @@ interface PolicyManagementProps {
 }
 
 // ============================================================================
-// PRE-CONFIGURED 5-STAR HOTEL POLICIES (All 8 Domains)
+// BASELINE DYNAMIC PRESETS
 // ============================================================================
 
-const INITIAL_POLICIES: HotelPolicyRule[] = [
-    // 1. CANCELLATION & NO-SHOW
+const BASELINE_POLICIES: HotelPolicyRule[] = [
+    // 1. CANCELLATION
     {
         id: 'pol-101',
         code: 'POL-CANC-FLEX48',
-        title: 'Standard Transient Flexible Cancellation',
+        title: 'Flexible Transient Free Cancellation',
         category: 'cancellation',
         scope: 'ALL_ROOMS',
-        condition: 'Cancellation received > 48 Hours prior to 14:00 check-in time',
-        action: 'Full 100% refund of advance deposit; zero cancellation penalty debited',
-        chargeAmount: '0% (Free)',
+        conditionSummary: 'Cancellation registered prior to cutoff window before 14:00 check-in',
+        actionSummary: 'Full 100% refund of advance deposit; zero penalty fee debited',
         chargeType: 'COMPLIMENTARY',
         glAccountCode: 'GL-4010-CANC',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Reservations may be cancelled up to 48 hours prior to arrival with zero penalty. Deposit is refunded in full.',
+        guestFacingLegalClause: 'Reservations may be cancelled prior to the cutoff threshold with zero penalty. Deposit is refunded in full.',
         isActive: true,
         priorityOrder: 1,
         lastAuditDate: '2026-01-15',
-        updatedBy: 'GM-Admin'
+        updatedBy: 'GM-Admin',
+        params: {
+            hoursThreshold: 48,
+            feePercentage: 0
+        }
     },
     {
         id: 'pol-102',
         code: 'POL-CANC-MID24',
-        title: 'Late Notice Window Cancellation (24h - 48h)',
+        title: 'Mid-Notice Window Cancellation Fee',
         category: 'cancellation',
         scope: 'ALL_ROOMS',
-        condition: 'Cancellation request received between 24 and 48 hours prior to scheduled arrival',
-        action: 'Charge 50% of the first night standard room tariff plus statutory taxes',
-        chargeAmount: '50% 1st Night',
+        conditionSummary: 'Cancellation registered within late notice window prior to arrival',
+        actionSummary: 'Charge penalty fee percentage on first night room tariff plus statutory taxes',
         chargeType: 'PERCENT_FIRST_NIGHT',
         glAccountCode: 'GL-4010-CANC',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Cancellations within 24 to 48 hours of check-in incur a 50% first-night room charge penalty.',
+        guestFacingLegalClause: 'Cancellations within the late notice threshold incur a first-night tariff deduction penalty.',
         isActive: true,
         priorityOrder: 2,
         lastAuditDate: '2026-01-15',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            hoursThreshold: 24,
+            feePercentage: 50
+        }
     },
     {
         id: 'pol-103',
         code: 'POL-CANC-NOSHOW',
-        title: 'Same-Day Cancellation & Guest No-Show Forfeiture',
+        title: 'Same-Day Late Cancel & Guest No-Show Forfeiture',
         category: 'cancellation',
         scope: 'ALL_ROOMS',
-        condition: 'Cancellation < 24 Hours or guest fails to register by 23:59 on arrival date',
-        action: 'Forfeit 100% of the first night room tariff; release room inventory to rack',
-        chargeAmount: '100% 1st Night',
+        conditionSummary: 'Cancellation < 24 Hours or guest fails to register by 23:59 on arrival date',
+        actionSummary: 'Forfeit 100% of first night room tariff; release room inventory to rack',
         chargeType: 'PERCENT_FIRST_NIGHT',
         glAccountCode: 'GL-4010-CANC',
         requiresApproval: true,
         supervisorTier: 'L2 Operations',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'No-show reservations or same-day cancellations incur a 100% first-night forfeiture penalty. Room is released after 23:59.',
+        guestFacingLegalClause: 'No-show reservations or same-day cancellations incur a 100% first-night room charge forfeiture. Room is released after 23:59.',
         isActive: true,
         priorityOrder: 3,
         lastAuditDate: '2026-01-10',
-        updatedBy: 'GM-Admin'
+        updatedBy: 'GM-Admin',
+        params: {
+            hoursThreshold: 24,
+            feePercentage: 100
+        }
     },
     {
         id: 'pol-104',
@@ -142,53 +165,59 @@ const INITIAL_POLICIES: HotelPolicyRule[] = [
         title: 'Non-Refundable Promotional Rate Lock',
         category: 'cancellation',
         scope: 'NON_REF_RATES',
-        condition: 'Reservations booked under promo codes "PROMO-NRF", "FLASH-SALE", or "EARLYBIRD"',
-        action: '100% non-refundable under all normal circumstances; date modifications restricted',
-        chargeAmount: '100% Full Stay',
+        conditionSummary: 'Bookings tagged with "PROMO-NRF", "FLASH-SALE", or "EARLYBIRD"',
+        actionSummary: '100% non-refundable under all normal circumstances; date modifications restricted',
         chargeType: 'PERCENT_TOTAL_STAY',
         glAccountCode: 'GL-4015-NRF',
         requiresApproval: true,
         supervisorTier: 'L1 Executive',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Non-refundable rate. Full prepayment charged upon booking. Cancellations or modifications forfeit 100% of total stay.',
+        guestFacingLegalClause: 'Non-refundable rate. Full prepayment charged upon booking. Cancellations forfeit 100% of total stay.',
         isActive: true,
         priorityOrder: 4,
         lastAuditDate: '2026-01-08',
-        updatedBy: 'Revenue-Lead'
+        updatedBy: 'Revenue-Lead',
+        params: {
+            hoursThreshold: 0,
+            feePercentage: 100
+        }
     },
 
     // 2. TIMINGS (CHECK-IN & CHECK-OUT)
     {
         id: 'pol-201',
         code: 'POL-TIME-EARLY06',
-        title: 'Early Arrival Morning Slot (06:00 - 10:00 AM)',
+        title: 'Morning Early Arrival Surcharge',
         category: 'timings',
         scope: 'ALL_ROOMS',
-        condition: 'Guest arrives between 06:00 AM and 10:00 AM prior to standard 14:00 check-in',
-        action: 'Apply 50% early arrival surcharge; room must be inspected and released by Housekeeping',
-        chargeAmount: '50% Room Rate',
+        conditionSummary: 'Guest arrives between early morning time window prior to standard 14:00 check-in',
+        actionSummary: 'Apply early arrival surcharge percentage; subject to inspected room turnaround',
         chargeType: 'PERCENT_FIRST_NIGHT',
         glAccountCode: 'GL-4020-EARLYCHECKIN',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Early check-in between 06:00 and 10:00 AM is subject to inspected room availability and incurs a 50% room tariff charge.',
+        guestFacingLegalClause: 'Early check-in is subject to inspected room availability and incurs an early arrival surcharge.',
         isActive: true,
         priorityOrder: 5,
         lastAuditDate: '2026-01-12',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            timeWindowStart: '06:00',
+            timeWindowEnd: '10:00',
+            feePercentage: 50
+        }
     },
     {
         id: 'pol-202',
         code: 'POL-TIME-COURTESY',
-        title: 'Mid-Day Courtesy Early Check-In (10:00 AM - 14:00 PM)',
+        title: 'Mid-Day Courtesy Early Check-In Window',
         category: 'timings',
         scope: 'ALL_ROOMS',
-        condition: 'Guest arrives between 10:00 AM and 14:00 PM',
-        action: 'Complimentary early check-in granted if inspected clean vacant room is available',
-        chargeAmount: '0% (Courtesy)',
+        conditionSummary: 'Guest arrives between mid-day window before standard 14:00 check-in',
+        actionSummary: 'Complimentary early check-in granted if inspected clean vacant room is ready',
         chargeType: 'COMPLIMENTARY',
         glAccountCode: 'GL-4001-ROOMREV',
         requiresApproval: false,
@@ -199,59 +228,71 @@ const INITIAL_POLICIES: HotelPolicyRule[] = [
         isActive: true,
         priorityOrder: 6,
         lastAuditDate: '2026-01-12',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            timeWindowStart: '10:00',
+            timeWindowEnd: '14:00',
+            feePercentage: 0
+        }
     },
     {
         id: 'pol-203',
         code: 'POL-TIME-LATE15',
-        title: 'Afternoon Late Check-Out (12:00 - 15:00 PM)',
+        title: 'Afternoon Late Departure Surcharge',
         category: 'timings',
         scope: 'ALL_ROOMS',
-        condition: 'Guest requests departure extension between 12:00 PM and 15:00 PM',
-        action: 'Charge 25% of standard room tariff; Housekeeping turnaround scheduled for 15:00',
-        chargeAmount: '25% Room Rate',
+        conditionSummary: 'Guest requests departure extension between afternoon threshold hours',
+        actionSummary: 'Charge surcharge percentage on standard room tariff; Housekeeping rescheduled',
         chargeType: 'PERCENT_FIRST_NIGHT',
         glAccountCode: 'GL-4025-LATECHECKOUT',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Late departure up to 15:00 PM is subject to room availability and billed at 25% of daily room rate.',
+        guestFacingLegalClause: 'Late departure is subject to room availability and billed at a percentage of the daily room rate.',
         isActive: true,
         priorityOrder: 7,
         lastAuditDate: '2026-01-10',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            timeWindowStart: '12:00',
+            timeWindowEnd: '15:00',
+            feePercentage: 25
+        }
     },
     {
         id: 'pol-204',
         code: 'POL-TIME-LATE18',
-        title: 'Evening Extended Departure (15:00 - 18:00 PM)',
+        title: 'Evening Extended Departure Surcharge',
         category: 'timings',
         scope: 'ALL_ROOMS',
-        condition: 'Guest requests room occupancy extension up to 18:00 PM',
-        action: 'Charge 50% of prevailing daily tariff; locks room from same-day reselling',
-        chargeAmount: '50% Room Rate',
+        conditionSummary: 'Guest requests room occupancy extension during evening window',
+        actionSummary: 'Charge extended rate; blocks room turnaround from same-day reselling',
         chargeType: 'PERCENT_FIRST_NIGHT',
         glAccountCode: 'GL-4025-LATECHECKOUT',
         requiresApproval: true,
         supervisorTier: 'L2 Operations',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: false,
-        guestFacingLegalClause: 'Late departure between 15:00 and 18:00 PM incurs a 50% room rate charge and requires Duty Manager authorization.',
+        guestFacingLegalClause: 'Extended departure requires Duty Manager authorization and incurs an extended half-day room surcharge.',
         isActive: true,
         priorityOrder: 8,
         lastAuditDate: '2026-01-10',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            timeWindowStart: '15:00',
+            timeWindowEnd: '18:00',
+            feePercentage: 50
+        }
     },
     {
         id: 'pol-205',
         code: 'POL-TIME-PAST18',
-        title: 'Night Departure Past 18:00 PM',
+        title: 'Late Night Departure (> 18:00 PM)',
         category: 'timings',
         scope: 'ALL_ROOMS',
-        condition: 'Guest vacates room after 18:00 PM without prior approved day-use booking',
-        action: 'Full 100% additional 1-night room tariff automatically posted to guest folio',
-        chargeAmount: '100% Full Night',
+        conditionSummary: 'Guest departs hotel after 18:00 PM without prior approved day-use booking',
+        actionSummary: 'Full 100% additional 1-night room tariff automatically posted to guest folio',
         chargeType: 'FULL_NIGHT',
         glAccountCode: 'GL-4001-ROOMREV',
         requiresApproval: false,
@@ -262,30 +303,37 @@ const INITIAL_POLICIES: HotelPolicyRule[] = [
         isActive: true,
         priorityOrder: 9,
         lastAuditDate: '2026-01-10',
-        updatedBy: 'GM-Admin'
+        updatedBy: 'GM-Admin',
+        params: {
+            timeWindowStart: '18:00',
+            timeWindowEnd: '23:59',
+            feePercentage: 100
+        }
     },
 
     // 3. FINANCIAL (DEPOSITS & CREDIT LIMITS)
     {
         id: 'pol-301',
         code: 'POL-FIN-INCIDENTAL',
-        title: 'Mandatory Incidental Security Deposit',
+        title: 'Incidental Security Deposit Requirement',
         category: 'financial',
         scope: 'ALL_ROOMS',
-        condition: 'Mandatory registration requirement for all transient check-ins',
-        action: 'Collect ৳ 5,000 / $50 per room per night via Card Pre-Authorization or Cash Float',
-        chargeAmount: '৳ 5,000 / night',
+        conditionSummary: 'Mandatory upon check-in registration for transient guests',
+        actionSummary: 'Collect incidental security deposit per room per night via Card Pre-Auth or Cash Float',
         chargeType: 'FLAT_BDT',
         glAccountCode: 'GL-2050-INCIDENTAL-ESCROW',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'An incidental security deposit of BDT 5,000 per night is held upon check-in and released upon room inspection at check-out.',
+        guestFacingLegalClause: 'An incidental security deposit is held upon check-in and released upon room inspection at check-out.',
         isActive: true,
         priorityOrder: 10,
         lastAuditDate: '2026-01-14',
-        updatedBy: 'Finance-Controller'
+        updatedBy: 'Finance-Controller',
+        params: {
+            flatAmountBDT: 5000
+        }
     },
     {
         id: 'pol-302',
@@ -293,85 +341,72 @@ const INITIAL_POLICIES: HotelPolicyRule[] = [
         title: 'House Credit Floor Limit & Auto-Folio Freeze',
         category: 'financial',
         scope: 'ALL_ROOMS',
-        condition: 'Unpaid room guest charges exceed ৳ 35,000 / $300 without interim payment',
-        action: 'Automatically suspends POS restaurant charging and room service charging until deposit top-up',
-        chargeAmount: 'Floor Limit ৳ 35,000',
+        conditionSummary: 'Unpaid room guest charges reach or exceed ceiling threshold without interim settlement',
+        actionSummary: 'Automatically suspends POS restaurant charging and room service charging until top-up',
         chargeType: 'CUSTOM',
         glAccountCode: 'GL-1200-GUEST-LEDGER',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: false,
         displayOnBookingEngine: false,
-        guestFacingLegalClause: 'Guest room credit is capped at BDT 35,000. Balance settlements are required when the floor threshold is reached.',
+        guestFacingLegalClause: 'Guest room credit is capped at the designated floor limit. Balance settlements are required when the threshold is reached.',
         isActive: true,
         priorityOrder: 11,
         lastAuditDate: '2026-01-14',
-        updatedBy: 'Finance-Controller'
-    },
-    {
-        id: 'pol-303',
-        code: 'POL-FIN-REFUND',
-        title: 'Statutory Credit Card Pre-Auth Release Protocol',
-        category: 'financial',
-        scope: 'ALL_ROOMS',
-        condition: 'Card pre-auth hold released by Front Desk upon check-out folio settlement',
-        action: 'Electronic authorization released immediately; issuing bank turnaround 3-7 business days',
-        chargeAmount: 'Zero Fee',
-        chargeType: 'COMPLIMENTARY',
-        glAccountCode: 'GL-2050-INCIDENTAL-ESCROW',
-        requiresApproval: false,
-        supervisorTier: 'None',
-        displayOnGuestReceipt: true,
-        displayOnBookingEngine: false,
-        guestFacingLegalClause: 'Pre-authorizations are released immediately upon departure. Depending on your bank, funds reflect within 3 to 7 working days.',
-        isActive: true,
-        priorityOrder: 12,
-        lastAuditDate: '2026-01-14',
-        updatedBy: 'Finance-Controller'
+        updatedBy: 'Finance-Controller',
+        params: {
+            flatAmountBDT: 35000
+        }
     },
 
     // 4. OCCUPANCY & EXTRA BEDDING
     {
         id: 'pol-401',
         code: 'POL-OCC-INFANT',
-        title: 'Infant Policy & Complimentary Baby Cot (< 6 Years)',
+        title: 'Infant Policy & Complimentary Baby Cot',
         category: 'occupancy',
         scope: 'ALL_ROOMS',
-        condition: 'Children under 6 years sharing existing adult bedding (Max 2 infants per room)',
-        action: 'Complimentary stay and complimentary buffet breakfast; baby cot provided on request',
-        chargeAmount: 'Free (0%)',
+        conditionSummary: 'Children under age threshold sharing existing adult bedding (Max 2 per room)',
+        actionSummary: 'Complimentary stay and complimentary buffet breakfast; baby cot provided on request',
         chargeType: 'COMPLIMENTARY',
         glAccountCode: 'GL-4001-ROOMREV',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Children under 6 years stay free in existing bedding with complimentary buffet breakfast. Baby crib provided on request.',
+        guestFacingLegalClause: 'Children under age limit stay free in existing bedding with complimentary buffet breakfast.',
         isActive: true,
-        priorityOrder: 13,
+        priorityOrder: 12,
         lastAuditDate: '2026-01-05',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            ageThreshold: 6,
+            flatAmountBDT: 0
+        }
     },
     {
         id: 'pol-402',
         code: 'POL-OCC-CHILD',
-        title: 'Junior Child Extra Bed & Breakfast (6 - 11 Years)',
+        title: 'Junior Child Extra Bed & Breakfast Surcharge',
         category: 'occupancy',
         scope: 'ALL_ROOMS',
-        condition: 'Children aged 6 to 11 years requiring rollaway bed setup',
-        action: 'Charge ৳ 1,500 + tax per night inclusive of daily restaurant breakfast buffet',
-        chargeAmount: '৳ 1,500 / night',
+        conditionSummary: 'Children aged between junior bracket requiring rollaway bed setup',
+        actionSummary: 'Charge nightly surcharge inclusive of daily restaurant breakfast buffet',
         chargeType: 'FLAT_BDT',
         glAccountCode: 'GL-4030-EXTRABED',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Children aged 6–11 requiring a rollaway bed are charged BDT 1,500 + tax per night, inclusive of breakfast.',
+        guestFacingLegalClause: 'Junior children requiring rollaway bed are charged nightly surcharge, inclusive of breakfast.',
         isActive: true,
-        priorityOrder: 14,
+        priorityOrder: 13,
         lastAuditDate: '2026-01-05',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            ageThreshold: 11,
+            flatAmountBDT: 1500
+        }
     },
     {
         id: 'pol-403',
@@ -379,20 +414,23 @@ const INITIAL_POLICIES: HotelPolicyRule[] = [
         title: 'Adult Third Person Surcharge (> 12 Years)',
         category: 'occupancy',
         scope: 'ALL_ROOMS',
-        condition: 'Third adult occupying King Deluxe or Executive Suite',
-        action: 'Supply luxury rollaway bed, luxury bathroom amenities, and full international buffet breakfast',
-        chargeAmount: '৳ 2,500 / night',
+        conditionSummary: 'Third adult occupying King Deluxe or Executive Suite',
+        actionSummary: 'Supply luxury rollaway bed, luxury bathroom amenities, and full international buffet breakfast',
         chargeType: 'FLAT_BDT',
         glAccountCode: 'GL-4030-EXTRABED',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Third adult in room is charged BDT 2,500 + tax per night, inclusive of rollaway bedding and buffet breakfast package.',
+        guestFacingLegalClause: 'Third adult in room is charged nightly surcharge, inclusive of rollaway bedding and buffet breakfast package.',
         isActive: true,
-        priorityOrder: 15,
+        priorityOrder: 14,
         lastAuditDate: '2026-01-05',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            ageThreshold: 12,
+            flatAmountBDT: 2500
+        }
     },
 
     // 5. CONDUCT, SMOKING, PETS & DAMAGES
@@ -402,62 +440,68 @@ const INITIAL_POLICIES: HotelPolicyRule[] = [
         title: 'Strict Non-Smoking Room Violation Penalty',
         category: 'conduct',
         scope: 'ALL_ROOMS',
-        condition: 'Evidence of cigarette smoking, e-cigarette/vaping or incense burned in non-smoking rooms',
-        action: 'Automated ৳ 25,000 / $250 deep cleaning, ozone air sanitization, and curtain treatment fine',
-        chargeAmount: '৳ 25,000',
+        conditionSummary: 'Evidence of smoking, e-cigarette/vaping or incense in non-smoking rooms',
+        actionSummary: 'Automated deep cleaning, ozone air sanitization, and fabric treatment fee',
         chargeType: 'FLAT_BDT',
         glAccountCode: 'GL-4990-FINES-CLEANING',
         requiresApproval: true,
         supervisorTier: 'L2 Operations',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'This is a 100% non-smoking hotel. Smoking or vaping in non-designated rooms incurs an automatic BDT 25,000 deep-cleaning fee.',
+        guestFacingLegalClause: 'This is a 100% non-smoking hotel. Smoking or vaping in non-designated rooms incurs an automatic deep-cleaning fee.',
         isActive: true,
-        priorityOrder: 16,
+        priorityOrder: 15,
         lastAuditDate: '2026-01-16',
-        updatedBy: 'GM-Admin'
+        updatedBy: 'GM-Admin',
+        params: {
+            flatAmountBDT: 25000
+        }
     },
     {
         id: 'pol-502',
         code: 'POL-COND-DAMAGE',
-        title: 'Property Asset Damage & Irreparable Stain Recovery',
+        title: 'Property Asset Damage & Irreparable Stain Surcharge',
         category: 'conduct',
         scope: 'ALL_ROOMS',
-        condition: 'Irreparable damage, burns, or missing furniture, electronic equipment, or linen',
-        action: 'Debited at official master replacement price schedule + 20% administrative handling surcharge',
-        chargeAmount: 'Cost + 20%',
+        conditionSummary: 'Irreparable damage, burns, or missing furniture, electronic equipment, or linen',
+        actionSummary: 'Debited at official master replacement price schedule plus administrative handling percentage',
         chargeType: 'CUSTOM',
         glAccountCode: 'GL-4991-DAMAGE-RECOVERY',
         requiresApproval: true,
         supervisorTier: 'L2 Operations',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: false,
-        guestFacingLegalClause: 'Guests are liable for any damages to room furniture, electronics, or fittings, charged at replacement cost plus a 20% service fee.',
+        guestFacingLegalClause: 'Guests are liable for any damages to room furniture, electronics, or fittings, charged at replacement cost plus administrative fee.',
         isActive: true,
-        priorityOrder: 17,
+        priorityOrder: 16,
         lastAuditDate: '2026-01-16',
-        updatedBy: 'GM-Admin'
+        updatedBy: 'GM-Admin',
+        params: {
+            feePercentage: 20
+        }
     },
     {
         id: 'pol-503',
         code: 'POL-COND-PETS',
-        title: 'Pet Accommodation & Pet Sanitization Deposit',
+        title: 'Pet Accommodation & Damage Escrow Deposit',
         category: 'conduct',
         scope: 'ALL_ROOMS',
-        condition: 'Guests traveling with registered domestic pets (Under 15 kg weight limit)',
-        action: 'Allowed exclusively in designated ground-floor Garden Rooms; requires ৳ 10,000 refundable damage deposit',
-        chargeAmount: 'Deposit ৳ 10,000',
+        conditionSummary: 'Guests traveling with registered domestic pets (Under 15 kg weight limit)',
+        actionSummary: 'Allowed in designated Garden Rooms; requires refundable damage escrow deposit',
         chargeType: 'FLAT_BDT',
         glAccountCode: 'GL-2050-INCIDENTAL-ESCROW',
         requiresApproval: true,
         supervisorTier: 'L2 Operations',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Pets under 15kg are welcomed in designated pet-friendly rooms with a refundable BDT 10,000 deposit and signed pet agreement.',
+        guestFacingLegalClause: 'Pets under 15kg are welcomed in designated pet-friendly rooms with a refundable deposit and signed pet agreement.',
         isActive: true,
-        priorityOrder: 18,
+        priorityOrder: 17,
         lastAuditDate: '2026-01-16',
-        updatedBy: 'FOM-Farhana'
+        updatedBy: 'FOM-Farhana',
+        params: {
+            flatAmountBDT: 10000
+        }
     },
 
     // 6. BILLING & PAYMENT GOVERNANCE
@@ -467,135 +511,90 @@ const INITIAL_POLICIES: HotelPolicyRule[] = [
         title: 'Anti-Money Laundering (AML) Cash Ceiling Limit',
         category: 'billing',
         scope: 'ALL_ROOMS',
-        condition: 'Single cash payment transaction exceeding ৳ 100,000 / $1,000',
-        action: 'Mandatory verified photo ID/Passport and NID/TIN verification copy archived in audit docket',
-        chargeAmount: 'Limit ৳ 100,000',
+        conditionSummary: 'Single cash payment transaction reaching statutory ceiling threshold',
+        actionSummary: 'Mandatory verified photo ID/Passport and NID/TIN verification copy archived in audit docket',
         chargeType: 'CUSTOM',
         glAccountCode: 'GL-1001-CASH-DRAWER',
         requiresApproval: true,
         supervisorTier: 'L2 Operations',
         displayOnGuestReceipt: false,
         displayOnBookingEngine: false,
-        guestFacingLegalClause: 'Per central banking anti-money laundering regulations, cash payments exceeding BDT 100,000 require statutory ID verification.',
+        guestFacingLegalClause: 'Per central banking regulations, cash payments exceeding statutory ceiling require mandatory ID verification.',
         isActive: true,
-        priorityOrder: 19,
+        priorityOrder: 18,
         lastAuditDate: '2026-01-12',
-        updatedBy: 'Finance-Controller'
-    },
-    {
-        id: 'pol-602',
-        code: 'POL-BILL-FX',
-        title: 'Foreign Currency Settlement & Change Policy',
-        category: 'billing',
-        scope: 'ALL_ROOMS',
-        condition: 'Guest pays bill folio in foreign banknotes (USD, EUR, GBP, SAR)',
-        action: 'Settled at daily official hotel buying rate; change returned in BDT local banknotes only',
-        chargeAmount: 'Official FX Buying',
-        chargeType: 'CUSTOM',
-        glAccountCode: 'GL-1002-FX-VAULT',
-        requiresApproval: false,
-        supervisorTier: 'None',
-        displayOnGuestReceipt: true,
-        displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Foreign currencies are accepted at the hotel front desk published daily rate. Change is rendered in BDT currency.',
-        isActive: true,
-        priorityOrder: 20,
-        lastAuditDate: '2026-01-12',
-        updatedBy: 'Finance-Controller'
+        updatedBy: 'Finance-Controller',
+        params: {
+            flatAmountBDT: 100000
+        }
     },
 
     // 7. GROUPS & EVENTS
     {
         id: 'pol-701',
-        code: 'POL-GRP-DEPOSIT',
-        title: 'Group Room Block Milestone Payment Schedule',
-        category: 'groups',
-        scope: 'ALL_ROOMS',
-        condition: 'Group contracts with 5 or more rooms or banquet hall reservations',
-        action: '25% deposit at contract signing; 50% milestone at T-30 days; 100% full balance at T-7 days',
-        chargeAmount: '100% at T-7 Days',
-        chargeType: 'CUSTOM',
-        glAccountCode: 'GL-2010-ADVANCE-DEPOSITS',
-        requiresApproval: true,
-        supervisorTier: 'L1 Executive',
-        displayOnGuestReceipt: true,
-        displayOnBookingEngine: false,
-        guestFacingLegalClause: 'Group bookings require 25% at signing, 50% 30 days prior, and full settlement 7 days prior to arrival.',
-        isActive: true,
-        priorityOrder: 21,
-        lastAuditDate: '2026-01-10',
-        updatedBy: 'GM-Admin'
-    },
-    {
-        id: 'pol-702',
         code: 'POL-GRP-ATTRITION',
-        title: 'Group Room Block Attrition Allowance (10%)',
+        title: 'Group Room Block Attrition Allowance',
         category: 'groups',
         scope: 'ALL_ROOMS',
-        condition: 'Group organizer reduces total reserved room nights up to 21 days before arrival',
-        action: 'Allows up to 10% reduction in contracted room count with zero penalty; excess billed at 100%',
-        chargeAmount: '10% Free Window',
+        conditionSummary: 'Group organizer reduces total reserved room nights up to 21 days before arrival',
+        actionSummary: 'Allows percentage reduction in contracted room count with zero penalty; excess billed at 100%',
         chargeType: 'CUSTOM',
         glAccountCode: 'GL-4010-CANC',
         requiresApproval: true,
         supervisorTier: 'L1 Executive',
         displayOnGuestReceipt: false,
         displayOnBookingEngine: false,
-        guestFacingLegalClause: 'A 10% room attrition allowance is permitted up to 21 days before event commencement without penalty.',
+        guestFacingLegalClause: 'A designated room attrition allowance is permitted up to 21 days before event commencement without penalty.',
         isActive: true,
-        priorityOrder: 22,
+        priorityOrder: 19,
         lastAuditDate: '2026-01-10',
-        updatedBy: 'GM-Admin'
+        updatedBy: 'GM-Admin',
+        params: {
+            feePercentage: 10
+        }
     },
 
     // 8. LOYALTY & VIP PRIVILEGES
     {
-        id: 'pol-801',
-        code: 'POL-LOY-UPGRADE',
-        title: 'Tier-1 VIP & Loyalty Courtesy Room Upgrade',
-        category: 'loyalty',
-        scope: 'VIP_TIER',
-        condition: 'Arrival of Platinum Tier Loyalty guest or General Manager VIP guest',
-        action: 'Automatic 1-tier complimentary room upgrade upon arrival based on inspected rack availability',
-        chargeAmount: 'Free Upgrade',
-        chargeType: 'COMPLIMENTARY',
-        glAccountCode: 'GL-4001-ROOMREV',
-        requiresApproval: false,
-        supervisorTier: 'None',
-        displayOnGuestReceipt: false,
-        displayOnBookingEngine: true,
-        guestFacingLegalClause: 'Platinum members receive one complimentary room tier upgrade subject to hotel inventory upon arrival.',
-        isActive: true,
-        priorityOrder: 23,
-        lastAuditDate: '2026-01-15',
-        updatedBy: 'GM-Admin'
-    },
-    {
         id: 'pol-802',
         code: 'POL-LOY-LATE16',
-        title: 'Guaranteed 16:00 PM Late Departure for VIP Guests',
+        title: 'Guaranteed Late Departure for VIP Loyalty Guests',
         category: 'loyalty',
         scope: 'VIP_TIER',
-        condition: 'Departure of VIP Tier-1 or Suite guests requesting late checkout',
-        action: 'Guaranteed late checkout granted up to 16:00 PM with zero surcharge',
-        chargeAmount: '0% (VIP Perk)',
+        conditionSummary: 'Departure of VIP Tier-1 or Suite guests requesting late checkout',
+        actionSummary: 'Guaranteed complimentary late checkout granted up to designated afternoon hour with zero fee',
         chargeType: 'COMPLIMENTARY',
         glAccountCode: 'GL-4001-ROOMREV',
         requiresApproval: false,
         supervisorTier: 'None',
         displayOnGuestReceipt: true,
         displayOnBookingEngine: true,
-        guestFacingLegalClause: 'VIP guests and Platinum members are entitled to guaranteed late checkout up to 16:00 PM complimentary.',
+        guestFacingLegalClause: 'VIP guests and Platinum members are entitled to guaranteed late checkout up to designated hour complimentary.',
         isActive: true,
-        priorityOrder: 24,
+        priorityOrder: 20,
         lastAuditDate: '2026-01-15',
-        updatedBy: 'GM-Admin'
+        updatedBy: 'GM-Admin',
+        params: {
+            timeWindowEnd: '16:00',
+            feePercentage: 0
+        }
     }
 ];
 
 export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
-    const [policies, setPolicies] = useState<HotelPolicyRule[]>(INITIAL_POLICIES);
+    // 1. Initial State with LocalStorage Persistence
+    const [policies, setPolicies] = useState<HotelPolicyRule[]>(() => {
+        try {
+            const saved = localStorage.getItem('hotel_policies_v2');
+            if (saved) return JSON.parse(saved);
+        } catch (e) {
+            console.error('Failed to parse saved policies', e);
+        }
+        return BASELINE_POLICIES;
+    });
+
     const [activeTab, setActiveTab] = useState<PolicyCategory>('cancellation');
+    const [activePreset, setActivePreset] = useState<PolicyStrategyPreset>('standard_flexible');
     const [searchQuery, setSearchQuery] = useState('');
     const [filterScope, setFilterScope] = useState<string>('ALL');
     const [filterApproval, setFilterApproval] = useState<string>('ALL');
@@ -609,15 +608,15 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
     // Simulator State
     const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
     const [simScenario, setSimScenario] = useState<string>('cancel-36h');
-    const [simResult, setSimResult] = useState<{
-        ruleCode: string;
-        ruleTitle: string;
-        calculatedFee: string;
-        glCode: string;
-        requiresApproval: boolean;
-        tier: string;
-        explanation: string;
-    } | null>(null);
+
+    // Sync to LocalStorage whenever policies change
+    useEffect(() => {
+        try {
+            localStorage.setItem('hotel_policies_v2', JSON.stringify(policies));
+        } catch (e) {
+            console.error('Failed to save policies to localStorage', e);
+        }
+    }, [policies]);
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -631,9 +630,9 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
         { id: 'financial', label: 'Deposits & Credit Limits', icon: CreditCard },
         { id: 'occupancy', label: 'Occupancy & Bedding', icon: Users },
         { id: 'conduct', label: 'Conduct, Smoking & Damages', icon: AlertTriangle },
-        { id: 'billing', label: 'Billing & FX Payments', icon: DollarSign },
-        { id: 'groups', label: 'Groups & Banquets', icon: Building2 },
-        { id: 'loyalty', label: 'Loyalty & VIP Perks', icon: Sparkles },
+        { id: 'billing', label: 'Billing & AML Limits', icon: DollarSign },
+        { id: 'groups', label: 'Groups & Attrition', icon: Building2 },
+        { id: 'loyalty', label: 'Loyalty & VIP Privileges', icon: Sparkles },
     ];
 
     // Filtered Policies
@@ -643,8 +642,8 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
             const matchesSearch =
                 p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                p.condition.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                p.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                p.conditionSummary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                p.actionSummary.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 p.glAccountCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 p.guestFacingLegalClause.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -663,7 +662,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
         });
     }, [policies, activeTab, searchQuery, filterScope, filterApproval, filterStatus]);
 
-    // Active Counts by category
+    // Active counts by category
     const categoryCounts = useMemo(() => {
         const counts: Record<string, number> = {};
         categories.forEach(c => {
@@ -672,13 +671,71 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
         return counts;
     }, [policies]);
 
-    // Actions
+    // Apply Strategy Presets dynamically
+    const handleApplyPreset = (preset: PolicyStrategyPreset) => {
+        setActivePreset(preset);
+        if (preset === 'standard_flexible') {
+            setPolicies(prev =>
+                prev.map(p => {
+                    if (p.code === 'POL-CANC-FLEX48') return { ...p, params: { ...p.params, hoursThreshold: 48, feePercentage: 0 } };
+                    if (p.code === 'POL-CANC-MID24') return { ...p, params: { ...p.params, hoursThreshold: 24, feePercentage: 50 } };
+                    if (p.code === 'POL-TIME-LATE15') return { ...p, params: { ...p.params, feePercentage: 25 } };
+                    if (p.code === 'POL-FIN-INCIDENTAL') return { ...p, params: { ...p.params, flatAmountBDT: 5000 } };
+                    return p;
+                })
+            );
+            showToast('Loaded: "Flexible Standard (Year-Round)" preset applied to all active policies.');
+        } else if (preset === 'strict_peak_season') {
+            setPolicies(prev =>
+                prev.map(p => {
+                    if (p.code === 'POL-CANC-FLEX48') return { ...p, params: { ...p.params, hoursThreshold: 168, feePercentage: 0 } }; // 7 days!
+                    if (p.code === 'POL-CANC-MID24') return { ...p, params: { ...p.params, hoursThreshold: 72, feePercentage: 100 } }; // Full forfeiture!
+                    if (p.code === 'POL-TIME-LATE15') return { ...p, params: { ...p.params, feePercentage: 50 } };
+                    if (p.code === 'POL-FIN-INCIDENTAL') return { ...p, params: { ...p.params, flatAmountBDT: 10000 } };
+                    return p;
+                })
+            );
+            showToast('Loaded: "Strict Peak Season (100% Deposit Lockdown)" preset applied to all rules.');
+        } else if (preset === 'corporate_priority') {
+            setPolicies(prev =>
+                prev.map(p => {
+                    if (p.code === 'POL-CANC-FLEX48') return { ...p, params: { ...p.params, hoursThreshold: 24, feePercentage: 0 } }; // 24h free!
+                    if (p.code === 'POL-TIME-LATE15') return { ...p, params: { ...p.params, feePercentage: 0 } }; // Complimentary till 15:00!
+                    if (p.code === 'POL-FIN-HOUSELIMIT') return { ...p, params: { ...p.params, flatAmountBDT: 50000 } };
+                    return p;
+                })
+            );
+            showToast('Loaded: "Corporate Negotiated Priority" preset applied dynamically.');
+        }
+    };
+
+    // Inline Parameter Updates
+    const handleUpdateParam = (ruleId: string, paramKey: keyof DynamicPolicyParams, value: any) => {
+        setPolicies(prev =>
+            prev.map(p => {
+                if (p.id === ruleId) {
+                    return {
+                        ...p,
+                        params: {
+                            ...p.params,
+                            [paramKey]: value
+                        },
+                        lastAuditDate: new Date().toISOString().slice(0, 10),
+                        updatedBy: 'Admin (Inline Calibration)'
+                    };
+                }
+                return p;
+            })
+        );
+        showToast('Rule parameter dynamically updated & saved.');
+    };
+
     const handleToggleRuleStatus = (ruleId: string) => {
         setPolicies(prev =>
             prev.map(p => {
                 if (p.id === ruleId) {
                     const next = !p.isActive;
-                    showToast(`Policy "${p.code}" ${next ? 'enabled' : 'disabled'}.`);
+                    showToast(`Policy "${p.code}" ${next ? 'activated' : 'deactivated'}.`);
                     return { ...p, isActive: next };
                 }
                 return p;
@@ -708,9 +765,8 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
         const title = (formData.get('title') as string) || 'New Policy';
         const category = (formData.get('category') as PolicyCategory) || activeTab;
         const scope = (formData.get('scope') as PolicyScope) || 'ALL_ROOMS';
-        const condition = (formData.get('condition') as string) || '';
-        const action = (formData.get('action') as string) || '';
-        const chargeAmount = (formData.get('chargeAmount') as string) || '0%';
+        const conditionSummary = (formData.get('conditionSummary') as string) || '';
+        const actionSummary = (formData.get('actionSummary') as string) || '';
         const chargeType = (formData.get('chargeType') as ChargeType) || 'FLAT_BDT';
         const glAccountCode = (formData.get('glAccountCode') as string) || 'GL-4001-ROOMREV';
         const requiresApproval = formData.get('requiresApproval') === 'on';
@@ -718,6 +774,23 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
         const displayOnGuestReceipt = formData.get('displayOnGuestReceipt') === 'on';
         const displayOnBookingEngine = formData.get('displayOnBookingEngine') === 'on';
         const guestFacingLegalClause = (formData.get('guestFacingLegalClause') as string) || '';
+
+        // Dynamic parameters from form
+        const hoursThreshold = Number(formData.get('paramHoursThreshold')) || undefined;
+        const feePercentage = Number(formData.get('paramFeePercentage')) || undefined;
+        const flatAmountBDT = Number(formData.get('paramFlatAmountBDT')) || undefined;
+        const timeWindowStart = (formData.get('paramTimeWindowStart') as string) || undefined;
+        const timeWindowEnd = (formData.get('paramTimeWindowEnd') as string) || undefined;
+        const ageThreshold = Number(formData.get('paramAgeThreshold')) || undefined;
+
+        const dynamicParams: DynamicPolicyParams = {
+            hoursThreshold,
+            feePercentage,
+            flatAmountBDT,
+            timeWindowStart,
+            timeWindowEnd,
+            ageThreshold,
+        };
 
         if (editingRule) {
             setPolicies(prev =>
@@ -729,9 +802,8 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             title,
                             category,
                             scope,
-                            condition,
-                            action,
-                            chargeAmount,
+                            conditionSummary,
+                            actionSummary,
                             chargeType,
                             glAccountCode,
                             requiresApproval,
@@ -739,6 +811,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             displayOnGuestReceipt,
                             displayOnBookingEngine,
                             guestFacingLegalClause,
+                            params: dynamicParams,
                             updatedBy: 'Admin-Current',
                             lastAuditDate: new Date().toISOString().slice(0, 10),
                         }
@@ -753,9 +826,8 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                 title,
                 category,
                 scope,
-                condition,
-                action,
-                chargeAmount,
+                conditionSummary,
+                actionSummary,
                 chargeType,
                 glAccountCode,
                 requiresApproval,
@@ -767,6 +839,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                 priorityOrder: policies.length + 1,
                 lastAuditDate: new Date().toISOString().slice(0, 10),
                 updatedBy: 'Admin-Current',
+                params: dynamicParams
             };
             setPolicies(prev => [newRule, ...prev]);
             showToast(`New policy "${code}" registered and live.`);
@@ -776,51 +849,74 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
         setEditingRule(null);
     };
 
-    // Run Simulator
-    const handleRunSimulation = (scenarioKey: string) => {
-        setSimScenario(scenarioKey);
-        if (scenarioKey === 'cancel-36h') {
-            setSimResult({
-                ruleCode: 'POL-CANC-MID24',
-                ruleTitle: 'Late Notice Window Cancellation (24h - 48h)',
-                calculatedFee: '50% First Night Room Tariff + VAT',
-                glCode: 'GL-4010-CANC (Cancellation Revenue)',
-                requiresApproval: false,
-                tier: 'Automated System Execution',
-                explanation: 'Cancellation was registered 36 hours prior to check-in. Falls inside the 24h-48h tier. System automatically charges 50% of room tariff and releases inventory back to booking engine.'
-            });
-        } else if (scenarioKey === 'checkout-1630') {
-            setSimResult({
-                ruleCode: 'POL-TIME-LATE18',
-                ruleTitle: 'Evening Extended Departure (15:00 - 18:00 PM)',
-                calculatedFee: '50% Daily Room Tariff',
-                glCode: 'GL-4025-LATECHECKOUT',
+    // Dynamic Simulator Evaluation: Reads current dynamic params of active policies
+    const evaluatedSimulation = useMemo(() => {
+        if (simScenario === 'cancel-36h') {
+            const cancelMidRule = policies.find(p => p.code === 'POL-CANC-MID24') || policies[1];
+            const cancelFlexRule = policies.find(p => p.code === 'POL-CANC-FLEX48') || policies[0];
+            const flexCutoff = cancelFlexRule?.params.hoursThreshold ?? 48;
+            const penaltyPercent = cancelMidRule?.params.feePercentage ?? 50;
+
+            if (36 >= flexCutoff) {
+                return {
+                    ruleCode: cancelFlexRule?.code ?? 'POL-CANC-FLEX48',
+                    ruleTitle: cancelFlexRule?.title ?? 'Flexible Free Cancellation',
+                    calculatedFee: '0% (Free Refund Granted)',
+                    glCode: 'GL-4010-CANC',
+                    requiresApproval: false,
+                    tier: 'Automated Zero Fee',
+                    explanation: `Cancellation registered 36h prior to arrival, which is greater than the current active threshold of ${flexCutoff}h. 100% advance deposit refunded with zero deduction.`
+                };
+            } else {
+                return {
+                    ruleCode: cancelMidRule?.code ?? 'POL-CANC-MID24',
+                    ruleTitle: cancelMidRule?.title ?? 'Mid-Notice Window Cancellation Fee',
+                    calculatedFee: `${penaltyPercent}% First Night Room Tariff + VAT`,
+                    glCode: cancelMidRule?.glAccountCode ?? 'GL-4010-CANC',
+                    requiresApproval: cancelMidRule?.requiresApproval ?? false,
+                    tier: cancelMidRule?.requiresApproval ? `${cancelMidRule.supervisorTier} Approval` : 'Automated System Execution',
+                    explanation: `Cancellation registered at 36h falls inside the active late notice threshold (< ${flexCutoff}h). System dynamically computes a ${penaltyPercent}% tariff penalty.`
+                };
+            }
+        } else if (simScenario === 'checkout-1630') {
+            const eveningRule = policies.find(p => p.code === 'POL-TIME-LATE18');
+            const fee = eveningRule?.params.feePercentage ?? 50;
+            return {
+                ruleCode: eveningRule?.code ?? 'POL-TIME-LATE18',
+                ruleTitle: eveningRule?.title ?? 'Evening Extended Departure Surcharge',
+                calculatedFee: `${fee}% Daily Room Tariff`,
+                glCode: eveningRule?.glAccountCode ?? 'GL-4025-LATECHECKOUT',
+                requiresApproval: eveningRule?.requiresApproval ?? true,
+                tier: 'L2 Operations (Front Office Manager Sign-off)',
+                explanation: `Departure requested at 16:30 PM (window 15:00 - 18:00 PM). System automatically posts ${fee}% of daily room rate to folio upon manager verification.`
+            };
+        } else if (simScenario === 'smoking-detected') {
+            const smokeRule = policies.find(p => p.code === 'POL-COND-SMOKE');
+            const fineBDT = smokeRule?.params.flatAmountBDT ?? 25000;
+            return {
+                ruleCode: smokeRule?.code ?? 'POL-COND-SMOKE',
+                ruleTitle: smokeRule?.title ?? 'Strict Non-Smoking Room Violation Penalty',
+                calculatedFee: `৳ ${fineBDT.toLocaleString()} Flat Sanitization Fine`,
+                glCode: smokeRule?.glAccountCode ?? 'GL-4990-FINES-CLEANING',
                 requiresApproval: true,
                 tier: 'L2 Operations Approval Required',
-                explanation: 'Departure requested at 16:30 PM. Extends past 15:00 PM threshold. Blocks evening room turnaround. Requires Front Office Manager (FOM) override approval.'
-            });
-        } else if (scenarioKey === 'smoking-detected') {
-            setSimResult({
-                ruleCode: 'POL-COND-SMOKE',
-                ruleTitle: 'Strict Non-Smoking Room Violation Penalty',
-                calculatedFee: '৳ 25,000 Flat Sanitization Fine',
-                glCode: 'GL-4990-FINES-CLEANING',
-                requiresApproval: true,
-                tier: 'L2 Operations (Executive Housekeeper Sign-Off)',
-                explanation: 'Housekeeping logged physical evidence of smoking in Suite 402. Fine of ৳ 25,000 posted directly to room folio. Requires L2 supervisor sign-off with photo evidence attached.'
-            });
-        } else if (scenarioKey === 'credit-limit') {
-            setSimResult({
-                ruleCode: 'POL-FIN-HOUSELIMIT',
-                ruleTitle: 'House Credit Floor Limit & Auto-Folio Freeze',
-                calculatedFee: '৳ 0 (Immediate POS Lock Triggered)',
-                glCode: 'GL-1200-GUEST-LEDGER',
+                explanation: `Physical smoking detected in guest suite. Policy dynamically charges ৳ ${fineBDT.toLocaleString()} to guest folio. Requires supervisor sign-off with ozone treatment log.`
+            };
+        } else if (simScenario === 'credit-limit') {
+            const limitRule = policies.find(p => p.code === 'POL-FIN-HOUSELIMIT');
+            const limitBDT = limitRule?.params.flatAmountBDT ?? 35000;
+            return {
+                ruleCode: limitRule?.code ?? 'POL-FIN-HOUSELIMIT',
+                ruleTitle: limitRule?.title ?? 'House Credit Floor Limit & Auto-Folio Freeze',
+                calculatedFee: `৳ 0 (Active Credit Threshold: ৳ ${limitBDT.toLocaleString()})`,
+                glCode: limitRule?.glAccountCode ?? 'GL-1200-GUEST-LEDGER',
                 requiresApproval: false,
-                tier: 'Automated System Lock',
-                explanation: 'Guest room charges reached ৳ 38,200 (exceeding ৳ 35,000 threshold). All further F&B and Spa room charging blocked until guest settles interim payment at Front Desk.'
-            });
+                tier: 'Automated Folio Lock',
+                explanation: `Unpaid room folio balance reached ৳ 38,200, exceeding current floor limit of ৳ ${limitBDT.toLocaleString()}. Automated lock placed on all POS restaurant and room service charging.`
+            };
         }
-    };
+        return null;
+    }, [simScenario, policies]);
 
     // Export Handbook as JSON
     const handleExportHandbook = () => {
@@ -831,7 +927,16 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
         document.body.appendChild(downloadAnchor);
         downloadAnchor.click();
         downloadAnchor.remove();
-        showToast('Master Hotel Policy Handbook exported successfully.');
+        showToast('Dynamic Master Hotel Policy Handbook exported as JSON.');
+    };
+
+    // Reset to Baseline
+    const handleResetBaseline = () => {
+        if (window.confirm('Reset all hotel policies to 5-star baseline defaults? Any custom parameters will be restored.')) {
+            setPolicies(BASELINE_POLICIES);
+            localStorage.removeItem('hotel_policies_v2');
+            showToast('All policies restored to enterprise baseline.');
+        }
     };
 
     return (
@@ -854,10 +959,10 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
                                 <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight">
-                                    Hotel Operations & Policy Governance Engine
+                                    Dynamic Hotel Policy & Rules Engine
                                 </h1>
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
-                                    Automated Rules
+                                    Computational Engine
                                 </span>
                                 <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                                     GL Ledger Mapped
@@ -866,7 +971,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
                                 <span className="flex items-center gap-1">
                                     <ShieldCheck size={11} className="text-gray-400" />
-                                    <span>{policies.filter(p => p.isActive).length} Active Policies</span>
+                                    <span>{policies.filter(p => p.isActive).length} Active Enforced Policies</span>
                                 </span>
                                 <span className="flex items-center gap-1">
                                     <Clock size={11} className="text-gray-400" />
@@ -874,11 +979,11 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                 </span>
                                 <span className="hidden sm:flex items-center gap-1">
                                     <Calendar size={11} className="text-gray-400" />
-                                    <span>Free Cancellation: 48h Window</span>
+                                    <span>Cancellation Cutoff: {policies.find(p => p.code === 'POL-CANC-FLEX48')?.params.hoursThreshold ?? 48}h Window</span>
                                 </span>
                                 <span className="hidden lg:flex items-center gap-1">
                                     <CreditCard size={11} className="text-gray-400" />
-                                    <span>Incidental Hold: ৳ 5,000 / Night</span>
+                                    <span>Incidental Hold: ৳ {(policies.find(p => p.code === 'POL-FIN-INCIDENTAL')?.params.flatAmountBDT ?? 5000).toLocaleString()} / Night</span>
                                 </span>
                             </div>
                         </div>
@@ -888,10 +993,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                     <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
                         <button
                             type="button"
-                            onClick={() => {
-                                setIsSimulatorOpen(!isSimulatorOpen);
-                                if (!simResult) handleRunSimulation('cancel-36h');
-                            }}
+                            onClick={() => setIsSimulatorOpen(!isSimulatorOpen)}
                             className={`h-7 px-2.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer ${isSimulatorOpen
                                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                                 : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
@@ -905,7 +1007,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             type="button"
                             onClick={handleExportHandbook}
                             className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            title="Export Master Hotel Policy Handbook (JSON)"
+                            title="Export Master Policy Handbook JSON"
                         >
                             <Download size={12} className="text-gray-400" />
                             <span>Export Rules</span>
@@ -917,6 +1019,47 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                         >
                             <Plus size={13} />
                             <span>Create Policy</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* DYNAMIC SEASONAL STRATEGY PRESET SWITCHER */}
+                <div className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-50/60 via-indigo-50/40 to-white border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                        <SlidersHorizontal size={13} className="text-blue-600 flex-shrink-0" />
+                        <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider">
+                            Seasonal Strategy Preset:
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            {[
+                                { id: 'standard_flexible', label: 'Standard Flexible (48h Free)' },
+                                { id: 'strict_peak_season', label: 'Strict Peak Season (7-Day Lock)' },
+                                { id: 'corporate_priority', label: 'Corporate MICE Priority (24h Free)' },
+                            ].map(preset => (
+                                <button
+                                    key={preset.id}
+                                    type="button"
+                                    onClick={() => handleApplyPreset(preset.id as PolicyStrategyPreset)}
+                                    className={`h-6 px-2.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${activePreset === preset.id
+                                        ? 'bg-blue-600 text-white shadow-2xs'
+                                        : 'bg-white hover:bg-gray-100 border border-gray-200 text-gray-600'
+                                        }`}
+                                >
+                                    {preset.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <button
+                            type="button"
+                            onClick={handleResetBaseline}
+                            className="text-[11px] text-gray-500 hover:text-gray-700 flex items-center gap-1 cursor-pointer font-medium"
+                            title="Reset all customized parameters to system baseline"
+                        >
+                            <RotateCcw size={11} />
+                            <span>Reset Baseline</span>
                         </button>
                     </div>
                 </div>
@@ -961,10 +1104,10 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             </div>
                             <div>
                                 <h3 className="text-xs font-bold text-white tracking-wide uppercase">
-                                    Real-Time Policy Automation & Surcharge Simulator
+                                    Real-Time Dynamic Policy Evaluation Simulator
                                 </h3>
                                 <p className="text-[11px] text-indigo-200/80">
-                                    Simulate operational front-desk scenarios to verify automated charge calculations and approval tiers.
+                                    Simulate operational front-desk scenarios against your dynamically calibrated policy parameters.
                                 </p>
                             </div>
                         </div>
@@ -993,7 +1136,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     <button
                                         key={sc.id}
                                         type="button"
-                                        onClick={() => handleRunSimulation(sc.id)}
+                                        onClick={() => setSimScenario(sc.id)}
                                         className={`w-full text-left p-2 rounded-lg border text-[11px] font-medium transition-all cursor-pointer ${simScenario === sc.id
                                             ? 'bg-indigo-600 border-indigo-400 text-white font-bold shadow-md'
                                             : 'bg-white/5 border-white/10 text-indigo-200 hover:bg-white/10'
@@ -1006,37 +1149,37 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                         </div>
 
                         {/* Simulation Result */}
-                        {simResult && (
+                        {evaluatedSimulation && (
                             <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl p-3 space-y-2.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-mono text-indigo-300 font-bold bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-700">
-                                        Triggered Rule: {simResult.ruleCode}
+                                        Dynamically Evaluated Rule: {evaluatedSimulation.ruleCode}
                                     </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${simResult.requiresApproval
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${evaluatedSimulation.requiresApproval
                                         ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
                                         : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
                                         }`}>
-                                        {simResult.tier}
+                                        {evaluatedSimulation.tier}
                                     </span>
                                 </div>
 
                                 <div className="text-sm font-bold text-white">
-                                    {simResult.ruleTitle}
+                                    {evaluatedSimulation.ruleTitle}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 p-2 bg-black/20 rounded-lg border border-white/5 text-[11px]">
                                     <div>
-                                        <span className="text-indigo-300 block text-[10px] uppercase">Automated Charge</span>
-                                        <span className="font-bold text-emerald-400">{simResult.calculatedFee}</span>
+                                        <span className="text-indigo-300 block text-[10px] uppercase">Calculated Dynamic Charge</span>
+                                        <span className="font-bold text-emerald-400">{evaluatedSimulation.calculatedFee}</span>
                                     </div>
                                     <div>
-                                        <span className="text-indigo-300 block text-[10px] uppercase">General Ledger Code</span>
-                                        <span className="font-mono text-indigo-200">{simResult.glCode}</span>
+                                        <span className="text-indigo-300 block text-[10px] uppercase">General Ledger Credit Code</span>
+                                        <span className="font-mono text-indigo-200">{evaluatedSimulation.glCode}</span>
                                     </div>
                                 </div>
 
                                 <p className="text-[11px] text-indigo-100 leading-relaxed">
-                                    {simResult.explanation}
+                                    {evaluatedSimulation.explanation}
                                 </p>
                             </div>
                         )}
@@ -1053,7 +1196,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder={`Search ${activeTab} rules by keyword, code (POL-), condition, or GL code...`}
+                        placeholder={`Search ${activeTab} rules by keyword, code (POL-), parameters, or GL code...`}
                         className="w-full h-8 pl-9 pr-7 text-xs bg-gray-50/70 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all font-normal"
                     />
                     {searchQuery && (
@@ -1128,8 +1271,8 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                 </div>
             </div>
 
-            {/* POLICY RULES LIST */}
-            <div className="space-y-2.5">
+            {/* DYNAMIC POLICY RULES LIST */}
+            <div className="space-y-3">
                 {filteredPolicies.length === 0 ? (
                     <div className="bg-white rounded-xl border border-gray-200/90 p-12 text-center shadow-2xs">
                         <ShieldCheck size={32} className="mx-auto text-gray-300 mb-2" />
@@ -1170,7 +1313,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     ) : (
                                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                                             <CheckCircle2 size={10} />
-                                            <span>Fully Automated Execution</span>
+                                            <span>Automated Engine Execution</span>
                                         </span>
                                     )}
                                 </div>
@@ -1195,7 +1338,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                         type="button"
                                         onClick={() => handleOpenEditRule(rule)}
                                         className="p-1.5 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-blue-100"
-                                        title="Edit Policy Parameters"
+                                        title="Configure Full Rule Schema"
                                     >
                                         <Edit2 size={13} />
                                     </button>
@@ -1210,42 +1353,169 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                 </div>
                             </div>
 
-                            {/* Card Middle Grid: Trigger & Action */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs">
-                                {/* Trigger Condition */}
-                                <div className="md:col-span-5 p-2.5 rounded-lg bg-gray-50/70 border border-gray-200/70 space-y-1">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block flex items-center gap-1">
-                                        <Clock size={11} className="text-gray-400" />
-                                        <span>Operational Trigger Condition</span>
+                            {/* DYNAMIC COMPUTATIONAL PARAMETERS BAR (Inline Interactive Controls) */}
+                            <div className="p-2.5 bg-gradient-to-r from-slate-50 via-gray-50 to-blue-50/30 rounded-lg border border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <Sliders size={13} className="text-blue-600" />
+                                    <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider">
+                                        Dynamic Rule Variables:
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    {/* Hours Threshold Stepper */}
+                                    {rule.params.hoursThreshold !== undefined && (
+                                        <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs">
+                                            <span className="text-[10.5px] font-medium text-gray-500">Cutoff Window:</span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateParam(rule.id, 'hoursThreshold', Math.max(0, (rule.params.hoursThreshold ?? 48) - 12))}
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                >
+                                                    -
+                                                </button>
+                                                <span className="font-mono font-bold text-blue-700 text-xs px-1">
+                                                    {rule.params.hoursThreshold}h
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateParam(rule.id, 'hoursThreshold', (rule.params.hoursThreshold ?? 48) + 12)}
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Fee Percentage Stepper */}
+                                    {rule.params.feePercentage !== undefined && (
+                                        <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs">
+                                            <span className="text-[10.5px] font-medium text-gray-500">Charge Rate:</span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateParam(rule.id, 'feePercentage', Math.max(0, (rule.params.feePercentage ?? 50) - 10))}
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                >
+                                                    -
+                                                </button>
+                                                <span className="font-mono font-bold text-emerald-700 text-xs px-1">
+                                                    {rule.params.feePercentage}%
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateParam(rule.id, 'feePercentage', Math.min(100, (rule.params.feePercentage ?? 50) + 10))}
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Flat Amount Input */}
+                                    {rule.params.flatAmountBDT !== undefined && (
+                                        <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs">
+                                            <span className="text-[10.5px] font-medium text-gray-500">Tariff BDT:</span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateParam(rule.id, 'flatAmountBDT', Math.max(0, (rule.params.flatAmountBDT ?? 5000) - 1000))}
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                >
+                                                    -
+                                                </button>
+                                                <span className="font-mono font-bold text-gray-900 text-xs px-1">
+                                                    ৳ {rule.params.flatAmountBDT.toLocaleString()}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateParam(rule.id, 'flatAmountBDT', (rule.params.flatAmountBDT ?? 5000) + 1000)}
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Time Window */}
+                                    {rule.params.timeWindowStart && rule.params.timeWindowEnd && (
+                                        <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs text-[11px]">
+                                            <span className="text-[10.5px] font-medium text-gray-500">Active Window:</span>
+                                            <span className="font-mono font-bold text-indigo-700">
+                                                {rule.params.timeWindowStart} – {rule.params.timeWindowEnd}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Age Limit */}
+                                    {rule.params.ageThreshold !== undefined && (
+                                        <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs text-[11px]">
+                                            <span className="text-[10.5px] font-medium text-gray-500">Age Limit:</span>
+                                            <span className="font-bold text-gray-800">
+                                                {rule.params.ageThreshold} Years
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* GL Account Badge */}
+                                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs text-[10.5px] font-mono text-gray-500">
+                                        <span>GL:</span>
+                                        <strong className="text-gray-800">{rule.glAccountCode}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* VISUAL PROGRAMMATIC IF-THEN COMPUTATIONAL NODES */}
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 text-xs items-stretch">
+                                {/* IF NODE (Trigger) */}
+                                <div className="md:col-span-5 p-2.5 rounded-lg bg-gray-50 border border-gray-200/80 space-y-1">
+                                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1">
+                                        <Clock size={11} className="text-blue-600" />
+                                        <span>IF (Operational Trigger Condition)</span>
                                     </span>
                                     <p className="text-gray-800 font-medium leading-snug">
-                                        {rule.condition}
+                                        {rule.conditionSummary}
+                                        {rule.params.hoursThreshold !== undefined && (
+                                            <span className="font-bold text-blue-700 ml-1">
+                                                (Currently set to {rule.params.hoursThreshold} hours)
+                                            </span>
+                                        )}
+                                        {rule.params.timeWindowStart && (
+                                            <span className="font-bold text-indigo-700 ml-1">
+                                                ({rule.params.timeWindowStart} to {rule.params.timeWindowEnd})
+                                            </span>
+                                        )}
                                     </p>
                                 </div>
 
-                                {/* Automated Action */}
-                                <div className="md:col-span-4 p-2.5 rounded-lg bg-blue-50/40 border border-blue-100 space-y-1">
-                                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block flex items-center gap-1">
-                                        <Check size={11} className="text-blue-600" />
-                                        <span>Folio Action & Resolution</span>
-                                    </span>
-                                    <p className="text-gray-900 font-medium leading-snug">
-                                        {rule.action}
-                                    </p>
+                                {/* CONNECTOR ARROW */}
+                                <div className="hidden md:flex md:col-span-1 items-center justify-center text-gray-400">
+                                    <ArrowRight size={16} />
                                 </div>
 
-                                {/* Charge & GL Code */}
-                                <div className="md:col-span-3 p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-100 space-y-1 flex flex-col justify-between">
+                                {/* THEN NODE (Folio Action) */}
+                                <div className="md:col-span-6 p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/80 space-y-1 flex flex-col justify-between">
                                     <div>
-                                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                                            Tariff / Penalty
+                                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                                            <Check size={11} className="text-emerald-600" />
+                                            <span>THEN (Automated Folio Action & Fee)</span>
                                         </span>
-                                        <div className="text-sm font-bold text-emerald-800">
-                                            {rule.chargeAmount}
-                                        </div>
+                                        <p className="text-gray-900 font-medium leading-snug">
+                                            {rule.actionSummary}
+                                        </p>
                                     </div>
-                                    <div className="text-[10.5px] font-mono text-gray-500 pt-1 border-t border-emerald-100/60">
-                                        GL: <strong className="text-gray-700">{rule.glAccountCode}</strong>
+
+                                    <div className="flex items-center justify-between pt-1 border-t border-emerald-200/50 text-[11px]">
+                                        <span className="text-[10px] uppercase font-bold text-emerald-800">Computed Charge Rate:</span>
+                                        <strong className="text-emerald-800 font-bold">
+                                            {rule.params.feePercentage !== undefined ? `${rule.params.feePercentage}%` : ''}
+                                            {rule.params.flatAmountBDT !== undefined ? `৳ ${rule.params.flatAmountBDT.toLocaleString()}` : ''}
+                                            {rule.params.feePercentage === undefined && rule.params.flatAmountBDT === undefined ? rule.chargeType.replace('_', ' ') : ''}
+                                        </strong>
                                     </div>
                                 </div>
                             </div>
@@ -1273,7 +1543,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                 )}
             </div>
 
-            {/* CREATE / EDIT POLICY RULE MODAL */}
+            {/* CREATE / EDIT DYNAMIC POLICY RULE MODAL */}
             {isRuleModalOpen && (
                 <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-xs z-[100] flex items-center justify-center p-3 sm:p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200">
@@ -1285,10 +1555,10 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                 </div>
                                 <div>
                                     <h2 className="text-sm font-bold text-gray-900">
-                                        {editingRule ? `Edit Policy Rule: ${editingRule.code}` : 'Register New Hotel Policy Rule'}
+                                        {editingRule ? `Configure Dynamic Policy: ${editingRule.code}` : 'Register Dynamic Hotel Policy Rule'}
                                     </h2>
                                     <p className="text-[11px] text-gray-500">
-                                        Configure automated operational triggers, penalty tariffs, and General Ledger mapping.
+                                        Configure computational parameters, trigger thresholds, fee formulas, and GL accounts.
                                     </p>
                                 </div>
                             </div>
@@ -1378,67 +1648,131 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                 </div>
                             </div>
 
-                            {/* Section 2: Trigger Condition & Action */}
+                            {/* Section 2: Computational Parameters */}
+                            <div className="space-y-1">
+                                <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider block flex items-center gap-1 text-blue-700">
+                                    <Sliders size={12} />
+                                    <span>2. Dynamic Computational Parameters (Live Input)</span>
+                                </span>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 bg-blue-50/40 border border-blue-100 rounded-xl">
+                                    <div className="space-y-1">
+                                        <label className="font-semibold text-gray-700">Cutoff Window (Hours)</label>
+                                        <input
+                                            type="number"
+                                            name="paramHoursThreshold"
+                                            defaultValue={editingRule?.params.hoursThreshold ?? ''}
+                                            placeholder="e.g. 48"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono font-bold text-xs"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="font-semibold text-gray-700">Fee Rate (%)</label>
+                                        <input
+                                            type="number"
+                                            name="paramFeePercentage"
+                                            min={0}
+                                            max={100}
+                                            defaultValue={editingRule?.params.feePercentage ?? ''}
+                                            placeholder="e.g. 50"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono font-bold text-xs"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="font-semibold text-gray-700">Flat Fee / Deposit (BDT)</label>
+                                        <input
+                                            type="number"
+                                            name="paramFlatAmountBDT"
+                                            defaultValue={editingRule?.params.flatAmountBDT ?? ''}
+                                            placeholder="e.g. 5000"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono font-bold text-xs"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="font-semibold text-gray-700">Time Window Start</label>
+                                        <input
+                                            type="text"
+                                            name="paramTimeWindowStart"
+                                            defaultValue={editingRule?.params.timeWindowStart ?? ''}
+                                            placeholder="e.g. 06:00"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="font-semibold text-gray-700">Time Window End</label>
+                                        <input
+                                            type="text"
+                                            name="paramTimeWindowEnd"
+                                            defaultValue={editingRule?.params.timeWindowEnd ?? ''}
+                                            placeholder="e.g. 10:00"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="font-semibold text-gray-700">Age Bracket Limit</label>
+                                        <input
+                                            type="number"
+                                            name="paramAgeThreshold"
+                                            defaultValue={editingRule?.params.ageThreshold ?? ''}
+                                            placeholder="e.g. 6 or 12"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section 3: Natural Language Summaries & GL */}
                             <div className="space-y-1">
                                 <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider block">
-                                    2. Operational Trigger & Folio Resolution
+                                    3. Rule Statements & GL Ledger
                                 </span>
                                 <div className="space-y-2.5 p-3 bg-gray-50/70 border border-gray-200/80 rounded-xl">
                                     <div className="space-y-1">
-                                        <label className="font-semibold text-gray-700">Trigger Condition Statement</label>
+                                        <label className="font-semibold text-gray-700">Trigger Condition Summary</label>
                                         <input
                                             type="text"
-                                            name="condition"
+                                            name="conditionSummary"
                                             required
-                                            defaultValue={editingRule?.condition || ''}
+                                            defaultValue={editingRule?.conditionSummary || ''}
                                             placeholder="e.g. Cancellation received > 48 Hours before 14:00 check-in"
                                             className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none text-xs"
                                         />
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="font-semibold text-gray-700">Folio Action / System Execution</label>
+                                        <label className="font-semibold text-gray-700">Folio Action / Resolution Statement</label>
                                         <input
                                             type="text"
-                                            name="action"
+                                            name="actionSummary"
                                             required
-                                            defaultValue={editingRule?.action || ''}
+                                            defaultValue={editingRule?.actionSummary || ''}
                                             placeholder="e.g. Charge 50% of first night room tariff + taxes"
                                             className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none text-xs"
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                        <div className="space-y-1">
-                                            <label className="font-semibold text-gray-700">Fee / Penalty Label</label>
-                                            <input
-                                                type="text"
-                                                name="chargeAmount"
-                                                required
-                                                defaultValue={editingRule?.chargeAmount || '0%'}
-                                                placeholder="e.g. 50% 1st Night or ৳ 25,000"
-                                                className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-bold text-xs"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="font-semibold text-gray-700">General Ledger (GL) Code</label>
-                                            <input
-                                                type="text"
-                                                name="glAccountCode"
-                                                required
-                                                defaultValue={editingRule?.glAccountCode || 'GL-4010-CANC'}
-                                                placeholder="e.g. GL-4010-CANC"
-                                                className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
-                                            />
-                                        </div>
+                                    <div className="space-y-1">
+                                        <label className="font-semibold text-gray-700">General Ledger (GL) Code</label>
+                                        <input
+                                            type="text"
+                                            name="glAccountCode"
+                                            required
+                                            defaultValue={editingRule?.glAccountCode || 'GL-4010-CANC'}
+                                            placeholder="e.g. GL-4010-CANC"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
+                                        />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Section 3: Governance, Approvals & Legal Disclosures */}
+                            {/* Section 4: Governance & Legal */}
                             <div className="space-y-1">
                                 <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider block">
-                                    3. Supervisor Override & Guest Legal Disclosures
+                                    4. Supervisor Override & Legal Disclosures
                                 </span>
                                 <div className="space-y-2.5 p-3 bg-gray-50/70 border border-gray-200/80 rounded-xl">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1470,12 +1804,12 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="font-semibold text-gray-700">Guest-Facing Legal Clause (Printed on terms / Registration Card)</label>
+                                        <label className="font-semibold text-gray-700">Guest-Facing Legal Clause</label>
                                         <textarea
                                             name="guestFacingLegalClause"
                                             rows={2}
                                             defaultValue={editingRule?.guestFacingLegalClause || ''}
-                                            placeholder="The exact legal sentence disclosed to guests during booking and check-in..."
+                                            placeholder="The exact legal sentence disclosed to guests during booking..."
                                             className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none text-xs font-normal"
                                         />
                                     </div>
@@ -1516,7 +1850,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     type="submit"
                                     className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
                                 >
-                                    {editingRule ? 'Save Changes' : 'Register Policy Rule'}
+                                    {editingRule ? 'Save Dynamic Rule' : 'Register Dynamic Rule'}
                                 </button>
                             </div>
                         </form>
