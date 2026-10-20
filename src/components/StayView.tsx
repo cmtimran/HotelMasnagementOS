@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Calendar as CalendarIcon,
     ChevronDown,
     ChevronRight,
     ChevronLeft,
     Plus,
-    Info,
     Building2,
+    BedDouble,
     X
 } from 'lucide-react';
 import QuickReservationModal from './modals/QuickReservationModal';
@@ -17,10 +17,11 @@ interface TimelineBooking {
     reservationNumber: string;
     guestName: string;
     roomNumber: string;
-    startIndex: number; // Index in the active days array
+    startIndex: number;
     endIndex: number;
-    status: 'arrived' | 'stayover' | 'confirmed' | 'hold' | 'due-out' | 'checked-out' | 'day-use';
+    status: 'arrived' | 'stayover' | 'confirmed' | 'hold' | 'due-out' | 'checked-out' | 'day-use' | 'out-of-order';
     vip?: boolean;
+    indicator?: string;
 }
 
 export const StayView: React.FC = () => {
@@ -43,10 +44,10 @@ export const StayView: React.FC = () => {
         setExpandedNodes(prev => ({ ...prev, [nodeId]: !prev[nodeId] }));
     };
 
-    // Information Popover State
+    // Information Popover (Legend) State
     const [isInfoPopoverOpen, setIsInfoPopoverOpen] = useState(false);
 
-    // Modals
+    // Modals & Selection
     const [isAddReservationOpen, setIsAddReservationOpen] = useState(false);
     const [isQuickReservationOpen, setIsQuickReservationOpen] = useState(false);
     const [selectedRange, setSelectedRange] = useState<{
@@ -66,7 +67,7 @@ export const StayView: React.FC = () => {
     } | null>(null);
 
     // Generate days array based on startDate and daysWindow
-    const days = React.useMemo(() => {
+    const days = useMemo(() => {
         const list = [];
         const base = new Date(startDate);
         const todayStr = new Date().toISOString().split('T')[0];
@@ -77,7 +78,7 @@ export const StayView: React.FC = () => {
             const iso = current.toISOString().split('T')[0];
             const dayOfWeek = current.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
             const dayNum = current.getDate();
-            const isWeekend = current.getDay() === 5 || current.getDay() === 6; // Fri or Sat in BD
+            const isWeekend = current.getDay() === 5 || current.getDay() === 6; // Friday or Saturday (BD standard)
             const isToday = iso === todayStr;
 
             list.push({
@@ -94,7 +95,7 @@ export const StayView: React.FC = () => {
     }, [startDate, daysWindow]);
 
     // Initial Rooms Structure
-    const roomTree = [
+    const roomTree = useMemo(() => [
         {
             id: 'b-1',
             name: 'Building 1 (Main Tower)',
@@ -134,16 +135,30 @@ export const StayView: React.FC = () => {
                 }
             ]
         }
-    ];
+    ], []);
+
+    // Total rooms count across entire hotel
+    const totalRoomsCount = useMemo(() => {
+        return roomTree.reduce((acc, b) => acc + b.floors.reduce((facc, f) => facc + f.rooms.length, 0), 0);
+    }, [roomTree]);
 
     // Seed bookings on the timeline
     const [bookings, setBookings] = useState<TimelineBooking[]>([
-        { id: 'b1', reservationNumber: 'RES-109281', guestName: 'A. Rahman', roomNumber: '101', startIndex: 1, endIndex: 4, status: 'stayover', vip: true },
-        { id: 'b2', reservationNumber: 'RES-109282', guestName: 'S. Chowdhury', roomNumber: '103', startIndex: 0, endIndex: 2, status: 'arrived' },
-        { id: 'b3', reservationNumber: 'RES-109283', guestName: 'T. Hasan (Hold)', roomNumber: '104', startIndex: 3, endIndex: 6, status: 'hold' },
-        { id: 'b4', reservationNumber: 'RES-109284', guestName: 'F. Kabir', roomNumber: '201', startIndex: 5, endIndex: 8, status: 'confirmed' },
-        { id: 'b5', reservationNumber: 'RES-109285', guestName: 'Dr. Jean Dupont', roomNumber: '203', startIndex: 2, endIndex: 5, status: 'stayover', vip: true }
+        { id: 'b1', reservationNumber: 'RES-109281', guestName: 'A. Rahman', roomNumber: '101', startIndex: 1, endIndex: 4, status: 'stayover', vip: true, indicator: '⭐' },
+        { id: 'b2', reservationNumber: 'RES-109282', guestName: 'S. Chowdhury', roomNumber: '103', startIndex: 0, endIndex: 2, status: 'arrived', indicator: '👑' },
+        { id: 'b3', reservationNumber: 'RES-109283', guestName: 'T. Hasan (Hold)', roomNumber: '104', startIndex: 3, endIndex: 6, status: 'hold', indicator: '$' },
+        { id: 'b4', reservationNumber: 'RES-109284', guestName: 'F. Kabir', roomNumber: '201', startIndex: 5, endIndex: 8, status: 'confirmed', indicator: '👥' },
+        { id: 'b5', reservationNumber: 'RES-109285', guestName: 'Dr. Jean Dupont', roomNumber: '203', startIndex: 2, endIndex: 5, status: 'stayover', vip: true, indicator: '⭐' }
     ]);
+
+    // Today counts
+    const todayAssignedCount = useMemo(() => {
+        const todayIndex = days.findIndex(d => d.isToday);
+        const targetIdx = todayIndex >= 0 ? todayIndex : 0;
+        return bookings.filter(b => targetIdx >= b.startIndex && targetIdx <= b.endIndex).length;
+    }, [bookings, days]);
+
+    const todayAvailableCount = Math.max(0, totalRoomsCount - todayAssignedCount);
 
     // Handle Mouse Up to finish drag selection
     useEffect(() => {
@@ -190,16 +205,18 @@ export const StayView: React.FC = () => {
         setStartDate(cur.toISOString().split('T')[0]);
     };
 
+    // Exact status colors matching hotel-management Legend
     const getStatusBadgeColor = (status: TimelineBooking['status']) => {
         switch (status) {
-            case 'arrived': return 'bg-blue-600 text-white';
-            case 'stayover': return 'bg-indigo-600 text-white';
-            case 'confirmed': return 'bg-emerald-600 text-white';
-            case 'hold': return 'bg-purple-600 text-white';
-            case 'due-out': return 'bg-amber-600 text-white';
-            case 'checked-out': return 'bg-gray-600 text-white';
-            case 'day-use': return 'bg-teal-600 text-white';
-            default: return 'bg-blue-500 text-white';
+            case 'arrived': return 'bg-[#4d79ff] text-white';
+            case 'stayover': return 'bg-[#668cff] text-white';
+            case 'checked-out': return 'bg-[#2d8659] text-white';
+            case 'due-out': return 'bg-[#ffb31a] text-white';
+            case 'confirmed': return 'bg-[#00cc00] text-white';
+            case 'hold': return 'bg-[#b366ff] text-white';
+            case 'day-use': return 'bg-[#d9b326] text-white';
+            case 'out-of-order': return 'bg-[#cc0000] text-white';
+            default: return 'bg-[#4d79ff] text-white';
         }
     };
 
@@ -208,7 +225,7 @@ export const StayView: React.FC = () => {
             {/* Header Controls Bar */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3.5 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-md bg-blue-700 text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                    <div className="w-7 h-7 rounded-md bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
                         <CalendarIcon size={15} />
                     </div>
                     <div>
@@ -273,79 +290,173 @@ export const StayView: React.FC = () => {
                         </select>
                     </div>
 
-                    {/* Information / Legend Button */}
-                    <div className="relative">
-                        <button
-                            type="button"
-                            onClick={() => setIsInfoPopoverOpen(!isInfoPopoverOpen)}
-                            className="h-7 px-2.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-md text-[11px] font-semibold text-gray-700 flex items-center gap-1 shadow-2xs cursor-pointer"
-                        >
-                            <Info size={13} className="text-blue-600" />
-                            <span>Legend</span>
-                        </button>
-
-                        {/* Legend Popover */}
-                        {isInfoPopoverOpen && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setIsInfoPopoverOpen(false)}></div>
-                                <div className="absolute right-0 top-10 z-50 bg-white rounded-xl border border-gray-200 shadow-xl p-3.5 w-72 text-xs space-y-3">
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 border-b border-gray-100 pb-1 text-[11px] uppercase tracking-wider">
-                                            Date Header Colors
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-4 h-4 rounded bg-rose-100 border border-rose-300"></div>
-                                                <span>Weekend</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-4 h-4 rounded bg-blue-100 border border-blue-400"></div>
-                                                <span>Today</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 border-b border-gray-100 pb-1 text-[11px] uppercase tracking-wider">
-                                            Booking Statuses
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-1.5 mt-2 text-[10.5px]">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-3 h-3 rounded bg-blue-600"></div>
-                                                <span>Arrived</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-3 h-3 rounded bg-indigo-600"></div>
-                                                <span>Stayover</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-3 h-3 rounded bg-emerald-600"></div>
-                                                <span>Confirmed</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-3 h-3 rounded bg-purple-600"></div>
-                                                <span>Temporary Hold</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-3 h-3 rounded bg-amber-600"></div>
-                                                <span>Due Out</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-3 h-3 rounded bg-gray-600"></div>
-                                                <span>Checked Out</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                    {/* Status Indicators from hotel-management */}
+                    <div className="flex items-center gap-2.5 border-l border-gray-200 pl-2.5">
+                        {/* Information / Legend Button */}
+                        <div className="relative">
+                            <div
+                                onClick={() => setIsInfoPopoverOpen(!isInfoPopoverOpen)}
+                                className="flex flex-col items-center gap-0.5 cursor-pointer group"
+                                title="View Legend & Information"
+                            >
+                                <div className="w-5 h-5 rounded-full bg-[#3b82f6] text-white font-serif font-bold text-xs flex items-center justify-center shadow-2xs group-hover:brightness-110 transition-all">
+                                    i
                                 </div>
-                            </>
-                        )}
+                                <span className="text-[10px] font-semibold text-gray-700">Information</span>
+                            </div>
+
+                            {/* Complete 3-Part Legend Popover matching hotel-management */}
+                            {isInfoPopoverOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsInfoPopoverOpen(false)}></div>
+                                    <div
+                                        onClick={e => e.stopPropagation()}
+                                        className="absolute right-0 top-11 z-50 bg-white rounded-lg border border-[#e0e0e0] shadow-2xl p-4 w-[380px] sm:w-[420px] text-xs space-y-3 animate-in fade-in zoom-in-95 duration-150"
+                                    >
+                                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                            <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider">Stay View Legend</h4>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsInfoPopoverOpen(false)}
+                                                className="text-gray-400 hover:text-gray-600 p-0.5 rounded cursor-pointer"
+                                            >
+                                                <X size={15} />
+                                            </button>
+                                        </div>
+
+                                        {/* Date Colors */}
+                                        <div className="space-y-1.5">
+                                            <div className="font-bold text-[#1e293b] text-[11px] uppercase tracking-wider">Date Colors</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-4 h-4 rounded-[3px] bg-[#ffb3b3] text-gray-800 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                                        1
+                                                    </div>
+                                                    <span className="text-[11px] text-gray-700 font-medium">Weekend</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-4 h-4 rounded-[3px] bg-[#cce5ff] text-[#333] text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                                        2
+                                                    </div>
+                                                    <span className="text-[11px] text-gray-700 font-medium">Today</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-4 h-4 rounded-[3px] bg-[#00ccb3] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                                        3
+                                                    </div>
+                                                    <span className="text-[11px] text-gray-700 font-medium">Today &amp; Weekend</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="h-px bg-gray-100"></div>
+
+                                        {/* Booking Status - All 8 Colors */}
+                                        <div className="space-y-1.5">
+                                            <div className="font-bold text-[#1e293b] text-[11px] uppercase tracking-wider">Booking Status</div>
+                                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#4d79ff] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Arrived</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#668cff] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Stayover</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#2d8659] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Checked Out</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#ffb31a] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Due Out</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#00cc00] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Confirmed Reservation</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#b366ff] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Temporary Reserve</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#cc0000] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Out of Order / Service</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3.5 h-3.5 rounded-[3px] bg-[#d9b326] flex-shrink-0"></div>
+                                                    <span className="text-gray-700">Dayuse Reservation</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="h-px bg-gray-100"></div>
+
+                                        {/* Booking Indicators - All 6 Indicators */}
+                                        <div className="space-y-1.5">
+                                            <div className="font-bold text-[#1e293b] text-[11px] uppercase tracking-wider">Booking Indicators</div>
+                                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">👑</span>
+                                                    <span className="text-gray-700">Master Guest</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">👥</span>
+                                                    <span className="text-gray-700">Group Booking</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-[#cc0000]">$</span>
+                                                    <span className="text-gray-700">Payment Pending</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">⚠️</span>
+                                                    <span className="text-gray-700">Stop Room Move</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">⭐</span>
+                                                    <span className="text-gray-700">VIP Guest</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-[#00cccc]">⑂</span>
+                                                    <span className="text-gray-700">Split Reservation</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Available Badge */}
+                        <div className="flex flex-col items-center gap-0.5">
+                            <div className="w-5 h-5 rounded-full bg-[#10b981] text-white font-bold text-[11px] flex items-center justify-center shadow-2xs">
+                                {todayAvailableCount}
+                            </div>
+                            <span className="text-[10px] font-semibold text-gray-700">Available</span>
+                        </div>
+
+                        {/* Assigned Badge */}
+                        <div className="flex flex-col items-center gap-0.5">
+                            <div className="w-5 h-5 rounded-full bg-[#f59e0b] text-white font-bold text-[11px] flex items-center justify-center shadow-2xs">
+                                {todayAssignedCount}
+                            </div>
+                            <span className="text-[10px] font-semibold text-gray-700">Assigned</span>
+                        </div>
+
+                        {/* Unassigned Badge */}
+                        <div className="flex flex-col items-center gap-0.5">
+                            <div className="w-5 h-5 rounded-full bg-[#06b6d4] text-white font-bold text-[11px] flex items-center justify-center shadow-2xs">
+                                0
+                            </div>
+                            <span className="text-[10px] font-semibold text-gray-700">Unassigned</span>
+                        </div>
                     </div>
 
                     {/* Action Buttons */}
                     <button
                         type="button"
                         onClick={() => setIsAddReservationOpen(true)}
-                        className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1 cursor-pointer"
+                        className="h-7 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
                     >
                         <Plus size={13} />
                         <span>+ Add Reservation</span>
@@ -365,24 +476,49 @@ export const StayView: React.FC = () => {
                                 <span className="text-[10px] text-gray-400 font-mono">Tree View</span>
                             </div>
 
-                            {/* Date Columns */}
+                            {/* Date Columns with exact Legend Colors */}
                             <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(48px, 1fr))` }}>
-                                {days.map(d => (
-                                    <div
-                                        key={d.index}
-                                        className={`p-2 border-r border-gray-200 text-center flex flex-col items-center justify-center transition-colors ${d.isToday ? 'bg-blue-100/70 border-b-2 border-b-blue-600' : d.isWeekend ? 'bg-rose-50/70' : 'bg-gray-50/50'}`}
-                                    >
-                                        <span className={`text-[10px] font-bold ${d.isWeekend ? 'text-rose-600' : 'text-gray-500'}`}>
-                                            {d.dayName}
-                                        </span>
-                                        <span className={`text-xs font-extrabold mt-0.5 ${d.isToday ? 'text-blue-800' : 'text-gray-900'}`}>
-                                            {d.num}
-                                        </span>
-                                        <span className="text-[9px] text-gray-400 font-medium">
-                                            {d.monthShort}
-                                        </span>
-                                    </div>
-                                ))}
+                                {days.map(d => {
+                                    const isTodayAndWeekend = d.isToday && d.isWeekend;
+                                    const headerBg = isTodayAndWeekend
+                                        ? 'bg-[#00ccb3] text-white'
+                                        : d.isToday
+                                        ? 'bg-[#cce5ff] text-[#1e3a8a] border-b-2 border-b-blue-600'
+                                        : d.isWeekend
+                                        ? 'bg-[#ffb3b3] text-rose-950'
+                                        : 'bg-gray-50/80 text-gray-700';
+
+                                    const dayNameColor = isTodayAndWeekend
+                                        ? 'text-white/90'
+                                        : d.isWeekend
+                                        ? 'text-rose-700 font-bold'
+                                        : 'text-gray-500 font-semibold';
+
+                                    const numColor = isTodayAndWeekend
+                                        ? 'text-white'
+                                        : d.isToday
+                                        ? 'text-[#1e3a8a]'
+                                        : d.isWeekend
+                                        ? 'text-rose-950'
+                                        : 'text-gray-900';
+
+                                    return (
+                                        <div
+                                            key={d.index}
+                                            className={`p-1.5 border-r border-gray-200 text-center flex flex-col items-center justify-center transition-colors ${headerBg}`}
+                                        >
+                                            <span className={`text-[10px] ${dayNameColor}`}>
+                                                {d.dayName}
+                                            </span>
+                                            <span className={`text-xs font-black mt-0.5 ${numColor}`}>
+                                                {d.num}
+                                            </span>
+                                            <span className="text-[9px] opacity-75 font-medium">
+                                                {d.monthShort}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -445,6 +581,8 @@ export const StayView: React.FC = () => {
                                                             const isDraggingThis = dragState && dragState.room === room.roomNumber &&
                                                                 d.index >= Math.min(dragState.startIndex, dragState.endIndex) &&
                                                                 d.index <= Math.max(dragState.startIndex, dragState.endIndex);
+                                                            const isSelectedRange = selectedRange && selectedRange.room === room.roomNumber &&
+                                                                d.index >= selectedRange.startIndex && d.index <= selectedRange.endIndex;
 
                                                             return (
                                                                 <div
@@ -465,7 +603,15 @@ export const StayView: React.FC = () => {
                                                                             setDragState(prev => prev ? { ...prev, endIndex: d.index, endRect: rect } : null);
                                                                         }
                                                                     }}
-                                                                    className={`border-r border-gray-100 min-h-[38px] transition-colors relative cursor-crosshair ${isDraggingThis ? 'bg-blue-300/60 ring-2 ring-blue-500/50' : d.isWeekend ? 'bg-rose-50/30' : 'bg-transparent hover:bg-gray-100/50'}`}
+                                                                    className={`border-r border-gray-100 min-h-[38px] transition-colors relative cursor-crosshair ${
+                                                                        isDraggingThis
+                                                                            ? 'bg-blue-300/70 ring-2 ring-blue-500/60'
+                                                                            : isSelectedRange
+                                                                            ? 'bg-blue-100/90 border-y-2 border-blue-500'
+                                                                            : d.isWeekend
+                                                                            ? 'bg-rose-50/30'
+                                                                            : 'bg-transparent hover:bg-gray-100/50'
+                                                                    }`}
                                                                 ></div>
                                                             );
                                                         })}
@@ -484,10 +630,15 @@ export const StayView: React.FC = () => {
                                                                             left: `${(leftCol / days.length) * 100}%`,
                                                                             width: `${(span / days.length) * 100}%`
                                                                         }}
-                                                                        className={`absolute top-1 bottom-1 mx-0.5 rounded-lg px-2 flex items-center justify-between font-semibold shadow-xs z-10 cursor-pointer hover:brightness-105 transition-all text-[11px] ${getStatusBadgeColor(booking.status)}`}
+                                                                        className={`absolute top-1 bottom-1 mx-0.5 rounded-md px-2 flex items-center justify-between font-semibold shadow-xs z-10 cursor-pointer hover:brightness-105 transition-all text-[11px] ${getStatusBadgeColor(booking.status)}`}
                                                                     >
                                                                         <div className="flex items-center gap-1.5 truncate">
-                                                                            {booking.vip && (
+                                                                            {booking.indicator && (
+                                                                                <span className="text-xs" title={`Indicator: ${booking.indicator}`}>
+                                                                                    {booking.indicator}
+                                                                                </span>
+                                                                            )}
+                                                                            {booking.vip && !booking.indicator && (
                                                                                 <span className="bg-amber-400 text-amber-950 px-1 rounded text-[9px] font-bold">
                                                                                     VIP
                                                                                 </span>
@@ -508,11 +659,43 @@ export const StayView: React.FC = () => {
                                 </div>
                             ))}
                         </div>
+
+                        {/* Grid Footer: Occupancy (%) & Available from hotel-management */}
+                        <div className="flex bg-[#1e3a8a] text-white border-t-2 border-[#1e3a8a] font-semibold sticky bottom-0 z-20 shadow-md">
+                            {/* Left Label */}
+                            <div className="w-56 px-3 py-1.5 border-r border-[#3b82f6] flex flex-col justify-between flex-shrink-0">
+                                <span className="text-xs font-bold text-white tracking-wide">Occupancy (%)</span>
+                                <span className="text-[11px] text-blue-200 font-medium">Available</span>
+                            </div>
+
+                            {/* Day Cells */}
+                            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(48px, 1fr))` }}>
+                                {days.map(d => {
+                                    const occupiedCount = bookings.filter(b => d.index >= b.startIndex && d.index <= b.endIndex).length;
+                                    const availableCount = Math.max(0, totalRoomsCount - occupiedCount);
+                                    const occupancyPct = totalRoomsCount > 0 ? Math.round((occupiedCount / totalRoomsCount) * 100) : 0;
+
+                                    return (
+                                        <div
+                                            key={d.index}
+                                            className="py-1 px-1 border-r border-[#3b82f6] text-center flex flex-col items-center justify-center text-xs"
+                                        >
+                                            <span className="font-bold text-white text-[11px] leading-tight">
+                                                {occupancyPct}
+                                            </span>
+                                            <span className="text-[10px] text-blue-200 font-medium leading-tight">
+                                                [{availableCount}]
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Selection Floating Popover */}
+            {/* Selection Floating Popover (New Booking Selection from hotel-management) */}
             {selectedRange && selectedRange.rect && (
                 <>
                     <div
@@ -520,61 +703,72 @@ export const StayView: React.FC = () => {
                         onClick={() => setSelectedRange(null)}
                     ></div>
                     <div
-                        className="fixed z-40 bg-white rounded-xl border border-gray-200 shadow-2xl p-4 w-72 text-xs space-y-3 animate-in fade-in zoom-in-95 duration-100"
+                        className="fixed z-40 bg-white rounded-lg border border-[#e2e8f0] shadow-2xl w-[280px] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
                         style={{
-                            top: `${Math.min(window.innerHeight - 200, selectedRange.rect.bottom + 10)}px`,
-                            left: `${Math.max(10, Math.min(window.innerWidth - 300, selectedRange.rect.left))}px`
+                            top: `${Math.min(window.innerHeight - 220, Math.max(10, selectedRange.rect.bottom + 10))}px`,
+                            left: `${Math.min(window.innerWidth - 300, Math.max(10, selectedRange.rect.left + (selectedRange.rect.width / 2) - 140))}px`
                         }}
                     >
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                            <h4 className="font-bold text-gray-900 text-xs">New Booking Selection</h4>
+                        {/* Popover Header */}
+                        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[#f1f5f9] bg-white">
+                            <h4 className="font-semibold text-[#0f172a] text-sm m-0">New Booking Selection</h4>
                             <button
                                 type="button"
                                 onClick={() => setSelectedRange(null)}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-[#64748b] hover:bg-[#f1f5f9] p-1 rounded cursor-pointer transition-colors"
+                                title="Close"
                             >
-                                <X size={15} />
+                                <X size={16} />
                             </button>
                         </div>
 
-                        <div className="space-y-1.5 text-gray-600">
-                            <div className="flex justify-between">
-                                <span>Room Number:</span>
-                                <span className="font-bold text-blue-700 font-mono">{selectedRange.room}</span>
+                        {/* Popover Body */}
+                        <div className="p-3.5 flex flex-col gap-2.5 text-xs">
+                            <div className="flex items-center gap-2 text-[#475569]">
+                                <BedDouble size={16} className="text-[#3b82f6] flex-shrink-0" />
+                                <span>Room: <strong className="text-gray-900 font-mono font-bold">{selectedRange.room}</strong></span>
                             </div>
-                            <div className="flex justify-between">
-                                <span>Dates:</span>
-                                <span className="font-medium text-gray-900">
-                                    {days[selectedRange.startIndex]?.date} → {days[selectedRange.endIndex]?.date}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Stay Duration:</span>
-                                <span className="font-bold text-gray-900">
-                                    {selectedRange.endIndex - selectedRange.startIndex + 1} Night(s)
-                                </span>
-                            </div>
-                        </div>
 
-                        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsQuickReservationOpen(true);
-                                }}
-                                className="flex-1 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-2xs cursor-pointer text-center"
-                            >
-                                Quick Walk-In
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsAddReservationOpen(true);
-                                }}
-                                className="h-8 px-2.5 border border-gray-200 hover:bg-gray-50 rounded-lg font-semibold text-gray-700 cursor-pointer"
-                            >
-                                Full Wizard
-                            </button>
+                            <div className="flex items-center gap-2 text-[#475569]">
+                                <CalendarIcon size={16} className="text-[#3b82f6] flex-shrink-0" />
+                                <span>
+                                    Dates: {days[selectedRange.startIndex]?.monthShort} {days[selectedRange.startIndex]?.num}, 2026 - {days[selectedRange.endIndex]?.monthShort} {days[selectedRange.endIndex]?.num}, 2026
+                                </span>
+                            </div>
+
+                            <div className="pl-6 text-[#475569]">
+                                <strong>Duration:</strong> {selectedRange.endIndex - selectedRange.startIndex + 1} night(s)
+                            </div>
+
+                            {/* Popover Actions */}
+                            <div className="flex items-center gap-1.5 pt-2 border-t border-[#f1f5f9]">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsQuickReservationOpen(true);
+                                    }}
+                                    className="flex-1 py-1.5 px-2 bg-[#2643a6] hover:bg-[#1e3687] text-white rounded-md text-xs font-semibold cursor-pointer shadow-xs transition-colors text-center"
+                                >
+                                    Walk In/Reservation
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsAddReservationOpen(true);
+                                    }}
+                                    className="py-1.5 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#3b82f6] rounded-md text-xs font-medium cursor-pointer transition-colors"
+                                    title="Open Full Wizard"
+                                >
+                                    Wizard
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedRange(null)}
+                                    className="py-1.5 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#64748b] rounded-md text-xs font-medium cursor-pointer transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </>
@@ -587,14 +781,22 @@ export const StayView: React.FC = () => {
                     setIsQuickReservationOpen(false);
                     setSelectedRange(null);
                 }}
-                roomInfo={{
-                    room: selectedRange?.room || '101',
-                    startDate: selectedRange ? days[selectedRange.startIndex]?.date : startDate,
-                    endDate: selectedRange ? days[selectedRange.endIndex]?.date : startDate,
-                    nights: selectedRange ? (selectedRange.endIndex - selectedRange.startIndex + 1) : 1,
-                    startIndex: selectedRange?.startIndex,
-                    endIndex: selectedRange?.endIndex
-                }}
+                roomInfo={(() => {
+                    const startIso = selectedRange ? days[selectedRange.startIndex]?.date : startDate;
+                    const stayNights = selectedRange ? (selectedRange.endIndex - selectedRange.startIndex + 1) : 1;
+                    const endD = new Date(startIso);
+                    endD.setDate(endD.getDate() + stayNights);
+                    const endIso = endD.toISOString().split('T')[0];
+
+                    return {
+                        room: selectedRange?.room || '101',
+                        startDate: startIso,
+                        endDate: endIso,
+                        nights: stayNights,
+                        startIndex: selectedRange?.startIndex,
+                        endIndex: selectedRange?.endIndex
+                    };
+                })()}
                 onReserve={(newBooking) => {
                     setBookings(prev => [
                         ...prev,
