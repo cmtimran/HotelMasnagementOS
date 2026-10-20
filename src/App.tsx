@@ -24,7 +24,11 @@ import Reports from './components/Reports';
 import AdminSecurity from './components/AdminSecurity';
 import MasterDataConfig from './components/MasterDataConfig';
 import RoomRack from './components/RoomRack';
-import ReservationList from './components/ReservationList';
+import ReservationsView from './components/reservations/ReservationsView';
+import ReservationSleepOut from './components/reservations/ReservationSleepOut';
+import ReservationHold from './components/reservations/ReservationHold';
+import ReservationUnassigned from './components/reservations/ReservationUnassigned';
+import ReservationCancel from './components/reservations/ReservationCancel';
 import HousekeepingGrid from './components/HousekeepingGrid';
 import RateCalendar from './components/RateCalendar';
 import OccupancyHeatmap from './components/OccupancyHeatmap';
@@ -503,7 +507,16 @@ function App() {
       case 'room-rack':
         return <RoomRack />;
       case 'reservations':
-        return <ReservationList />;
+      case 'reservations-view':
+        return <ReservationsView />;
+      case 'reservations-sleep-out':
+        return <ReservationSleepOut />;
+      case 'reservations-hold':
+        return <ReservationHold />;
+      case 'reservations-unassigned':
+        return <ReservationUnassigned />;
+      case 'reservations-cancel':
+        return <ReservationCancel />;
       case 'housekeeping':
         return <HousekeepingGrid />;
       case 'stay-view':

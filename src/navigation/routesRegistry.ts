@@ -97,6 +97,50 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     propertyScoped: true,
   },
   {
+    id: 'reservations-sleep-out',
+    slug: '/reservations/sleep-out',
+    title: 'Sleep Out List',
+    panel: 'main',
+    category: 'Front Desk',
+    permission: 'reservation.view',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'reservations-hold',
+    slug: '/reservations/hold',
+    title: 'Reservation Hold List',
+    panel: 'main',
+    category: 'Front Desk',
+    permission: 'reservation.view',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'reservations-unassigned',
+    slug: '/reservations/unassigned',
+    title: 'Unassigned Room List',
+    panel: 'main',
+    category: 'Front Desk',
+    permission: 'reservation.view',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'reservations-cancel',
+    slug: '/reservations/cancel',
+    title: 'Reservation Cancel List',
+    panel: 'main',
+    category: 'Front Desk',
+    permission: 'reservation.view',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'front_desk'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
     id: 'stay-view',
     slug: '/stay-view',
     title: 'Stay View Calendar',
@@ -837,6 +881,39 @@ const generalRoute = SLUG_TO_ROUTE_MAP.get('/general-settings');
 if (generalRoute) {
   SLUG_TO_ROUTE_MAP.set('/system-settings', generalRoute);
   SLUG_TO_ROUTE_MAP.set('/settings', generalRoute);
+}
+
+// Reservations & Stay View Aliases
+const resRoute = SLUG_TO_ROUTE_MAP.get('/reservations');
+if (resRoute) {
+  SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/view', resRoute);
+  SLUG_TO_ROUTE_MAP.set('/dashboard/reservations', resRoute);
+  SLUG_TO_ROUTE_MAP.set('/reservations/view', resRoute);
+}
+
+const sleepOutRoute = SLUG_TO_ROUTE_MAP.get('/reservations/sleep-out');
+if (sleepOutRoute) {
+  SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/sleep-out', sleepOutRoute);
+}
+
+const holdRoute = SLUG_TO_ROUTE_MAP.get('/reservations/hold');
+if (holdRoute) {
+  SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/hold', holdRoute);
+}
+
+const unassignedRoute = SLUG_TO_ROUTE_MAP.get('/reservations/unassigned');
+if (unassignedRoute) {
+  SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/unassigned', unassignedRoute);
+}
+
+const cancelRoute = SLUG_TO_ROUTE_MAP.get('/reservations/cancel');
+if (cancelRoute) {
+  SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/cancel', cancelRoute);
+}
+
+const stayViewRoute = SLUG_TO_ROUTE_MAP.get('/stay-view');
+if (stayViewRoute) {
+  SLUG_TO_ROUTE_MAP.set('/dashboard/stay-view', stayViewRoute);
 }
 
 for (const report of REPORT_PANEL_ROUTES) {
