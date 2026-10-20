@@ -46,6 +46,12 @@ import NightAuditAutomation from './components/NightAuditAutomation';
 import GuestVoucherSystem from './components/GuestVoucherSystem';
 import PolicyManagement from './components/PolicyManagement';
 import GeneralSettings from './components/GeneralSettings';
+import BankingManagement from './components/BankingManagement';
+import RevenueManagement from './components/RevenueManagement';
+import ExtraChargesManagement from './components/ExtraChargesManagement';
+import DiscountManagement from './components/DiscountManagement';
+import DepartmentManagement from './components/DepartmentManagement';
+import ShiftManagement from './components/ShiftManagement';
 
 import { useNavigation } from './context/NavigationContext';
 
@@ -550,20 +556,21 @@ function App() {
       case 'roles':
         return <AdminSecurity initialTab="roles" onNavigate={setActivePage} />;
       case 'departments':
-        return <AdminSecurity initialTab="departments" onNavigate={setActivePage} />;
+        return <DepartmentManagement />;
       case 'shifts':
-        return <AdminSecurity initialTab="shifts" onNavigate={setActivePage} />;
+        return <ShiftManagement />;
       case 'banking':
-        return <MasterDataConfig initialTab="banking" />;
+        return <BankingManagement />;
       case 'discounts':
-        return <MasterDataConfig initialTab="discounts" />;
+        return <DiscountManagement />;
       case 'extra-charges':
-        return <MasterDataConfig initialTab="charges" />;
-      case 'finance-overview':
-      case 'finance':
+        return <ExtraChargesManagement />;
       case 'revenue-heads':
       case 'revenue-groups':
-        return <MasterDataConfig initialTab="revenue" />;
+        return <RevenueManagement />;
+      case 'finance-overview':
+      case 'finance':
+        return <MasterDataConfig initialTab="revenue" onNavigate={setActivePage} />;
       case 'occupancy-heatmap':
         return <OccupancyHeatmap />;
       case 'master-data':

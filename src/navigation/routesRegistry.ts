@@ -579,6 +579,72 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     propertyScoped: true,
   },
   {
+    id: 'banking',
+    slug: '/banking',
+    title: 'Bank Accounts & MFS',
+    panel: 'main',
+    category: 'Finance & Accounting',
+    permission: 'finance.banking.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'accountant'],
+    minSubscriptionTier: 'pro',
+    propertyScoped: true,
+  },
+  {
+    id: 'revenue-heads',
+    slug: '/revenue-heads',
+    title: 'Revenue Heads & Groups',
+    panel: 'main',
+    category: 'Finance & Accounting',
+    permission: 'finance.revenue.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'accountant'],
+    minSubscriptionTier: 'pro',
+    propertyScoped: true,
+  },
+  {
+    id: 'extra-charges',
+    slug: '/extra-charges',
+    title: 'Extra Charges & Add-ons',
+    panel: 'main',
+    category: 'Finance & Accounting',
+    permission: 'finance.charges.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'accountant'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'discounts',
+    slug: '/discounts',
+    title: 'Discounts & Rebates (GL-4990)',
+    panel: 'main',
+    category: 'Finance & Accounting',
+    permission: 'finance.discounts.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'accountant'],
+    minSubscriptionTier: 'pro',
+    propertyScoped: true,
+  },
+  {
+    id: 'departments',
+    slug: '/departments',
+    title: 'Department Management',
+    panel: 'main',
+    category: 'Human Resources',
+    permission: 'hrm.departments.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'shifts',
+    slug: '/shifts',
+    title: '24/7 Work Shifts & Handover',
+    panel: 'main',
+    category: 'Human Resources',
+    permission: 'hrm.shifts.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
     id: 'policy-management',
     slug: '/policy-settings',
     title: 'Policy Settings',
@@ -743,8 +809,6 @@ const userRoute = SLUG_TO_ROUTE_MAP.get('/users');
 if (userRoute) {
   SLUG_TO_ROUTE_MAP.set('/user-management', userRoute);
   SLUG_TO_ROUTE_MAP.set('/staff', userRoute);
-  SLUG_TO_ROUTE_MAP.set('/departments', userRoute);
-  SLUG_TO_ROUTE_MAP.set('/shifts', userRoute);
 }
 
 const rolesRoute = SLUG_TO_ROUTE_MAP.get('/roles-permissions');
@@ -756,11 +820,11 @@ if (rolesRoute) {
 const masterDataRoute = SLUG_TO_ROUTE_MAP.get('/master-data');
 if (masterDataRoute) {
   SLUG_TO_ROUTE_MAP.set('/master-data-config', masterDataRoute);
-  SLUG_TO_ROUTE_MAP.set('/banking', masterDataRoute);
-  SLUG_TO_ROUTE_MAP.set('/discounts', masterDataRoute);
-  SLUG_TO_ROUTE_MAP.set('/extra-charges', masterDataRoute);
-  SLUG_TO_ROUTE_MAP.set('/revenue-heads', masterDataRoute);
-  SLUG_TO_ROUTE_MAP.set('/revenue-groups', masterDataRoute);
+}
+
+const revenueHeadsRoute = SLUG_TO_ROUTE_MAP.get('/revenue-heads');
+if (revenueHeadsRoute) {
+  SLUG_TO_ROUTE_MAP.set('/revenue-groups', revenueHeadsRoute);
 }
 
 const policyRoute = SLUG_TO_ROUTE_MAP.get('/policy-settings');
