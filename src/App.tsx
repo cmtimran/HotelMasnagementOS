@@ -549,6 +549,19 @@ function App() {
       case 'roles-permissions':
       case 'roles':
         return <AdminSecurity initialTab="roles" onNavigate={setActivePage} />;
+      case 'departments':
+        return <AdminSecurity initialTab="departments" onNavigate={setActivePage} />;
+      case 'shifts':
+        return <AdminSecurity initialTab="shifts" onNavigate={setActivePage} />;
+      case 'banking':
+        return <MasterDataConfig initialTab="banking" />;
+      case 'discounts':
+        return <MasterDataConfig initialTab="discounts" />;
+      case 'extra-charges':
+        return <MasterDataConfig initialTab="charges" />;
+      case 'revenue-heads':
+      case 'revenue-groups':
+        return <MasterDataConfig initialTab="revenue" />;
       case 'occupancy-heatmap':
         return <OccupancyHeatmap />;
       case 'master-data':

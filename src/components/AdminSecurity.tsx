@@ -747,7 +747,7 @@ const INITIAL_ACTIVE_SESSIONS: ActiveSession[] = [
 // ==========================================
 
 interface AdminSecurityProps {
-    initialTab?: 'users' | 'roles' | 'policies' | 'audit';
+    initialTab?: 'users' | 'roles' | 'departments' | 'shifts' | 'policies' | 'audit';
     onNavigate?: (page: string) => void;
 }
 
@@ -756,7 +756,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
     onNavigate,
 }) => {
     // Tab Navigation State
-    const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'policies' | 'audit'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'departments' | 'shifts' | 'policies' | 'audit'>(initialTab);
 
     // Sync initialTab when route changes
     useEffect(() => {
@@ -770,6 +770,29 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
     const [rolesList, setRolesList] = useState<SecurityRole[]>(INITIAL_ROLES);
     const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
     const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(INITIAL_ACTIVE_SESSIONS);
+
+    // Organization Master Data (Synced with Master Data Config)
+    const [departmentsList] = useState(() => {
+        const saved = localStorage.getItem('master_departments_v2');
+        return saved ? JSON.parse(saved) : [
+            { id: 1, code: 'FO', name: 'Front Office & Guest Services', hodName: 'Md. Rafiqul Islam (FOM)', costCenterCode: 'CC-101', type: 'Operational (Revenue Generating)', staffCount: 18, monthlyBudgetBDT: 850000, status: 'Active' },
+            { id: 2, code: 'HK', name: 'Housekeeping & Public Areas', hodName: 'Nasrin Sultana (Executive Housekeeper)', costCenterCode: 'CC-102', type: 'Operational (Revenue Generating)', staffCount: 32, monthlyBudgetBDT: 1100000, status: 'Active' },
+            { id: 3, code: 'FNB', name: 'Food & Beverage Service', hodName: 'Chef Jean Dupont (F&B Director)', costCenterCode: 'CC-201', type: 'Operational (Revenue Generating)', staffCount: 28, monthlyBudgetBDT: 1450000, status: 'Active' },
+            { id: 4, code: 'ENG', name: 'Engineering & Facilities', hodName: 'Engr. Tanvir Ahmed (Chief Engineer)', costCenterCode: 'CC-301', type: 'Support & Administration', staffCount: 12, monthlyBudgetBDT: 650000, status: 'Active' },
+            { id: 5, code: 'ACC', name: 'Accounts & Financial Control', hodName: 'Farhan Chowdhury, FCA (Controller)', costCenterCode: 'CC-401', type: 'Support & Administration', staffCount: 8, monthlyBudgetBDT: 550000, status: 'Active' },
+            { id: 6, code: 'SEC', name: 'Security & Loss Prevention', hodName: 'Major (Retd.) Enamul Haque (CSO)', costCenterCode: 'CC-501', type: 'Support & Administration', staffCount: 16, monthlyBudgetBDT: 480000, status: 'Active' }
+        ];
+    });
+
+    const [shiftsList] = useState(() => {
+        const saved = localStorage.getItem('master_shifts_v2');
+        return saved ? JSON.parse(saved) : [
+            { id: 1, code: 'SHT-MOR', name: 'Morning Shift', startTime: '07:00', endTime: '15:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 42, color: 'border-amber-400 bg-amber-50 text-amber-800', status: 'Active' },
+            { id: 2, code: 'SHT-EVE', name: 'Evening / Swing Shift', startTime: '15:00', endTime: '23:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 38, color: 'border-blue-400 bg-blue-50 text-blue-800', status: 'Active' },
+            { id: 3, code: 'SHT-NGT', name: 'Night Audit / Graveyard Shift', startTime: '23:00', endTime: '07:30', gracePeriodMinutes: 10, mandatoryCashHandover: true, canTriggerNightAudit: true, assignedStaffCount: 14, color: 'border-purple-400 bg-purple-50 text-purple-800', status: 'Active' },
+            { id: 4, code: 'SHT-DAY', name: 'General Administration Day Shift', startTime: '09:00', endTime: '18:00', gracePeriodMinutes: 20, mandatoryCashHandover: false, canTriggerNightAudit: false, assignedStaffCount: 26, color: 'border-emerald-400 bg-emerald-50 text-emerald-800', status: 'Active' }
+        ];
+    });
 
     // Filter States for Users
     const [searchQuery, setSearchQuery] = useState('');
@@ -821,7 +844,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
     }, [staffList, searchQuery, departmentFilter, roleFilter, shiftFilter, statusFilter]);
 
     // Handle Tab Switch & Sync Route
-    const handleTabChange = (tab: 'users' | 'roles' | 'policies' | 'audit') => {
+    const handleTabChange = (tab: 'users' | 'roles' | 'departments' | 'shifts' | 'policies' | 'audit') => {
         setActiveTab(tab);
         if (onNavigate) {
             if (tab === 'users') onNavigate('users');
@@ -1198,6 +1221,36 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                             <span>Roles & RBAC Matrix</span>
                             <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
                                 {rolesList.length}
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleTabChange('departments')}
+                            className={`h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'departments'
+                                ? 'bg-white text-blue-700 shadow-2xs border border-gray-200 font-bold'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                                }`}
+                        >
+                            <Building2 size={13} />
+                            <span>Departments</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                {departmentsList.length}
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleTabChange('shifts')}
+                            className={`h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'shifts'
+                                ? 'bg-white text-blue-700 shadow-2xs border border-gray-200 font-bold'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                                }`}
+                        >
+                            <Clock size={13} />
+                            <span>Work Shifts</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
+                                {shiftsList.length}
                             </span>
                         </button>
 
@@ -1761,6 +1814,145 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                             <Sliders size={12} />
                                             <span>Edit Matrix ({role.permissions.length})</span>
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* TAB: DEPARTMENTS & COST CENTERS */}
+            {activeTab === 'departments' && (
+                <div className="space-y-3">
+                    <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                                <Building2 size={16} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-gray-900">Hotel Organizational Departments & Cost Center Roster</span>
+                                    <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Master Org Structure</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 mt-0.5">
+                                    Each department maps to a specific hotel operational cost center, budget allotment, and Head of Department (HOD).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <Building2 size={14} className="text-blue-600" />
+                                <span>Active Departments ({departmentsList.length})</span>
+                            </h3>
+                            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                Synced with Master Data Config
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto no-scrollbar">
+                            <table className="w-full text-left text-xs min-w-[700px]">
+                                <thead>
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 py-2">Code</th>
+                                        <th className="px-3 py-2">Department Name</th>
+                                        <th className="px-3 py-2">Head of Department (HOD)</th>
+                                        <th className="px-3 py-2">Cost Center</th>
+                                        <th className="px-3 py-2">Category</th>
+                                        <th className="px-3 py-2">Active Staff</th>
+                                        <th className="px-3 py-2">Monthly Budget</th>
+                                        <th className="px-3 py-2">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {departmentsList.map((d: any) => (
+                                        <tr key={d.id} className="hover:bg-blue-50/20">
+                                            <td className="px-3 py-2 font-mono font-bold text-blue-700">{d.code}</td>
+                                            <td className="px-3 py-2 font-bold text-gray-900">{d.name}</td>
+                                            <td className="px-3 py-2 text-gray-700">{d.hodName}</td>
+                                            <td className="px-3 py-2 font-mono text-[11px] text-gray-600 font-bold">{d.costCenterCode}</td>
+                                            <td className="px-3 py-2">
+                                                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${d.type.includes('Operational') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {d.type.includes('Operational') ? 'Operational' : 'Support / Overhead'}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2 font-bold text-gray-900">
+                                                {staffList.filter(s => s.department === d.name || s.department.toLowerCase().includes(d.code.toLowerCase())).length || d.staffCount} Staff
+                                            </td>
+                                            <td className="px-3 py-2 font-mono text-gray-700">৳ {d.monthlyBudgetBDT?.toLocaleString()}</td>
+                                            <td className="px-3 py-2">
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    {d.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB: WORK SHIFTS & ROSTERING */}
+            {activeTab === 'shifts' && (
+                <div className="space-y-3">
+                    <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-purple-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                                <Clock size={16} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-gray-900">24/7 Hotel Operations Work Shift Configuration</span>
+                                    <span className="text-[10px] font-semibold bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded">Continuous Desk Protocol</span>
+                                </div>
+                                <p className="text-[11px] text-gray-600 mt-0.5">
+                                    Configures shift turnover boundaries, cash drawer blind counts, grace periods, and night audit automation permissions.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {shiftsList.map((s: any) => (
+                            <div
+                                key={s.id}
+                                className={`bg-white p-3.5 rounded-xl border ${s.color} transition-all flex flex-col justify-between space-y-2 relative shadow-2xs`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="font-mono text-[10px] font-bold uppercase bg-white/90 px-1.5 py-0.2 rounded border border-current">
+                                        {s.code}
+                                    </span>
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        {s.status}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-sm text-gray-900">{s.name}</h4>
+                                    <div className="font-mono text-xs font-bold text-blue-700 mt-1">
+                                        {s.startTime} - {s.endTime}
+                                    </div>
+                                    <div className="text-[10.5px] text-gray-500 mt-0.5">Clock-in Grace: {s.gracePeriodMinutes} mins</div>
+                                </div>
+                                <div className="pt-2 border-t border-gray-100 text-[10.5px] space-y-1 text-gray-600">
+                                    <div className="flex items-center justify-between">
+                                        <span>Cash Drawer Handover:</span>
+                                        <span className="font-bold text-gray-900">{s.mandatoryCashHandover ? 'Mandatory' : 'Optional'}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span>Night Audit EOD:</span>
+                                        <span className={`font-bold ${s.canTriggerNightAudit ? 'text-purple-700' : 'text-gray-400'}`}>
+                                            {s.canTriggerNightAudit ? 'Authorized' : 'Restricted'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1">
+                                        <span>Staff Scheduled:</span>
+                                        <span className="font-bold text-gray-900">
+                                            {staffList.filter(st => st.shift.includes(s.name.split(' ')[0])).length || s.assignedStaffCount} Personnel
+                                        </span>
                                     </div>
                                 </div>
                             </div>
