@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
+import AmendStayModal, { type AmendBookingData } from './modals/AmendStayModal';
 
 interface TimelineBooking {
     id: string;
@@ -115,7 +116,8 @@ export const StayView: React.FC = () => {
         'b-1': true,
         'f-1': true,
         'f-2': true,
-        'b-2': false
+        'b-2': true,
+        'f-3': true
     });
 
     const toggleNode = (nodeId: string) => {
@@ -142,6 +144,22 @@ export const StayView: React.FC = () => {
         endIndex: number;
         startRect?: DOMRect;
         endRect?: DOMRect;
+    } | null>(null);
+
+    // =========================================================================
+    // EXTEND STAY (DRAG-TO-EXTEND & AMEND STAY MODAL)
+    // =========================================================================
+    const [extendDrag, setExtendDrag] = useState<{
+        booking: TimelineBooking;
+        originalEndIndex: number;
+        currentEndIndex: number;
+    } | null>(null);
+
+    const [isAmendStayOpen, setIsAmendStayOpen] = useState(false);
+    const [amendBookingData, setAmendBookingData] = useState<{
+        booking: AmendBookingData;
+        targetDeparture: string;
+        targetNights: number;
     } | null>(null);
 
     // =========================================================================
@@ -248,9 +266,10 @@ export const StayView: React.FC = () => {
             floors: [
                 {
                     id: 'f-3',
-                    name: 'Floor 5 (Presidential)',
+                    name: 'Floor 5 (Presidential & Deluxe)',
                     rooms: [
                         { id: 'r-501', roomNumber: '501', type: 'Presidential Suite', floor: '5', building: 'Building 2', status: 'clean' },
+                        { id: 'r-505', roomNumber: '505', type: 'Winter Rate Plan (Deluxe)', floor: '5', building: 'Building 2', status: 'clean' },
                         { id: 'r-508', roomNumber: '508', type: 'Superior King', floor: '5', building: 'Building 2', status: 'clean' }
                     ]
                 }
@@ -356,6 +375,16 @@ export const StayView: React.FC = () => {
             isGroupBooking: true,
             isPaymentDue: true,
             isVipOrSingleLady: true
+        },
+        {
+            id: 'b-rokib',
+            reservationNumber: 'RES-1171-2026-01',
+            guestName: 'Rokib vai',
+            roomNumber: '505',
+            startIndex: 3, // 2026-07-04
+            endIndex: 5,   // 2026-07-06 (2 nights)
+            status: 'confirmed',
+            isPaymentDue: true
         }
     ]);
 
@@ -442,7 +471,56 @@ export const StayView: React.FC = () => {
 
     const todayAvailableCount = Math.max(0, totalRoomsCount - todayAssignedCount);
 
-    // Handle Mouse Up to finish drag selection
+    const handleOpenAmendModal = (booking: TimelineBooking, customTargetDep?: string, customTargetNights?: number) => {
+        const arrivalDateStr = days[booking.startIndex]?.date || '2026-07-04';
+        const currentDepDateStr = days[booking.endIndex]?.date || '2026-07-06';
+        const currentNights = Math.max(1, booking.endIndex - booking.startIndex + 1);
+
+        let targetDeparture = customTargetDep;
+        let targetNights = customTargetNights;
+
+        if (!targetDeparture) {
+            const d = new Date(currentDepDateStr);
+            d.setDate(d.getDate() + 1);
+            targetDeparture = d.toISOString().split('T')[0];
+            targetNights = currentNights + 1;
+        }
+
+        setAmendBookingData({
+            booking: {
+                id: booking.id,
+                reservationNumber: booking.reservationNumber,
+                guestName: booking.guestName,
+                roomNumber: booking.roomNumber,
+                roomType: 'Winter Rate Plan',
+                ratePlan: 'Summer Vacation',
+                arrivalDate: arrivalDateStr,
+                departureDate: currentDepDateStr,
+                nights: currentNights,
+                avgDailyRate: 3000,
+                status: booking.status.toUpperCase()
+            },
+            targetDeparture,
+            targetNights: targetNights || currentNights + 1
+        });
+        setIsAmendStayOpen(true);
+    };
+
+    const handleSaveAmendStay = (bookingId: string, newDeparture: string, newNights: number) => {
+        setBookings(prev => prev.map(b => {
+            if (b.id !== bookingId) return b;
+            const depIndex = days.findIndex(d => d.date === newDeparture);
+            const calculatedEnd = depIndex >= 0 ? depIndex : b.startIndex + newNights - 1;
+            return {
+                ...b,
+                endIndex: calculatedEnd
+            };
+        }));
+        const targetB = bookings.find(b => b.id === bookingId);
+        showToast(`Reservation ${targetB?.reservationNumber || ''} (${targetB?.guestName || ''}) extended to ${newDeparture} (${newNights} Nights)!`);
+    };
+
+    // Handle Mouse Up to finish drag selection or extend-stay drag
     useEffect(() => {
         const handleMouseUp = () => {
             if (dragState) {
@@ -472,11 +550,50 @@ export const StayView: React.FC = () => {
                 // Launch Quick Reservation Modal upon drag selection release
                 setIsQuickReservationOpen(true);
             }
+
+            if (extendDrag) {
+                const b = extendDrag.booking;
+                const targetCol = Math.max(b.startIndex, extendDrag.currentEndIndex);
+                const arrivalDateStr = days[b.startIndex]?.date || '2026-07-04';
+                const currentDepDateStr = days[b.endIndex]?.date || '2026-07-06';
+                const currentNights = Math.max(1, b.endIndex - b.startIndex + 1);
+
+                let targetDeparture = days[targetCol]?.date || currentDepDateStr;
+                let targetNights = Math.max(1, targetCol - b.startIndex + 1);
+
+                // If dragged to exact same position, default to +1 night extend
+                if (targetCol === b.endIndex) {
+                    const d = new Date(currentDepDateStr);
+                    d.setDate(d.getDate() + 1);
+                    targetDeparture = d.toISOString().split('T')[0];
+                    targetNights = currentNights + 1;
+                }
+
+                setAmendBookingData({
+                    booking: {
+                        id: b.id,
+                        reservationNumber: b.reservationNumber,
+                        guestName: b.guestName,
+                        roomNumber: b.roomNumber,
+                        roomType: 'Winter Rate Plan',
+                        ratePlan: 'Summer Vacation',
+                        arrivalDate: arrivalDateStr,
+                        departureDate: currentDepDateStr,
+                        nights: currentNights,
+                        avgDailyRate: 3000,
+                        status: b.status.toUpperCase()
+                    },
+                    targetDeparture,
+                    targetNights
+                });
+                setIsAmendStayOpen(true);
+                setExtendDrag(null);
+            }
         };
 
         window.addEventListener('mouseup', handleMouseUp);
         return () => window.removeEventListener('mouseup', handleMouseUp);
-    }, [dragState]);
+    }, [dragState, extendDrag, days]);
 
     const handleDateJump = (direction: 'prev' | 'next' | 'today') => {
         if (direction === 'today') {
@@ -915,6 +1032,14 @@ export const StayView: React.FC = () => {
                                                                             endRect: rect
                                                                         }) : null);
                                                                     }
+                                                                    if (extendDrag && extendDrag.booking.roomNumber === room.roomNumber) {
+                                                                        if (d.index >= extendDrag.booking.startIndex) {
+                                                                            setExtendDrag(prev => prev ? ({
+                                                                                ...prev,
+                                                                                currentEndIndex: d.index
+                                                                            }) : null);
+                                                                        }
+                                                                    }
                                                                 }}
                                                                 className={`w-16 border-r border-gray-100 flex-shrink-0 cursor-pointer transition-colors relative ${
                                                                     d.isToday ? 'bg-blue-50/30' : d.isWeekend ? 'bg-gray-50/40' : ''
@@ -922,25 +1047,32 @@ export const StayView: React.FC = () => {
                                                             ></div>
                                                         ))}
 
-                                                        {/* Render Booking Bars with Exact Floating Indicators */}
+                                                        {/* Render Booking Bars with Exact Floating Indicators & Extend Stay Handle */}
                                                         {bookings
                                                             .filter(b => b.roomNumber === room.roomNumber)
                                                             .map(booking => {
                                                                 const colWidth = 64; // w-16 is 64px
+                                                                const isBeingExtended = extendDrag && extendDrag.booking.id === booking.id;
+                                                                const effectiveEnd = isBeingExtended
+                                                                    ? Math.max(booking.startIndex, extendDrag.currentEndIndex)
+                                                                    : booking.endIndex;
                                                                 const start = Math.max(0, booking.startIndex);
-                                                                const end = Math.min(daysWindow - 1, booking.endIndex);
+                                                                const end = Math.min(daysWindow - 1, effectiveEnd);
                                                                 if (start > daysWindow - 1 || end < 0) return null;
 
                                                                 const left = start * colWidth + 2;
-                                                                const width = Math.max(20, (end - start + 1) * colWidth - 4);
+                                                                const width = Math.max(24, (end - start + 1) * colWidth - 4);
                                                                 const colorClass = getStatusBadgeColor(booking.status);
 
                                                                 return (
                                                                     <div
                                                                         key={booking.id}
                                                                         style={{ left: `${left}px`, width: `${width}px` }}
-                                                                        className={`absolute top-1 bottom-1 ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 truncate cursor-pointer hover:brightness-105 transition-all`}
-                                                                        title={`${booking.guestName} (${booking.reservationNumber}) • Status: ${booking.status.toUpperCase()}`}
+                                                                        onClick={() => handleOpenAmendModal(booking)}
+                                                                        className={`absolute top-1 bottom-1 ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 truncate cursor-pointer hover:brightness-105 transition-all select-none ${
+                                                                            isBeingExtended ? 'ring-2 ring-white shadow-lg' : ''
+                                                                        }`}
+                                                                        title={`${booking.guestName} (${booking.reservationNumber}) • Click to Amend Stay • Drag right edge to extend`}
                                                                     >
                                                                         {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] */}
                                                                         <div className="flex items-center -space-x-0.5 absolute -top-2 left-2 z-20 pointer-events-auto">
@@ -986,6 +1118,33 @@ export const StayView: React.FC = () => {
                                                                                 {booking.indicator}
                                                                             </span>
                                                                         )}
+
+                                                                        {/* Extend Stay Drag Handle & Tooltip (media_1792539649051_3f618fc1.png) */}
+                                                                        <div
+                                                                            onMouseDown={(e) => {
+                                                                                e.stopPropagation();
+                                                                                e.preventDefault();
+                                                                                setExtendDrag({
+                                                                                    booking,
+                                                                                    originalEndIndex: booking.endIndex,
+                                                                                    currentEndIndex: booking.endIndex
+                                                                                });
+                                                                            }}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleOpenAmendModal(booking);
+                                                                            }}
+                                                                            className="absolute right-0 top-0 bottom-0 w-3.5 cursor-ew-resize flex items-center justify-center hover:bg-black/25 group/resize z-30 transition-colors"
+                                                                            title="Extend stay"
+                                                                        >
+                                                                            {/* Vertical line handle indicator */}
+                                                                            <div className="w-[3px] h-3.5 bg-white/70 rounded-full group-hover/resize:bg-white group-hover/resize:h-4.5 transition-all shadow-xs" />
+
+                                                                            {/* Floating Tooltip Box matching media_1792539649051_3f618fc1.png */}
+                                                                            <div className="hidden group-hover/resize:block absolute top-full right-0 mt-1.5 bg-white text-gray-900 border border-black shadow-lg rounded-xs px-2 py-0.5 text-[11px] font-sans font-medium whitespace-nowrap z-50 pointer-events-none select-none">
+                                                                                Extend stay
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
                                                                 );
                                                             })}
@@ -1350,6 +1509,19 @@ export const StayView: React.FC = () => {
                     setIsAddReservationOpen(false);
                     setSelectedRange(null);
                 }}
+            />
+
+            {/* Amend Stay Modal matching media_1792539676402_f4f7269d.png */}
+            <AmendStayModal
+                isOpen={isAmendStayOpen}
+                onClose={() => {
+                    setIsAmendStayOpen(false);
+                    setAmendBookingData(null);
+                }}
+                booking={amendBookingData?.booking || null}
+                initialTargetDeparture={amendBookingData?.targetDeparture}
+                initialTargetNights={amendBookingData?.targetNights}
+                onSave={handleSaveAmendStay}
             />
         </div>
     );
