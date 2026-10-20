@@ -14,7 +14,6 @@ import {
     Edit2,
     Info
 } from 'lucide-react';
-import SecuritySettingsHubNav from './SecuritySettingsHubNav';
 
 type TabType = 'currency' | 'source' | 'charges' | 'discounts' | 'revenue';
 
@@ -92,7 +91,6 @@ interface MasterDataConfigProps {
 
 export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
     initialTab = 'currency',
-    onNavigate,
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>(initialTab);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -270,9 +268,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
 
     return (
         <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
-            {/* Top Suite Hub Navigation Bar */}
-            <SecuritySettingsHubNav activeHub="master-data" onNavigate={onNavigate} />
-
+            
             {/* Informative Micro-guide for Finance & Revenue Operations */}
             <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                 <div className="flex items-center gap-2.5">
@@ -285,7 +281,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Financial Backbone</span>
                         </div>
                         <p className="text-[11px] text-gray-600 mt-0.5">
-                            এখানে বৈদেশিক মুদ্রার বিনিময় হার (FX Rates), মার্কেট সেগমেন্ট কোড, ফোলিও চার্জেস এবং চার্ট অব একাউন্টস (GL Code) একীভূতভাবে পরিচালিত হয়।
+                            Manage foreign currency exchange rates (FX), market segments, supplemental folio charges, and General Ledger (GL) account code mappings.
                         </p>
                     </div>
                 </div>

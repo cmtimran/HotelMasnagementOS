@@ -15,7 +15,6 @@ import {
     Info,
     Check
 } from 'lucide-react';
-import SecuritySettingsHubNav from './SecuritySettingsHubNav';
 
 interface PolicyManagementProps {
     onNavigate?: (page: string) => void;
@@ -32,7 +31,7 @@ interface PolicyRule {
     isActive: boolean;
 }
 
-export const PolicyManagement: React.FC<PolicyManagementProps> = ({ onNavigate }) => {
+export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
     const [activeTab, setActiveTab] = useState<'cancellation' | 'checkin' | 'deposits' | 'occupancy' | 'damages'>('cancellation');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -285,9 +284,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = ({ onNavigate }
                 </div>
             )}
 
-            {/* Security & Settings Suite Unified Navigation */}
-            <SecuritySettingsHubNav activeHub="policy" onNavigate={onNavigate} />
-
+            
             {/* Informative Micro-guide for Front Desk & Management */}
             <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                 <div className="flex items-center gap-2.5">
@@ -300,7 +297,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = ({ onNavigate }
                             <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Live Active</span>
                         </div>
                         <p className="text-[11px] text-gray-600 mt-0.5">
-                            এখানকার রুলস অনুযায়ী গেস্টদের ক্যান্সেলেশন ফি, আর্লি চেক-ইন এবং লেট চেক-আউট পেনাল্টি অটোমেটিক্যালি বিল ফোলিওতে যোগ হবে।
+                            Automated policy governance: enforce reservation cancellation tiers, early check-in fees, late departure surcharges, and damage penalties.
                         </p>
                     </div>
                 </div>

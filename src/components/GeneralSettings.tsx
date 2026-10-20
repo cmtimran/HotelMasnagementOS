@@ -15,13 +15,12 @@ import {
     Send,
     Database
 } from 'lucide-react';
-import SecuritySettingsHubNav from './SecuritySettingsHubNav';
 
 interface GeneralSettingsProps {
     onNavigate?: (page: string) => void;
 }
 
-export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ onNavigate }) => {
+export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
     const [activeTab, setActiveTab] = useState<'regional' | 'currency' | 'numbering' | 'operations' | 'communication' | 'backup'>('regional');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -107,9 +106,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ onNavigate }) 
                 </div>
             )}
 
-            {/* Security & Settings Suite Unified Navigation */}
-            <SecuritySettingsHubNav activeHub="general" onNavigate={onNavigate} />
-
+            
             {/* Informative Micro-guide for Hotel Operations */}
             <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                 <div className="flex items-center gap-2.5">
@@ -119,10 +116,10 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ onNavigate }) 
                     <div>
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-gray-900">Hotel Global Configuration & Regional Compliance</span>
-                            <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">BD NBR Compliant</span>
+                            <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">Statutory Standard</span>
                         </div>
                         <p className="text-[11px] text-gray-600 mt-0.5">
-                            এখানে কারেন্সি (৳ BDT), ১৫% ভ্যাট, ১০% সার্ভিস চার্জ, ইনভয়েস প্রিফিক্স ও ক্লাউড অটো-ব্যাকআপ শিডিউল সেন্ট্রালি কনফিগার করা থাকে।
+                            Configure property profile, base operating currency, statutory VAT/taxes, numbering sequences, and automated cloud backup policies.
                         </p>
                     </div>
                 </div>

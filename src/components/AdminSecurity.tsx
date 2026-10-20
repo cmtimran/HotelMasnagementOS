@@ -28,7 +28,6 @@ import {
     Info,
     Calendar
 } from 'lucide-react';
-import SecuritySettingsHubNav from './SecuritySettingsHubNav';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -1102,21 +1101,6 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                 </div>
             )}
 
-            {/* Security & Settings Suite Unified Navigation */}
-            <SecuritySettingsHubNav
-                activeHub={activeTab === 'users' ? 'users' : activeTab === 'roles' ? 'roles' : 'users'}
-                onNavigate={(page) => {
-                    if (page === 'users' || page === 'user-management') {
-                        setActiveTab('users');
-                    } else if (page === 'roles' || page === 'roles-permissions') {
-                        setActiveTab('roles');
-                    }
-                    if (onNavigate) {
-                        onNavigate(page);
-                    }
-                }}
-            />
-
             {/* Consistent Elevated Header Card */}
             <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                 <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
@@ -1126,15 +1110,11 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight truncate">
-                                    Identity & Role-Based Access Control (RBAC)
+                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight">
+                                    Staff Directory & Access Control
                                 </h1>
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
                                     Enterprise RBAC
-                                </span>
-                                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                    <Lock size={10} />
-                                    <span>PCI-DSS & ISO-27001</span>
                                 </span>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
@@ -1175,7 +1155,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                             className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                         >
                             <Shield size={12} className="text-blue-600" />
-                            <span>+ New Role</span>
+                            <span>New Role</span>
                         </button>
                         <button
                             type="button"
@@ -1183,7 +1163,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                             className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                         >
                             <Plus size={13} />
-                            <span>+ Register Staff</span>
+                            <span>Register Staff</span>
                         </button>
                     </div>
                 </div>
@@ -1274,7 +1254,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                     <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">PCI-DSS Audited</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-0.5">
-                                    হোটেলের কর্মকর্তা ও কর্মচারীদের একাউন্ট, এক্সেস রোল (L1-L4), টু-ফ্যাক্টর অথেনটিকেশন (2FA), এবং ম্যাক্সিমাম ডিসকাউন্ট লিমিট এখান থেকে কনফিগার করুন।
+                                    Configure staff user accounts, assign role security tiers (L1–L4), enforce 2FA verification, and calibrate max discount limits.
                                 </p>
                             </div>
                         </div>
@@ -1449,170 +1429,194 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     </div>
 
                     {/* Compact High-Density Staff Table */}
-                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden overflow-x-auto no-scrollbar">
-                        <table className="w-full text-left min-w-[950px] border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                                    <th className="px-3 py-2.5">Employee</th>
-                                    <th className="px-3 py-2.5">Department & Shift</th>
-                                    <th className="px-3 py-2.5">Role & Tier</th>
-                                    <th className="px-3 py-2.5">Security & 2FA</th>
-                                    <th className="px-3 py-2.5">Financial Powers</th>
-                                    <th className="px-3 py-2.5">Status</th>
-                                    <th className="px-3 py-2.5">Last Login</th>
-                                    <th className="px-3 py-2.5 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 text-xs">
-                                {filteredStaff.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
-                                            <div className="flex flex-col items-center justify-center gap-2">
-                                                <Users size={28} className="text-gray-300" />
-                                                <span className="text-sm font-medium text-gray-600">No staff members match the selected criteria.</span>
-                                                <span className="text-xs text-gray-400">Try adjusting your department, role, or search keyword.</span>
-                                            </div>
-                                        </td>
+                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left min-w-[980px] border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/90 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 py-2.5">Employee</th>
+                                        <th className="px-3 py-2.5">Department & Shift</th>
+                                        <th className="px-3 py-2.5">Role & Tier</th>
+                                        <th className="px-3 py-2.5">Security & 2FA</th>
+                                        <th className="px-3 py-2.5">Financial Authority</th>
+                                        <th className="px-3 py-2.5">Status</th>
+                                        <th className="px-3 py-2.5">Last Login</th>
+                                        <th className="px-3 py-2.5 text-right sticky right-0 bg-gray-50/95 backdrop-blur-xs shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)] z-10 w-[100px]">
+                                            Actions
+                                        </th>
                                     </tr>
-                                ) : (
-                                    filteredStaff.map(staff => (
-                                        <tr key={staff.id} className="hover:bg-blue-50/20 transition-colors">
-                                            {/* Employee info */}
-                                            <td className="px-3 py-2.5">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="relative">
-                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
-                                                            {staff.avatarInitials}
-                                                        </div>
-                                                        {staff.isOnline && (
-                                                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" title="Online on property LAN" />
-                                                        )}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <div className="font-semibold text-gray-900 leading-snug flex items-center gap-1.5">
-                                                            <span className="truncate">{staff.name}</span>
-                                                            <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1 py-0.2 rounded">
-                                                                {staff.staffCode}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-[11px] text-gray-400 flex items-center gap-1.5 font-normal">
-                                                            <span>@{staff.username}</span>
-                                                            <span>•</span>
-                                                            <span className="truncate max-w-[140px]">{staff.email}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Department & Shift */}
-                                            <td className="px-3 py-2.5">
-                                                <div className="font-medium text-gray-800">{staff.department}</div>
-                                                <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                                                    <Clock size={10} className="text-gray-400 flex-shrink-0" />
-                                                    <span className="truncate max-w-[150px]">{staff.shift.split(' (')[0]}</span>
-                                                </div>
-                                            </td>
-
-                                            {/* Role & Tier */}
-                                            <td className="px-3 py-2.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 whitespace-nowrap">
-                                                        {staff.role}
-                                                    </span>
-                                                </div>
-                                                <div className="text-[10px] font-mono text-gray-400 mt-0.5">
-                                                    {staff.roleTier}
-                                                </div>
-                                            </td>
-
-                                            {/* Security & 2FA */}
-                                            <td className="px-3 py-2.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    {staff.twoFactorEnabled ? (
-                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                            <CheckCircle2 size={11} /> 2FA Active
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                                            <AlertTriangle size={11} /> 2FA Off
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-[10.5px] text-gray-400 font-mono mt-0.5 truncate max-w-[120px]">
-                                                    {staff.deviceBinding}
-                                                </div>
-                                            </td>
-
-                                            {/* Financial Powers */}
-                                            <td className="px-3 py-2.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[11px] font-medium text-gray-700">
-                                                        Max Disc: <strong className="text-blue-700">{staff.maxDiscountPercent}%</strong>
-                                                    </span>
-                                                </div>
-                                                <div className="text-[10.5px] text-gray-500 mt-0.5">
-                                                    Void Bill: {staff.canVoidBills ? <span className="text-emerald-600 font-bold">Allowed</span> : <span className="text-gray-400">Blocked</span>}
-                                                </div>
-                                            </td>
-
-                                            {/* Status */}
-                                            <td className="px-3 py-2.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleToggleStaffStatus(staff.id)}
-                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all cursor-pointer ${staff.status === 'Active'
-                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                                                        : staff.status === 'On Leave'
-                                                            ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                                                            : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                                                        }`}
-                                                    title="Click to toggle account status"
-                                                >
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${staff.status === 'Active' ? 'bg-emerald-500' : staff.status === 'On Leave' ? 'bg-blue-500' : 'bg-rose-500'}`} />
-                                                    <span>{staff.status}</span>
-                                                </button>
-                                            </td>
-
-                                            {/* Last Login */}
-                                            <td className="px-3 py-2.5">
-                                                <div className="text-gray-700 font-medium text-[11px]">{staff.lastLogin}</div>
-                                                <div className="text-[10.5px] font-mono text-gray-400">{staff.lastIp}</div>
-                                            </td>
-
-                                            {/* Actions */}
-                                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleOpenEditStaff(staff)}
-                                                        className="p-1.5 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
-                                                        title="Edit Staff Profile & Access"
-                                                    >
-                                                        <Edit2 size={13} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setResetCredsStaff(staff)}
-                                                        className="p-1.5 hover:bg-amber-50 text-gray-500 hover:text-amber-600 rounded-lg transition-colors cursor-pointer"
-                                                        title="Reset Password or Cashier PIN"
-                                                    >
-                                                        <KeyRound size={13} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleToggleStaffStatus(staff.id)}
-                                                        className="p-1.5 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded-lg transition-colors cursor-pointer"
-                                                        title={staff.status === 'Active' ? 'Suspend Account' : 'Reactivate Account'}
-                                                    >
-                                                        {staff.status === 'Active' ? <Lock size={13} /> : <Unlock size={13} />}
-                                                    </button>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-xs">
+                                    {filteredStaff.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
+                                                <div className="flex flex-col items-center justify-center gap-2">
+                                                    <Users size={28} className="text-gray-300" />
+                                                    <span className="text-sm font-medium text-gray-600">No staff members match the selected criteria.</span>
+                                                    <span className="text-xs text-gray-400">Try adjusting your department, role, or search keyword.</span>
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                                    ) : (
+                                        filteredStaff.map(staff => (
+                                            <tr key={staff.id} className="hover:bg-blue-50/25 transition-colors group">
+                                                {/* Employee info */}
+                                                <td className="px-3 py-2">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="relative">
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                                                                {staff.avatarInitials}
+                                                            </div>
+                                                            {staff.isOnline && (
+                                                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" title="Online on property LAN" />
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="font-bold text-gray-900 leading-snug flex items-center gap-1.5">
+                                                                <span className="truncate">{staff.name}</span>
+                                                                <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1 py-0.2 rounded font-normal">
+                                                                    {staff.staffCode}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[11px] text-gray-400 flex items-center gap-1.5 font-normal">
+                                                                <span>@{staff.username}</span>
+                                                                <span>•</span>
+                                                                <span className="truncate max-w-[140px]" title={staff.email}>{staff.email}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Department & Shift */}
+                                                <td className="px-3 py-2">
+                                                    <div className="font-medium text-gray-800">{staff.department}</div>
+                                                    <div className="mt-0.5">
+                                                        <span className="inline-flex items-center gap-1 text-[10.5px] text-gray-500 font-medium bg-gray-50 px-1.5 py-0.2 rounded border border-gray-100">
+                                                            <Clock size={10} className="text-gray-400 flex-shrink-0" />
+                                                            <span className="truncate max-w-[130px]">{staff.shift.split(' (')[0]}</span>
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Role & Tier */}
+                                                <td className="px-3 py-2">
+                                                    <div>
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 inline-block">
+                                                            {staff.role}
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-0.5">
+                                                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border inline-block ${staff.roleTier.startsWith('L1')
+                                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                            : staff.roleTier.startsWith('L2')
+                                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                                : staff.roleTier.startsWith('L3')
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                    : 'bg-gray-100 text-gray-600 border-gray-200'
+                                                            }`}>
+                                                            {staff.roleTier}
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Security & 2FA */}
+                                                <td className="px-3 py-2">
+                                                    <div>
+                                                        {staff.twoFactorEnabled ? (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                <CheckCircle2 size={11} /> 2FA Active
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                                <AlertTriangle size={11} /> 2FA Off
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-400 font-mono mt-0.5 truncate max-w-[130px]" title={staff.deviceBinding}>
+                                                        {staff.deviceBinding}
+                                                    </div>
+                                                </td>
+
+                                                {/* Financial Powers */}
+                                                <td className="px-3 py-2">
+                                                    <div className="text-[11px] font-medium text-gray-700">
+                                                        Max Disc: <strong className="text-blue-700">{staff.maxDiscountPercent}%</strong>
+                                                    </div>
+                                                    <div className="mt-0.5">
+                                                        {staff.canVoidBills ? (
+                                                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                                                Void: Authorized
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-medium text-gray-400 bg-gray-50 px-1.5 py-0.2 rounded border border-gray-200">
+                                                                Void: Requires Sup.
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+
+                                                {/* Status */}
+                                                <td className="px-3 py-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleStaffStatus(staff.id)}
+                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all cursor-pointer ${staff.status === 'Active'
+                                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                                            : staff.status === 'On Leave'
+                                                                ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                                                                : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                                                            }`}
+                                                        title="Click to toggle account status"
+                                                    >
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${staff.status === 'Active' ? 'bg-emerald-500' : staff.status === 'On Leave' ? 'bg-blue-500' : 'bg-rose-500'}`} />
+                                                        <span>{staff.status}</span>
+                                                    </button>
+                                                </td>
+
+                                                {/* Last Login */}
+                                                <td className="px-3 py-2">
+                                                    <div className="text-gray-700 font-medium text-[11px]">{staff.lastLogin}</div>
+                                                    <div className="text-[10px] font-mono text-gray-400">{staff.lastIp}</div>
+                                                </td>
+
+                                                {/* Actions (Sticky) */}
+                                                <td className="px-3 py-2 text-right whitespace-nowrap sticky right-0 bg-white/95 backdrop-blur-xs group-hover:bg-blue-50/40 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)] z-10 w-[100px]">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenEditStaff(staff)}
+                                                            className="p-1.5 hover:bg-blue-100/60 text-gray-500 hover:text-blue-700 rounded-md transition-colors cursor-pointer border border-transparent hover:border-blue-200"
+                                                            title="Edit Staff Profile & Access"
+                                                        >
+                                                            <Edit2 size={13} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setResetCredsStaff(staff)}
+                                                            className="p-1.5 hover:bg-amber-100/60 text-gray-500 hover:text-amber-700 rounded-md transition-colors cursor-pointer border border-transparent hover:border-amber-200"
+                                                            title="Reset Password or Cashier PIN"
+                                                        >
+                                                            <KeyRound size={13} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleStaffStatus(staff.id)}
+                                                            className={`p-1.5 rounded-md transition-colors cursor-pointer border border-transparent ${staff.status === 'Active'
+                                                                ? 'hover:bg-rose-100/60 text-gray-400 hover:text-rose-600 hover:border-rose-200'
+                                                                : 'hover:bg-emerald-100/60 text-emerald-600 hover:border-emerald-200'
+                                                                }`}
+                                                            title={staff.status === 'Active' ? 'Suspend Account' : 'Reactivate Account'}
+                                                        >
+                                                            {staff.status === 'Active' ? <Lock size={13} /> : <Unlock size={13} />}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1632,7 +1636,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                     <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded">Granular Matrix</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-0.5">
-                                    নির্দিষ্ট পদের কর্মীদের শুধুমাত্র তাদের কাজের প্রয়োজনীয় পারমিশন দিন। যেমন: নাইট অডিট ক্লোজার, ফোলিও ডিসকাউন্ট বা বিল ভয়েড পারমিশন সীমাবদ্ধ রাখুন।
+                                    Configure role-based permission matrices, supervisory override authorizations, maximum discount caps, and billing void controls.
                                 </p>
                             </div>
                         </div>
