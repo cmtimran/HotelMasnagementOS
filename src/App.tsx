@@ -559,6 +559,8 @@ function App() {
         return <MasterDataConfig initialTab="discounts" />;
       case 'extra-charges':
         return <MasterDataConfig initialTab="charges" />;
+      case 'finance-overview':
+      case 'finance':
       case 'revenue-heads':
       case 'revenue-groups':
         return <MasterDataConfig initialTab="revenue" />;
