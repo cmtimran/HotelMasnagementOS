@@ -187,6 +187,8 @@ export const StayView: React.FC = () => {
                     rect: mergedRect || dragState.startRect
                 });
                 setDragState(null);
+                // Directly launch the Quick Reservation Modal upon drag selection release
+                setIsQuickReservationOpen(true);
             }
         };
 
@@ -221,43 +223,43 @@ export const StayView: React.FC = () => {
     };
 
     return (
-        <div className="p-3 space-y-2.5 max-w-full animate-in fade-in duration-150 select-none">
+        <div className="p-2 space-y-1.5 max-w-full h-full flex flex-col overflow-hidden animate-in fade-in duration-150 select-none">
             {/* Header Controls Bar */}
-            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3.5 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-md bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
-                        <CalendarIcon size={15} />
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-2.5 py-1.5 flex items-center justify-between gap-2 flex-shrink-0">
+                {/* Left Title */}
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded bg-[#1e3a8a] text-white flex items-center justify-center shadow-2xs flex-shrink-0">
+                        <CalendarIcon size={13} />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-gray-900 tracking-tight">
-                                Stay View (Interactive Front Office Timeline)
-                            </h1>
-                            <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200">
-                                Drag-to-Book
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500">
-                            Visual 24/7 tape chart for room occupancy, stayovers, hold reservations, and instant bookings.
-                        </p>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <h1 className="text-xs font-bold text-gray-900 tracking-tight whitespace-nowrap">
+                            Stay View
+                        </h1>
+                        <span className="hidden xl:inline-block px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                            Interactive Timeline
+                        </span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                            Drag-to-Book
+                        </span>
                     </div>
                 </div>
 
                 {/* Date Controls & Action Buttons */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md p-0.5 text-xs">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Navigation */}
+                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded p-0.5 text-xs h-7">
                         <button
                             type="button"
                             onClick={() => handleDateJump('prev')}
                             className="p-1 hover:bg-gray-200 rounded cursor-pointer text-gray-600"
                             title="Previous 7 Days"
                         >
-                            <ChevronLeft size={14} />
+                            <ChevronLeft size={13} />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleDateJump('today')}
-                            className="px-2 py-0.5 font-bold text-blue-700 hover:bg-white rounded cursor-pointer text-[11px]"
+                            className="px-1.5 py-0.5 font-bold text-blue-700 hover:bg-white rounded cursor-pointer text-[10px]"
                         >
                             Today
                         </button>
@@ -267,22 +269,23 @@ export const StayView: React.FC = () => {
                             className="p-1 hover:bg-gray-200 rounded cursor-pointer text-gray-600"
                             title="Next 7 Days"
                         >
-                            <ChevronRight size={14} />
+                            <ChevronRight size={13} />
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-md px-2 py-0.5 text-xs">
-                        <span className="text-gray-500 font-semibold text-[11px]">From:</span>
+                    {/* From Date & Days Window */}
+                    <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 text-xs h-7">
+                        <span className="text-gray-500 font-semibold text-[10px]">From:</span>
                         <input
                             type="date"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
-                            className="bg-transparent font-medium outline-none text-gray-800 text-[11px]"
+                            className="bg-transparent font-medium outline-none text-gray-800 text-[10px] w-24 cursor-pointer"
                         />
                         <select
                             value={daysWindow}
                             onChange={e => setDaysWindow(Number(e.target.value))}
-                            className="bg-white border border-gray-200 rounded px-1.5 py-0.5 font-semibold text-gray-700 outline-none text-[11px]"
+                            className="bg-white border border-gray-200 rounded px-1 py-0.5 font-semibold text-gray-700 outline-none text-[10px] cursor-pointer"
                         >
                             <option value={7}>7 Days</option>
                             <option value={15}>15 Days</option>
@@ -291,19 +294,20 @@ export const StayView: React.FC = () => {
                     </div>
 
                     {/* Status Indicators from hotel-management */}
-                    <div className="flex items-center gap-2.5 border-l border-gray-200 pl-2.5">
+                    <div className="flex items-center gap-1.5 border-l border-gray-200 pl-1.5">
                         {/* Information / Legend Button */}
                         <div className="relative">
-                            <div
+                            <button
+                                type="button"
                                 onClick={() => setIsInfoPopoverOpen(!isInfoPopoverOpen)}
-                                className="flex flex-col items-center gap-0.5 cursor-pointer group"
+                                className="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-gray-100 cursor-pointer text-gray-700 text-[10px] font-semibold h-7 transition-colors"
                                 title="View Legend & Information"
                             >
-                                <div className="w-5 h-5 rounded-full bg-[#3b82f6] text-white font-serif font-bold text-xs flex items-center justify-center shadow-2xs group-hover:brightness-110 transition-all">
+                                <div className="w-4 h-4 rounded-full bg-[#3b82f6] text-white font-serif font-bold text-[10px] flex items-center justify-center">
                                     i
                                 </div>
-                                <span className="text-[10px] font-semibold text-gray-700">Information</span>
-                            </div>
+                                <span className="hidden sm:inline">Info</span>
+                            </button>
 
                             {/* Complete 3-Part Legend Popover matching hotel-management */}
                             {isInfoPopoverOpen && (
@@ -311,7 +315,7 @@ export const StayView: React.FC = () => {
                                     <div className="fixed inset-0 z-40" onClick={() => setIsInfoPopoverOpen(false)}></div>
                                     <div
                                         onClick={e => e.stopPropagation()}
-                                        className="absolute right-0 top-11 z-50 bg-white rounded-lg border border-[#e0e0e0] shadow-2xl p-4 w-[380px] sm:w-[420px] text-xs space-y-3 animate-in fade-in zoom-in-95 duration-150"
+                                        className="absolute right-0 top-9 z-50 bg-white rounded-lg border border-[#e0e0e0] shadow-2xl p-4 w-[380px] sm:w-[420px] text-xs space-y-3 animate-in fade-in zoom-in-95 duration-150"
                                     >
                                         <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                                             <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider">Stay View Legend</h4>
@@ -428,56 +432,53 @@ export const StayView: React.FC = () => {
                         </div>
 
                         {/* Available Badge */}
-                        <div className="flex flex-col items-center gap-0.5">
-                            <div className="w-5 h-5 rounded-full bg-[#10b981] text-white font-bold text-[11px] flex items-center justify-center shadow-2xs">
-                                {todayAvailableCount}
-                            </div>
-                            <span className="text-[10px] font-semibold text-gray-700">Available</span>
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold h-7" title="Today Available Rooms">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span>{todayAvailableCount}</span>
+                            <span className="hidden md:inline font-medium text-emerald-600">Avail</span>
                         </div>
 
                         {/* Assigned Badge */}
-                        <div className="flex flex-col items-center gap-0.5">
-                            <div className="w-5 h-5 rounded-full bg-[#f59e0b] text-white font-bold text-[11px] flex items-center justify-center shadow-2xs">
-                                {todayAssignedCount}
-                            </div>
-                            <span className="text-[10px] font-semibold text-gray-700">Assigned</span>
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold h-7" title="Today Assigned Rooms">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            <span>{todayAssignedCount}</span>
+                            <span className="hidden md:inline font-medium text-amber-600">Assigned</span>
                         </div>
 
                         {/* Unassigned Badge */}
-                        <div className="flex flex-col items-center gap-0.5">
-                            <div className="w-5 h-5 rounded-full bg-[#06b6d4] text-white font-bold text-[11px] flex items-center justify-center shadow-2xs">
-                                0
-                            </div>
-                            <span className="text-[10px] font-semibold text-gray-700">Unassigned</span>
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 border border-cyan-200 text-cyan-800 text-[10px] font-bold h-7" title="Unassigned Bookings">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+                            <span>0</span>
+                            <span className="hidden lg:inline font-medium text-cyan-600">Unassigned</span>
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Action Button */}
                     <button
                         type="button"
                         onClick={() => setIsAddReservationOpen(true)}
-                        className="h-7 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-md text-xs font-semibold shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
+                        className="h-7 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] font-semibold shadow-2xs flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap ml-1"
                     >
                         <Plus size={13} />
-                        <span>+ Add Reservation</span>
+                        <span>Add Reservation</span>
                     </button>
                 </div>
             </div>
 
             {/* Stay View Interactive Timeline Board */}
-            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden text-xs">
-                <div className="overflow-x-auto no-scrollbar">
-                    <div className="min-w-[1100px]">
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden text-xs flex-1 min-h-0 flex flex-col">
+                <div className="overflow-auto flex-1 min-h-0 relative select-none">
+                    <div className="w-full min-w-full">
                         {/* Header Row: Room Info Column + Date Columns */}
-                        <div className="flex border-b border-gray-200 bg-gray-50/90 font-bold sticky top-0 z-20">
+                        <div className="flex border-b border-gray-200 bg-gray-50/95 font-bold sticky top-0 z-30 shadow-xs">
                             {/* Room Info Header */}
-                            <div className="w-56 px-3 py-1.5 border-r border-gray-200 flex items-center justify-between text-gray-700 text-xs">
-                                <span>Rooms & Categories</span>
-                                <span className="text-[10px] text-gray-400 font-mono">Tree View</span>
+                            <div className="w-44 px-2 py-1 border-r border-gray-200 flex items-center justify-between text-gray-700 text-[11px] sticky left-0 z-40 bg-gray-100 flex-shrink-0">
+                                <span>Rooms &amp; Types</span>
+                                <span className="text-[9px] text-gray-400 font-mono">Tree</span>
                             </div>
 
                             {/* Date Columns with exact Legend Colors */}
-                            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(48px, 1fr))` }}>
+                            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${daysWindow === 30 ? '28px' : daysWindow === 15 ? '32px' : '44px'}, 1fr))` }}>
                                 {days.map(d => {
                                     const isTodayAndWeekend = d.isToday && d.isWeekend;
                                     const headerBg = isTodayAndWeekend
@@ -505,15 +506,15 @@ export const StayView: React.FC = () => {
                                     return (
                                         <div
                                             key={d.index}
-                                            className={`p-1.5 border-r border-gray-200 text-center flex flex-col items-center justify-center transition-colors ${headerBg}`}
+                                            className={`py-1 px-0.5 border-r border-gray-200 text-center flex flex-col items-center justify-center transition-colors ${headerBg}`}
                                         >
-                                            <span className={`text-[10px] ${dayNameColor}`}>
+                                            <span className={`text-[9px] uppercase tracking-tight leading-none ${dayNameColor}`}>
                                                 {d.dayName}
                                             </span>
-                                            <span className={`text-xs font-black mt-0.5 ${numColor}`}>
+                                            <span className={`text-[11px] font-black my-0.5 leading-none ${numColor}`}>
                                                 {d.num}
                                             </span>
-                                            <span className="text-[9px] opacity-75 font-medium">
+                                            <span className="text-[8px] opacity-75 font-medium leading-none">
                                                 {d.monthShort}
                                             </span>
                                         </div>
@@ -529,12 +530,12 @@ export const StayView: React.FC = () => {
                                     {/* Building Header Row */}
                                     <div
                                         onClick={() => toggleNode(building.id)}
-                                        className="flex items-center bg-gray-100/80 px-3 py-1.5 border-b border-gray-200 font-bold text-gray-800 cursor-pointer hover:bg-gray-200/70 transition-colors"
+                                        className="flex items-center bg-gray-100/90 px-2 py-1 border-b border-gray-200 font-bold text-gray-800 cursor-pointer hover:bg-gray-200/70 transition-colors"
                                     >
-                                        <div className="flex items-center gap-1.5 w-56">
-                                            {expandedNodes[building.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                            <Building2 size={13} className="text-blue-700" />
-                                            <span className="text-xs">{building.name}</span>
+                                        <div className="flex items-center gap-1.5 w-44 sticky left-0 z-20 bg-gray-100/90 flex-shrink-0">
+                                            {expandedNodes[building.id] ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                            <Building2 size={12} className="text-blue-700 flex-shrink-0" />
+                                            <span className="text-[11px] truncate">{building.name}</span>
                                         </div>
                                     </div>
 
@@ -544,12 +545,12 @@ export const StayView: React.FC = () => {
                                             {/* Floor Header Row */}
                                             <div
                                                 onClick={() => toggleNode(floor.id)}
-                                                className="flex items-center bg-gray-50/70 pl-6 pr-3 py-1 border-b border-gray-100 text-[11px] font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                                                className="flex items-center bg-gray-50/90 pl-4 pr-2 py-0.5 border-b border-gray-100 text-[10px] font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                                             >
-                                                <div className="flex items-center gap-1.5 w-56">
-                                                    {expandedNodes[floor.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                                    <span>{floor.name}</span>
-                                                    <span className="text-[10px] text-gray-400">({floor.rooms.length} rooms)</span>
+                                                <div className="flex items-center gap-1.5 w-44 sticky left-0 z-20 bg-gray-50/90 flex-shrink-0">
+                                                    {expandedNodes[floor.id] ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                                    <span className="truncate">{floor.name}</span>
+                                                    <span className="text-[9px] text-gray-400 font-mono">({floor.rooms.length})</span>
                                                 </div>
                                             </div>
 
@@ -560,24 +561,27 @@ export const StayView: React.FC = () => {
                                                     className="flex items-stretch hover:bg-blue-50/20 transition-colors group relative"
                                                 >
                                                     {/* Room Identifier */}
-                                                    <div className="w-56 pl-6 pr-3 py-1.5 border-r border-gray-200 flex items-center justify-between bg-white z-10">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-mono font-bold text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                                    <div className="w-44 pl-3 pr-2 py-0.5 border-r border-gray-200 flex items-center justify-between bg-white sticky left-0 z-20 shadow-2xs flex-shrink-0">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <span className="font-mono font-bold text-[10px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 flex-shrink-0">
                                                                 {room.roomNumber}
                                                             </span>
-                                                            <div className="text-[11px] font-medium text-gray-800 truncate max-w-[120px]">
+                                                            <div className="text-[10px] font-medium text-gray-800 truncate" title={room.type}>
                                                                 {room.type}
                                                             </div>
                                                         </div>
-                                                        <span className={`w-2 h-2 rounded-full ${room.status === 'clean' ? 'bg-emerald-500' : room.status === 'inspected' ? 'bg-blue-500' : 'bg-amber-500'}`} title={`Status: ${room.status}`}></span>
+                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${room.status === 'clean' ? 'bg-emerald-500' : room.status === 'inspected' ? 'bg-blue-500' : 'bg-amber-500'}`} title={`Status: ${room.status}`}></span>
                                                     </div>
 
                                                     {/* Timeline Day Grid for this Room */}
                                                     <div
                                                         className="flex-1 grid relative"
-                                                        style={{ gridTemplateColumns: `repeat(${days.length}, minmax(48px, 1fr))` }}
+                                                        style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${daysWindow === 30 ? '28px' : daysWindow === 15 ? '32px' : '44px'}, 1fr))` }}
                                                     >
                                                         {days.map(d => {
+                                                            const isCellOccupied = bookings.some(
+                                                                b => b.roomNumber === room.roomNumber && d.index >= b.startIndex && d.index <= b.endIndex
+                                                            );
                                                             const isDraggingThis = dragState && dragState.room === room.roomNumber &&
                                                                 d.index >= Math.min(dragState.startIndex, dragState.endIndex) &&
                                                                 d.index <= Math.max(dragState.startIndex, dragState.endIndex);
@@ -588,22 +592,24 @@ export const StayView: React.FC = () => {
                                                                 <div
                                                                     key={d.index}
                                                                     onMouseDown={(e) => {
-                                                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                                        setDragState({
-                                                                            room: room.roomNumber,
-                                                                            startIndex: d.index,
-                                                                            endIndex: d.index,
-                                                                            startRect: rect,
-                                                                            endRect: rect
-                                                                        });
-                                                                    }}
-                                                                    onMouseEnter={(e) => {
-                                                                        if (dragState && dragState.room === room.roomNumber) {
+                                                                        if (e.button === 0 && !isCellOccupied) {
+                                                                            e.preventDefault();
                                                                             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                                            setDragState(prev => prev ? { ...prev, endIndex: d.index, endRect: rect } : null);
+                                                                            setDragState({
+                                                                                room: room.roomNumber,
+                                                                                startIndex: d.index,
+                                                                                endIndex: d.index,
+                                                                                startRect: rect,
+                                                                                endRect: rect
+                                                                            });
                                                                         }
                                                                     }}
-                                                                    className={`border-r border-gray-100 min-h-[38px] transition-colors relative cursor-crosshair ${
+                                                                    onMouseEnter={() => {
+                                                                        if (dragState && dragState.room === room.roomNumber && !isCellOccupied) {
+                                                                            setDragState(prev => prev ? { ...prev, endIndex: d.index } : null);
+                                                                        }
+                                                                    }}
+                                                                    className={`border-r border-gray-100 min-h-[30px] h-[30px] transition-colors relative cursor-crosshair ${
                                                                         isDraggingThis
                                                                             ? 'bg-blue-300/70 ring-2 ring-blue-500/60'
                                                                             : isSelectedRange
@@ -630,22 +636,23 @@ export const StayView: React.FC = () => {
                                                                             left: `${(leftCol / days.length) * 100}%`,
                                                                             width: `${(span / days.length) * 100}%`
                                                                         }}
-                                                                        className={`absolute top-1 bottom-1 mx-0.5 rounded-md px-2 flex items-center justify-between font-semibold shadow-xs z-10 cursor-pointer hover:brightness-105 transition-all text-[11px] ${getStatusBadgeColor(booking.status)}`}
+                                                                        className={`absolute top-0.5 bottom-0.5 mx-0.5 rounded px-1.5 flex items-center justify-between font-semibold shadow-2xs z-10 cursor-pointer hover:brightness-105 transition-all text-[10px] ${getStatusBadgeColor(booking.status)}`}
+                                                                        title={`${booking.guestName} (${booking.reservationNumber}) - ${booking.status}`}
                                                                     >
-                                                                        <div className="flex items-center gap-1.5 truncate">
+                                                                        <div className="flex items-center gap-1 truncate min-w-0">
                                                                             {booking.indicator && (
-                                                                                <span className="text-xs" title={`Indicator: ${booking.indicator}`}>
+                                                                                <span className="text-[10px]" title={`Indicator: ${booking.indicator}`}>
                                                                                     {booking.indicator}
                                                                                 </span>
                                                                             )}
                                                                             {booking.vip && !booking.indicator && (
-                                                                                <span className="bg-amber-400 text-amber-950 px-1 rounded text-[9px] font-bold">
+                                                                                <span className="bg-amber-400 text-amber-950 px-0.5 rounded text-[8px] font-bold">
                                                                                     VIP
                                                                                 </span>
                                                                             )}
                                                                             <span className="truncate">{booking.guestName}</span>
                                                                         </div>
-                                                                        <span className="text-[10px] opacity-80 font-mono hidden md:inline">
+                                                                        <span className="text-[9px] opacity-80 font-mono hidden xl:inline ml-1 flex-shrink-0">
                                                                             {booking.reservationNumber}
                                                                         </span>
                                                                     </div>
@@ -661,15 +668,15 @@ export const StayView: React.FC = () => {
                         </div>
 
                         {/* Grid Footer: Occupancy (%) & Available from hotel-management */}
-                        <div className="flex bg-[#1e3a8a] text-white border-t-2 border-[#1e3a8a] font-semibold sticky bottom-0 z-20 shadow-md">
+                        <div className="flex bg-[#1e3a8a] text-white border-t-2 border-[#1e3a8a] font-semibold sticky bottom-0 z-30 shadow-md">
                             {/* Left Label */}
-                            <div className="w-56 px-3 py-1.5 border-r border-[#3b82f6] flex flex-col justify-between flex-shrink-0">
-                                <span className="text-xs font-bold text-white tracking-wide">Occupancy (%)</span>
-                                <span className="text-[11px] text-blue-200 font-medium">Available</span>
+                            <div className="w-44 px-2 py-0.5 border-r border-[#3b82f6] flex flex-col justify-center flex-shrink-0 sticky left-0 z-40 bg-[#1e3a8a]">
+                                <span className="text-[10px] font-bold text-white tracking-wide leading-tight">Occupancy (%)</span>
+                                <span className="text-[9px] text-blue-200 font-medium leading-tight">Available</span>
                             </div>
 
                             {/* Day Cells */}
-                            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(48px, 1fr))` }}>
+                            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${daysWindow === 30 ? '28px' : daysWindow === 15 ? '32px' : '44px'}, 1fr))` }}>
                                 {days.map(d => {
                                     const occupiedCount = bookings.filter(b => d.index >= b.startIndex && d.index <= b.endIndex).length;
                                     const availableCount = Math.max(0, totalRoomsCount - occupiedCount);
@@ -678,12 +685,12 @@ export const StayView: React.FC = () => {
                                     return (
                                         <div
                                             key={d.index}
-                                            className="py-1 px-1 border-r border-[#3b82f6] text-center flex flex-col items-center justify-center text-xs"
+                                            className="py-0.5 px-0.5 border-r border-[#3b82f6]/50 text-center flex flex-col items-center justify-center"
                                         >
-                                            <span className="font-bold text-white text-[11px] leading-tight">
-                                                {occupancyPct}
+                                            <span className="font-bold text-white text-[10px] leading-tight">
+                                                {occupancyPct}%
                                             </span>
-                                            <span className="text-[10px] text-blue-200 font-medium leading-tight">
+                                            <span className="text-[9px] text-blue-200 font-medium leading-tight">
                                                 [{availableCount}]
                                             </span>
                                         </div>
@@ -695,8 +702,8 @@ export const StayView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Selection Floating Popover (New Booking Selection from hotel-management) */}
-            {selectedRange && selectedRange.rect && (
+            {/* Selection Floating Popover (Only when quick reservation is not already open) */}
+            {!isQuickReservationOpen && selectedRange && selectedRange.rect && (
                 <>
                     <div
                         className="fixed inset-0 z-30"
@@ -710,33 +717,33 @@ export const StayView: React.FC = () => {
                         }}
                     >
                         {/* Popover Header */}
-                        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[#f1f5f9] bg-white">
-                            <h4 className="font-semibold text-[#0f172a] text-sm m-0">New Booking Selection</h4>
+                        <div className="flex items-center justify-between px-3.5 py-2 border-b border-[#f1f5f9] bg-white">
+                            <h4 className="font-semibold text-[#0f172a] text-xs m-0">New Booking Selection</h4>
                             <button
                                 type="button"
                                 onClick={() => setSelectedRange(null)}
                                 className="text-[#64748b] hover:bg-[#f1f5f9] p-1 rounded cursor-pointer transition-colors"
                                 title="Close"
                             >
-                                <X size={16} />
+                                <X size={14} />
                             </button>
                         </div>
 
                         {/* Popover Body */}
-                        <div className="p-3.5 flex flex-col gap-2.5 text-xs">
+                        <div className="p-3 flex flex-col gap-2 text-xs">
                             <div className="flex items-center gap-2 text-[#475569]">
-                                <BedDouble size={16} className="text-[#3b82f6] flex-shrink-0" />
+                                <BedDouble size={14} className="text-[#3b82f6] flex-shrink-0" />
                                 <span>Room: <strong className="text-gray-900 font-mono font-bold">{selectedRange.room}</strong></span>
                             </div>
 
                             <div className="flex items-center gap-2 text-[#475569]">
-                                <CalendarIcon size={16} className="text-[#3b82f6] flex-shrink-0" />
+                                <CalendarIcon size={14} className="text-[#3b82f6] flex-shrink-0" />
                                 <span>
-                                    Dates: {days[selectedRange.startIndex]?.monthShort} {days[selectedRange.startIndex]?.num}, 2026 - {days[selectedRange.endIndex]?.monthShort} {days[selectedRange.endIndex]?.num}, 2026
+                                    Dates: {days[selectedRange.startIndex]?.monthShort} {days[selectedRange.startIndex]?.num} - {days[selectedRange.endIndex]?.monthShort} {days[selectedRange.endIndex]?.num}
                                 </span>
                             </div>
 
-                            <div className="pl-6 text-[#475569]">
+                            <div className="pl-5 text-[#475569]">
                                 <strong>Duration:</strong> {selectedRange.endIndex - selectedRange.startIndex + 1} night(s)
                             </div>
 
@@ -747,16 +754,16 @@ export const StayView: React.FC = () => {
                                     onClick={() => {
                                         setIsQuickReservationOpen(true);
                                     }}
-                                    className="flex-1 py-1.5 px-2 bg-[#2643a6] hover:bg-[#1e3687] text-white rounded-md text-xs font-semibold cursor-pointer shadow-xs transition-colors text-center"
+                                    className="flex-1 py-1 px-2 bg-[#2643a6] hover:bg-[#1e3687] text-white rounded text-[11px] font-semibold cursor-pointer shadow-xs transition-colors text-center"
                                 >
-                                    Walk In/Reservation
+                                    Quick Reservation
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setIsAddReservationOpen(true);
                                     }}
-                                    className="py-1.5 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#3b82f6] rounded-md text-xs font-medium cursor-pointer transition-colors"
+                                    className="py-1 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#3b82f6] rounded text-[11px] font-medium cursor-pointer transition-colors"
                                     title="Open Full Wizard"
                                 >
                                     Wizard
@@ -764,7 +771,7 @@ export const StayView: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setSelectedRange(null)}
-                                    className="py-1.5 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#64748b] rounded-md text-xs font-medium cursor-pointer transition-colors"
+                                    className="py-1 px-2 bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#64748b] rounded text-[11px] font-medium cursor-pointer transition-colors"
                                 >
                                     Cancel
                                 </button>
