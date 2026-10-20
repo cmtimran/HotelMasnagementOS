@@ -11,7 +11,8 @@ import {
     Check,
     X,
     CheckSquare,
-    Square
+    Square,
+    ArrowRight
 } from 'lucide-react';
 import AddReservationModal from '../modals/AddReservationModal';
 import { useNavigation } from '../../context/NavigationContext';
@@ -29,7 +30,7 @@ export interface ReservationItem {
     nights: number;
     adults: number;
     children: number;
-    status: 'arriving' | 'in-house' | 'departing' | 'checked-out' | 'hold';
+    status: 'confirmed' | 'arriving' | 'in-house' | 'departing' | 'checked-out' | 'hold';
     totalAmount: number;
     paidAmount: number;
     dueAmount: number;
@@ -42,53 +43,52 @@ export interface ReservationItem {
 }
 
 const INITIAL_RESERVATIONS: ReservationItem[] = [
+    // 1. Confirmed / Future Reservations (Belong to "Reservations")
     {
-        id: 1,
-        reservationNumber: 'RES-009281',
-        guestName: 'Md. Tariqul Islam',
-        phone: '+880 1711-928371',
-        email: 'tariqul@grameen.com',
-        roomNumber: '101',
+        id: 101,
+        reservationNumber: 'RES-009288',
+        guestName: 'Mr. Asif Iqbal',
+        phone: '+880 1711-234567',
+        email: 'asif.iqbal@brac.net',
+        roomNumber: '105',
         roomType: 'Deluxe Double',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-04',
+        checkIn: '2026-07-10',
+        checkOut: '2026-07-13',
         nights: 3,
         adults: 2,
         children: 0,
-        status: 'in-house',
+        status: 'confirmed',
         totalAmount: 10500,
-        paidAmount: 10500,
-        dueAmount: 0,
-        source: 'Direct Corporate',
-        vip: 'VIP-1',
+        paidAmount: 5000,
+        dueAmount: 5500,
+        source: 'Direct Web',
+        vip: 'None',
         isGroup: false
     },
     {
-        id: 2,
-        reservationNumber: 'RES-009282',
-        guestName: 'Samantha Chowdhury',
-        phone: '+880 1819-283746',
-        email: 'samantha.c@un.org',
-        roomNumber: '103',
+        id: 102,
+        reservationNumber: 'RES-009289',
+        guestName: 'Mrs. Sabrina Yeasmin',
+        phone: '+880 1819-876543',
+        email: 'sabrina.y@gmail.com',
+        roomNumber: '204',
         roomType: 'Superior King',
-        checkIn: '2026-07-02',
-        checkOut: '2026-07-05',
+        checkIn: '2026-07-12',
+        checkOut: '2026-07-15',
         nights: 3,
-        adults: 1,
-        children: 0,
-        status: 'in-house',
+        adults: 2,
+        children: 1,
+        status: 'confirmed',
         totalAmount: 13500,
-        paidAmount: 7000,
-        dueAmount: 6500,
-        source: 'UN Diplomatic',
-        vip: 'VIP-2',
-        isGroup: true,
-        groupId: 'GRP-UN-2026',
-        groupName: 'UN Delegation Mission',
-        isMasterGuest: true
+        paidAmount: 13500,
+        dueAmount: 0,
+        source: 'Booking.com',
+        vip: 'VIP-1',
+        isGroup: false
     },
+    // 2. Arriving Bookings (Belong to "Reservations" and "Arrivals")
     {
-        id: 3,
+        id: 103,
         reservationNumber: 'RES-009283',
         guestName: 'Engr. Tanvir Ahmed',
         phone: '+880 1912-384729',
@@ -112,7 +112,7 @@ const INITIAL_RESERVATIONS: ReservationItem[] = [
         isMasterGuest: true
     },
     {
-        id: 4,
+        id: 104,
         reservationNumber: 'RES-009284',
         guestName: 'Farhan Kabir',
         phone: '+880 1611-293847',
@@ -134,8 +134,52 @@ const INITIAL_RESERVATIONS: ReservationItem[] = [
         groupId: 'GRP-APEX-2026',
         groupName: 'Apex Footwear AGM'
     },
+    // 3. Hold Bookings (Belongs to "Reservations")
     {
-        id: 5,
+        id: 105,
+        reservationNumber: 'RES-009287',
+        guestName: 'Rashidul Hasan (Hold)',
+        phone: '+880 1819-384720',
+        email: 'rashidul@gmail.com',
+        roomNumber: '102',
+        roomType: 'Deluxe Double',
+        checkIn: '2026-07-05',
+        checkOut: '2026-07-08',
+        nights: 3,
+        adults: 2,
+        children: 0,
+        status: 'hold',
+        totalAmount: 10500,
+        paidAmount: 0,
+        dueAmount: 10500,
+        source: 'Phone Tentative',
+        vip: 'None',
+        isGroup: false
+    },
+    // 4. In-House Guests (Belongs to "In House")
+    {
+        id: 106,
+        reservationNumber: 'RES-009281',
+        guestName: 'Md. Tariqul Islam',
+        phone: '+880 1711-928371',
+        email: 'tariqul@grameen.com',
+        roomNumber: '101',
+        roomType: 'Deluxe Double',
+        checkIn: '2026-07-01',
+        checkOut: '2026-07-04',
+        nights: 3,
+        adults: 2,
+        children: 0,
+        status: 'in-house',
+        totalAmount: 10500,
+        paidAmount: 10500,
+        dueAmount: 0,
+        source: 'Direct Corporate',
+        vip: 'VIP-1',
+        isGroup: false
+    },
+    {
+        id: 107,
         reservationNumber: 'RES-009285',
         guestName: 'Dr. Jean Dupont',
         phone: '+33 612-384920',
@@ -157,8 +201,55 @@ const INITIAL_RESERVATIONS: ReservationItem[] = [
         groupId: 'GRP-UN-2026',
         groupName: 'UN Delegation Mission'
     },
+    // 5. Departing Guest (Belongs to "Departures" and "In House")
     {
-        id: 6,
+        id: 108,
+        reservationNumber: 'RES-009280',
+        guestName: 'Shahidul Alam',
+        phone: '+880 1715-443322',
+        email: 'shahidul@drik.net',
+        roomNumber: '103',
+        roomType: 'Superior King',
+        checkIn: '2026-06-29',
+        checkOut: '2026-07-01',
+        nights: 2,
+        adults: 1,
+        children: 0,
+        status: 'departing',
+        totalAmount: 9000,
+        paidAmount: 9000,
+        dueAmount: 0,
+        source: 'Direct Walk-In',
+        vip: 'VIP-2',
+        isGroup: false
+    },
+    // 6. Checked-Out Guests (Belongs to "Check Out")
+    {
+        id: 109,
+        reservationNumber: 'RES-009282',
+        guestName: 'Samantha Chowdhury',
+        phone: '+880 1819-283746',
+        email: 'samantha.c@un.org',
+        roomNumber: '103',
+        roomType: 'Superior King',
+        checkIn: '2026-06-27',
+        checkOut: '2026-06-30',
+        nights: 3,
+        adults: 1,
+        children: 0,
+        status: 'checked-out',
+        totalAmount: 13500,
+        paidAmount: 13500,
+        dueAmount: 0,
+        source: 'UN Diplomatic',
+        vip: 'VIP-2',
+        isGroup: true,
+        groupId: 'GRP-UN-2026',
+        groupName: 'UN Delegation Mission',
+        isMasterGuest: true
+    },
+    {
+        id: 110,
         reservationNumber: 'RES-009286',
         guestName: 'Nusrat Jahan',
         phone: '+880 1712-384729',
@@ -177,33 +268,14 @@ const INITIAL_RESERVATIONS: ReservationItem[] = [
         source: 'Direct Walk-In',
         vip: 'None',
         isGroup: false
-    },
-    {
-        id: 7,
-        reservationNumber: 'RES-009287',
-        guestName: 'Rashidul Hasan (Hold)',
-        phone: '+880 1819-384720',
-        email: 'rashidul@gmail.com',
-        roomNumber: '102',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-05',
-        checkOut: '2026-07-08',
-        nights: 3,
-        adults: 2,
-        children: 0,
-        status: 'hold',
-        totalAmount: 10500,
-        paidAmount: 0,
-        dueAmount: 10500,
-        source: 'Phone Tentative',
-        vip: 'None',
-        isGroup: false
     }
 ];
 
 export const ReservationsView: React.FC = () => {
     const { setActivePage } = useNavigation();
-    const [activeTab, setActiveTab] = useState<'all' | 'arrivals' | 'departures' | 'checked-out' | 'in-house'>('all');
+    
+    // Active Tab: 'reservations' (Active Bookings), 'arrivals', 'departures', 'checked-out', 'in-house'
+    const [activeTab, setActiveTab] = useState<'reservations' | 'arrivals' | 'departures' | 'checked-out' | 'in-house'>('reservations');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [guestFilter, setGuestFilter] = useState<'all' | 'single' | 'group'>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -214,7 +286,9 @@ export const ReservationsView: React.FC = () => {
     const [endDate, setEndDate] = useState('');
     const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
 
-    // Multi-Selection State for Group Making
+    // Grouping Mode & Multi-Selection
+    // UX FIX: Only active when user explicitly clicks "Make Group"
+    const [isGroupingMode, setIsGroupingMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isMakeGroupModalOpen, setIsMakeGroupModalOpen] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
@@ -225,7 +299,7 @@ export const ReservationsView: React.FC = () => {
     // Hydrate state from localStorage or initial
     const [reservations, setReservations] = useState<ReservationItem[]>(() => {
         try {
-            const saved = localStorage.getItem('hotel_reservations_v2');
+            const saved = localStorage.getItem('hotel_reservations_v3');
             return saved ? JSON.parse(saved) : INITIAL_RESERVATIONS;
         } catch {
             return INITIAL_RESERVATIONS;
@@ -234,11 +308,19 @@ export const ReservationsView: React.FC = () => {
 
     useEffect(() => {
         try {
-            localStorage.setItem('hotel_reservations_v2', JSON.stringify(reservations));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(reservations));
         } catch (e) {
             console.error(e);
         }
     }, [reservations]);
+
+    // Handle Tab Change:
+    // UX FIX: Instantly clears previous selections and turns off grouping mode so no ghost selection leaks across tabs!
+    const handleTabChange = (nextTab: 'reservations' | 'arrivals' | 'departures' | 'checked-out' | 'in-house') => {
+        setActiveTab(nextTab);
+        setSelectedIds([]);
+        setIsGroupingMode(false);
+    };
 
     // Handle check in / check out actions
     const handleStatusChange = (id: number, nextStatus: ReservationItem['status']) => {
@@ -247,7 +329,7 @@ export const ReservationsView: React.FC = () => {
         );
     };
 
-    // Toggle Selection of row
+    // Toggle Selection of row in grouping mode
     const toggleSelectRow = (id: number) => {
         setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -283,27 +365,40 @@ export const ReservationsView: React.FC = () => {
         );
 
         setSelectedIds([]);
+        setIsGroupingMode(false);
         setIsMakeGroupModalOpen(false);
         setNewGroupName('');
         setNewGroupCompany('');
     };
 
     // Filter Logic
+    // PMS RULE:
+    // 'reservations' -> Only active bookings: 'confirmed', 'arriving', 'hold' (NOT already in-house or checked-out)
+    // 'arrivals' -> Arriving bookings scheduled for arrival ('arriving')
+    // 'departures' -> Departing bookings scheduled to depart ('departing')
+    // 'in-house' -> Currently occupied / in-house guests ('in-house', 'departing')
+    // 'checked-out' -> Completed stays ('checked-out')
     const filteredReservations = useMemo(() => {
         return reservations.filter(r => {
-            // 1. Tab Status Filter
-            const matchesTab =
-                activeTab === 'all' ? true :
-                activeTab === 'arrivals' ? r.status === 'arriving' :
-                activeTab === 'departures' ? r.status === 'departing' :
-                activeTab === 'checked-out' ? r.status === 'checked-out' :
-                r.status === 'in-house';
+            // 1. Status Matching
+            let matchesTab = false;
+            if (activeTab === 'reservations') {
+                matchesTab = r.status === 'confirmed' || r.status === 'arriving' || r.status === 'hold';
+            } else if (activeTab === 'arrivals') {
+                matchesTab = r.status === 'arriving';
+            } else if (activeTab === 'departures') {
+                matchesTab = r.status === 'departing';
+            } else if (activeTab === 'in-house') {
+                matchesTab = r.status === 'in-house' || r.status === 'departing';
+            } else if (activeTab === 'checked-out') {
+                matchesTab = r.status === 'checked-out';
+            }
 
             // 2. Single vs Group Guest Filter
             const matchesGuest =
                 guestFilter === 'all' ? true :
                 guestFilter === 'single' ? !r.isGroup :
-                r.isGroup;
+                Boolean(r.isGroup);
 
             // 3. Search Query
             const matchesQuery =
@@ -327,12 +422,12 @@ export const ReservationsView: React.FC = () => {
         });
     }, [reservations, activeTab, guestFilter, searchQuery, startDate, endDate]);
 
-    // Tab counts based on all reservations
-    const countAll = reservations.length;
+    // Precise Tab counts
+    const countReservations = reservations.filter(r => r.status === 'confirmed' || r.status === 'arriving' || r.status === 'hold').length;
     const countArrivals = reservations.filter(r => r.status === 'arriving').length;
     const countDepartures = reservations.filter(r => r.status === 'departing').length;
+    const countInHouse = reservations.filter(r => r.status === 'in-house' || r.status === 'departing').length;
     const countCheckOut = reservations.filter(r => r.status === 'checked-out').length;
-    const countInHouse = reservations.filter(r => r.status === 'in-house').length;
 
     // Quick Date Presets
     const setDatePreset = (preset: 'today' | 'week' | 'month' | 'clear') => {
@@ -385,30 +480,30 @@ export const ReservationsView: React.FC = () => {
     };
 
     return (
-        <div className="p-3 sm:p-5 bg-[#f0f4f8] min-h-full flex flex-col gap-3.5 font-sans text-xs text-gray-800 animate-in fade-in duration-150">
+        <div className="p-3 sm:p-5 bg-[#f0f4f8] min-h-full flex flex-col gap-3 font-sans text-xs text-gray-800 animate-in fade-in duration-150">
             {/* Top Control Bar (Exact 2-Row Design matching hotel-management) */}
-            <div className="bg-white rounded-lg p-3.5 sm:px-5 sm:py-3 flex flex-col gap-2.5 shadow-2xs border border-gray-200/80 select-none">
+            <div className="bg-white rounded-lg p-3 sm:px-5 sm:py-2.5 flex flex-col gap-2.5 shadow-2xs border border-gray-200/80 select-none">
                 {/* Row 1: Primary Tabs & Primary Action Controls */}
                 <div className="flex items-center justify-between flex-wrap gap-2.5">
                     {/* Primary Tabs */}
                     <div className="flex items-center gap-5 border-b border-gray-200 flex-1 min-w-[260px]">
                         <button
                             type="button"
-                            onClick={() => setActiveTab('all')}
+                            onClick={() => handleTabChange('reservations')}
                             className={`py-2 text-[13px] font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-                                activeTab === 'all' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
+                                activeTab === 'reservations' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
                             }`}
                         >
                             <span>Reservations</span>
-                            <span className="text-xs font-semibold">{countAll}</span>
-                            {activeTab === 'all' && (
+                            <span className="text-xs font-semibold">{countReservations}</span>
+                            {activeTab === 'reservations' && (
                                 <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#312e81]"></span>
                             )}
                         </button>
 
                         <button
                             type="button"
-                            onClick={() => setActiveTab('arrivals')}
+                            onClick={() => handleTabChange('arrivals')}
                             className={`py-2 text-[13px] font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
                                 activeTab === 'arrivals' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
                             }`}
@@ -422,7 +517,7 @@ export const ReservationsView: React.FC = () => {
 
                         <button
                             type="button"
-                            onClick={() => setActiveTab('departures')}
+                            onClick={() => handleTabChange('departures')}
                             className={`py-2 text-[13px] font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
                                 activeTab === 'departures' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
                             }`}
@@ -445,7 +540,7 @@ export const ReservationsView: React.FC = () => {
                                     value={startDate}
                                     onChange={e => setStartDate(e.target.value)}
                                     className="border-0 outline-none text-gray-700 text-[11px] bg-transparent cursor-pointer font-medium w-28"
-                                    title="Start Date (Check-in/Stay)"
+                                    title="From Date"
                                 />
                                 <span className="text-gray-400 font-bold">→</span>
                                 <input
@@ -453,7 +548,7 @@ export const ReservationsView: React.FC = () => {
                                     value={endDate}
                                     onChange={e => setEndDate(e.target.value)}
                                     className="border-0 outline-none text-gray-700 text-[11px] bg-transparent cursor-pointer font-medium w-28"
-                                    title="End Date (Check-out/Stay)"
+                                    title="To Date"
                                 />
                                 {(startDate || endDate) && (
                                     <button
@@ -575,16 +670,22 @@ export const ReservationsView: React.FC = () => {
                         {/* Make Group Action Button */}
                         <button
                             type="button"
-                            onClick={() => setIsMakeGroupModalOpen(true)}
+                            onClick={() => {
+                                if (filteredReservations.length === 0) {
+                                    setIsMakeGroupModalOpen(true);
+                                } else {
+                                    setIsGroupingMode(!isGroupingMode);
+                                }
+                            }}
                             className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition-all h-8 cursor-pointer shadow-2xs ${
-                                selectedIds.length > 0
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
+                                isGroupingMode
+                                    ? 'bg-purple-700 text-white ring-2 ring-purple-300'
                                     : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                             }`}
-                            title={selectedIds.length > 0 ? `Group ${selectedIds.length} selected reservation(s)` : 'Select reservations to Make Group or create a new group'}
+                            title="Click to enter grouping selection mode"
                         >
                             <Users size={14} />
-                            <span>Make Group {selectedIds.length > 0 && `(${selectedIds.length})`}</span>
+                            <span>{isGroupingMode ? 'Grouping Active' : 'Make Group'}</span>
                         </button>
 
                         {/* Add New Reservation Button */}
@@ -605,7 +706,7 @@ export const ReservationsView: React.FC = () => {
                     <div className="flex items-center gap-5 border-b border-gray-200 flex-1 min-w-[200px]">
                         <button
                             type="button"
-                            onClick={() => setActiveTab('checked-out')}
+                            onClick={() => handleTabChange('checked-out')}
                             className={`py-1.5 text-xs font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
                                 activeTab === 'checked-out' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
                             }`}
@@ -619,7 +720,7 @@ export const ReservationsView: React.FC = () => {
 
                         <button
                             type="button"
-                            onClick={() => setActiveTab('in-house')}
+                            onClick={() => handleTabChange('in-house')}
                             className={`py-1.5 text-xs font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
                                 activeTab === 'in-house' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
                             }`}
@@ -691,6 +792,45 @@ export const ReservationsView: React.FC = () => {
                 </div>
             </div>
 
+            {/* Grouping Selection Mode Action Banner */}
+            {isGroupingMode && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 flex items-center justify-between gap-3 text-xs shadow-2xs animate-in fade-in duration-150 select-none">
+                    <div className="flex items-center gap-2 text-purple-900 font-semibold">
+                        <Users size={16} className="text-purple-700 flex-shrink-0" />
+                        <span>Select the reservations you want to bundle into a group:</span>
+                        <span className="bg-purple-700 text-white px-2 py-0.5 rounded-full text-[11px] font-bold">
+                            {selectedIds.length} Selected
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsGroupingMode(false);
+                                setSelectedIds([]);
+                            }}
+                            className="px-3 py-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded text-xs font-semibold cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={selectedIds.length === 0}
+                            onClick={() => setIsMakeGroupModalOpen(true)}
+                            className={`px-3.5 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs ${
+                                selectedIds.length > 0
+                                    ? 'bg-purple-700 hover:bg-purple-800 text-white cursor-pointer'
+                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            }`}
+                        >
+                            <span>Bundle Selected ({selectedIds.length})</span>
+                            <ArrowRight size={13} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Main Content Area */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs flex-1 flex flex-col overflow-hidden min-h-[380px]">
                 {filteredReservations.length === 0 ? (
@@ -745,20 +885,22 @@ export const ReservationsView: React.FC = () => {
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider select-none">
-                                    <th className="px-3 py-2.5 w-10 text-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleSelectAll(filteredReservations)}
-                                            className="text-gray-400 hover:text-blue-700 cursor-pointer"
-                                            title="Select all"
-                                        >
-                                            {selectedIds.length > 0 && selectedIds.length === filteredReservations.length ? (
-                                                <CheckSquare size={15} className="text-blue-700" />
-                                            ) : (
-                                                <Square size={15} />
-                                            )}
-                                        </button>
-                                    </th>
+                                    {isGroupingMode && (
+                                        <th className="px-3 py-2.5 w-10 text-center animate-in fade-in duration-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleSelectAll(filteredReservations)}
+                                                className="text-purple-700 hover:text-purple-900 cursor-pointer"
+                                                title="Select all"
+                                            >
+                                                {selectedIds.length > 0 && selectedIds.length === filteredReservations.length ? (
+                                                    <CheckSquare size={15} />
+                                                ) : (
+                                                    <Square size={15} />
+                                                )}
+                                            </button>
+                                        </th>
+                                    )}
                                     <th className="px-3 py-2.5">Res #</th>
                                     <th className="px-3 py-2.5">Guest &amp; Group</th>
                                     <th className="px-3 py-2.5">Room</th>
@@ -777,24 +919,34 @@ export const ReservationsView: React.FC = () => {
                                     return (
                                         <tr
                                             key={r.id}
+                                            onClick={() => {
+                                                if (isGroupingMode) toggleSelectRow(r.id);
+                                            }}
                                             className={`transition-colors ${
-                                                isSelected ? 'bg-blue-50/40' : 'hover:bg-blue-50/20'
+                                                isGroupingMode ? 'cursor-pointer' : ''
+                                            } ${
+                                                isSelected ? 'bg-purple-50/60' : 'hover:bg-blue-50/20'
                                             }`}
                                         >
-                                            {/* Row Checkbox for Make Group */}
-                                            <td className="px-3 py-2 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => toggleSelectRow(r.id)}
-                                                    className="text-gray-400 hover:text-blue-700 cursor-pointer"
-                                                >
-                                                    {isSelected ? (
-                                                        <CheckSquare size={15} className="text-blue-700" />
-                                                    ) : (
-                                                        <Square size={15} />
-                                                    )}
-                                                </button>
-                                            </td>
+                                            {/* Row Checkbox (Visible only when Grouping Mode is Active) */}
+                                            {isGroupingMode && (
+                                                <td className="px-3 py-2 text-center animate-in fade-in duration-100">
+                                                    <button
+                                                        type="button"
+                                                        onClick={e => {
+                                                            e.stopPropagation();
+                                                            toggleSelectRow(r.id);
+                                                        }}
+                                                        className="text-purple-700 cursor-pointer"
+                                                    >
+                                                        {isSelected ? (
+                                                            <CheckSquare size={15} />
+                                                        ) : (
+                                                            <Square size={15} className="text-gray-300" />
+                                                        )}
+                                                    </button>
+                                                </td>
+                                            )}
 
                                             {/* Reservation Number */}
                                             <td className="px-3 py-2 font-mono font-bold text-blue-700 whitespace-nowrap">
@@ -862,6 +1014,8 @@ export const ReservationsView: React.FC = () => {
                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap ${
                                                     r.status === 'in-house'
                                                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                        : r.status === 'confirmed'
+                                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                                         : r.status === 'arriving'
                                                         ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : r.status === 'departing'
@@ -875,9 +1029,9 @@ export const ReservationsView: React.FC = () => {
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            <td className="px-3 py-2 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-1.5">
-                                                    {r.status === 'arriving' && (
+                                                    {(r.status === 'arriving' || r.status === 'confirmed') && (
                                                         <button
                                                             type="button"
                                                             onClick={() => handleStatusChange(r.id, 'in-house')}
@@ -887,7 +1041,7 @@ export const ReservationsView: React.FC = () => {
                                                             Check In
                                                         </button>
                                                     )}
-                                                    {r.status === 'in-house' && (
+                                                    {(r.status === 'in-house' || r.status === 'departing') && (
                                                         <button
                                                             type="button"
                                                             onClick={() => handleStatusChange(r.id, 'checked-out')}
@@ -895,6 +1049,16 @@ export const ReservationsView: React.FC = () => {
                                                             title="Check Out Guest"
                                                         >
                                                             Check Out
+                                                        </button>
+                                                    )}
+                                                    {r.status === 'hold' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleStatusChange(r.id, 'confirmed')}
+                                                            className="h-6 px-2 text-[10px] font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded cursor-pointer shadow-2xs"
+                                                            title="Confirm Hold"
+                                                        >
+                                                            Confirm
                                                         </button>
                                                     )}
                                                 </div>
@@ -914,15 +1078,31 @@ export const ReservationsView: React.FC = () => {
                             return (
                                 <div
                                     key={r.id}
-                                    onClick={() => toggleSelectRow(r.id)}
-                                    className={`border rounded-lg p-3.5 bg-white transition-all shadow-2xs space-y-2.5 cursor-pointer relative ${
+                                    onClick={() => {
+                                        if (isGroupingMode) toggleSelectRow(r.id);
+                                    }}
+                                    className={`border rounded-lg p-3.5 bg-white transition-all shadow-2xs space-y-2.5 relative ${
+                                        isGroupingMode ? 'cursor-pointer' : ''
+                                    } ${
                                         isSelected
-                                            ? 'border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/10'
+                                            ? 'border-purple-600 ring-2 ring-purple-500/20 bg-purple-50/10'
                                             : 'border-gray-200 hover:border-blue-300'
                                     }`}
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-start gap-2 min-w-0">
+                                            {isGroupingMode && (
+                                                <button
+                                                    type="button"
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        toggleSelectRow(r.id);
+                                                    }}
+                                                    className="mt-0.5 text-purple-700"
+                                                >
+                                                    {isSelected ? <CheckSquare size={15} /> : <Square size={15} className="text-gray-300" />}
+                                                </button>
+                                            )}
                                             <div className="w-8 h-8 rounded-full bg-blue-100 text-[#1e3a8a] font-bold flex items-center justify-center flex-shrink-0 text-xs">
                                                 {r.guestName.slice(0, 2).toUpperCase()}
                                             </div>
@@ -943,11 +1123,6 @@ export const ReservationsView: React.FC = () => {
                                             <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-blue-50 text-blue-800 border border-blue-200">
                                                 Room {r.roomNumber}
                                             </span>
-                                            {isSelected && (
-                                                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 rounded">
-                                                    Selected
-                                                </span>
-                                            )}
                                         </div>
                                     </div>
 
@@ -986,6 +1161,8 @@ export const ReservationsView: React.FC = () => {
                                         <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold uppercase ${
                                             r.status === 'in-house'
                                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                : r.status === 'confirmed'
+                                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                                 : r.status === 'arriving'
                                                 ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                 : r.status === 'departing'
@@ -998,7 +1175,7 @@ export const ReservationsView: React.FC = () => {
                                         </span>
 
                                         <div className="flex items-center gap-1.5">
-                                            {r.status === 'arriving' && (
+                                            {(r.status === 'arriving' || r.status === 'confirmed') && (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleStatusChange(r.id, 'in-house')}
@@ -1007,7 +1184,7 @@ export const ReservationsView: React.FC = () => {
                                                     Check In
                                                 </button>
                                             )}
-                                            {r.status === 'in-house' && (
+                                            {(r.status === 'in-house' || r.status === 'departing') && (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleStatusChange(r.id, 'checked-out')}
@@ -1037,9 +1214,7 @@ export const ReservationsView: React.FC = () => {
                                 <div>
                                     <h3 className="font-bold text-gray-900 text-sm">Create Group Reservation</h3>
                                     <p className="text-[11px] text-gray-500">
-                                        {selectedIds.length > 0
-                                            ? `Bundle ${selectedIds.length} selected reservation(s) into a unified group`
-                                            : 'Create a new group folio & assign rooms'}
+                                        Bundle {selectedIds.length} selected reservation(s) into a unified corporate/event group
                                     </p>
                                 </div>
                             </div>
@@ -1052,114 +1227,67 @@ export const ReservationsView: React.FC = () => {
                             </button>
                         </div>
 
-                        {selectedIds.length === 0 ? (
-                            <div className="space-y-3">
-                                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg border border-amber-200 text-xs">
-                                    💡 <strong>Tip:</strong> Select one or more reservations by clicking their checkboxes in the table or cards, then click <strong>Make Group</strong> to bundle them!
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-xs font-semibold text-gray-700">Group Name</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g., Summit 2026 Delegation, Dhaka Tech Team"
-                                        value={newGroupName}
-                                        onChange={e => setNewGroupName(e.target.value)}
-                                        className="h-9 px-3 border border-gray-300 rounded-md text-xs outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-xs font-semibold text-gray-700">Company / Organization</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g., Grameenphone, Apex, UN"
-                                        value={newGroupCompany}
-                                        onChange={e => setNewGroupCompany(e.target.value)}
-                                        className="h-9 px-3 border border-gray-300 rounded-md text-xs outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                                <div className="pt-2 flex justify-end gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsMakeGroupModalOpen(false)}
-                                        className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded text-xs font-semibold cursor-pointer"
-                                    >
-                                        Close
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsMakeGroupModalOpen(false);
-                                            setActivePage('add-reservation');
-                                        }}
-                                        className="px-4 py-1.5 bg-[#1e3a8a] text-white rounded text-xs font-bold cursor-pointer hover:bg-blue-900"
-                                    >
-                                        Open Add Reservation Form
-                                    </button>
+                        <div className="space-y-3.5">
+                            <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-md text-xs text-purple-900">
+                                Selected <strong>{selectedIds.length}</strong> reservation(s):
+                                <div className="mt-1 flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                                    {reservations.filter(r => selectedIds.includes(r.id)).map(r => (
+                                        <span key={r.id} className="bg-white border border-purple-200 px-1.5 py-0.5 rounded text-[10px] font-semibold text-purple-800">
+                                            {r.guestName} (Room {r.roomNumber})
+                                        </span>
+                                    ))}
                                 </div>
                             </div>
-                        ) : (
-                            <div className="space-y-3.5">
-                                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-900">
-                                    Selected <strong>{selectedIds.length}</strong> reservation(s):
-                                    <div className="mt-1 flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                                        {reservations.filter(r => selectedIds.includes(r.id)).map(r => (
-                                            <span key={r.id} className="bg-white border border-blue-200 px-1.5 py-0.5 rounded text-[10px] font-semibold text-blue-800">
-                                                {r.guestName} (Room {r.roomNumber})
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
 
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-xs font-semibold text-gray-700">
-                                        Group Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        autoFocus
-                                        placeholder="e.g. Apex Annual Retreat, Tech Summit"
-                                        value={newGroupName}
-                                        onChange={e => setNewGroupName(e.target.value)}
-                                        className="h-9 px-3 border border-gray-300 rounded-md text-xs outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-xs font-semibold text-gray-700">
-                                        Company / Sponsoring Organization
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Apex Footwear Ltd."
-                                        value={newGroupCompany}
-                                        onChange={e => setNewGroupCompany(e.target.value)}
-                                        className="h-9 px-3 border border-gray-300 rounded-md text-xs outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                <div className="pt-2 flex justify-end gap-2 border-t border-gray-100">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsMakeGroupModalOpen(false)}
-                                        className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded text-xs font-semibold cursor-pointer"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={!newGroupName.trim()}
-                                        onClick={handleCreateGroup}
-                                        className={`px-4 py-1.5 rounded text-xs font-bold transition-colors cursor-pointer shadow-2xs ${
-                                            newGroupName.trim()
-                                                ? 'bg-[#1e3a8a] hover:bg-blue-900 text-white'
-                                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                        }`}
-                                    >
-                                        Confirm &amp; Create Group
-                                    </button>
-                                </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-700">
+                                    Group / Event Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="e.g. Apex Annual Retreat 2026, Tech Summit Delegation"
+                                    value={newGroupName}
+                                    onChange={e => setNewGroupName(e.target.value)}
+                                    className="h-9 px-3 border border-gray-300 rounded-md text-xs outline-none focus:border-purple-500"
+                                />
                             </div>
-                        )}
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-gray-700">
+                                    Company / Sponsoring Organization
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Apex Footwear Ltd., Beximco Pharma"
+                                    value={newGroupCompany}
+                                    onChange={e => setNewGroupCompany(e.target.value)}
+                                    className="h-9 px-3 border border-gray-300 rounded-md text-xs outline-none focus:border-purple-500"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex justify-end gap-2 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMakeGroupModalOpen(false)}
+                                    className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded text-xs font-semibold cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={!newGroupName.trim()}
+                                    onClick={handleCreateGroup}
+                                    className={`px-4 py-1.5 rounded text-xs font-bold transition-colors cursor-pointer shadow-2xs ${
+                                        newGroupName.trim()
+                                            ? 'bg-purple-700 hover:bg-purple-800 text-white'
+                                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                >
+                                    Confirm &amp; Create Group
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
