@@ -1718,6 +1718,18 @@ export const StayView: React.FC = () => {
                 initialTargetDeparture={amendBookingData?.targetDeparture}
                 initialTargetNights={amendBookingData?.targetNights}
                 onSave={handleSaveAmendStay}
+                onRoomMove={(b) => {
+                    setIsAmendStayOpen(false);
+                    setRoomMoveData({
+                        booking: b,
+                        targetRoomNumber: b.roomNumber,
+                        targetFromDate: b.arrivalDate,
+                        targetToDate: b.departureDate,
+                        targetRoomType: b.roomType || 'Winter Rate Plan',
+                        targetRateType: b.ratePlan || 'Summer Vacation'
+                    });
+                    setIsRoomMoveOpen(true);
+                }}
             />
 
             {/* Room Move Modal on Drag-and-Drop or Menu Action (matching media_1792541566827_b05dc667.png) */}
@@ -1730,6 +1742,13 @@ export const StayView: React.FC = () => {
                 data={roomMoveData}
                 allRooms={allRooms}
                 onSaveRoomMove={handleSaveRoomMove}
+                onAmendStay={(b) => {
+                    setIsRoomMoveOpen(false);
+                    const targetBooking = bookings.find(item => item.id === b.id);
+                    if (targetBooking) {
+                        handleOpenAmendModal(targetBooking);
+                    }
+                }}
             />
 
             {/* Floating Mouse Cursor Badge during Room Move Drag */}

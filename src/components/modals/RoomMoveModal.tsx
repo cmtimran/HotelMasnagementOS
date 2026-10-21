@@ -13,7 +13,12 @@ import {
     Layers,
     Home,
     Printer,
-    MoveHorizontal
+    Settings,
+    CalendarDays,
+    CheckSquare,
+    Receipt,
+    Printer as PrintIcon,
+    AlertCircle
 } from 'lucide-react';
 import type { AmendBookingData } from './AmendStayModal';
 
@@ -32,6 +37,8 @@ interface RoomMoveModalProps {
     data: RoomMoveData | null;
     allRooms: Array<{ id?: string; roomNumber: string; type: string; status: string }>;
     onSaveRoomMove: (bookingId: string, newRoomNumber: string, newFromDate: string, newToDate: string) => void;
+    onAmendStay?: (booking: AmendBookingData) => void;
+    onEdit?: (booking: AmendBookingData) => void;
 }
 
 export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
@@ -39,18 +46,18 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
     onClose,
     data,
     allRooms,
-    onSaveRoomMove
+    onSaveRoomMove,
+    onAmendStay,
+    onEdit
 }) => {
-    if (!isOpen || !data) return null;
-
-    const { booking } = data;
+    const [isOptionsOpen, setIsOptionsOpen] = useState(false);
 
     // Form states
-    const [selectedRoom, setSelectedRoom] = useState<string>(() => data.targetRoomNumber || booking.roomNumber);
-    const [fromDate, setFromDate] = useState<string>(() => data.targetFromDate || booking.arrivalDate);
-    const [toDate, setToDate] = useState<string>(() => data.targetToDate || booking.departureDate);
-    const [roomType, setRoomType] = useState<string>(() => data.targetRoomType || booking.roomType || 'Winter Rate Plan');
-    const [rateType, setRateType] = useState<string>(() => data.targetRateType || booking.ratePlan || 'Summer Vacation');
+    const [selectedRoom, setSelectedRoom] = useState<string>(() => data?.targetRoomNumber || data?.booking.roomNumber || '');
+    const [fromDate, setFromDate] = useState<string>(() => data?.targetFromDate || data?.booking.arrivalDate || '');
+    const [toDate, setToDate] = useState<string>(() => data?.targetToDate || data?.booking.departureDate || '');
+    const [roomType, setRoomType] = useState<string>(() => data?.targetRoomType || data?.booking.roomType || 'Winter Rate Plan');
+    const [rateType, setRateType] = useState<string>(() => data?.targetRateType || data?.booking.ratePlan || 'Summer Vacation');
 
     useEffect(() => {
         if (data) {
@@ -61,6 +68,10 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
             setRateType(data.targetRateType || data.booking.ratePlan || 'Summer Vacation');
         }
     }, [data]);
+
+    if (!isOpen || !data) return null;
+
+    const { booking } = data;
 
     // Calculate nights between fromDate and toDate
     const calcNights = () => {
@@ -88,10 +99,10 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                 onClick={onClose}
             />
 
-            {/* Right-Side Docked Drawer - Exact 2-Column Layout matching media_1792541566827_b05dc667.png */}
+            {/* Right-Side Docked Drawer - Exact 2-Column Layout */}
             <div className="fixed top-0 bottom-0 right-0 w-full md:w-[62%] lg:w-[58%] min-w-[700px] max-w-[960px] bg-[#0e3592] text-white shadow-2xl flex flex-col border-l border-blue-900 animate-in slide-in-from-right duration-200 z-[100000]">
-                {/* 1. White Top Header Bar */}
-                <div className="px-4 py-2.5 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                {/* 1. White Top Header Bar with Edit & Options Actions */}
+                <div className="px-3.5 py-2.5 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <button
                             type="button"
@@ -101,53 +112,106 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                         >
                             <X size={17} />
                         </button>
-                        <div className="text-gray-700 flex items-center justify-center flex-shrink-0">
-                            <Users size={16} />
+                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center font-bold flex-shrink-0">
+                            <Users size={14} />
                         </div>
                         <span className="font-extrabold text-gray-900 text-sm tracking-wide uppercase truncate font-sans">
                             {booking.guestName}
                         </span>
+                        <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[9.5px] px-2 py-0.5 rounded uppercase shadow-2xs ml-1">
+                            {booking.status || 'CONFIRMED'}
+                        </span>
+                    </div>
+
+                    {/* Right: Top Action Buttons (Edit + Options ∨) */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (onEdit) onEdit(booking);
+                            }}
+                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                        >
+                            <Edit3 size={11} className="text-[#0e3592]" />
+                            <span>Edit</span>
+                        </button>
+
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setIsOptionsOpen(!isOptionsOpen)}
+                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            >
+                                <Settings size={11} className="text-[#0e3592]" />
+                                <span>Options</span>
+                                <ChevronDown size={11} className={`transition-transform duration-200 ${isOptionsOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {/* Options Dropdown Menu */}
+                            {isOptionsOpen && (
+                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-2xl border border-gray-200 py-1.5 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onAmendStay) onAmendStay(booking);
+                                        }}
+                                        className="w-full px-3 py-1.5 text-left text-xs font-bold hover:bg-blue-50 text-[#0e3592] flex items-center gap-2 cursor-pointer transition-colors"
+                                    >
+                                        <CalendarDays size={13} className="text-blue-600" />
+                                        <span>Amend Stay / Extend</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOptionsOpen(false)}
+                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                    >
+                                        <CheckSquare size={13} className="text-emerald-600" />
+                                        <span>Check In / Out</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOptionsOpen(false)}
+                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                    >
+                                        <Receipt size={13} className="text-purple-600" />
+                                        <span>Folio & Billing</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOptionsOpen(false)}
+                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                    >
+                                        <PrintIcon size={13} className="text-gray-600" />
+                                        <span>Registration Card</span>
+                                    </button>
+                                    <div className="h-px bg-gray-100 my-1" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOptionsOpen(false)}
+                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-rose-50 text-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
+                                    >
+                                        <AlertCircle size={13} className="text-rose-600" />
+                                        <span>Cancel Reservation</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
                 {/* 2. Drawer Body: 2 Columns Side-by-Side */}
-                <div className="flex-1 overflow-y-auto p-4 grid grid-cols-12 gap-4 bg-[#0e3592]">
-                    {/* LEFT COLUMN (~55% width): Action Pills, Overview Cards & Financial Card */}
-                    <div className="col-span-7 flex flex-col gap-2.5">
-                        {/* Action Pills: Edit, Room Move ∨, select ∨ */}
-                        <div className="flex items-center gap-1.5">
-                            <button
-                                type="button"
-                                className="px-3 py-1 bg-white hover:bg-gray-100 text-[#0e3592] rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <Edit3 size={11} />
-                                <span>Edit</span>
-                            </button>
-                            <button
-                                type="button"
-                                className="px-3 py-1 bg-white hover:bg-gray-100 text-[#0e3592] rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <MoveHorizontal size={11} />
-                                <span>Room Move</span>
-                                <ChevronDown size={11} />
-                            </button>
-                            <button
-                                type="button"
-                                className="px-3 py-1 bg-white hover:bg-gray-100 text-[#0e3592] rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <span>select</span>
-                                <ChevronDown size={11} />
-                            </button>
-                        </div>
-
+                <div className="flex-1 overflow-y-auto p-3.5 grid grid-cols-12 gap-3.5 bg-[#0e3592]">
+                    {/* LEFT COLUMN (~57% width): Overview Cards & Financial Card */}
+                    <div className="col-span-7 flex flex-col gap-2">
                         {/* Row 1: Reservation # & Status */}
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-blue-500/30 text-blue-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                                <div className="w-6 h-6 rounded bg-blue-500/30 text-blue-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
                                     #
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9.5px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
                                         Reservation #
                                     </div>
                                     <div className="text-xs font-bold text-white truncate font-mono">
@@ -156,16 +220,16 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                 </div>
                             </div>
 
-                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
+                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                                <div className="w-6 h-6 rounded bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
                                     <Layers size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9.5px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
                                         Status
                                     </div>
                                     <div className="mt-0.5">
-                                        <span className="bg-white text-emerald-600 font-black text-[10px] px-2 py-0.5 rounded shadow-2xs uppercase">
+                                        <span className="bg-white text-emerald-600 font-black text-[9.5px] px-2 py-0.5 rounded shadow-2xs uppercase">
                                             {booking.status || 'CONFIRMED'}
                                         </span>
                                     </div>
@@ -175,28 +239,28 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
 
                         {/* Row 2: Arrival, Nights, Departure */}
                         <div className="grid grid-cols-12 gap-2">
-                            <div className="col-span-5 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2 flex items-center gap-2">
+                            <div className="col-span-5 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2 flex items-center gap-2 shadow-2xs">
                                 <div className="w-6 h-6 rounded bg-emerald-500/30 text-emerald-200 flex items-center justify-center flex-shrink-0">
                                     <Calendar size={12} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200">ARRIVAL</div>
+                                    <div className="text-[8.5px] uppercase font-bold text-blue-200">ARRIVAL</div>
                                     <div className="text-[11.5px] font-bold text-white truncate">{booking.arrivalDate}</div>
                                     <div className="text-[8.5px] text-blue-200">🕒 16:00:00</div>
                                 </div>
                             </div>
 
-                            <div className="col-span-2 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-1.5 flex flex-col items-center justify-center text-center">
-                                <div className="text-[8.5px] uppercase font-bold text-blue-200">NIGHTS</div>
+                            <div className="col-span-2 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-1.5 flex flex-col items-center justify-center text-center shadow-2xs">
+                                <div className="text-[8px] uppercase font-bold text-blue-200">NIGHTS</div>
                                 <div className="text-base font-black text-white font-mono leading-none">{booking.nights}</div>
                             </div>
 
-                            <div className="col-span-5 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2 flex items-center gap-2">
+                            <div className="col-span-5 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2 flex items-center gap-2 shadow-2xs">
                                 <div className="w-6 h-6 rounded bg-rose-500/30 text-rose-200 flex items-center justify-center flex-shrink-0">
                                     <Calendar size={12} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200">DEPARTURE</div>
+                                    <div className="text-[8.5px] uppercase font-bold text-blue-200">DEPARTURE</div>
                                     <div className="text-[11.5px] font-bold text-white truncate">{booking.departureDate}</div>
                                     <div className="text-[8.5px] text-blue-200">🕒 12:00:00</div>
                                 </div>
@@ -205,12 +269,12 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
 
                         {/* Row 3: Room Details & Rate Plan */}
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-indigo-500/30 text-indigo-200 flex items-center justify-center flex-shrink-0">
+                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                                <div className="w-6 h-6 rounded bg-indigo-500/30 text-indigo-200 flex items-center justify-center flex-shrink-0">
                                     <Home size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9.5px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
                                         Room Details
                                     </div>
                                     <div className="text-xs font-bold text-white truncate">
@@ -219,12 +283,12 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                 </div>
                             </div>
 
-                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
+                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                                <div className="w-6 h-6 rounded bg-amber-500/30 text-amber-200 flex items-center justify-center flex-shrink-0">
                                     <Printer size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9.5px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
                                         Rate Plan
                                     </div>
                                     <div className="text-xs font-bold text-white truncate">
@@ -236,12 +300,12 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
 
                         {/* Row 4: Guests & Avg Daily Rate */}
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-cyan-500/30 text-cyan-200 flex items-center justify-center flex-shrink-0">
+                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                                <div className="w-6 h-6 rounded bg-cyan-500/30 text-cyan-200 flex items-center justify-center flex-shrink-0">
                                     <Users size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9.5px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
                                         Guests (Pax)
                                     </div>
                                     <div className="text-xs font-bold text-white truncate">
@@ -250,12 +314,12 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                 </div>
                             </div>
 
-                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-emerald-500/30 text-emerald-200 flex items-center justify-center flex-shrink-0">
+                            <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
+                                <div className="w-6 h-6 rounded bg-emerald-500/30 text-emerald-200 flex items-center justify-center flex-shrink-0">
                                     <DollarSign size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9.5px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
                                         Avg Daily Rate
                                     </div>
                                     <div className="text-xs font-bold text-white font-mono">
@@ -266,7 +330,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                         </div>
 
                         {/* Financial Overview Card */}
-                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-2 text-xs">
+                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 space-y-1.5 text-xs shadow-2xs">
                             <div className="flex items-center justify-between text-blue-100 text-[11px]">
                                 <div className="flex items-center gap-2">
                                     <div className="w-5 h-5 rounded bg-blue-500/30 flex items-center justify-center text-blue-200">
@@ -299,10 +363,10 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                         </div>
 
                         {/* Separate Room Net Balance Card */}
-                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-3 flex items-center justify-between font-bold">
+                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center justify-between font-bold shadow-2xs">
                             <div className="flex items-center gap-2 text-white">
-                                <div className="w-6 h-6 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400">
-                                    <Wallet size={13} />
+                                <div className="w-5 h-5 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400">
+                                    <Wallet size={12} />
                                 </div>
                                 <span className="text-xs">Room Net Balance</span>
                             </div>
@@ -312,9 +376,9 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN (~45% width): Room Move Form (matching media_1792541566827_b05dc667.png) */}
+                    {/* RIGHT COLUMN (~43% width): Room Move Form */}
                     <div className="col-span-5 flex flex-col justify-between space-y-3">
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                             {/* Header Row */}
                             <div className="flex items-center justify-between border-b border-blue-400/20 pb-2">
                                 <h2 className="text-base font-bold text-white">Room Move</h2>
