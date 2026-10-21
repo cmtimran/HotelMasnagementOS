@@ -48,7 +48,9 @@ import {
     Wrench,
     ExternalLink,
     HelpCircle,
-    XCircle
+    XCircle,
+    Printer,
+    CalendarDays
 } from 'lucide-react';
 import { getRouteByPageId } from '../navigation/routesRegistry';
 
@@ -283,6 +285,11 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             icon: <Settings size={14} />,
             sectionHeader: 'System & Configuration',
             items: [
+                { id: 'holiday-management', label: 'Holiday & Peak Calendar', icon: <CalendarDays size={12} />, badge: 'Gov', badgeColor: 'bg-amber-100 text-amber-700' },
+                { id: 'taxes-vat', label: 'Taxes, VAT & Service Charges', icon: <Percent size={12} />, badge: 'Tax', badgeColor: 'bg-rose-100 text-rose-700' },
+                { id: 'printer-settings', label: 'Hardware & Printer Settings', icon: <Printer size={12} />, badge: 'ESC/POS', badgeColor: 'bg-indigo-100 text-indigo-700' },
+                { id: 'roles-permissions', label: 'Roles & RBAC Access Matrix', icon: <Shield size={12} />, badge: 'RBAC', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'user-management', label: 'Staff & User Directory', icon: <UserCog size={12} />, badge: 'Staff', badgeColor: 'bg-sky-100 text-sky-700' },
                 { id: 'policy-management', label: 'Hotel Policy Governance', icon: <ShieldCheck size={12} />, badge: 'Rules', badgeColor: 'bg-emerald-100 text-emerald-700' },
                 { id: 'general-settings', label: 'System Configuration', icon: <Settings size={12} /> },
                 { id: 'properties', label: 'All Hotel Properties', icon: <Building2 size={12} /> },

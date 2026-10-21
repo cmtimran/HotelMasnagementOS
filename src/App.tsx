@@ -21,7 +21,6 @@ import RoomManagement from './components/RoomManagement';
 import RatePlanManagement from './components/RatePlanManagement';
 import MealPlanManagement from './components/MealPlanManagement';
 import Reports from './components/Reports';
-import AdminSecurity from './components/AdminSecurity';
 import MasterDataConfig from './components/MasterDataConfig';
 import RoomRack from './components/RoomRack';
 import ReservationsView from './components/reservations/ReservationsView';
@@ -56,6 +55,11 @@ import ExtraChargesManagement from './components/ExtraChargesManagement';
 import DiscountManagement from './components/DiscountManagement';
 import DepartmentManagement from './components/DepartmentManagement';
 import ShiftManagement from './components/ShiftManagement';
+import HolidayManagement from './components/HolidayManagement';
+import TaxVatManagement from './components/TaxVatManagement';
+import PrinterSettingsManagement from './components/PrinterSettingsManagement';
+import RolesPermissionsManagement from './components/RolesPermissionsManagement';
+import UserStaffManagement from './components/UserStaffManagement';
 
 import { useNavigation } from './context/NavigationContext';
 
@@ -601,12 +605,27 @@ function App() {
         return <NightAuditAutomation />;
       case 'service-vouchers':
         return <GuestVoucherSystem />;
+      case 'holiday-management':
+      case 'holidays':
+      case 'holiday':
+        return <HolidayManagement />;
+      case 'taxes-vat':
+      case 'tax-vat-settings':
+      case 'taxes':
+      case 'vat':
+        return <TaxVatManagement />;
+      case 'printer-settings':
+      case 'printers':
+      case 'hardware-printers':
+        return <PrinterSettingsManagement />;
       case 'user-management':
       case 'users':
-        return <AdminSecurity initialTab="users" onNavigate={setActivePage} />;
+      case 'staff':
+        return <UserStaffManagement />;
       case 'roles-permissions':
       case 'roles':
-        return <AdminSecurity initialTab="roles" onNavigate={setActivePage} />;
+      case 'permissions':
+        return <RolesPermissionsManagement />;
       case 'departments':
         return <DepartmentManagement />;
       case 'shifts':

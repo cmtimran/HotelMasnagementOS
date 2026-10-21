@@ -755,6 +755,39 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     propertyScoped: true,
   },
   {
+    id: 'holiday-management',
+    slug: '/holidays',
+    title: 'Holiday & Peak Calendar',
+    panel: 'main',
+    category: 'Security & Settings',
+    permission: 'settings.holidays.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'taxes-vat',
+    slug: '/taxes-vat',
+    title: 'Taxes, VAT & Service Charges',
+    panel: 'main',
+    category: 'Security & Settings',
+    permission: 'settings.taxes.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'accountant'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'printer-settings',
+    slug: '/printer-settings',
+    title: 'Hardware & Printer Settings',
+    panel: 'main',
+    category: 'Security & Settings',
+    permission: 'settings.printers.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
     id: 'policy-management',
     slug: '/policy-settings',
     title: 'Policy Settings',
@@ -947,6 +980,25 @@ const generalRoute = SLUG_TO_ROUTE_MAP.get('/general-settings');
 if (generalRoute) {
   SLUG_TO_ROUTE_MAP.set('/system-settings', generalRoute);
   SLUG_TO_ROUTE_MAP.set('/settings', generalRoute);
+}
+
+const holidayRoute = SLUG_TO_ROUTE_MAP.get('/holidays');
+if (holidayRoute) {
+  SLUG_TO_ROUTE_MAP.set('/holiday-management', holidayRoute);
+  SLUG_TO_ROUTE_MAP.set('/holiday', holidayRoute);
+}
+
+const taxRoute = SLUG_TO_ROUTE_MAP.get('/taxes-vat');
+if (taxRoute) {
+  SLUG_TO_ROUTE_MAP.set('/taxes', taxRoute);
+  SLUG_TO_ROUTE_MAP.set('/vat', taxRoute);
+  SLUG_TO_ROUTE_MAP.set('/tax-settings', taxRoute);
+}
+
+const printerRoute = SLUG_TO_ROUTE_MAP.get('/printer-settings');
+if (printerRoute) {
+  SLUG_TO_ROUTE_MAP.set('/printers', printerRoute);
+  SLUG_TO_ROUTE_MAP.set('/hardware-printers', printerRoute);
 }
 
 // Reservations & Stay View Aliases
