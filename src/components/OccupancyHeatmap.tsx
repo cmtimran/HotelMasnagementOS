@@ -1,233 +1,348 @@
-import { useState } from 'react';
-import { TrendingUp, Users, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+    ChevronLeft, ChevronRight,
+    TrendingUp, Calendar,
+    Sparkles
+} from 'lucide-react';
 
-interface DayOccupancy {
-    date: string;
-    occupancy: number;
-    revenue: number;
-    availableRooms: number;
-    bookedRooms: number;
+interface DayOccupancyData {
+    dateStr: string; // YYYY-MM-DD
+    dayNumber: number;
+    occupancyPct: number;
+    occupiedRooms: number;
+    totalRooms: number;
+    revenueBDT: number;
+    adrBDT: number;
+    arrivals: number;
+    departures: number;
+    pricingSurge: string;
 }
 
-const OccupancyHeatmap = () => {
-    const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0)); // January 2026
+export const OccupancyHeatmap: React.FC = () => {
+    const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 5, 1)); // June 2026
+    const [selectedDayData, setSelectedDayData] = useState<DayOccupancyData | null>(null);
 
-    // Mock data - replace with API
-    const occupancyData: Record<string, DayOccupancy> = {
-        '2026-01-16': { date: '2026-01-16', occupancy: 75, revenue: 180000, availableRooms: 3, bookedRooms: 9 },
-        '2026-01-17': { date: '2026-01-17', occupancy: 92, revenue: 220000, availableRooms: 1, bookedRooms: 11 },
-        '2026-01-18': { date: '2026-01-18', occupancy: 100, revenue: 240000, availableRooms: 0, bookedRooms: 12 },
-        '2026-01-19': { date: '2026-01-19', occupancy: 83, revenue: 200000, availableRooms: 2, bookedRooms: 10 },
-        '2026-01-24': { date: '2026-01-24', occupancy: 67, revenue: 160000, availableRooms: 4, bookedRooms: 8 },
-        '2026-01-25': { date: '2026-01-25', occupancy: 92, revenue: 220000, availableRooms: 1, bookedRooms: 11 },
-        '2026-01-26': { date: '2026-01-26', occupancy: 100, revenue: 280000, availableRooms: 0, bookedRooms: 12 },
-        '2026-01-31': { date: '2026-01-31', occupancy: 58, revenue: 140000, availableRooms: 5, bookedRooms: 7 },
-    };
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
 
-    const getDaysInMonth = (date: Date) => {
-        const year = date.getFullYear();
-        const month = date.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        const daysInMonth = lastDay.getDate();
-        const startingDayOfWeek = firstDay.getDay();
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
 
-        const days: (Date | null)[] = [];
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sunday
 
-        for (let i = 0; i < startingDayOfWeek; i++) {
-            days.push(null);
+    // Generate simulated high-fidelity telemetry data for all days in month
+    const monthDaysData: DayOccupancyData[] = Array.from({ length: daysInMonth }, (_, i) => {
+        const day = i + 1;
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // Dynamic weekend & corporate surge simulation
+        const dayOfWeek = (startDayOfWeek + i) % 7;
+        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Fri, Sat in BD
+
+        let occupancyPct: number;
+        if (day >= 24 && day <= 28) {
+            occupancyPct = 92 + (day % 3) * 4; // Peak conference block
+        } else if (isWeekend) {
+            occupancyPct = 85 + (day % 4) * 3;
+        } else {
+            occupancyPct = 65 + (day % 5) * 5;
         }
+        if (occupancyPct > 100) occupancyPct = 100;
 
-        for (let day = 1; day <= daysInMonth; day++) {
-            days.push(new Date(year, month, day));
-        }
+        const totalRooms = 28;
+        const occupiedRooms = Math.round((occupancyPct / 100) * totalRooms);
+        const adrBDT = 7200 + (occupancyPct > 85 ? 1200 : 0);
+        const revenueBDT = occupiedRooms * adrBDT;
 
-        return days;
-    };
+        return {
+            dateStr,
+            dayNumber: day,
+            occupancyPct,
+            occupiedRooms,
+            totalRooms,
+            revenueBDT,
+            adrBDT,
+            arrivals: Math.round(occupiedRooms * 0.35) + 1,
+            departures: Math.round(occupiedRooms * 0.3) + 1,
+            pricingSurge: occupancyPct >= 90 ? '+20% Peak Demand Surge' : occupancyPct >= 75 ? '+10% Dynamic Yield' : 'Standard Base Rate'
+        };
+    });
 
-    const formatDate = (date: Date) => {
-        return date.toISOString().split('T')[0];
-    };
-
-    const getOccupancyColor = (occupancy: number) => {
-        if (occupancy >= 95) return 'from-red-500 to-red-600';
-        if (occupancy >= 80) return 'from-orange-500 to-orange-600';
-        if (occupancy >= 60) return 'from-yellow-500 to-yellow-600';
-        if (occupancy >= 40) return 'from-emerald-500 to-emerald-600';
-        if (occupancy >= 20) return 'from-blue-400 to-blue-500';
-        return 'from-gray-300 to-gray-400';
-    };
-
-    const getOccupancyLabel = (occupancy: number) => {
-        if (occupancy >= 95) return 'Full';
-        if (occupancy >= 80) return 'High';
-        if (occupancy >= 60) return 'Good';
-        if (occupancy >= 40) return 'Fair';
-        if (occupancy >= 20) return 'Low';
-        return 'Empty';
-    };
-
-    const previousMonth = () => {
-        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+    const prevMonth = () => {
+        setCurrentDate(new Date(year, month - 1, 1));
+        setSelectedDayData(null);
     };
 
     const nextMonth = () => {
-        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+        setCurrentDate(new Date(year, month + 1, 1));
+        setSelectedDayData(null);
     };
 
-    const days = getDaysInMonth(currentMonth);
-    const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const avgOccupancy = Math.round(
+        monthDaysData.reduce((acc, d) => acc + d.occupancyPct, 0) / monthDaysData.length
+    );
+    const totalMonthRevenue = monthDaysData.reduce((acc, d) => acc + d.revenueBDT, 0);
+    const avgADR = Math.round(
+        monthDaysData.reduce((acc, d) => acc + d.adrBDT, 0) / monthDaysData.length
+    );
+    const revPAR = Math.round((avgOccupancy / 100) * avgADR);
 
-    // Calculate stats
-    const totalOccupancy = Object.values(occupancyData).reduce((sum, day) => sum + day.occupancy, 0) / Object.keys(occupancyData).length;
-    const totalRevenue = Object.values(occupancyData).reduce((sum, day) => sum + day.revenue, 0);
+    const getOccupancyHeatColor = (pct: number) => {
+        if (pct >= 90) return 'bg-rose-50 border-rose-300 text-rose-900';
+        if (pct >= 75) return 'bg-amber-50 border-amber-300 text-amber-900';
+        if (pct >= 50) return 'bg-emerald-50 border-emerald-300 text-emerald-900';
+        return 'bg-blue-50 border-blue-200 text-blue-900';
+    };
+
+    const getBadgeStyle = (pct: number) => {
+        if (pct >= 90) return 'bg-rose-600 text-white';
+        if (pct >= 75) return 'bg-amber-500 text-white';
+        if (pct >= 50) return 'bg-emerald-600 text-white';
+        return 'bg-blue-500 text-white';
+    };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-orange-50/20 to-gray-50 p-4 md:p-6 lg:p-8">
-            {/* Header */}
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg shadow-orange-600/30">
-                        <TrendingUp size={24} className="text-white" />
+        <div className="h-full min-h-[calc(100vh-48px)] bg-gray-50 flex flex-col font-sans text-xs select-none animate-in fade-in duration-150">
+            {/* Master Header */}
+            <header className="bg-white border-b border-gray-200 px-3.5 py-2 flex items-center justify-between shadow-2xs z-20">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 flex items-center justify-center flex-shrink-0">
+                        <TrendingUp size={18} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Occupancy Heatmap</h1>
-                        <p className="text-sm text-gray-500">Visual calendar showing occupancy levels</p>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-sm font-bold text-gray-900 tracking-tight">
+                                Occupancy Heatmap & Revenue Forecast
+                            </h1>
+                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-orange-50 text-orange-700 border border-orange-200">
+                                30-Day Yield Matrix
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500">
+                            Calendar heat distribution of room inventory occupancy, daily revenue pacing, and dynamic yield pricing.
+                        </p>
                     </div>
                 </div>
-            </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl shadow-lg shadow-blue-500/30">
-                    <p className="text-blue-100 text-sm font-semibold mb-2">Avg. Occupancy</p>
-                    <p className="text-4xl font-bold text-white">{totalOccupancy.toFixed(0)}%</p>
-                </div>
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-2xl shadow-lg shadow-emerald-500/30">
-                    <p className="text-emerald-100 text-sm font-semibold mb-2">Total Revenue</p>
-                    <p className="text-4xl font-bold text-white">৳{(totalRevenue / 1000).toFixed(0)}K</p>
-                </div>
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl shadow-lg shadow-purple-500/30">
-                    <p className="text-purple-100 text-sm font-semibold mb-2">Peak Day</p>
-                    <p className="text-4xl font-bold text-white">100%</p>
-                </div>
-                <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-6 rounded-2xl shadow-lg shadow-amber-500/30">
-                    <p className="text-amber-100 text-sm font-semibold mb-2">Lowest Day</p>
-                    <p className="text-4xl font-bold text-white">58%</p>
-                </div>
-            </div>
-
-            {/* Controls */}
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border border-gray-200 shadow-lg mb-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                {/* Month Navigator */}
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
                         <button
-                            onClick={previousMonth}
-                            className="w-10 h-10 bg-white border border-gray-300 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all"
+                            onClick={prevMonth}
+                            className="p-1 hover:bg-white rounded text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
                         >
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={14} />
                         </button>
-                        <span className="text-lg font-bold text-gray-900 min-w-[200px] text-center">{monthName}</span>
+                        <span className="font-bold text-gray-900 px-3 text-xs">
+                            {monthNames[month]} {year}
+                        </span>
                         <button
                             onClick={nextMonth}
-                            className="w-10 h-10 bg-white border border-gray-300 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all"
+                            className="p-1 hover:bg-white rounded text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
                         >
-                            <ChevronRight size={20} />
+                            <ChevronRight size={14} />
                         </button>
                     </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Legend */}
-            <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-gray-200 shadow-lg mb-6">
-                <div className="flex items-center gap-6 text-sm flex-wrap">
-                    <span className="font-semibold text-gray-700">Occupancy Levels:</span>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-red-500 to-red-600 rounded"></div>
-                        <span className="text-gray-600">Full (95-100%)</span>
+            {/* Top KPI Metrics */}
+            <div className="bg-white border-b border-gray-200 px-3.5 py-2 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                    <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Avg Occupancy</span>
+                        <p className="text-base font-bold text-gray-900 mt-0.5">{avgOccupancy}%</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-orange-500 to-orange-600 rounded"></div>
-                        <span className="text-gray-600">High (80-94%)</span>
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        +4.2% vs May
+                    </span>
+                </div>
+
+                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                    <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Forecast Revenue</span>
+                        <p className="text-base font-bold text-blue-700 font-mono mt-0.5">৳ {(totalMonthRevenue / 100000).toFixed(2)}L</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded"></div>
-                        <span className="text-gray-600">Good (60-79%)</span>
+                    <span className="text-[10px] font-mono font-bold text-gray-500">
+                        {daysInMonth} Days
+                    </span>
+                </div>
+
+                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                    <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Avg Daily Rate (ADR)</span>
+                        <p className="text-base font-bold text-gray-900 font-mono mt-0.5">৳ {avgADR.toLocaleString()}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded"></div>
-                        <span className="text-gray-600">Fair (40-59%)</span>
+                    <span className="text-[9.5px] text-gray-400 uppercase">Per Room</span>
+                </div>
+
+                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                    <div>
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">RevPAR</span>
+                        <p className="text-base font-bold text-emerald-700 font-mono mt-0.5">৳ {revPAR.toLocaleString()}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-blue-400 to-blue-500 rounded"></div>
-                        <span className="text-gray-600">Low (20-39%)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-gradient-to-r from-gray-300 to-gray-400 rounded"></div>
-                        <span className="text-gray-600">Empty (&lt;20%)</span>
-                    </div>
+                    <span className="text-[9.5px] font-bold text-emerald-600">Optimal Yield</span>
                 </div>
             </div>
 
-            {/* Heatmap Calendar */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
-                <div className="grid grid-cols-7 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="p-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            {day}
-                        </div>
-                    ))}
+            {/* Heatmap Legend */}
+            <div className="bg-gray-50 px-3.5 py-1.5 border-b border-gray-200 flex items-center justify-between text-[10.5px]">
+                <div className="flex items-center gap-4">
+                    <span className="font-semibold text-gray-500">Density Scale:</span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded bg-blue-100 border border-blue-300" />
+                        <span>Low (0-49%)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" />
+                        <span>Healthy (50-74%)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded bg-amber-100 border border-amber-300" />
+                        <span>High Demand (75-89%)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded bg-rose-100 border border-rose-300" />
+                        <span>Sold Out / Surge (90-100%)</span>
+                    </span>
                 </div>
-                <div className="grid grid-cols-7">
-                    {days.map((day, index) => {
-                        if (!day) {
-                            return <div key={`empty-${index}`} className="aspect-square border border-gray-100 bg-gray-50" />;
-                        }
 
-                        const dateStr = formatDate(day);
-                        const dayData = occupancyData[dateStr];
-                        const isToday = formatDate(new Date()) === dateStr;
+                <span className="text-gray-400 text-[10px]">
+                    Click any day cell to open daily yield telemetry & pricing recommendations
+                </span>
+            </div>
 
-                        return (
-                            <div
-                                key={dateStr}
-                                className={`aspect-square border border-gray-200 p-3 transition-all hover:shadow-lg cursor-pointer group ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''
+            {/* Main Heatmap Grid & Inspection Drawer */}
+            <div className="flex-1 p-3 flex gap-3 overflow-hidden">
+                {/* 7-column Calendar Matrix */}
+                <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-2xs p-3 overflow-y-auto">
+                    {/* Weekday Headers */}
+                    <div className="grid grid-cols-7 gap-2 mb-2 text-center text-[10.5px] font-bold text-gray-500 uppercase">
+                        <div>Sun</div>
+                        <div>Mon</div>
+                        <div>Tue</div>
+                        <div>Wed</div>
+                        <div>Thu</div>
+                        <div className="text-blue-600">Fri</div>
+                        <div className="text-blue-600">Sat</div>
+                    </div>
+
+                    {/* Cells Grid */}
+                    <div className="grid grid-cols-7 gap-2">
+                        {/* Empty padding cells for start of month */}
+                        {Array.from({ length: startDayOfWeek }).map((_, idx) => (
+                            <div key={`empty-${idx}`} className="h-20 bg-gray-50/40 rounded-lg border border-dashed border-gray-200" />
+                        ))}
+
+                        {/* Actual Day Cells */}
+                        {monthDaysData.map(day => {
+                            const isSelected = selectedDayData?.dayNumber === day.dayNumber;
+                            const heatStyle = getOccupancyHeatColor(day.occupancyPct);
+                            const badgeStyle = getBadgeStyle(day.occupancyPct);
+
+                            return (
+                                <button
+                                    key={day.dayNumber}
+                                    onClick={() => setSelectedDayData(day)}
+                                    className={`h-20 p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer relative ${heatStyle} ${
+                                        isSelected ? 'ring-2 ring-blue-600 shadow-md scale-[1.02]' : 'hover:shadow-2xs'
                                     }`}
-                            >
-                                {dayData ? (
-                                    <div className={`h-full bg-gradient-to-br ${getOccupancyColor(dayData.occupancy)} rounded-xl p-3 flex flex-col justify-between shadow-md`}>
-                                        <div className="flex items-start justify-between">
-                                            <span className="text-sm font-bold text-white">{day.getDate()}</span>
-                                            <span className="text-[10px] font-bold text-white/90 bg-white/20 px-2 py-0.5 rounded-full">
-                                                {getOccupancyLabel(dayData.occupancy)}
-                                            </span>
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-gray-900 text-xs">
+                                            {day.dayNumber}
+                                        </span>
+                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold font-mono ${badgeStyle}`}>
+                                            {day.occupancyPct}%
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-0.5">
+                                        <div className="flex justify-between items-center text-[10px] text-gray-600">
+                                            <span>Rooms:</span>
+                                            <span className="font-bold font-mono text-gray-800">{day.occupiedRooms}/{day.totalRooms}</span>
                                         </div>
-                                        <div className="space-y-1">
-                                            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2">
-                                                <p className="text-2xl font-bold text-white text-center">{dayData.occupancy}%</p>
-                                            </div>
-                                            <div className="text-white/90 text-[10px] space-y-0.5">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="flex items-center gap-1">
-                                                        <Users size={10} />
-                                                        {dayData.bookedRooms}/{dayData.bookedRooms + dayData.availableRooms}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <DollarSign size={10} />
-                                                        {(dayData.revenue / 1000).toFixed(0)}K
-                                                    </span>
-                                                </div>
-                                            </div>
+                                        <div className="flex justify-between items-center text-[10px] text-gray-600">
+                                            <span>Revenue:</span>
+                                            <span className="font-bold font-mono text-gray-900">৳{(day.revenueBDT / 1000).toFixed(0)}k</span>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="h-full bg-gray-50 rounded-xl p-3 flex items-start">
-                                        <span className="text-sm font-semibold text-gray-400">{day.getDate()}</span>
-                                    </div>
-                                )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Day Inspector Drawer */}
+                <div className="w-80 bg-white rounded-xl border border-gray-200 shadow-2xs p-3.5 flex flex-col justify-between flex-shrink-0">
+                    {selectedDayData ? (
+                        <div className="space-y-3.5">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-900">
+                                        {selectedDayData.dateStr}
+                                    </h3>
+                                    <p className="text-[10.5px] text-gray-500">Day {selectedDayData.dayNumber} Performance</p>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded text-[10.5px] font-bold font-mono ${getBadgeStyle(selectedDayData.occupancyPct)}`}>
+                                    {selectedDayData.occupancyPct}% Occupancy
+                                </span>
                             </div>
-                        );
-                    })}
+
+                            <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 space-y-2">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500">Rooms Occupied:</span>
+                                    <span className="font-bold font-mono text-gray-900">{selectedDayData.occupiedRooms} / {selectedDayData.totalRooms}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500">Unsold Rooms:</span>
+                                    <span className="font-bold font-mono text-rose-700">{selectedDayData.totalRooms - selectedDayData.occupiedRooms} Available</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500">Arrivals Due:</span>
+                                    <span className="font-bold font-mono text-blue-700">{selectedDayData.arrivals} Check-ins</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500">Departures Due:</span>
+                                    <span className="font-bold font-mono text-gray-700">{selectedDayData.departures} Check-outs</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 space-y-1">
+                                <span className="text-[9.5px] font-bold text-blue-800 uppercase">Daily Revenue Yield</span>
+                                <p className="text-lg font-bold font-mono text-blue-900">
+                                    ৳ {selectedDayData.revenueBDT.toLocaleString()}
+                                </p>
+                                <p className="text-[10px] text-blue-700">Average Daily Rate (ADR): ৳ {selectedDayData.adrBDT.toLocaleString()}</p>
+                            </div>
+
+                            <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200 flex items-start gap-2">
+                                <Sparkles size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <span className="text-[10px] font-bold text-amber-900 uppercase">AI Revenue Optimizer</span>
+                                    <p className="text-[10.5px] text-amber-800 mt-0.5 font-semibold">
+                                        {selectedDayData.pricingSurge}
+                                    </p>
+                                    <p className="text-[10px] text-amber-700 mt-0.5">
+                                        Recommended base rack adjustment to maximize yield and RevPAR for this date.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-4 text-gray-400 space-y-2">
+                            <Calendar size={28} className="text-gray-300" />
+                            <p className="font-semibold text-xs text-gray-600">Select Date</p>
+                            <p className="text-[11px] text-gray-400">Click on any calendar day in the heatmap to view detailed room pacing, ADR, and revenue yield.</p>
+                        </div>
+                    )}
+
+                    <div className="pt-3 border-t border-gray-200 text-center text-[10px] text-gray-400">
+                        Occupancy Heatmap Engine • HotelOS 2026
+                    </div>
                 </div>
             </div>
         </div>
