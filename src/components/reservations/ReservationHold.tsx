@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Clock,
-    Plus,
-    Search,
-    Trash2,
-    CheckCircle2,
-    X
+    Clock, Plus, Search, CheckCircle2, X,
+    ArrowRight, Check, RefreshCw
 } from 'lucide-react';
+import { useNavigation } from '../../context/NavigationContext';
 
 export interface HoldItem {
     id: number;
     reservationNumber: string;
     guestName: string;
+    contact?: string;
     status: 'Hold' | 'Confirmed' | 'Expired';
     holdStartDate: string;
     holdEndDate: string;
@@ -21,17 +19,65 @@ export interface HoldItem {
     checkOutDate: string;
     roomType: string;
     estimatedAmount: number;
+    depositRequiredBDT?: number;
 }
 
 const INITIAL_HOLDS: HoldItem[] = [
-    { id: 1, reservationNumber: 'RES-000000000009', guestName: 'Brig. Gen. M. Haque', status: 'Hold', holdStartDate: '2026-07-14', holdEndDate: '2026-07-16', reason: 'Awaiting official government delegation clearance letter.', reservationDate: '2026-07-12', checkInDate: '2026-07-20', checkOutDate: '2026-07-25', roomType: 'Executive Suite', estimatedAmount: 37500 },
-    { id: 2, reservationNumber: 'RES-000000000010', guestName: 'Beximco Pharma VIP Team', status: 'Hold', holdStartDate: '2026-07-15', holdEndDate: '2026-07-17', reason: 'Corporate purchase order pending final procurement signature.', reservationDate: '2026-07-13', checkInDate: '2026-07-22', checkOutDate: '2026-07-24', roomType: 'Deluxe Double', estimatedAmount: 21000 },
-    { id: 3, reservationNumber: 'RES-000000000011', guestName: 'Mr. David Wilson (UK)', status: 'Hold', holdStartDate: '2026-07-10', holdEndDate: '2026-07-12', reason: 'Connecting flight confirmation from Dubai pending.', reservationDate: '2026-07-09', checkInDate: '2026-07-18', checkOutDate: '2026-07-21', roomType: 'Superior King', estimatedAmount: 13500 }
+    { 
+        id: 1, 
+        reservationNumber: 'HLD-2026-001', 
+        guestName: 'Brig. Gen. M. Haque', 
+        contact: '+880 1711-123456', 
+        status: 'Hold', 
+        holdStartDate: '2026-06-29', 
+        holdEndDate: '2026-07-02', 
+        reason: 'Awaiting official government defense delegation travel clearance letter.', 
+        reservationDate: '2026-06-29', 
+        checkInDate: '2026-07-10', 
+        checkOutDate: '2026-07-15', 
+        roomType: 'Executive Suite', 
+        estimatedAmount: 32500,
+        depositRequiredBDT: 10000
+    },
+    { 
+        id: 2, 
+        reservationNumber: 'HLD-2026-002', 
+        guestName: 'Beximco Pharma VIP Team', 
+        contact: '+880 1819-234567', 
+        status: 'Hold', 
+        holdStartDate: '2026-06-30', 
+        holdEndDate: '2026-07-01', 
+        reason: 'Corporate purchase order pending final regional finance director signature.', 
+        reservationDate: '2026-06-30', 
+        checkInDate: '2026-07-05', 
+        checkOutDate: '2026-07-08', 
+        roomType: 'Deluxe Double', 
+        estimatedAmount: 18000,
+        depositRequiredBDT: 6000
+    },
+    { 
+        id: 3, 
+        reservationNumber: 'HLD-2026-003', 
+        guestName: 'Mr. David Wilson (UK Embassy)', 
+        contact: '+44 7911-123456', 
+        status: 'Hold', 
+        holdStartDate: '2026-07-01', 
+        holdEndDate: '2026-07-03', 
+        reason: 'Connecting Emirates flight confirmation from Dubai pending arrival visa issue.', 
+        reservationDate: '2026-07-01', 
+        checkInDate: '2026-07-12', 
+        checkOutDate: '2026-07-16', 
+        roomType: 'Superior King', 
+        estimatedAmount: 18000,
+        depositRequiredBDT: 9000
+    }
 ];
 
 export const ReservationHold: React.FC = () => {
+    const { setActivePage } = useNavigation();
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'Hold' | 'Confirmed' | 'Expired'>('all');
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const showToast = (msg: string) => {
@@ -41,25 +87,39 @@ export const ReservationHold: React.FC = () => {
 
     // Hydrate state
     const [holds, setHolds] = useState<HoldItem[]>(() => {
-        const saved = localStorage.getItem('hotel_holds_v2');
-        return saved ? JSON.parse(saved) : INITIAL_HOLDS;
+        try {
+            const saved = localStorage.getItem('hotel_holds_v2');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        return INITIAL_HOLDS;
     });
 
     useEffect(() => {
-        localStorage.setItem('hotel_holds_v2', JSON.stringify(holds));
+        try {
+            localStorage.setItem('hotel_holds_v2', JSON.stringify(holds));
+        } catch (e) {
+            console.error(e);
+        }
     }, [holds]);
 
-    // Form Modal State
+    // Modal Form State
     const [form, setForm] = useState({
-        reservationNumber: `RES-${String(Math.floor(100000000000 + Math.random() * 900000000000))}`,
+        reservationNumber: `HLD-2026-00${holds.length + 1}`,
         guestName: '',
-        holdStartDate: new Date().toISOString().split('T')[0],
-        holdEndDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-        checkInDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-        checkOutDate: new Date(Date.now() + 86400000 * 8).toISOString().split('T')[0],
+        contact: '',
+        holdStartDate: '2026-07-01',
+        holdEndDate: '2026-07-03',
+        checkInDate: '2026-07-08',
+        checkOutDate: '2026-07-11',
         roomType: 'Deluxe Double',
-        estimatedAmount: 10500,
-        reason: ''
+        estimatedAmount: 9000,
+        depositRequiredBDT: 3000,
+        reason: 'Awaiting formal corporate confirmation & advance payment.'
     });
 
     const handleCreateHold = (e: React.FormEvent) => {
@@ -68,8 +128,9 @@ export const ReservationHold: React.FC = () => {
 
         const newItem: HoldItem = {
             id: Date.now(),
-            reservationNumber: form.reservationNumber,
+            reservationNumber: `HLD-2026-${String(Math.floor(100 + Math.random() * 900))}`,
             guestName: form.guestName,
+            contact: form.contact || '+880 1711-000000',
             status: 'Hold',
             holdStartDate: form.holdStartDate,
             holdEndDate: form.holdEndDate,
@@ -78,183 +139,333 @@ export const ReservationHold: React.FC = () => {
             checkInDate: form.checkInDate,
             checkOutDate: form.checkOutDate,
             roomType: form.roomType,
-            estimatedAmount: form.estimatedAmount
+            estimatedAmount: form.estimatedAmount,
+            depositRequiredBDT: form.depositRequiredBDT
         };
 
         setHolds(prev => [newItem, ...prev]);
-        showToast(`Hold reservation created for ${newItem.guestName}`);
+        showToast(`Hold reservation ${newItem.reservationNumber} created for ${newItem.guestName}`);
         setIsModalOpen(false);
     };
 
-    const handleConfirmBooking = (id: number) => {
+    const handleConfirmBooking = (item: HoldItem) => {
+        // Convert hold to confirmed reservation
         setHolds(prev =>
-            prev.map(h => h.id === id ? { ...h, status: 'Confirmed' } : h)
+            prev.map(h => h.id === item.id ? { ...h, status: 'Confirmed' } : h)
         );
-        showToast('Hold reservation successfully converted to Confirmed Booking!');
+
+        // Also push into active reservations in hotel_reservations_v2
+        try {
+            const existingResStr = localStorage.getItem('hotel_reservations_v2');
+            const existingRes = existingResStr ? JSON.parse(existingResStr) : [];
+            const newRes = {
+                id: Date.now(),
+                reservationNumber: `RES-${String(Math.floor(100000 + Math.random() * 900000))}`,
+                guestName: item.guestName,
+                phone: item.contact || '+880 1711-000000',
+                roomNumber: '102',
+                roomType: item.roomType,
+                roomStatus: 'clean',
+                checkIn: item.checkInDate,
+                checkOut: item.checkOutDate,
+                nights: 3,
+                adults: 2,
+                children: 0,
+                totalAmount: item.estimatedAmount,
+                paidAmount: item.depositRequiredBDT || 0,
+                dueAmount: Math.max(0, item.estimatedAmount - (item.depositRequiredBDT || 0)),
+                status: 'arriving',
+                source: 'Confirmed from Hold',
+                vip: 'VIP',
+                specialRequests: `Converted from Hold ${item.reservationNumber}`
+            };
+            existingRes.unshift(newRes);
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(existingRes));
+        } catch (e) {
+            console.error('Failed to convert hold to reservation', e);
+        }
+
+        showToast(`Hold ${item.reservationNumber} converted to active Confirmed Reservation!`);
     };
 
-    const handleDelete = (id: number) => {
-        if (window.confirm('Are you sure you want to release and delete this hold booking?')) {
+    const handleReleaseHold = (id: number) => {
+        if (window.confirm('Release and cancel this hold booking? Room inventory will be freed for public sale.')) {
             setHolds(prev => prev.filter(h => h.id !== id));
-            showToast('Hold reservation released.');
+            showToast('Hold reservation released. Room inventory unlocked.');
         }
     };
 
-    const filtered = holds.filter(h =>
-        h.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.reason.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Filter Logic
+    const filtered = useMemo(() => {
+        return holds.filter(h => {
+            const matchesQuery =
+                h.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                h.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                h.roomType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                h.reason.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesStatus = filterStatus === 'all' || h.status === filterStatus;
+            return matchesQuery && matchesStatus;
+        });
+    }, [holds, searchQuery, filterStatus]);
+
+    const activeHolds = useMemo(() => holds.filter(h => h.status === 'Hold'), [holds]);
+    const expiringTodayCount = useMemo(() => holds.filter(h => h.status === 'Hold' && h.holdEndDate <= '2026-07-01').length, [holds]);
+    const totalPotentialRevenue = useMemo(() => holds.reduce((acc, h) => acc + (Number(h.estimatedAmount) || 0), 0), [holds]);
 
     return (
-        <div className="p-3 sm:p-4 max-w-full space-y-2.5 animate-in fade-in duration-150 text-xs">
+        <div className="p-3 sm:p-4 max-w-[1400px] mx-auto space-y-3 font-sans select-none animate-in fade-in duration-150">
             {toastMessage && (
-                <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle2 size={14} className="text-emerald-400" />
+                <div className="fixed top-4 right-4 z-[99999] bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-top-2">
+                    <CheckCircle2 size={16} className="text-emerald-400" />
                     <span>{toastMessage}</span>
                 </div>
             )}
 
-            {/* Compact Header Bar */}
-            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center flex-shrink-0">
-                        <Clock size={18} />
+            {/* Top Operational Header */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-amber-700 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
+                        <Clock size={20} />
                     </div>
-                    <div className="min-w-0">
+                    <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-gray-900 tracking-tight truncate">
-                                Tentative Reservation Hold List
+                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
+                                Reservation Hold &amp; Tentative Block Queue
                             </h1>
-                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-200">
-                                Auto-Release Guard
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                {activeHolds.length} Active Holds
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-500 truncate">
-                            Track tentative room blocks awaiting payment or confirmation with auto-release deadlines.
+                        <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
+                            Manages tentative room blocks pending purchase orders, embassy visas, or advance bank transfers
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Primary Actions */}
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(true)}
-                        className="h-7 px-3 text-[11px] font-bold bg-[#1e3a8a] hover:bg-blue-900 text-white rounded shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
+                        className="h-8.5 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                     >
-                        <Plus size={13} />
-                        <span>Create Hold</span>
+                        <Plus size={14} className="stroke-[2.5]" />
+                        <span>New Hold Block</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActivePage('front-desk')}
+                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                    >
+                        <span>Front Desk</span>
+                        <ArrowRight size={13} />
                     </button>
                 </div>
             </div>
 
-            {/* Compact Controls Bar */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs px-3 py-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-medium text-[11px]">Active Holds:</span>
-                    <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold font-mono text-[11px]">
-                        {holds.filter(h => h.status === 'Hold').length} Pending
-                    </span>
-                    <span className="text-gray-300">|</span>
-                    <span className="text-gray-500 font-medium text-[11px]">Confirmed:</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold font-mono text-[11px]">
-                        {holds.filter(h => h.status === 'Confirmed').length}
-                    </span>
+            {/* Metric KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Holds</span>
+                    <div className="text-xl font-black text-amber-900 font-mono mt-0.5">{activeHolds.length} Rooms</div>
+                    <p className="text-[10px] text-slate-500 mt-1">Temporarily blocked from sale</p>
                 </div>
 
-                <div className="relative">
-                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Search guest, res #, reason..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="h-7 pl-7 pr-2.5 text-[11px] border border-gray-200 rounded-md bg-white outline-none w-52 sm:w-60 focus:border-amber-500"
-                    />
+                <div className="bg-rose-50/70 p-3 rounded-xl border border-rose-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Expiring Today</span>
+                    <div className="text-xl font-black text-rose-900 font-mono mt-0.5">{expiringTodayCount} Deadline</div>
+                    <p className="text-[10px] text-rose-700 mt-1">Requires confirmation or release</p>
+                </div>
+
+                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Converted to Confirmed</span>
+                    <div className="text-xl font-black text-emerald-950 font-mono mt-0.5">
+                        {holds.filter(h => h.status === 'Confirmed').length} Bookings
+                    </div>
+                    <p className="text-[10px] text-emerald-700 mt-1">Successfully booked</p>
+                </div>
+
+                <div className="bg-gradient-to-br from-slate-900 to-[#1e3a8a] text-white p-3 rounded-xl shadow-xs">
+                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">Potential Revenue</span>
+                    <div className="text-xl font-black font-mono mt-0.5">BDT {totalPotentialRevenue.toLocaleString()}</div>
+                    <p className="text-[10px] text-blue-200/80 mt-1">Held inventory value</p>
                 </div>
             </div>
 
-            {/* Compact Table View */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
-                <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left min-w-[900px] border-collapse">
+            {/* Filter & Search Bar */}
+            <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-3 flex flex-col md:flex-row items-center justify-between gap-2.5">
+                <div className="relative w-full md:w-80">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search Guest, Hold #, Room Type, Reason..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full h-8 pl-8 pr-3 bg-slate-50/60 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
+                    />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status:</span>
+                        <select
+                            value={filterStatus}
+                            onChange={e => setFilterStatus(e.target.value as any)}
+                            className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:border-blue-500"
+                        >
+                            <option value="all">All Holds</option>
+                            <option value="Hold">Active Hold</option>
+                            <option value="Confirmed">Confirmed Bookings</option>
+                            <option value="Expired">Expired</option>
+                        </select>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSearchQuery('');
+                            setFilterStatus('all');
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Reset Filters"
+                    >
+                        <RefreshCw size={13} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Hold Register Table */}
+            <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
-                                <th className="px-3 py-2">Hold Res #</th>
-                                <th className="px-3 py-2">Guest / Entity</th>
-                                <th className="px-3 py-2">Room Type</th>
-                                <th className="px-3 py-2">Planned Stay</th>
-                                <th className="px-3 py-2">Hold Expiration Window</th>
-                                <th className="px-3 py-2">Hold Reason & Notes</th>
-                                <th className="px-3 py-2">Est. Tariff</th>
-                                <th className="px-3 py-2">Status</th>
-                                <th className="px-3 py-2 text-right">Actions</th>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                                <th className="py-2.5 px-3.5">Guest &amp; Reference</th>
+                                <th className="py-2.5 px-3">Room Category</th>
+                                <th className="py-2.5 px-3">Intended Stay</th>
+                                <th className="py-2.5 px-3">Hold Expiry Deadline</th>
+                                <th className="py-2.5 px-3">Hold Reason</th>
+                                <th className="py-2.5 px-3 text-right">Tariff Value</th>
+                                <th className="py-2.5 px-3.5 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 text-[11.5px]">
-                            {filtered.length === 0 ? (
+                        <tbody className="divide-y divide-slate-100">
+                            {filtered.length > 0 ? (
+                                filtered.map(h => {
+                                    const isHold = h.status === 'Hold';
+                                    const isExpiring = isHold && h.holdEndDate <= '2026-07-01';
+
+                                    return (
+                                        <tr key={h.id} className="hover:bg-amber-50/15 transition-colors">
+                                            {/* Guest & Reference */}
+                                            <td className="py-2.5 px-3.5">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                                        {h.guestName.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-900">{h.guestName}</div>
+                                                        <div className="text-[10.5px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+                                                            <span className="font-mono text-blue-700 font-semibold">{h.reservationNumber}</span>
+                                                            {h.contact && (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <span>{h.contact}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Category */}
+                                            <td className="py-2.5 px-3">
+                                                <span className="font-bold text-slate-800">{h.roomType}</span>
+                                                <span className="text-[10px] text-slate-400 block mt-0.5">Tentative Lock</span>
+                                            </td>
+
+                                            {/* Stay Dates */}
+                                            <td className="py-2.5 px-3">
+                                                <div className="text-[11px] font-semibold text-slate-800 leading-tight">
+                                                    <span>{h.checkInDate}</span> ➔ <span>{h.checkOutDate}</span>
+                                                </div>
+                                            </td>
+
+                                            {/* Hold Deadline */}
+                                            <td className="py-2.5 px-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-bold text-amber-900 text-xs">{h.holdEndDate}</span>
+                                                    {isExpiring && (
+                                                        <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 font-bold text-[9px] animate-pulse">
+                                                            Expires Today!
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-[10px] text-slate-400 block mt-0.5">Auto-release at 18:00</span>
+                                            </td>
+
+                                            {/* Reason */}
+                                            <td className="py-2.5 px-3">
+                                                <p className="text-[11px] text-slate-700 max-w-[240px] leading-relaxed truncate">
+                                                    {h.reason}
+                                                </p>
+                                            </td>
+
+                                            {/* Tariff */}
+                                            <td className="py-2.5 px-3 text-right">
+                                                <div className="font-mono font-bold text-slate-900 text-xs">
+                                                    ৳{h.estimatedAmount.toLocaleString()}
+                                                </div>
+                                                <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                                                    Dep: ৳{(h.depositRequiredBDT || 0).toLocaleString()}
+                                                </span>
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="py-2.5 px-3.5 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {isHold ? (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleConfirmBooking(h)}
+                                                                className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                                title="Convert Hold into Confirmed Active Booking"
+                                                            >
+                                                                <Check size={11} className="stroke-[3]" />
+                                                                <span>Confirm</span>
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleReleaseHold(h.id)}
+                                                                className="h-7 px-2 border border-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold rounded-lg text-[10.5px] cursor-pointer transition-colors"
+                                                                title="Release Room back to General Sale"
+                                                            >
+                                                                Release
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            {h.status}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
                                 <tr>
-                                    <td colSpan={9} className="px-4 py-6 text-center text-gray-400">
-                                        No hold reservations found.
+                                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                                        <div className="flex flex-col items-center justify-center gap-1.5">
+                                            <Clock size={26} className="text-slate-300" />
+                                            <p className="text-xs font-bold text-slate-700">No hold reservations in queue</p>
+                                            <p className="text-[11px] text-slate-400">All room inventory is available for direct reservation.</p>
+                                        </div>
                                     </td>
                                 </tr>
-                            ) : (
-                                filtered.map(h => (
-                                    <tr key={h.id} className="hover:bg-amber-50/20 transition-colors">
-                                        <td className="px-3 py-1.5 font-mono font-bold text-amber-800">
-                                            {h.reservationNumber}
-                                        </td>
-                                        <td className="px-3 py-1.5 font-semibold text-gray-900">
-                                            {h.guestName}
-                                        </td>
-                                        <td className="px-3 py-1.5 text-gray-700">
-                                            {h.roomType}
-                                        </td>
-                                        <td className="px-3 py-1.5 whitespace-nowrap text-gray-600">
-                                            {h.checkInDate} → {h.checkOutDate}
-                                        </td>
-                                        <td className="px-3 py-1.5 whitespace-nowrap font-mono text-[10.5px] text-amber-900 font-semibold">
-                                            {h.holdStartDate} → {h.holdEndDate}
-                                        </td>
-                                        <td className="px-3 py-1.5 text-gray-600 max-w-xs truncate" title={h.reason}>
-                                            {h.reason}
-                                        </td>
-                                        <td className="px-3 py-1.5 font-mono font-bold text-gray-900 whitespace-nowrap">
-                                            ৳ {h.estimatedAmount.toLocaleString()}
-                                        </td>
-                                        <td className="px-3 py-1.5">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                h.status === 'Hold'
-                                                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                            }`}>
-                                                {h.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                                            <div className="flex items-center justify-end gap-1.5">
-                                                {h.status === 'Hold' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleConfirmBooking(h.id)}
-                                                        className="h-5 px-2 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
-                                                        title="Convert to Confirmed Reservation"
-                                                    >
-                                                        Confirm
-                                                    </button>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDelete(h.id)}
-                                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded cursor-pointer"
-                                                    title="Release Hold"
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
                             )}
                         </tbody>
                     </table>
@@ -263,116 +474,147 @@ export const ReservationHold: React.FC = () => {
 
             {/* Create Hold Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
-                        <div className="px-4 py-3 bg-[#1e3a8a] text-white flex items-center justify-between">
-                            <h3 className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                                <Clock size={14} />
-                                <span>Create Tentative Reservation Hold</span>
-                            </h3>
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[500px] w-full p-4.5 space-y-3.5 animate-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold">
+                                    <Clock size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900">Create Tentative Hold Block</h3>
+                                    <p className="text-[10.5px] text-slate-500">Temporarily reserve room pending payment confirmation</p>
+                                </div>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="text-white/80 hover:text-white p-0.5 rounded"
+                                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
                             >
-                                <X size={16} />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleCreateHold} className="p-4 space-y-3 text-xs">
-                            <div className="grid grid-cols-2 gap-3">
+                        <form onSubmit={handleCreateHold} className="space-y-3 text-xs">
+                            <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="font-semibold text-gray-700">Guest Name / Entity *</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Guest / Group Name</label>
                                     <input
                                         type="text"
-                                        required
-                                        placeholder="Full Name / Company"
                                         value={form.guestName}
                                         onChange={e => setForm({ ...form, guestName: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-semibold"
+                                        placeholder="e.g. Beximco Delegation"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="font-semibold text-gray-700">Room Category</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Mobile Number</label>
+                                    <input
+                                        type="text"
+                                        value={form.contact}
+                                        onChange={e => setForm({ ...form, contact: e.target.value })}
+                                        placeholder="+880 1711-000000"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Room Category</label>
                                     <select
                                         value={form.roomType}
                                         onChange={e => setForm({ ...form, roomType: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs font-semibold bg-white"
                                     >
                                         <option value="Deluxe Double">Deluxe Double</option>
-                                        <option value="Executive Suite">Executive Suite</option>
                                         <option value="Superior King">Superior King</option>
+                                        <option value="Executive Suite">Executive Suite</option>
+                                        <option value="Standard Single">Standard Single</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="font-semibold text-gray-700">Planned Check-In</label>
-                                    <input
-                                        type="date"
-                                        value={form.checkInDate}
-                                        onChange={e => setForm({ ...form, checkInDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="font-semibold text-gray-700">Planned Check-Out</label>
-                                    <input
-                                        type="date"
-                                        value={form.checkOutDate}
-                                        onChange={e => setForm({ ...form, checkOutDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="font-semibold text-gray-700">Hold Active From</label>
-                                    <input
-                                        type="date"
-                                        value={form.holdStartDate}
-                                        onChange={e => setForm({ ...form, holdStartDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="font-semibold text-gray-700">Release Deadline</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Hold Release Deadline</label>
                                     <input
                                         type="date"
                                         value={form.holdEndDate}
                                         onChange={e => setForm({ ...form, holdEndDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-bold text-amber-700"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs font-bold text-amber-900"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Target Check-In</label>
+                                    <input
+                                        type="date"
+                                        value={form.checkInDate}
+                                        onChange={e => setForm({ ...form, checkInDate: e.target.value })}
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Target Check-Out</label>
+                                    <input
+                                        type="date"
+                                        value={form.checkOutDate}
+                                        onChange={e => setForm({ ...form, checkOutDate: e.target.value })}
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Estimated Total (BDT)</label>
+                                    <input
+                                        type="number"
+                                        value={form.estimatedAmount}
+                                        onChange={e => setForm({ ...form, estimatedAmount: Number(e.target.value) })}
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono font-bold text-xs"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Deposit Needed (BDT)</label>
+                                    <input
+                                        type="number"
+                                        value={form.depositRequiredBDT}
+                                        onChange={e => setForm({ ...form, depositRequiredBDT: Number(e.target.value) })}
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono font-bold text-xs"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="font-semibold text-gray-700">Hold Reason & Justification *</label>
+                                <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Hold Justification / Reason</label>
                                 <textarea
-                                    required
                                     rows={2}
-                                    placeholder="Explain why room is held without deposit (e.g. government clearance, PO pending)..."
                                     value={form.reason}
                                     onChange={e => setForm({ ...form, reason: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded text-xs mt-1 outline-none resize-none"
+                                    className="w-full p-2 border border-slate-200 rounded-lg text-xs"
+                                    required
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                            <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="h-7 px-3 border border-gray-300 text-gray-600 rounded text-xs font-semibold cursor-pointer"
+                                    className="h-8 px-3.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-xs font-bold cursor-pointer"
+                                    className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer shadow-xs"
                                 >
-                                    Create Hold Lock
+                                    <Check size={13} className="stroke-[3]" />
+                                    <span>Create Hold Block</span>
                                 </button>
                             </div>
                         </form>

@@ -1,13 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { toast } from '../../context/ToastContext';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Moon,
-    Plus,
-    Search,
-    Trash2,
-    CheckCircle2,
-    X
+    Moon, Plus, Search, Trash2, CheckCircle2, X,
+    Printer, RefreshCw, ArrowRight, Check
 } from 'lucide-react';
+import { useNavigation } from '../../context/NavigationContext';
 
 export interface SleepOutItem {
     id: number;
@@ -15,23 +11,56 @@ export interface SleepOutItem {
     guestName: string;
     reason: string;
     roomType: string;
-    roomCode: string;
     roomNumber: string;
     contact: string;
     startDate: string;
     endDate: string;
+    expectedReturnTime?: string;
     status: 'Sleeping Out' | 'Returned';
+    keyCardLocation: 'Held at Front Desk' | 'With Guest';
+    securityPassNo: string;
 }
 
 const INITIAL_SLEEPOUTS: SleepOutItem[] = [
-    { id: 1, reservationNumber: 'RES-009281', guestName: 'Md. Tariqul Islam', reason: 'Midnight executive meeting in Chittagong, returning tomorrow morning.', roomType: 'Deluxe Double', roomCode: 'DLX-101', roomNumber: '101', contact: '+880 1711-928371', startDate: '2026-07-02', endDate: '2026-07-03', status: 'Sleeping Out' },
-    { id: 2, reservationNumber: 'RES-009285', guestName: 'Dr. Jean Dupont', reason: 'Emergency medical consultation trip outside Dhaka.', roomType: 'Executive Suite', roomCode: 'SUT-203', roomNumber: '203', contact: '+33 612-384920', startDate: '2026-07-03', endDate: '2026-07-04', status: 'Sleeping Out' }
+    { 
+        id: 1, 
+        reservationNumber: 'RES-892104', 
+        guestName: 'Zubair Ahmed', 
+        reason: 'Midnight executive board meeting in Chittagong, returning tomorrow morning.', 
+        roomType: 'Deluxe Double', 
+        roomNumber: '101', 
+        contact: '+880 1611-987654', 
+        startDate: '2026-07-01', 
+        endDate: '2026-07-02', 
+        expectedReturnTime: '09:00 AM', 
+        status: 'Sleeping Out',
+        keyCardLocation: 'Held at Front Desk',
+        securityPassNo: 'SO-2026-042'
+    },
+    { 
+        id: 2, 
+        reservationNumber: 'RES-892105', 
+        guestName: 'Mim Akter', 
+        reason: 'Emergency research consultation outside Dhaka division.', 
+        roomType: 'Executive Suite', 
+        roomNumber: '410', 
+        contact: '+880 1733-456789', 
+        startDate: '2026-06-30', 
+        endDate: '2026-07-01', 
+        expectedReturnTime: '12:00 PM', 
+        status: 'Sleeping Out',
+        keyCardLocation: 'With Guest',
+        securityPassNo: 'SO-2026-041'
+    }
 ];
 
 export const ReservationSleepOut: React.FC = () => {
+    const { setActivePage } = useNavigation();
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'Sleeping Out' | 'Returned'>('all');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [printPassTarget, setPrintPassTarget] = useState<SleepOutItem | null>(null);
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -40,32 +69,43 @@ export const ReservationSleepOut: React.FC = () => {
 
     // Hydrate state
     const [sleepOuts, setSleepOuts] = useState<SleepOutItem[]>(() => {
-        const saved = localStorage.getItem('hotel_sleepouts_v2');
-        return saved ? JSON.parse(saved) : INITIAL_SLEEPOUTS;
+        try {
+            const saved = localStorage.getItem('hotel_sleepouts_v2');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        return INITIAL_SLEEPOUTS;
     });
 
     useEffect(() => {
-        localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(sleepOuts));
+        try {
+            localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(sleepOuts));
+        } catch (e) {
+            console.error(e);
+        }
     }, [sleepOuts]);
 
     // Modal Form State
     const [form, setForm] = useState({
-        reservationNumber: '',
-        guestName: '',
-        roomNumber: '101',
+        reservationNumber: 'RES-892101',
+        guestName: 'Mahmudul Hasan',
+        roomNumber: '102',
         roomType: 'Deluxe Double',
-        contact: '',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-        reason: ''
+        contact: '+880 1711-234567',
+        startDate: '2026-07-01',
+        endDate: '2026-07-02',
+        expectedReturnTime: '10:00 AM',
+        reason: 'Out-of-town business trip. Room remains booked and billed.',
+        keyCardLocation: 'Held at Front Desk' as const
     });
 
     const handleCreateSleepOut = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.guestName || !form.reservationNumber) {
-            toast.warning('Please provide guest name and reservation number.');
-            return;
-        }
+        if (!form.guestName || !form.reservationNumber) return;
 
         const newItem: SleepOutItem = {
             id: Date.now(),
@@ -73,16 +113,18 @@ export const ReservationSleepOut: React.FC = () => {
             guestName: form.guestName,
             reason: form.reason,
             roomType: form.roomType,
-            roomCode: `RM-${form.roomNumber}`,
             roomNumber: form.roomNumber,
             contact: form.contact || '+880 1700-000000',
             startDate: form.startDate,
             endDate: form.endDate,
-            status: 'Sleeping Out'
+            expectedReturnTime: form.expectedReturnTime,
+            status: 'Sleeping Out',
+            keyCardLocation: form.keyCardLocation,
+            securityPassNo: `SO-2026-${String(Math.floor(100 + Math.random() * 900))}`
         };
 
         setSleepOuts(prev => [newItem, ...prev]);
-        showToast(`Sleep-out logged for ${newItem.guestName}`);
+        showToast(`Sleep-out pass registered for ${newItem.guestName} (Room ${newItem.roomNumber})`);
         setIsModalOpen(false);
     };
 
@@ -90,7 +132,7 @@ export const ReservationSleepOut: React.FC = () => {
         setSleepOuts(prev =>
             prev.map(s => s.id === id ? { ...s, status: 'Returned' } : s)
         );
-        showToast('Guest marked as returned to room.');
+        showToast('Guest marked as returned to room. Security pass closed.');
     };
 
     const handleDelete = (id: number) => {
@@ -100,281 +142,474 @@ export const ReservationSleepOut: React.FC = () => {
         }
     };
 
-    const filtered = sleepOuts.filter(s =>
-        s.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.roomNumber.includes(searchQuery) ||
-        s.reason.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Filter Logic
+    const filtered = useMemo(() => {
+        return sleepOuts.filter(s => {
+            const matchesQuery =
+                s.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.reason.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
+            return matchesQuery && matchesStatus;
+        });
+    }, [sleepOuts, searchQuery, filterStatus]);
+
+    const activeOutCount = useMemo(() => sleepOuts.filter(s => s.status === 'Sleeping Out').length, [sleepOuts]);
 
     return (
-        <div className="p-3 sm:p-4 max-w-full space-y-2.5 animate-in fade-in duration-150 text-xs">
+        <div className="p-3 sm:p-4 max-w-[1400px] mx-auto space-y-3 font-sans select-none animate-in fade-in duration-150">
             {toastMessage && (
-                <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle2 size={14} className="text-emerald-400" />
+                <div className="fixed top-4 right-4 z-[99999] bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-top-2">
+                    <CheckCircle2 size={16} className="text-emerald-400" />
                     <span>{toastMessage}</span>
                 </div>
             )}
 
-            {/* Compact Header Bar */}
-            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center flex-shrink-0">
-                        <Moon size={18} />
+            {/* Top Operational Header */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-700 to-indigo-900 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
+                        <Moon size={20} />
                     </div>
-                    <div className="min-w-0">
+                    <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-gray-900 tracking-tight truncate">
-                                Sleep Out Registry (Guest Absence Tracker)
+                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
+                                Sleep Out Register &amp; Security Ledger
                             </h1>
-                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-purple-50 text-purple-700 border border-purple-200">
-                                Night Safety
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {activeOutCount} Active Out
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-500 truncate">
-                            Track checked-in guests spending the night off property for duty-of-care.
+                        <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
+                            Tracks checked-in guests sleeping away from property while retaining room billing &amp; key security
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Primary Actions */}
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(true)}
-                        className="h-7 px-3 text-[11px] font-bold bg-[#1e3a8a] hover:bg-blue-900 text-white rounded shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
+                        className="h-8.5 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                     >
-                        <Plus size={13} />
+                        <Plus size={14} className="stroke-[2.5]" />
                         <span>Log Sleep Out</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActivePage('front-desk')}
+                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                    >
+                        <span>Front Desk</span>
+                        <ArrowRight size={13} />
                     </button>
                 </div>
             </div>
 
-            {/* Compact Controls Bar */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs px-3 py-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-medium text-[11px]">Active Away:</span>
-                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold font-mono text-[11px]">
-                        {sleepOuts.filter(s => s.status === 'Sleeping Out').length} Guests
-                    </span>
-                    <span className="text-gray-300">|</span>
-                    <span className="text-gray-500 font-medium text-[11px]">Returned:</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold font-mono text-[11px]">
-                        {sleepOuts.filter(s => s.status === 'Returned').length}
-                    </span>
+            {/* Metric KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Sleep-Outs</span>
+                    <div className="text-xl font-black text-indigo-900 font-mono mt-0.5">{activeOutCount} Rooms</div>
+                    <p className="text-[10px] text-slate-500 mt-1">Currently away from hotel</p>
                 </div>
 
-                <div className="relative">
-                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Search guest, room, reason..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="h-7 pl-7 pr-2.5 text-[11px] border border-gray-200 rounded-md bg-white outline-none w-52 sm:w-60 focus:border-purple-500"
-                    />
+                <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider block">Key Cards Secured</span>
+                    <div className="text-xl font-black text-indigo-950 font-mono mt-0.5">
+                        {sleepOuts.filter(s => s.status === 'Sleeping Out' && s.keyCardLocation === 'Held at Front Desk').length} Keys
+                    </div>
+                    <p className="text-[10px] text-indigo-700 mt-1">Held at Front Desk safe</p>
+                </div>
+
+                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Returned &amp; Closed</span>
+                    <div className="text-xl font-black text-emerald-950 font-mono mt-0.5">
+                        {sleepOuts.filter(s => s.status === 'Returned').length} Records
+                    </div>
+                    <p className="text-[10px] text-emerald-700 mt-1">Safely re-occupied</p>
+                </div>
+
+                <div className="bg-gradient-to-br from-slate-900 to-[#1e3a8a] text-white p-3 rounded-xl shadow-xs">
+                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">Night Audit Policy</span>
+                    <div className="text-xl font-black font-mono mt-0.5">Active Billing</div>
+                    <p className="text-[10px] text-blue-200/80 mt-1">Tariff posting continues as in-house</p>
                 </div>
             </div>
 
-            {/* Compact Table View */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
-                <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left min-w-[900px] border-collapse">
+            {/* Filter & Search Bar */}
+            <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-3 flex flex-col md:flex-row items-center justify-between gap-2.5">
+                <div className="relative w-full md:w-80">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search Guest, Room #, Pass #, Reason..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full h-8 pl-8 pr-3 bg-slate-50/60 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
+                    />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status:</span>
+                        <select
+                            value={filterStatus}
+                            onChange={e => setFilterStatus(e.target.value as any)}
+                            className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:border-blue-500"
+                        >
+                            <option value="all">All Sleep-Outs</option>
+                            <option value="Sleeping Out">Currently Sleeping Out</option>
+                            <option value="Returned">Returned to Room</option>
+                        </select>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSearchQuery('');
+                            setFilterStatus('all');
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Reset Filters"
+                    >
+                        <RefreshCw size={13} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Sleep Out Ledger Table */}
+            <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
-                                <th className="px-3 py-2">Res #</th>
-                                <th className="px-3 py-2">Guest Name</th>
-                                <th className="px-3 py-2">Room</th>
-                                <th className="px-3 py-2">Emergency Contact</th>
-                                <th className="px-3 py-2">Absence Dates</th>
-                                <th className="px-3 py-2">Reason / Itinerary</th>
-                                <th className="px-3 py-2">Status</th>
-                                <th className="px-3 py-2 text-right">Actions</th>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                                <th className="py-2.5 px-3.5">Guest &amp; Room</th>
+                                <th className="py-2.5 px-3">Pass &amp; Dates</th>
+                                <th className="py-2.5 px-3">Reason / Purpose</th>
+                                <th className="py-2.5 px-2.5">Key Card Location</th>
+                                <th className="py-2.5 px-3 text-center">Status</th>
+                                <th className="py-2.5 px-3.5 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 text-[11.5px]">
-                            {filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
-                                        No sleep out records found.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filtered.map(s => (
-                                    <tr key={s.id} className="hover:bg-purple-50/20 transition-colors">
-                                        <td className="px-3 py-1.5 font-mono font-bold text-purple-800">
-                                            {s.reservationNumber}
-                                        </td>
-                                        <td className="px-3 py-1.5 font-semibold text-gray-900">
-                                            {s.guestName}
-                                        </td>
-                                        <td className="px-3 py-1.5">
-                                            <span className="px-1.5 py-0.2 bg-purple-50 text-purple-800 rounded font-bold font-mono">
-                                                {s.roomNumber}
-                                            </span>
-                                            <span className="text-[10px] text-gray-500 ml-1.5">{s.roomType}</span>
-                                        </td>
-                                        <td className="px-3 py-1.5 font-mono text-gray-600">
-                                            {s.contact}
-                                        </td>
-                                        <td className="px-3 py-1.5 whitespace-nowrap text-gray-700">
-                                            {s.startDate} → {s.endDate}
-                                        </td>
-                                        <td className="px-3 py-1.5 text-gray-600 max-w-xs truncate" title={s.reason}>
-                                            {s.reason}
-                                        </td>
-                                        <td className="px-3 py-1.5">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                s.status === 'Sleeping Out'
-                                                    ? 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse'
-                                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                            }`}>
-                                                {s.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                                            <div className="flex items-center justify-end gap-1.5">
-                                                {s.status === 'Sleeping Out' && (
+                        <tbody className="divide-y divide-slate-100">
+                            {filtered.length > 0 ? (
+                                filtered.map(s => {
+                                    const isOut = s.status === 'Sleeping Out';
+
+                                    return (
+                                        <tr key={s.id} className="hover:bg-indigo-50/15 transition-colors">
+                                            {/* Guest & Room */}
+                                            <td className="py-2.5 px-3.5">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                                        {s.guestName.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-slate-900">{s.guestName}</span>
+                                                            <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 text-[10.5px]">
+                                                                Room {s.roomNumber}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-[10.5px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+                                                            <span className="font-mono">{s.reservationNumber}</span>
+                                                            <span>•</span>
+                                                            <span>{s.contact}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Pass & Dates */}
+                                            <td className="py-2.5 px-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-mono font-bold text-indigo-700 text-xs">{s.securityPassNo}</span>
+                                                </div>
+                                                <p className="text-[10.5px] text-slate-600 mt-0.5">
+                                                    {s.startDate} ➔ {s.endDate} ({s.expectedReturnTime || 'Morning'})
+                                                </p>
+                                            </td>
+
+                                            {/* Reason */}
+                                            <td className="py-2.5 px-3">
+                                                <p className="text-[11px] text-slate-700 max-w-[280px] leading-relaxed">
+                                                    {s.reason}
+                                                </p>
+                                            </td>
+
+                                            {/* Key Card Location */}
+                                            <td className="py-2.5 px-2.5">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                    s.keyCardLocation === 'Held at Front Desk'
+                                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                }`}>
+                                                    {s.keyCardLocation}
+                                                </span>
+                                            </td>
+
+                                            {/* Status */}
+                                            <td className="py-2.5 px-3 text-center">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                    isOut
+                                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                }`}>
+                                                    {s.status}
+                                                </span>
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="py-2.5 px-3.5 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {isOut && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleMarkReturned(s.id)}
+                                                            className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                            title="Mark Guest Returned to Room"
+                                                        >
+                                                            <Check size={11} className="stroke-[3]" />
+                                                            <span>Returned</span>
+                                                        </button>
+                                                    )}
+
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleMarkReturned(s.id)}
-                                                        className="h-5 px-2 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
-                                                        title="Mark Guest Returned"
+                                                        onClick={() => setPrintPassTarget(s)}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                                        title="Print Security Gate Pass"
                                                     >
-                                                        Mark Returned
+                                                        <Printer size={13} />
                                                     </button>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDelete(s.id)}
-                                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded cursor-pointer"
-                                                    title="Delete Record"
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDelete(s.id)}
+                                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                                        title="Delete Record"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                                        <div className="flex flex-col items-center justify-center gap-1.5">
+                                            <Moon size={26} className="text-slate-300" />
+                                            <p className="text-xs font-bold text-slate-700">No sleep out records found</p>
+                                            <p className="text-[11px] text-slate-400">All in-house guests are logged as staying on-property.</p>
+                                        </div>
+                                    </td>
+                                </tr>
                             )}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {/* Log Sleep Out Modal */}
+            {/* Create Sleep Out Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
-                        <div className="px-4 py-3 bg-[#1e3a8a] text-white flex items-center justify-between">
-                            <h3 className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                                <Moon size={14} />
-                                <span>Record Guest Sleep Out</span>
-                            </h3>
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[480px] w-full p-4.5 space-y-3.5 animate-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-700 text-white flex items-center justify-center font-bold">
+                                    <Moon size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900">Log Guest Sleep-Out Pass</h3>
+                                    <p className="text-[10.5px] text-slate-500">Official Front Desk &amp; Security Registry</p>
+                                </div>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="text-white/80 hover:text-white p-0.5 rounded"
+                                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
                             >
-                                <X size={16} />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleCreateSleepOut} className="p-4 space-y-3 text-xs">
-                            <div className="grid grid-cols-2 gap-3">
+                        <form onSubmit={handleCreateSleepOut} className="space-y-3 text-xs">
+                            <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="font-semibold text-gray-700">Res Number *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="RES-009..."
-                                        value={form.reservationNumber}
-                                        onChange={e => setForm({ ...form, reservationNumber: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-mono"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="font-semibold text-gray-700">Guest Name *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="Full Name"
-                                        value={form.guestName}
-                                        onChange={e => setForm({ ...form, guestName: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-semibold"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="font-semibold text-gray-700">Room Number</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Room Number</label>
                                     <input
                                         type="text"
                                         value={form.roomNumber}
                                         onChange={e => setForm({ ...form, roomNumber: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none font-bold"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono font-bold text-xs"
+                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="font-semibold text-gray-700">Contact Number</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Res #</label>
                                     <input
                                         type="text"
-                                        value={form.contact}
-                                        onChange={e => setForm({ ...form, contact: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                        value={form.reservationNumber}
+                                        onChange={e => setForm({ ...form, reservationNumber: e.target.value })}
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono text-xs"
+                                        required
                                     />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="font-semibold text-gray-700">Start Date</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Guest Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={form.guestName}
+                                        onChange={e => setForm({ ...form, guestName: e.target.value })}
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Emergency Mobile</label>
+                                    <input
+                                        type="text"
+                                        value={form.contact}
+                                        onChange={e => setForm({ ...form, contact: e.target.value })}
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Away Start Date</label>
                                     <input
                                         type="date"
                                         value={form.startDate}
                                         onChange={e => setForm({ ...form, startDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
                                     />
                                 </div>
                                 <div>
-                                    <label className="font-semibold text-gray-700">Expected Return</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Expected Return Date</label>
                                     <input
                                         type="date"
                                         value={form.endDate}
                                         onChange={e => setForm({ ...form, endDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-gray-300 rounded text-xs mt-1 outline-none"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="font-semibold text-gray-700">Reason / Temporary Destination</label>
+                                <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Key Card Handling</label>
+                                <select
+                                    value={form.keyCardLocation}
+                                    onChange={e => setForm({ ...form, keyCardLocation: e.target.value as any })}
+                                    className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs font-semibold bg-white"
+                                >
+                                    <option value="Held at Front Desk">Held at Front Desk (Safe Storage)</option>
+                                    <option value="With Guest">Guest Keeping Key Card</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Reason / Purpose for Absence</label>
                                 <textarea
-                                    required
                                     rows={2}
-                                    placeholder="Explain travel purpose, emergency trip, or location..."
                                     value={form.reason}
                                     onChange={e => setForm({ ...form, reason: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded text-xs mt-1 outline-none resize-none"
+                                    placeholder="e.g. Traveling to Chittagong for business, returning tomorrow morning."
+                                    className="w-full p-2 border border-slate-200 rounded-lg text-xs"
+                                    required
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                            <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="h-7 px-3 border border-gray-300 text-gray-600 rounded text-xs font-semibold cursor-pointer"
+                                    className="h-8 px-3.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-xs font-bold cursor-pointer"
+                                    className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer shadow-xs"
                                 >
-                                    Save Record
+                                    <Check size={13} className="stroke-[3]" />
+                                    <span>Register Sleep-Out</span>
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Printable Security Gate Pass */}
+            {printPassTarget && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[500px] w-full p-5 space-y-4 animate-in zoom-in-95 duration-150">
+                        <div className="border border-slate-300 p-4 rounded-lg space-y-3">
+                            <div className="flex justify-between items-center border-b pb-2 border-slate-200">
+                                <div>
+                                    <h3 className="font-black text-sm uppercase tracking-wider text-slate-900">HotelOS Security Gate Pass</h3>
+                                    <p className="text-[10px] text-slate-500">Guest Sleep-Out Authorization Voucher</p>
+                                </div>
+                                <span className="font-mono font-bold text-indigo-700 text-xs">{printPassTarget.securityPassNo}</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Guest Name</span>
+                                    <p className="font-bold text-slate-900">{printPassTarget.guestName}</p>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Room &amp; Category</span>
+                                    <p className="font-bold text-blue-700 font-mono">Room {printPassTarget.roomNumber} ({printPassTarget.roomType})</p>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Departure Date</span>
+                                    <p className="font-medium text-slate-800">{printPassTarget.startDate}</p>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Expected Return</span>
+                                    <p className="font-medium text-slate-800">{printPassTarget.endDate} ({printPassTarget.expectedReturnTime || 'Morning'})</p>
+                                </div>
+                            </div>
+
+                            <div className="p-2 bg-slate-50 rounded border border-slate-200 text-[11px] text-slate-700">
+                                <strong>Reason:</strong> {printPassTarget.reason}
+                            </div>
+
+                            <div className="pt-4 flex justify-between text-center text-[10px] text-slate-400 border-t border-slate-200">
+                                <div className="border-t border-slate-400 pt-1 w-32">Duty Officer Sign</div>
+                                <div className="border-t border-slate-400 pt-1 w-32">Guest Signature</div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setPrintPassTarget(null)}
+                                className="h-8 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                                <Printer size={13} />
+                                <span>Print Pass</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
