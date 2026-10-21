@@ -5,6 +5,7 @@ import {
     ArrowRight, BedDouble, ShieldCheck, RefreshCw,
     Sparkles, Compass, AlertTriangle, CheckCircle2
 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 // ============================================================================
@@ -1008,172 +1009,160 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 min-h-[calc(100vh-100px)] flex flex-col font-sans">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans">
             {/* Toast Notification */}
             {toastMessage && (
-                <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 text-xs font-semibold animate-bounce">
+                <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-semibold animate-bounce">
                     <Sparkles size={14} className="text-amber-400" />
                     <span>{toastMessage}</span>
                 </div>
             )}
 
-            {/* TOP HEADER */}
-            <div className="p-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3 bg-gray-50/70">
-                <div>
+            {/* Standard Thesis Page Header */}
+            <PageHeader
+                title="Property Structure & Amenities Master"
+                subtitle="Manage wings, towers, floor levels, room capacity, and dynamic life safety assets with duplicate-free short codes"
+                icon={<Building2 className="size-6 text-primary" />}
+                actions={
                     <div className="flex items-center gap-2">
-                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">Property Structure & Amenities Master</h1>
-                        <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200">
-                            {buildingMetrics.totalBuildings} Wings • {buildingMetrics.totalFloors} Floors • {amenitiesCatalog.length} Amenities
-                        </span>
+                        {mainTab === 'buildings' && (
+                            <button
+                                onClick={handleOpenAddBuilding}
+                                className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <Plus size={15} /> Add Building
+                            </button>
+                        )}
+                        {mainTab === 'floors' && (
+                            <button
+                                onClick={() => handleOpenAddFloor()}
+                                className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <Plus size={15} /> Add Floor
+                            </button>
+                        )}
+                        {mainTab === 'amenities' && (
+                            <button
+                                onClick={handleOpenAddAmenity}
+                                className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <Plus size={15} /> Add Amenity / Safety Asset
+                            </button>
+                        )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                        Manage wings, towers, floor levels, room capacity, and dynamic life safety assets with duplicate-free short codes
-                    </p>
+                }
+            />
+
+            {/* 4 Standardized Thesis KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Buildings</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Building2 size={16} />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{buildingMetrics.totalBuildings}</div>
+                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{buildingMetrics.activeBuildings} Active Wings</div>
                 </div>
 
-                {/* Primary Action Buttons & Tab Switchers */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    {/* Main Tab Switcher */}
-                    <div className="bg-gray-200/80 p-0.5 rounded-lg flex items-center text-xs font-semibold">
-                        <button
-                            onClick={() => setMainTab('buildings')}
-                            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
-                                mainTab === 'buildings'
-                                    ? 'bg-white text-blue-700 shadow-xs font-bold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                        >
-                            <Building2 size={13} />
-                            <span>Buildings</span>
-                            <span className="text-[10px] bg-blue-50 text-blue-700 font-mono px-1 rounded">
-                                {buildings.length}
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => setMainTab('floors')}
-                            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
-                                mainTab === 'floors'
-                                    ? 'bg-white text-blue-700 shadow-xs font-bold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                        >
-                            <Layers size={13} />
-                            <span>Floors</span>
-                            <span className="text-[10px] bg-blue-50 text-blue-700 font-mono px-1 rounded">
-                                {floors.length}
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => setMainTab('amenities')}
-                            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
-                                mainTab === 'amenities'
-                                    ? 'bg-white text-blue-700 shadow-xs font-bold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                        >
-                            <ShieldCheck size={13} className="text-emerald-600" />
-                            <span>Amenities & Safety</span>
-                            <span className="text-[10px] bg-emerald-50 text-emerald-700 font-mono px-1 rounded">
-                                {amenitiesCatalog.length}
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => setMainTab('matrix')}
-                            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
-                                mainTab === 'matrix'
-                                    ? 'bg-white text-blue-700 shadow-xs font-bold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                        >
-                            <Compass size={13} />
-                            <span>Matrix</span>
-                        </button>
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Floor Levels</span>
+                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <Layers size={16} />
+                        </div>
                     </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{buildingMetrics.totalFloors}</div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Configured levels</div>
+                </div>
 
-                    {/* Dynamic Add Buttons */}
-                    {mainTab === 'buildings' && (
-                        <button
-                            onClick={handleOpenAddBuilding}
-                            className="h-8 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                        >
-                            <Plus size={14} /> Add Building
-                        </button>
-                    )}
-                    {mainTab === 'floors' && (
-                        <button
-                            onClick={() => handleOpenAddFloor()}
-                            className="h-8 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                        >
-                            <Plus size={14} /> Add Floor
-                        </button>
-                    )}
-                    {mainTab === 'amenities' && (
-                        <button
-                            onClick={handleOpenAddAmenity}
-                            className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                        >
-                            <Plus size={14} /> Add Amenity / Safety Asset
-                        </button>
-                    )}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Life Safety & Assets</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <ShieldCheck size={16} />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{amenitiesCatalog.length}</div>
+                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{buildingMetrics.totalSafetyAssets} Safety Assets</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Room Inventory</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <BedDouble size={16} />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{buildingMetrics.totalRooms}</div>
+                    <div className="mt-1 text-[11px] text-primary font-semibold">Total Physical Keys</div>
                 </div>
             </div>
 
-            {/* TOP METRICS SUMMARY STRIP */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-gray-50/40 border-b border-gray-100 text-xs">
-                <div className="bg-white p-3 rounded-lg border border-gray-200/80 flex items-center justify-between">
-                    <div>
-                        <span className="text-gray-500 text-[11px] font-medium block">Total Property Buildings</span>
-                        <div className="text-lg font-bold text-gray-900 mt-0.5 flex items-baseline gap-1.5">
-                            {buildingMetrics.totalBuildings}
-                            <span className="text-[10px] text-emerald-600 font-semibold font-mono">
-                                ({buildingMetrics.activeBuildings} Active)
-                            </span>
-                        </div>
-                    </div>
-                    <div className="p-2 bg-blue-50 text-blue-600 rounded-md">
-                        <Building2 size={16} />
-                    </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-lg border border-gray-200/80 flex items-center justify-between">
-                    <div>
-                        <span className="text-gray-500 text-[11px] font-medium block">Floor Levels Configured</span>
-                        <div className="text-lg font-bold text-gray-900 mt-0.5 flex items-baseline gap-1.5">
-                            {buildingMetrics.totalFloors}
-                            <span className="text-[10px] text-gray-400 font-semibold font-mono">Levels</span>
-                        </div>
-                    </div>
-                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-md">
-                        <Layers size={16} />
-                    </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-lg border border-gray-200/80 flex items-center justify-between">
-                    <div>
-                        <span className="text-gray-500 text-[11px] font-medium block">Life Safety & Assets</span>
-                        <div className="text-lg font-bold text-gray-900 mt-0.5 flex items-baseline gap-1.5">
+            {/* Navigation Tabs Bar */}
+            <div className="bg-white p-2 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
+                    <button
+                        onClick={() => setMainTab('buildings')}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                            mainTab === 'buildings'
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <Building2 size={14} />
+                        <span>Buildings</span>
+                        <span className="badge-code !py-0 !px-1.5 !text-[10px]">
+                            {buildings.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setMainTab('floors')}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                            mainTab === 'floors'
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <Layers size={14} />
+                        <span>Floors</span>
+                        <span className="badge-code !py-0 !px-1.5 !text-[10px]">
+                            {floors.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setMainTab('amenities')}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                            mainTab === 'amenities'
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <ShieldCheck size={14} className="text-emerald-600" />
+                        <span>Amenities & Safety</span>
+                        <span className="badge-code !py-0 !px-1.5 !text-[10px]">
                             {amenitiesCatalog.length}
-                            <span className="text-[10px] text-emerald-600 font-semibold font-mono">
-                                ({buildingMetrics.totalSafetyAssets} Safety)
-                            </span>
-                        </div>
-                    </div>
-                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-md">
-                        <ShieldCheck size={16} />
-                    </div>
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setMainTab('matrix')}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                            mainTab === 'matrix'
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <Compass size={14} />
+                        <span>Matrix</span>
+                    </button>
                 </div>
 
-                <div className="bg-white p-3 rounded-lg border border-gray-200/80 flex items-center justify-between">
-                    <div>
-                        <span className="text-gray-500 text-[11px] font-medium block">Physical Room Inventory</span>
-                        <div className="text-lg font-bold text-gray-900 mt-0.5 flex items-baseline gap-1.5">
-                            {buildingMetrics.totalRooms}
-                            <span className="text-[10px] text-blue-600 font-semibold font-mono">Keys</span>
-                        </div>
-                    </div>
-                    <div className="p-2 bg-amber-50 text-amber-600 rounded-md">
-                        <BedDouble size={16} />
-                    </div>
+                <div className="text-xs text-slate-400 font-medium px-2 hidden sm:block">
+                    {mainTab === 'buildings' && 'Viewing property wings & structural specs'}
+                    {mainTab === 'floors' && 'Viewing floor levels & capacity'}
+                    {mainTab === 'amenities' && 'Viewing life safety assets & guest amenities'}
+                    {mainTab === 'matrix' && 'Floor & Amenity Coverage Matrix'}
                 </div>
             </div>
 

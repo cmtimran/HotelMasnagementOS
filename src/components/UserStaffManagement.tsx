@@ -16,10 +16,10 @@ import {
     User,
     Lock,
     Unlock,
-    DollarSign,
     Save,
     ShieldAlert
 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode } from '../utils/codeGenerator';
 
 // ==========================================
@@ -411,7 +411,7 @@ export default function UserStaffManagement() {
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto pb-16 p-4 sm:p-6">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans pb-16">
             {/* Toast Alert */}
             {toast && (
                 <div
@@ -424,154 +424,141 @@ export default function UserStaffManagement() {
                 </div>
             )}
 
-            {/* Top Header Card */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-                <div className="flex items-center gap-3">
-                    <div className="size-12 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 shadow-2xs">
-                        <Users className="size-6" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                                Staff & User Management
-                            </h1>
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
-                                HRM & Security
-                            </span>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            Employee directory, role assignments, 4-digit POS Cashier PINs, department quotas & account lockouts.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+            {/* Standard Page Header */}
+            <PageHeader
+                title="Staff & User Management"
+                subtitle="Employee directory, role assignments, 4-digit POS Cashier PINs, department quotas & account lockouts"
+                icon={<Users className="size-6 text-primary" />}
+                actions={
                     <button
                         type="button"
                         onClick={handleOpenCreate}
-                        className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs rounded-xl shadow-xs flex items-center gap-2 transition"
+                        className="btn-primary flex items-center gap-2 cursor-pointer"
                     >
                         <Plus className="size-4" />
                         <span>Register Staff Member</span>
                     </button>
+                }
+            />
+
+            {/* 4 Standardized Thesis KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Staff</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Users className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">
+                        {users.filter(u => u.status === 'active').length}
+                        <span className="text-sm font-normal text-slate-400"> / {users.length}</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">Active staff accounts</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">POS Cashier PINs</span>
+                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <KeyRound className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">
+                        {users.filter(u => u.posPin && u.posPin !== '—').length}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">4-digit PINs configured</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Locked Accounts</span>
+                        <div className="size-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                            <Lock className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-rose-600 tracking-tight">
+                        {users.filter(u => u.status === 'locked').length}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Security lockout triggered</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Monthly Payroll</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold font-mono text-xs">
+                            ৳
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight font-mono">
+                        ৳{users.reduce((acc, u) => acc + (u.salary || 0), 0).toLocaleString()}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Estimated salary base</div>
                 </div>
             </div>
 
-            {/* Quota & Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 flex items-center justify-center">
-                        <Users className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">Active Staff</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">
-                            {users.filter(u => u.status === 'active').length} / {users.length}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                        <KeyRound className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">POS Terminal PINs</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">
-                            {users.filter(u => u.posPin && u.posPin !== '—').length} Configured
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                        <Lock className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">Locked Accounts</div>
-                        <div className="text-lg font-bold text-rose-600 dark:text-rose-400">
-                            {users.filter(u => u.status === 'locked').length} Locked
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                        <DollarSign className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">Total Monthly Payroll</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white font-mono">
-                            ${users.reduce((acc, u) => acc + (u.salary || 0), 0).toLocaleString()}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Filter & Search Bar */}
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-3 items-center justify-between">
-                <div className="relative w-full md:w-80">
-                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Standardized Search & Filter Toolbar */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap gap-3 items-center justify-between">
+                <div className="relative flex-1 min-w-[240px] max-w-md">
+                    <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search name, username, email, phone, code..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                        className="input-standard pl-10"
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-2.5">
                     {/* Role Filter */}
                     <select
                         value={roleFilter}
                         onChange={e => setRoleFilter(e.target.value)}
-                        className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-medium focus:outline-none"
+                        className="select-standard !py-1.5 !text-xs !w-auto"
                     >
                         <option value="ALL">All Roles</option>
-                        <option value="GM-ADMIN">General Manager</option>
-                        <option value="FD-MGR">Front Desk Manager</option>
-                        <option value="RECEPTION">Receptionist</option>
-                        <option value="CHIEF-ACC">Chief Accountant</option>
-                        <option value="FNB-CAPT">F&B Captain</option>
-                        <option value="HK-EXEC">Executive Housekeeper</option>
-                        <option value="CASHIER">POS Cashier</option>
+                        {Array.from(new Set(users.map(u => u.role))).map(r => (
+                            <option key={r} value={r}>
+                                {r}
+                            </option>
+                        ))}
                     </select>
 
                     {/* Department Filter */}
                     <select
                         value={deptFilter}
                         onChange={e => setDeptFilter(e.target.value)}
-                        className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-medium focus:outline-none"
+                        className="select-standard !py-1.5 !text-xs !w-auto"
                     >
                         <option value="ALL">All Departments</option>
-                        <option value="Executive Management">Executive Management</option>
-                        <option value="Front Office">Front Office</option>
-                        <option value="Finance & Accounts">Finance & Accounts</option>
-                        <option value="Food & Beverage">Food & Beverage</option>
-                        <option value="Housekeeping & Rooms">Housekeeping & Rooms</option>
+                        {Array.from(new Set(users.map(u => u.department))).map(d => (
+                            <option key={d} value={d}>
+                                {d}
+                            </option>
+                        ))}
                     </select>
 
                     {/* Status Filter */}
                     <select
                         value={statusFilter}
-                        onChange={e => setStatusFilter(e.target.value)}
-                        className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-medium focus:outline-none"
+                        onChange={e => setStatusFilter(e.target.value as any)}
+                        className="select-standard !py-1.5 !text-xs !w-auto"
                     >
                         <option value="ALL">All Statuses</option>
-                        <option value="active">Active Only</option>
-                        <option value="inactive">Inactive Only</option>
-                        <option value="locked">Locked Only</option>
+                        <option value="active">Active</option>
+                        <option value="suspended">Suspended</option>
+                        <option value="locked">Security Locked</option>
                     </select>
                 </div>
             </div>
 
             {/* Staff Directory Table */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
                                 <th className="py-3 px-4">Staff Member</th>
                                 <th className="py-3 px-4">Employee ID</th>
                                 <th className="py-3 px-4">Role & Department</th>
@@ -582,7 +569,7 @@ export default function UserStaffManagement() {
                                 <th className="py-3 px-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                        <tbody className="divide-y divide-slate-100">
                             {filteredUsers.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="py-10 text-center text-slate-400 text-xs">
@@ -602,7 +589,7 @@ export default function UserStaffManagement() {
                                     return (
                                         <tr
                                             key={user.id}
-                                            className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition group"
+                                            className="hover:bg-slate-50/70 transition group"
                                         >
                                             {/* Staff Name & Contact */}
                                             <td className="py-3 px-4">
@@ -613,7 +600,7 @@ export default function UserStaffManagement() {
                                                         {initials}
                                                     </div>
                                                     <div>
-                                                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
                                                             <span>{user.name}</span>
                                                             <span className="text-[10px] text-slate-400 font-normal">
                                                                 (@{user.username})
@@ -636,15 +623,15 @@ export default function UserStaffManagement() {
                                             </td>
 
                                             {/* Code */}
-                                            <td className="py-3 px-4 font-mono font-semibold text-slate-700 dark:text-slate-300">
-                                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                            <td className="py-3 px-4 font-mono font-semibold text-slate-700">
+                                                <span className="px-2 py-0.5 bg-slate-100 rounded border border-slate-200">
                                                     {user.code}
                                                 </span>
                                             </td>
 
                                             {/* Role & Dept */}
                                             <td className="py-3 px-4">
-                                                <div className="font-semibold text-slate-900 dark:text-white">
+                                                <div className="font-semibold text-slate-900">
                                                     {user.role}
                                                 </div>
                                                 <div className="text-[10px] text-slate-400">
@@ -653,7 +640,7 @@ export default function UserStaffManagement() {
                                             </td>
 
                                             {/* Property */}
-                                            <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                                            <td className="py-3 px-4 text-slate-600">
                                                 <div className="line-clamp-1 max-w-[180px]">
                                                     {user.property}
                                                 </div>
@@ -664,7 +651,7 @@ export default function UserStaffManagement() {
                                                 <button
                                                     type="button"
                                                     onClick={() => toggleRevealPin(user.id)}
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 font-mono text-xs font-bold text-slate-800 border border-slate-200 hover:bg-slate-200 transition"
                                                     title="Click to show/hide 4-digit POS PIN"
                                                 >
                                                     <span>{isRevealed ? user.posPin : '••••'}</span>
@@ -677,7 +664,7 @@ export default function UserStaffManagement() {
                                             </td>
 
                                             {/* Salary */}
-                                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
                                                 ${user.salary.toLocaleString()}
                                             </td>
 
@@ -712,7 +699,7 @@ export default function UserStaffManagement() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setViewingUser(user)}
-                                                        className="size-7 rounded hover:bg-slate-100 text-slate-600 dark:text-slate-300 flex items-center justify-center transition"
+                                                        className="size-7 rounded hover:bg-slate-100 text-slate-600 flex items-center justify-center transition"
                                                         title="View Profile Details"
                                                     >
                                                         <Eye className="size-3.5" />
@@ -720,7 +707,7 @@ export default function UserStaffManagement() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleOpenEdit(user)}
-                                                        className="size-7 rounded hover:bg-slate-100 text-slate-600 dark:text-slate-300 flex items-center justify-center transition"
+                                                        className="size-7 rounded hover:bg-slate-100 text-slate-600 flex items-center justify-center transition"
                                                         title="Edit Staff Member"
                                                     >
                                                         <Edit2 className="size-3.5" />
@@ -747,11 +734,11 @@ export default function UserStaffManagement() {
             {/* View Profile Drawer */}
             {viewingUser && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <User className="size-5 text-sky-600" />
-                                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                                <h3 className="font-bold text-slate-900 text-base">
                                     Staff Account Profile
                                 </h3>
                             </div>
@@ -777,58 +764,58 @@ export default function UserStaffManagement() {
                                         .slice(0, 2)}
                                 </div>
                                 <div>
-                                    <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                                    <h4 className="text-lg font-bold text-slate-900">
                                         {viewingUser.name}
                                     </h4>
                                     <div className="text-xs text-slate-500 font-mono">@{viewingUser.username}</div>
-                                    <div className="text-xs font-semibold text-sky-600 dark:text-sky-400 mt-0.5">
+                                    <div className="text-xs font-semibold text-sky-600 mt-0.5">
                                         {viewingUser.role} • {viewingUser.department}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-100">
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">EMPLOYEE CODE:</span>
-                                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                                    <span className="font-mono font-bold text-slate-800">
                                         {viewingUser.code}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">SECURITY PIN:</span>
-                                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                                    <span className="font-mono font-bold text-slate-800">
                                         {viewingUser.posPin}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">WORK EMAIL:</span>
-                                    <span className="text-slate-800 dark:text-slate-200 font-medium truncate block">
+                                    <span className="text-slate-800 font-medium truncate block">
                                         {viewingUser.email}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">CONTACT PHONE:</span>
-                                    <span className="text-slate-800 dark:text-slate-200 font-medium">
+                                    <span className="text-slate-800 font-medium">
                                         {viewingUser.phone || '—'}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">ASSIGNED PROPERTY:</span>
-                                    <span className="text-slate-800 dark:text-slate-200 font-medium line-clamp-1">
+                                    <span className="text-slate-800 font-medium line-clamp-1">
                                         {viewingUser.property}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">BASE SALARY:</span>
-                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                    <span className="font-mono font-bold text-emerald-600">
                                         ${viewingUser.salary.toLocaleString()} / mo
                                     </span>
                                 </div>
                             </div>
 
                             {viewingUser.status === 'locked' && (
-                                <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl flex items-center justify-between gap-3">
-                                    <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 text-xs">
+                                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2 text-rose-700 text-xs">
                                         <ShieldAlert className="size-5 shrink-0" />
                                         <div>
                                             <div className="font-bold">Account Locked due to 5 Failed Login Attempts</div>
@@ -846,11 +833,11 @@ export default function UserStaffManagement() {
                             )}
                         </div>
 
-                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                        <div className="p-4 border-t border-slate-200 flex justify-end">
                             <button
                                 type="button"
                                 onClick={() => setViewingUser(null)}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 rounded-xl text-xs font-semibold"
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-semibold"
                             >
                                 Close
                             </button>
@@ -862,11 +849,11 @@ export default function UserStaffManagement() {
             {/* Create & Edit Modal */}
             {isFormModalOpen && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div className="bg-white w-full max-w-xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <Users className="size-5 text-sky-600" />
-                                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                <h2 className="text-base font-bold text-slate-900">
                                     {editingUserId ? 'Edit Staff Account' : 'Register New Staff Member'}
                                 </h2>
                             </div>
@@ -883,7 +870,7 @@ export default function UserStaffManagement() {
                             {/* Full Name & Username */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Full Name *
                                     </label>
                                     <input
@@ -900,11 +887,11 @@ export default function UserStaffManagement() {
                                                 setFormUsername(autoUsername);
                                             }
                                         }}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Login Username *
                                     </label>
                                     <input
@@ -913,7 +900,7 @@ export default function UserStaffManagement() {
                                         placeholder="e.g. imran.gm"
                                         value={formUsername}
                                         onChange={e => setFormUsername(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white font-mono"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
                                     />
                                 </div>
                             </div>
@@ -921,7 +908,7 @@ export default function UserStaffManagement() {
                             {/* Email & Phone */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Work Email Address *
                                     </label>
                                     <input
@@ -930,11 +917,11 @@ export default function UserStaffManagement() {
                                         placeholder="e.g. imran@grandpalace.hotel"
                                         value={formEmail}
                                         onChange={e => setFormEmail(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Contact Phone
                                     </label>
                                     <input
@@ -942,7 +929,7 @@ export default function UserStaffManagement() {
                                         placeholder="+880 1711-000000"
                                         value={formPhone}
                                         onChange={e => setFormPhone(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     />
                                 </div>
                             </div>
@@ -950,7 +937,7 @@ export default function UserStaffManagement() {
                             {/* Role & Department */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Assigned RBAC Security Role *
                                     </label>
                                     <select
@@ -968,7 +955,7 @@ export default function UserStaffManagement() {
                                             };
                                             setFormRole(roleMap[e.target.value] || e.target.value);
                                         }}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     >
                                         <option value="GM-ADMIN">General Manager (Super Admin)</option>
                                         <option value="FD-MGR">Front Desk Operations Manager</option>
@@ -981,13 +968,13 @@ export default function UserStaffManagement() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Department
                                     </label>
                                     <select
                                         value={formDepartment}
                                         onChange={e => setFormDepartment(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     >
                                         <option value="Executive Management">Executive Management</option>
                                         <option value="Front Office">Front Office</option>
@@ -1002,13 +989,13 @@ export default function UserStaffManagement() {
                             {/* Property & POS PIN */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Assigned Property
                                     </label>
                                     <select
                                         value={formProperty}
                                         onChange={e => setFormProperty(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     >
                                         <option value="Grand Palace Hotel & Resort (Dhaka HQ)">
                                             Grand Palace Hotel & Resort (Dhaka HQ)
@@ -1023,7 +1010,7 @@ export default function UserStaffManagement() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         4-Digit POS Cashier PIN *
                                     </label>
                                     <input
@@ -1033,7 +1020,7 @@ export default function UserStaffManagement() {
                                         placeholder="4-digit PIN"
                                         value={formPosPin}
                                         onChange={e => setFormPosPin(e.target.value.replace(/\D/g, ''))}
-                                        className="w-full px-3 py-2 text-xs font-mono font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900"
                                     />
                                 </div>
                             </div>
@@ -1041,19 +1028,19 @@ export default function UserStaffManagement() {
                             {/* Salary & Status */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Monthly Base Salary ($)
                                     </label>
                                     <input
                                         type="number"
                                         value={formSalary}
                                         onChange={e => setFormSalary(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-200 rounded-lg text-slate-900"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Account Status
                                     </label>
                                     <select
@@ -1061,7 +1048,7 @@ export default function UserStaffManagement() {
                                         onChange={e =>
                                             setFormStatus(e.target.value as 'active' | 'inactive' | 'locked')
                                         }
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     >
                                         <option value="active">Active (Access Allowed)</option>
                                         <option value="inactive">Inactive / Suspended</option>
@@ -1072,7 +1059,7 @@ export default function UserStaffManagement() {
 
                             {/* Password */}
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
                                     {editingUserId ? 'Change Password (leave blank to retain current)' : 'Account Password *'}
                                 </label>
                                 <div className="relative">
@@ -1082,7 +1069,7 @@ export default function UserStaffManagement() {
                                         placeholder="Min 6 characters"
                                         value={formPassword}
                                         onChange={e => setFormPassword(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white pr-9"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 pr-9"
                                     />
                                     <button
                                         type="button"
@@ -1095,11 +1082,11 @@ export default function UserStaffManagement() {
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                                 <button
                                     type="button"
                                     onClick={() => setIsFormModalOpen(false)}
-                                    className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                                    className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl"
                                 >
                                     Cancel
                                 </button>

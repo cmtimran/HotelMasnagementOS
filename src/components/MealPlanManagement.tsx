@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Utensils,
-    DollarSign, Clock, FileText, Search, RefreshCw, AlertTriangle, CheckCircle2
+    DollarSign, Clock, FileText, Search, RefreshCw, AlertTriangle, CheckCircle2,
+    Coffee, Pizza
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import PageHeader from './common/PageHeader';
 
 interface MealPlan {
     id: number;
@@ -453,182 +455,285 @@ export default function MealPlanManagement() {
         (p.marketingName && p.marketingName.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
+    const activeCount = mealPlans.filter(p => p.status === 'Active').length;
+    const breakfastCount = mealPlans.filter(p => p.hasBreakfast).length;
+    const fullBoardCount = mealPlans.filter(p => p.hasBreakfast && p.hasLunch && p.hasDinner).length;
+
     const renderList = () => (
         <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meal Plan Master Data</h1>
-                    <p className="text-xs sm:text-sm text-gray-500">Define base meal templates for use in Packages and Rate Plans</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                        <input
-                            type="text"
-                            placeholder="Search meal plans..."
-                            className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-56 sm:w-64 transition-all shadow-2xs"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
+            {/* Header */}
+            <PageHeader
+                title="Meal Plan Master Data"
+                subtitle="Configure standardized catering boards, guest inclusions, serving styles, and revenue accounting ledgers."
+                icon={<Utensils className="size-6 text-primary" />}
+                actions={
                     <button
                         onClick={openCreate}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold text-xs shadow-xs cursor-pointer"
+                        className="btn-primary"
                     >
-                        <Plus size={15} />
-                        Add Meal Plan
+                        <Plus className="size-4 mr-1.5" />
+                        Create Meal Plan
                     </button>
+                }
+            />
+
+            {/* KPI Metric Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Total Plans</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Utensils className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">{mealPlans.length}</div>
+                    <div className="text-[11px] text-slate-500 font-medium mt-1">Configured templates</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Active Board Plans</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <CheckCircle2 className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">{activeCount}</div>
+                    <div className="text-[11px] text-emerald-600 font-semibold mt-1">Available for rate packages</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Breakfast Boards</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <Coffee className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">{breakfastCount}</div>
+                    <div className="text-[11px] text-slate-500 font-medium mt-1">Include morning buffet/set</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Full Board (AP)</span>
+                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <Pizza className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">{fullBoardCount}</div>
+                    <div className="text-[11px] text-indigo-600 font-semibold mt-1">All 3 daily courses included</div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[850px]">
-                        <thead className="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold text-gray-600">
+            {/* Toolbar */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row gap-3 items-center justify-between">
+                <div className="relative w-full md:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+                    <input
+                        type="text"
+                        placeholder="Search meal plans, short code, menu..."
+                        className="input-standard pl-9"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                    <span className="text-xs text-slate-500 font-medium">
+                        Showing <strong className="text-slate-800">{filteredMealPlans.length}</strong> of {mealPlans.length}
+                    </span>
+                </div>
+            </div>
+
+            {/* Table Container */}
+            <div className="table-container">
+                <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                            <th className="py-3.5 px-4">Identity & Code</th>
+                            <th className="py-3.5 px-4">Inclusions</th>
+                            <th className="py-3.5 px-4">Menu & Catering Details</th>
+                            <th className="py-3.5 px-4 text-right">Selling Price</th>
+                            <th className="py-3.5 px-4 text-center">Status</th>
+                            <th className="py-3.5 px-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {filteredMealPlans.length === 0 ? (
                             <tr>
-                                <th className="px-6 py-3.5">Identity</th>
-                                <th className="px-6 py-3.5">Inclusions</th>
-                                <th className="px-6 py-3.5 font-mono text-[10px] uppercase">Menus Assigned</th>
-                                <th className="px-6 py-3.5 text-right text-[10px] uppercase">Pricing</th>
-                                <th className="px-6 py-3.5 text-right pr-6">Actions</th>
+                                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                    <Utensils className="size-8 mx-auto mb-2 text-slate-300" />
+                                    No meal plans match your search query.
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 text-gray-600">
-                            {filteredMealPlans.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
-                                        No meal plans match your search query.
+                        ) : (
+                            filteredMealPlans.map(plan => (
+                                <tr key={plan.id} className="hover:bg-slate-50/70 transition">
+                                    <td className="py-3.5 px-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-900 text-sm">{plan.name}</span>
+                                            <span className="badge-code">{plan.shortCode}</span>
+                                        </div>
+                                        {plan.marketingName && (
+                                            <div className="text-[11px] text-slate-500 mt-0.5">{plan.marketingName}</div>
+                                        )}
                                     </td>
-                                </tr>
-                            ) : (
-                                filteredMealPlans.map(plan => (
-                                    <tr key={plan.id} className="hover:bg-blue-50/20 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-gray-900">{plan.name}</div>
-                                            <div className="text-xs font-mono text-gray-500 font-bold mt-0.5">{plan.shortCode}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-wrap gap-1">
-                                                {plan.hasBreakfast && <span className="px-2 py-0.5 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded text-[10px] font-bold">Breakfast</span>}
-                                                {plan.hasLunch && <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[10px] font-bold">Lunch</span>}
-                                                {plan.hasDinner && <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded text-[10px] font-bold">Dinner</span>}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="space-y-1">
-                                                {plan.hasBreakfast && <div className="text-[10.5px] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-yellow-500"/> <span className="font-medium text-gray-800">{plan.breakfastMenu}</span> <span className="text-gray-400">({plan.breakfastStyle})</span></div>}
-                                                {plan.hasLunch && <div className="text-[10.5px] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"/> <span className="font-medium text-gray-800">{plan.lunchMenu}</span> <span className="text-gray-400">({plan.lunchStyle})</span></div>}
-                                                {plan.hasDinner && <div className="text-[10.5px] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/> <span className="font-medium text-gray-800">{plan.dinnerMenu}</span> <span className="text-gray-400">({plan.dinnerStyle})</span></div>}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="font-bold font-mono text-gray-900">৳{plan.sellingPriceAdult} / ৳{plan.sellingPriceChild}</div>
-                                            <div className="text-[10px] text-gray-400 font-mono">{plan.revenueCode}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right pr-6 space-x-1.5">
+                                    <td className="py-3.5 px-4">
+                                        <div className="flex flex-wrap gap-1">
+                                            {plan.hasBreakfast && <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/80 rounded-md text-[10px] font-semibold">Breakfast</span>}
+                                            {plan.hasLunch && <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-md text-[10px] font-semibold">Lunch</span>}
+                                            {plan.hasDinner && <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200/80 rounded-md text-[10px] font-semibold">Dinner</span>}
+                                            {plan.hasBrunch && <span className="px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200/80 rounded-md text-[10px] font-semibold">Brunch</span>}
+                                            {plan.hasCupole && <span className="px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-200/80 rounded-md text-[10px] font-semibold">Cupole</span>}
+                                            {plan.hasSnacks && <span className="px-2 py-0.5 bg-orange-50 text-orange-800 border border-orange-200/80 rounded-md text-[10px] font-semibold">Snacks</span>}
+                                        </div>
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                        <div className="space-y-1">
+                                            {plan.hasBreakfast && (
+                                                <div className="text-[11px] flex items-center gap-1.5 text-slate-600">
+                                                    <span className="size-1.5 rounded-full bg-amber-500" />
+                                                    <span className="font-medium text-slate-800">{plan.breakfastMenu || 'Continental'}</span>
+                                                    <span className="text-slate-400">({plan.breakfastStyle})</span>
+                                                </div>
+                                            )}
+                                            {plan.hasLunch && (
+                                                <div className="text-[11px] flex items-center gap-1.5 text-slate-600">
+                                                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                                                    <span className="font-medium text-slate-800">{plan.lunchMenu || 'Buffet'}</span>
+                                                    <span className="text-slate-400">({plan.lunchStyle})</span>
+                                                </div>
+                                            )}
+                                            {plan.hasDinner && (
+                                                <div className="text-[11px] flex items-center gap-1.5 text-slate-600">
+                                                    <span className="size-1.5 rounded-full bg-indigo-500" />
+                                                    <span className="font-medium text-slate-800">{plan.dinnerMenu || 'Gala Buffet'}</span>
+                                                    <span className="text-slate-400">({plan.dinnerStyle})</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right">
+                                        <div className="font-bold font-mono text-slate-900 text-sm">৳{plan.sellingPriceAdult} <span className="text-slate-400 text-xs font-normal">/ ৳{plan.sellingPriceChild}</span></div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">{plan.revenueCode}</div>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-center">
+                                        <span className={plan.status === 'Active' ? 'badge-status-active' : 'badge-status-inactive'}>
+                                            {plan.status}
+                                        </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
                                             <button 
                                                 onClick={() => openEdit(plan)}
-                                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                                title="Edit"
+                                                className="btn-icon"
+                                                title="Edit Meal Plan"
                                             >
-                                                <Edit2 size={15} />
+                                                <Edit2 className="size-3.5" />
                                             </button>
                                             <button 
                                                 onClick={() => handleDelete(plan.id)}
-                                                className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                                title="Delete"
+                                                className="btn-icon-danger"
+                                                title="Delete Meal Plan"
                                             >
-                                                <Trash2 size={15} />
+                                                <Trash2 className="size-3.5" />
                                             </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
 
     const renderForm = () => (
-        <div className="h-full flex flex-col bg-gray-50">
+        <div className="min-h-screen bg-[#fafafc] flex flex-col">
             {/* Header */}
-            <div className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setView('list')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <X size={20} className="text-gray-500" />
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-bold text-gray-900">
-                            {formData.id ? 'Edit Meal Plan' : 'New Meal Plan'}
-                        </h1>
-                        <p className="text-sm text-gray-500">Configure comprehensive meal inclusions and revenue routing</p>
+            <div className="bg-white border-b border-slate-200/90 px-6 py-4 sticky top-0 z-20 shadow-2xs">
+                <div className="max-w-5xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setView('list')} className="btn-secondary p-2">
+                            <X className="size-4 text-slate-600" />
+                        </button>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900">
+                                {formData.id ? 'Edit Meal Plan' : 'Create New Meal Plan'}
+                            </h1>
+                            <p className="text-xs text-slate-500">Configure catering inclusions, meal periods, and revenue ledger codes</p>
+                        </div>
                     </div>
-                </div>
-                <div className="flex gap-3">
-                    <button onClick={() => setView('list')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Cancel</button>
-                    <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md">
-                        <Save size={18} />
-                        Save Master Plan
-                    </button>
+                    <div className="flex items-center gap-2.5">
+                        <button onClick={() => setView('list')} className="btn-secondary">
+                            Cancel
+                        </button>
+                        <button onClick={handleSave} className="btn-primary">
+                            <Save className="size-4 mr-1.5" />
+                            Save Meal Plan
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b bg-white px-6 sticky top-[73px] z-10">
-                {[
-                    { id: 'identity', label: 'Identity', icon: <FileText size={16} /> },
-                    { id: 'inclusions', label: 'Inclusions', icon: <Utensils size={16} /> },
-                    { id: 'pricing', label: 'Pricing & Finance', icon: <DollarSign size={16} /> },
-                    { id: 'operations', label: 'Operations', icon: <Clock size={16} /> },
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 px-6 py-4 text-xs font-bold border-b-2 transition-all ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+            {/* Navigation Tabs */}
+            <div className="bg-white border-b border-slate-200/90 sticky top-[69px] z-10 shadow-2xs">
+                <div className="max-w-5xl mx-auto flex px-4">
+                    {[
+                        { id: 'identity', label: 'Identity & Overview', icon: <FileText className="size-4" /> },
+                        { id: 'inclusions', label: 'Meal Inclusions', icon: <Utensils className="size-4" /> },
+                        { id: 'pricing', label: 'Pricing & Ledgers', icon: <DollarSign className="size-4" /> },
+                        { id: 'operations', label: 'Service Operations', icon: <Clock className="size-4" /> },
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-5 py-3.5 text-xs font-semibold border-b-2 transition ${
+                                activeTab === tab.id
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
                             }`}
-                    >
-                        {tab.icon}
-                        {tab.label.toUpperCase()}
-                    </button>
-                ))}
+                        >
+                            {tab.icon}
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-auto p-8 max-w-5xl mx-auto w-full">
+            <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto w-full">
 
                 {/* 1. Identity */}
                 {activeTab === 'identity' && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <div className="flex items-center gap-2 border-b pb-4">
-                            <FileText size={18} className="text-blue-600" />
-                            <h3 className="text-lg font-bold text-gray-900">Basic Information</h3>
+                    <div className="card-container p-6 space-y-6">
+                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                            <FileText className="size-5 text-primary" />
+                            <h3 className="text-sm font-bold text-slate-900">Plan Identity & Codes</h3>
                         </div>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-2 text-xs">
-                                <label className="font-bold text-gray-700">Plan Name <span className="text-red-500">*</span></label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Plan Name <span className="text-rose-500">*</span></label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all"
-                                    placeholder="e.g. Continental Plan"
+                                    className="input-standard"
+                                    placeholder="e.g. Continental Plan (CP)"
                                     value={formData.name || ''}
                                     onChange={e => handleNameChange(e.target.value)}
                                 />
                             </div>
-                            <div className="space-y-2 text-xs">
-                                <label className="font-bold text-gray-700">Marketing Name</label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Marketing Name</label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all"
-                                    placeholder="e.g. Ultra Buffet Breakfast"
+                                    className="input-standard"
+                                    placeholder="e.g. Daily Buffet Breakfast"
                                     value={formData.marketingName || ''}
                                     onChange={e => setFormData({ ...formData, marketingName: e.target.value })}
                                 />
                             </div>
-                            <div className="space-y-2 text-xs">
+                            <div className="space-y-1.5">
                                 <div className="flex justify-between items-center">
-                                    <label className="font-bold text-gray-700">Short Code <span className="text-red-500">*</span></label>
+                                    <label className="text-xs font-semibold text-slate-700">Short Code <span className="text-rose-500">*</span></label>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -639,18 +744,18 @@ export default function MealPlanManagement() {
                                             setFormData(prev => ({ ...prev, shortCode: auto }));
                                             setIsCodeManual(false);
                                         }}
-                                        className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                        className="text-[11px] text-primary hover:underline flex items-center gap-1 font-semibold cursor-pointer"
                                     >
-                                        <RefreshCw size={10} /> Auto-Generate
+                                        <RefreshCw className="size-3" /> Auto-Generate
                                     </button>
                                 </div>
                                 <div className="relative">
                                     <input
                                         type="text"
-                                        className={`w-full px-3 py-2 pr-8 border rounded-lg outline-none text-sm font-mono font-bold uppercase transition-all ${
+                                        className={`input-standard font-mono font-bold uppercase pr-8 ${
                                             isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode)
-                                                ? 'border-rose-500 bg-rose-50 text-rose-700'
-                                                : 'border-gray-200 text-blue-700 focus:ring-2 focus:ring-blue-500'
+                                                ? 'border-rose-400 bg-rose-50/50 text-rose-700'
+                                                : ''
                                         }`}
                                         placeholder="e.g. CP"
                                         value={formData.shortCode || ''}
@@ -659,24 +764,24 @@ export default function MealPlanManagement() {
                                             setFormData({ ...formData, shortCode: e.target.value.toUpperCase() });
                                         }}
                                     />
-                                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                                         {isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode) ? (
-                                            <AlertTriangle size={14} className="text-rose-500" />
+                                            <AlertTriangle className="size-4 text-rose-500" />
                                         ) : formData.shortCode ? (
-                                            <CheckCircle2 size={14} className="text-emerald-500" />
+                                            <CheckCircle2 className="size-4 text-emerald-500" />
                                         ) : null}
                                     </div>
                                 </div>
                                 {isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode) && (
-                                    <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
-                                        <AlertTriangle size={10} /> Short Code already in use! Must be unique.
+                                    <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1">
+                                        <AlertTriangle className="size-3" /> Short Code already in use! Must be unique.
                                     </p>
                                 )}
                             </div>
-                            <div className="space-y-2 text-xs">
-                                <label className="font-bold text-gray-700">Status <span className="text-red-500">*</span></label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Status <span className="text-rose-500">*</span></label>
                                 <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm"
+                                    className="select-standard"
                                     value={formData.status || 'Active'}
                                     onChange={e => setFormData({ ...formData, status: e.target.value as any })}
                                 >
@@ -684,11 +789,11 @@ export default function MealPlanManagement() {
                                     <option value="Inactive">Inactive</option>
                                 </select>
                             </div>
-                            <div className="col-span-2 space-y-2 text-xs">
-                                <label className="font-bold text-gray-700">Description</label>
+                            <div className="md:col-span-2 space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Description</label>
                                 <textarea
-                                    className="w-full px-3 py-2 border rounded-lg h-24 focus:ring-2 focus:ring-blue-500 outline-none text-sm resize-none"
-                                    placeholder="Details shown to guest on booking engine..."
+                                    className="input-standard h-24 resize-none py-2"
+                                    placeholder="Detailed description shown to guest on booking engine..."
                                     value={formData.description || ''}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                                 />
@@ -699,13 +804,16 @@ export default function MealPlanManagement() {
 
                 {/* 2. Inclusions */}
                 {activeTab === 'inclusions' && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-8 animate-in fade-in duration-500">
-                        <div className="flex items-center gap-2 border-b pb-4">
-                            <Utensils size={18} className="text-blue-600" />
-                            <h3 className="text-lg font-bold text-gray-900 tracking-tight">Meal Selection & Menus</h3>
+                    <div className="card-container p-6 space-y-6">
+                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                            <Utensils className="size-5 text-primary" />
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">Meal Courses & Outlets</h3>
+                                <p className="text-xs text-slate-500">Enable courses and select designated restaurant venues</p>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {[
                                 { key: 'hasBreakfast', menuKey: 'breakfastMenu', styleKey: 'breakfastStyle', venueKey: 'breakfastVenue', cuisineKey: 'breakfastCuisine', label: 'Breakfast', icon: '🍳' },
                                 { key: 'hasLunch', menuKey: 'lunchMenu', styleKey: 'lunchStyle', venueKey: 'lunchVenue', cuisineKey: 'lunchCuisine', label: 'Lunch', icon: '🥗' },
@@ -715,30 +823,35 @@ export default function MealPlanManagement() {
                                 { key: 'hasSnacks', menuKey: 'snacksMenu', styleKey: 'snacksStyle', venueKey: 'snacksVenue', cuisineKey: 'snacksCuisine', label: 'Snacks', icon: '🍪' },
                             ].map((item) => (
                                 <div key={item.key} className="space-y-3">
-                                    <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData[item.key as keyof MealPlan] ? `bg-white border-blue-500 shadow-sm` : 'bg-gray-50 border-gray-100 hover:border-gray-200 opacity-60'}`}>
+                                    <label className={`flex items-center gap-3 p-3.5 rounded-2xl border transition cursor-pointer ${
+                                        formData[item.key as keyof MealPlan]
+                                            ? 'bg-primary-subtle/50 border-primary shadow-2xs'
+                                            : 'bg-white border-slate-200/90 hover:border-slate-300'
+                                    }`}>
                                         <input
                                             type="checkbox"
-                                            className="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-0"
+                                            className="size-4 text-primary rounded border-slate-300 focus:ring-primary"
                                             checked={!!formData[item.key as keyof MealPlan]}
                                             onChange={() => toggleInclusion(item.key as keyof MealPlan)}
                                         />
-                                        <span className={`text-sm font-bold flex items-center gap-2 ${formData[item.key as keyof MealPlan] ? 'text-blue-600' : 'text-gray-500'}`}>
-                                            {item.icon} {item.label}
+                                        <span className={`text-xs font-bold flex items-center gap-1.5 ${
+                                            formData[item.key as keyof MealPlan] ? 'text-primary' : 'text-slate-700'
+                                        }`}>
+                                            <span>{item.icon}</span> {item.label}
                                         </span>
                                     </label>
 
                                     {formData[item.key as keyof MealPlan] && (
-                                        <div className="p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                                            {/* Grid of 2x2 for sub-fields */}
-                                            <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3 text-xs">
+                                            <div className="grid grid-cols-2 gap-2.5">
                                                 <div className="space-y-1">
-                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Venue</label>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Venue</label>
                                                     <select
-                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        className="select-standard text-xs py-1.5"
                                                         value={formData[item.venueKey as keyof MealPlan] as string || ''}
                                                         onChange={e => setFormData({ ...formData, [item.venueKey]: e.target.value })}
                                                     >
-                                                        <option value="">Select Outlet...</option>
+                                                        <option value="">Select Venue...</option>
                                                         <option value="Main Restaurant">Main Restaurant</option>
                                                         <option value="The Atrium Cafe">The Atrium Cafe</option>
                                                         <option value="Poolside Grill">Poolside Grill</option>
@@ -746,9 +859,9 @@ export default function MealPlanManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Cuisine</label>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cuisine</label>
                                                     <select
-                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        className="select-standard text-xs py-1.5"
                                                         value={formData[item.cuisineKey as keyof MealPlan] as string || ''}
                                                         onChange={e => setFormData({ ...formData, [item.cuisineKey]: e.target.value })}
                                                     >
@@ -761,9 +874,9 @@ export default function MealPlanManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Menu</label>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Menu</label>
                                                     <select
-                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        className="select-standard text-xs py-1.5"
                                                         value={formData[item.menuKey as keyof MealPlan] as string || ''}
                                                         onChange={e => setFormData({ ...formData, [item.menuKey]: e.target.value })}
                                                     >
@@ -775,16 +888,16 @@ export default function MealPlanManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest pl-0.5">Serving</label>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Serving</label>
                                                     <select
-                                                        className="w-full px-2 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-700 outline-none shadow-sm h-8"
+                                                        className="select-standard text-xs py-1.5"
                                                         value={formData[item.styleKey as keyof MealPlan] as string || 'Buffet'}
                                                         onChange={e => setFormData({ ...formData, [item.styleKey]: e.target.value as any })}
                                                     >
                                                         <option value="Buffet">Buffet</option>
                                                         <option value="Set Menu">Set Menu</option>
                                                         <option value="À la carte">A La Carte</option>
-                                                        <option value="Fixed Credit">Credit</option>
+                                                        <option value="Fixed Credit">Fixed Credit</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -798,68 +911,92 @@ export default function MealPlanManagement() {
 
                 {/* 3. Pricing */}
                 {activeTab === 'pricing' && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <div className="flex items-center justify-between border-b pb-4">
-                            <div className="flex items-center gap-2">
-                                <DollarSign size={18} className="text-blue-600" />
-                                <h3 className="text-lg font-bold text-gray-900">Pricing & Accounting</h3>
-                            </div>
-                            <span className="text-[10px] font-bold text-gray-400 border px-2 py-1 rounded-full uppercase tracking-tighter">Revenue Routing Engine</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <div className="space-y-1 text-xs">
-                                    <label className="font-bold text-gray-700">Internal Cost / Unit</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2.5 text-gray-400 font-bold">৳</span>
-                                        <input type="number" className="w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="0.00" value={formData.internalCost || ''} onChange={e => setFormData({ ...formData, internalCost: parseFloat(e.target.value) })} />
-                                    </div>
-                                    <p className="text-[10px] text-gray-400">Used for GOP (Gross Operating Profit) calculation</p>
+                    <div className="card-container p-6 space-y-6">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <DollarSign className="size-5 text-primary" />
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900">Pricing & Accounting Ledger</h3>
+                                    <p className="text-xs text-slate-500">Configure adult/child rates and automated posting ledger</p>
                                 </div>
-                                <div className="space-y-1 text-xs">
-                                    <label className="font-bold text-gray-700">Posting Frequency</label>
-                                    <select className="w-full px-3 py-2 border rounded-lg bg-white text-sm" value={formData.postingFrequency || 'Daily'} onChange={e => setFormData({ ...formData, postingFrequency: e.target.value as any })}>
+                            </div>
+                            <span className="badge-code">Ledger Sync</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Internal Cost / Unit (৳)</label>
+                                    <input 
+                                        type="number" 
+                                        className="input-standard" 
+                                        placeholder="0.00" 
+                                        value={formData.internalCost || ''} 
+                                        onChange={e => setFormData({ ...formData, internalCost: parseFloat(e.target.value) })} 
+                                    />
+                                    <p className="text-[11px] text-slate-500">Calculates Gross Operating Profit (GOP)</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Posting Frequency</label>
+                                    <select 
+                                        className="select-standard" 
+                                        value={formData.postingFrequency || 'Daily'} 
+                                        onChange={e => setFormData({ ...formData, postingFrequency: e.target.value as any })}
+                                    >
                                         <option value="Daily">Night Audit (Daily Posting)</option>
                                         <option value="One-time">Check-in (Once per Stay)</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2 text-xs">
-                                        <label className="font-bold text-blue-700">Selling Price (Adult)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2 text-blue-400 font-bold">৳</span>
-                                            <input type="number" className="w-full pl-7 pr-3 py-2 border-2 border-blue-100 rounded-lg font-bold text-blue-900 focus:border-blue-500 outline-none text-sm" value={formData.sellingPriceAdult || ''} onChange={e => setFormData({ ...formData, sellingPriceAdult: parseFloat(e.target.value) })} />
-                                        </div>
+                            <div className="space-y-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-800">Selling Price Adult (৳)</label>
+                                        <input 
+                                            type="number" 
+                                            className="input-standard font-mono font-bold" 
+                                            value={formData.sellingPriceAdult || ''} 
+                                            onChange={e => setFormData({ ...formData, sellingPriceAdult: parseFloat(e.target.value) })} 
+                                        />
                                     </div>
-                                    <div className="space-y-2 text-xs">
-                                        <label className="font-bold text-pink-700">Selling Price (Child)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2 text-pink-300 font-bold">৳</span>
-                                            <input type="number" className="w-full pl-7 pr-3 py-2 border-2 border-pink-50 rounded-lg font-bold text-pink-900 focus:border-pink-500 outline-none text-sm" value={formData.sellingPriceChild || ''} onChange={e => setFormData({ ...formData, sellingPriceChild: parseFloat(e.target.value) })} />
-                                        </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-800">Selling Price Child (৳)</label>
+                                        <input 
+                                            type="number" 
+                                            className="input-standard font-mono font-bold" 
+                                            value={formData.sellingPriceChild || ''} 
+                                            onChange={e => setFormData({ ...formData, sellingPriceChild: parseFloat(e.target.value) })} 
+                                        />
                                     </div>
                                 </div>
-                                <div className="pt-2 border-t flex items-center justify-between">
+                                <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Infants Policy</span>
-                                        <input type="checkbox" className="w-4 h-4 rounded text-emerald-500" checked={formData.infantMealsFree || false} onChange={e => setFormData({ ...formData, infantMealsFree: e.target.checked })} />
-                                        <span className="text-[10px] text-emerald-600 font-bold">MEALS FREE</span>
+                                        <input 
+                                            type="checkbox" 
+                                            className="size-4 rounded text-primary" 
+                                            checked={formData.infantMealsFree || false} 
+                                            onChange={e => setFormData({ ...formData, infantMealsFree: e.target.checked })} 
+                                        />
+                                        <span className="text-xs text-slate-700 font-semibold">Infant Meals Free</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-gray-400 font-bold">UP TO</span>
-                                        <input type="number" className="w-10 px-1 py-1 border rounded text-xs text-center font-bold" value={formData.maxInfantAge || 4} onChange={e => setFormData({ ...formData, maxInfantAge: parseInt(e.target.value) })} />
-                                        <span className="text-[10px] text-gray-400 font-bold">YRS</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs text-slate-500 font-medium">Up to</span>
+                                        <input 
+                                            type="number" 
+                                            className="w-12 px-2 py-1 border border-slate-200 rounded-lg text-xs text-center font-bold" 
+                                            value={formData.maxInfantAge || 4} 
+                                            onChange={e => setFormData({ ...formData, maxInfantAge: parseInt(e.target.value) })} 
+                                        />
+                                        <span className="text-xs text-slate-500 font-medium">yrs</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="col-span-2 space-y-2 text-xs">
-                                <label className="font-bold text-gray-700">Revenue Code / Ledger <span className="text-[10px] text-blue-500 ml-2 font-normal">(Master Ledger Sync)</span></label>
+                            <div className="md:col-span-2 space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Revenue Ledger Code</label>
                                 <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm font-mono"
+                                    className="select-standard font-mono"
                                     value={formData.revenueCode || ''}
                                     onChange={e => setFormData({ ...formData, revenueCode: e.target.value })}
                                 >
@@ -873,16 +1010,16 @@ export default function MealPlanManagement() {
                                 </select>
                             </div>
 
-                            <div className="col-span-2 pt-2 bg-amber-50 rounded-xl p-4 border border-amber-100 flex items-start gap-3">
+                            <div className="md:col-span-2 p-4 bg-amber-50/80 rounded-2xl border border-amber-200/80 flex items-start gap-3">
                                 <input
                                     type="checkbox"
-                                    className="w-5 h-5 mt-0.5 text-amber-600 rounded border-gray-300"
+                                    className="size-4 mt-0.5 text-amber-600 rounded border-amber-300"
                                     checked={formData.taxInclusive || false}
                                     onChange={e => setFormData({ ...formData, taxInclusive: e.target.checked })}
                                 />
                                 <div className="text-xs">
-                                    <span className="font-bold text-amber-900 block">Is Price Tax Inclusive?</span>
-                                    <span className="text-amber-700">If checked, the selling price includes all applicable taxes (VAT/SC). If unchecked, taxes will be added on top during posting.</span>
+                                    <span className="font-bold text-amber-900 block">Selling Price is Tax Inclusive</span>
+                                    <span className="text-amber-800">If checked, taxes and service charges are included in the tariff. If unchecked, the guest folio will be assessed supplemental VAT/SC.</span>
                                 </div>
                             </div>
                         </div>
@@ -891,54 +1028,57 @@ export default function MealPlanManagement() {
 
                 {/* 4. Operations */}
                 {activeTab === 'operations' && (
-                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-                        <div className="flex items-center gap-2 border-b pb-4">
-                            <Clock size={18} className="text-blue-600" />
-                            <h3 className="text-lg font-bold text-gray-900">Timings & Service Flow</h3>
+                    <div className="card-container p-6 space-y-6">
+                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                            <Clock className="size-5 text-primary" />
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">Service Hours & POS/KDS Sync</h3>
+                                <p className="text-xs text-slate-500">Operational service schedule and kitchen display system routing</p>
+                            </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="space-y-4">
-                                <div className="space-y-2 text-xs">
-                                    <label className="font-bold text-gray-700">Service From (Start)</label>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Service Start Time</label>
                                     <input
                                         type="time"
-                                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                                        className="input-standard"
                                         value={formData.startTime || ''}
                                         onChange={e => setFormData({ ...formData, startTime: e.target.value })}
                                     />
                                 </div>
-                                <div className="space-y-2 text-xs">
-                                    <label className="font-bold text-gray-700">Service To (End)</label>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Service End Time</label>
                                     <input
                                         type="time"
-                                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                                        className="input-standard"
                                         value={formData.endTime || ''}
                                         onChange={e => setFormData({ ...formData, endTime: e.target.value })}
                                     />
                                 </div>
                             </div>
                             <div className="space-y-4">
-                                <div className="space-y-2 text-xs">
-                                    <label className="font-bold text-gray-700">Primary Restaurant Outlet</label>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Primary Restaurant Outlet</label>
                                     <select
-                                        className="w-full px-3 py-2 border rounded-lg bg-white text-sm font-medium"
+                                        className="select-standard"
                                         value={formData.venue || ''}
                                         onChange={e => setFormData({ ...formData, venue: e.target.value })}
                                     >
                                         <option value="">Select Outlet...</option>
-                                        <option value="Main Kitchen">The Cove (Main Restaurant)</option>
-                                        <option value="Poolside Bar">Blue Wave (Poolside)</option>
-                                        <option value="Roof Top Restaurant">Sky Cupole (Rooftop)</option>
-                                        <option value="Coffee Shop">Bean & Leaf (Cafe)</option>
+                                        <option value="Main Restaurant">The Cove (Main Restaurant)</option>
+                                        <option value="Poolside Grill">Blue Wave (Poolside Grill)</option>
+                                        <option value="The Atrium Cafe">The Atrium Cafe</option>
+                                        <option value="Executive Lounge">Executive Club Lounge</option>
                                         <option value="In-Room Dining">In-Room Dining (Room Service)</option>
                                     </select>
                                 </div>
-                                <div className="p-4 bg-gray-900 rounded-xl">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="text-[10px] font-bold text-gray-400 tracking-tighter uppercase font-mono">Real-time Kitchen Sync</span>
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <div className="size-2 rounded-full bg-emerald-500" />
+                                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider font-mono">Kitchen Display System (KDS)</span>
                                     </div>
-                                    <p className="text-[10px] text-gray-500 italic">This plan will be visible on the KDS (Kitchen Display System) for the selected outlet during operational hours.</p>
+                                    <p className="text-xs text-slate-500">This plan will be broadcasted to kitchen dispatch screens during active meal service hours.</p>
                                 </div>
                             </div>
                         </div>

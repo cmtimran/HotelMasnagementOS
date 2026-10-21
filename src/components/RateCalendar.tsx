@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { Calendar, TrendingUp, Save, RotateCcw, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
+import { 
+    Calendar, TrendingUp, Save, RotateCcw, ChevronLeft, ChevronRight, X, Check,
+    BedDouble, DollarSign, Flame
+} from 'lucide-react';
+import PageHeader from './common/PageHeader';
 
 interface DayRate {
     date: string;
@@ -231,101 +235,156 @@ export default function RateCalendar() {
     const days = getDaysInMonth(currentMonth);
     const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+    const activeDays = days.filter((d): d is Date => d !== null);
+    const dayRates = activeDays.map(d => getRateForDate(d));
+    const maxRate = dayRates.length > 0 ? Math.max(...dayRates.map(r => r.rate)) : 0;
+    const avgRate = dayRates.length > 0 ? Math.round(dayRates.reduce((acc, r) => acc + r.rate, 0) / dayRates.length) : 0;
+    const highOccupancyDays = dayRates.filter(r => r.occupancy >= 80).length;
+
     return (
-        <div className="p-3 sm:p-5 max-w-7xl mx-auto space-y-3 font-sans select-none">
-            {/* Header & Controls Toolbar */}
-            <div className="bg-white p-3 rounded-xl border border-gray-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold shadow-2xs">
-                        <span>৳</span>
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 select-none animate-in fade-in duration-300">
+            {/* Header */}
+            <PageHeader
+                title="Rate & ARI Distribution Calendar"
+                subtitle="Multi-channel dynamic rate management, surge pricing, weekend adjustments, and occupancy distribution."
+                icon={<Calendar className="size-6 text-primary" />}
+                actions={
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <button
+                            onClick={resetToOperationalMonth}
+                            className="btn-secondary"
+                            title="Jump to Current Operations Month (July 2026)"
+                        >
+                            July 2026
+                        </button>
+                        <button
+                            onClick={() => setIsBulkOpen(true)}
+                            className="btn-primary"
+                        >
+                            <Calendar className="size-4 mr-1.5" />
+                            Bulk Rate Adjustment
+                        </button>
                     </div>
-                    <div>
-                        <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-none">Rate & ARI Distribution Calendar</h1>
-                        <p className="text-[11px] text-gray-500 font-medium leading-none mt-1">Multi-channel dynamic rate management, surge pricing & weekend adjustments</p>
+                }
+            />
+
+            {/* KPI Metric Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Selected Room</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <BedDouble className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-base font-bold text-slate-900 truncate tracking-tight">{selectedRoomType}</div>
+                    <div className="text-[11px] text-slate-500 font-medium mt-1">
+                        WD: ৳{ROOM_TYPE_DEFAULTS[selectedRoomType]?.weekday} | WE: ৳{ROOM_TYPE_DEFAULTS[selectedRoomType]?.weekend}
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* Room Type Selector */}
-                    <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-lg border border-gray-200">
-                        <span className="text-[11px] font-bold text-gray-500">Category:</span>
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Avg Monthly Tariff</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <DollarSign className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{avgRate.toLocaleString()}</div>
+                    <div className="text-[11px] text-emerald-600 font-semibold mt-1">Dynamic ARI average</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Peak Yield Rate</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <Flame className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{maxRate.toLocaleString()}</div>
+                    <div className="text-[11px] text-slate-500 font-medium mt-1">Maximum surge rate</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-slate-500">Peak Occupancy Days</span>
+                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <TrendingUp className="size-4" />
+                        </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">{highOccupancyDays} Days</div>
+                    <div className="text-[11px] text-indigo-600 font-semibold mt-1">&ge;80% occupancy threshold</div>
+                </div>
+            </div>
+
+            {/* Controls & Category Toolbar */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500">Room Category:</span>
                         <select
                             value={selectedRoomType}
                             onChange={(e) => setSelectedRoomType(e.target.value)}
-                            className="bg-transparent text-xs font-bold text-gray-800 outline-none cursor-pointer"
+                            className="select-standard text-xs py-1.5 px-3 min-w-[180px]"
                         >
                             {Object.keys(ROOM_TYPE_DEFAULTS).map(rt => (
                                 <option key={rt} value={rt}>{rt}</option>
                             ))}
                         </select>
                     </div>
+                </div>
 
-                    {/* Month Navigator */}
-                    <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-0.5">
+                {/* Month Navigator */}
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-slate-50 border border-slate-200/90 rounded-xl p-0.5 shadow-2xs">
                         <button
                             onClick={previousMonth}
-                            className="p-1 hover:bg-white rounded-md text-gray-600 hover:shadow-2xs transition-all"
+                            className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
                             title="Previous Month"
                         >
-                            <ChevronLeft size={14} />
+                            <ChevronLeft className="size-4" />
                         </button>
-                        <span className="text-xs font-bold text-gray-800 px-2 min-w-[120px] text-center">{monthName}</span>
+                        <span className="text-xs font-bold text-slate-800 px-3 min-w-[130px] text-center">{monthName}</span>
                         <button
                             onClick={nextMonth}
-                            className="p-1 hover:bg-white rounded-md text-gray-600 hover:shadow-2xs transition-all"
+                            className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
                             title="Next Month"
                         >
-                            <ChevronRight size={14} />
+                            <ChevronRight className="size-4" />
                         </button>
                     </div>
-
-                    <button
-                        onClick={resetToOperationalMonth}
-                        className="h-7 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold transition-colors"
-                        title="Jump to Current Operations Month (July 2026)"
-                    >
-                        July 2026
-                    </button>
-
-                    <button
-                        onClick={() => setIsBulkOpen(true)}
-                        className="h-7 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-colors"
-                    >
-                        <Calendar size={13} />
-                        <span>Bulk Update</span>
-                    </button>
                 </div>
             </div>
 
             {/* Compact Legend Bar */}
-            <div className="bg-white px-3.5 py-2 rounded-xl border border-gray-200/80 shadow-2xs flex flex-wrap items-center justify-between text-[11px] text-gray-500 gap-2">
+            <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
                 <div className="flex flex-wrap items-center gap-4">
-                    <span className="font-bold text-gray-700 text-[10px] uppercase">Tariff Legend:</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-purple-600"></span> Suite / VIP (৳10k+)</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-600"></span> Premium (৳5k-10k)</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-600"></span> Standard (৳3k-5k)</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-gray-600"></span> Base (&lt;৳3k)</span>
+                    <span className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">Tariff Legend:</span>
+                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-purple-600"></span> Suite / VIP (৳10k+)</span>
+                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-primary"></span> Premium (৳5k-10k)</span>
+                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-emerald-600"></span> Standard (৳3k-5k)</span>
+                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-slate-500"></span> Base (&lt;৳3k)</span>
                 </div>
-                <div className="flex items-center gap-2 text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100">
-                    <TrendingUp size={12} />
+                <div className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary-subtle px-2.5 py-1 rounded-lg border border-primary-border/40">
+                    <TrendingUp className="size-3.5" />
                     <span>Dynamic ARI Engine Synchronized with Channels</span>
                 </div>
             </div>
 
             {/* Calendar Grid */}
-            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto">
-                    <div className="min-w-[720px]">
-                        <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider py-2">
-                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri (W)', 'Sat (W)'].map(day => (
+                    <div className="min-w-[760px]">
+                        <div className="grid grid-cols-7 bg-slate-50/80 border-b border-slate-200/80 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider py-2.5">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri (Weekend)', 'Sat (Weekend)'].map(day => (
                                 <div key={day}>{day}</div>
                             ))}
                         </div>
 
-                        <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
+                        <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
                             {days.map((day, index) => {
                                 if (!day) {
-                                    return <div key={`empty-${index}`} className="h-20 bg-gray-50/40" />;
+                                    return <div key={`empty-${index}`} className="h-24 bg-slate-50/40" />;
                                 }
 
                                 const dayRate = getRateForDate(day);
@@ -337,32 +396,32 @@ export default function RateCalendar() {
                                     <div
                                         key={dateStr}
                                         onClick={() => !isEditing && handleCellClick(day)}
-                                        className={`h-20 p-2 cursor-pointer transition-all hover:bg-blue-50/30 ${
-                                            isToday ? 'bg-purple-50/30 ring-1 ring-purple-500 inset-0' : 'bg-white'
+                                        className={`h-24 p-2.5 cursor-pointer transition hover:bg-slate-50/80 ${
+                                            isToday ? 'bg-primary-subtle/30 ring-1 ring-primary inset-0' : 'bg-white'
                                         }`}
                                     >
                                         <div className="h-full flex flex-col justify-between">
                                             <div className="flex items-center justify-between leading-none">
-                                                <span className={`text-xs font-bold ${isToday ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                <span className={`text-xs font-bold ${isToday ? 'text-primary' : 'text-slate-800'}`}>
                                                     {day.getDate()}
                                                 </span>
                                                 {dayRate.occupancy > 0 && (
-                                                    <span className="flex items-center gap-1 text-[9px] text-gray-400 font-semibold">
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
+                                                    <span className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                                                        <span className={`size-1.5 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
                                                         {dayRate.occupancy}%
                                                     </span>
                                                 )}
                                             </div>
 
                                             {isEditing ? (
-                                                <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                                                <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
                                                     <div className="relative">
-                                                        <span className="absolute left-1 top-0.5 text-[10px] text-gray-400 font-bold">৳</span>
+                                                        <span className="absolute left-2 top-1 text-[11px] text-slate-400 font-bold">৳</span>
                                                         <input
                                                             type="number"
                                                             value={tempRate}
                                                             onChange={(e) => setTempRate(e.target.value)}
-                                                            className="w-full pl-3.5 pr-1 py-0.5 border border-purple-500 rounded text-xs font-bold outline-none"
+                                                            className="w-full pl-5 pr-1 py-1 border border-primary rounded-lg text-xs font-bold outline-none"
                                                             autoFocus
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') handleSaveRate();
@@ -373,25 +432,25 @@ export default function RateCalendar() {
                                                     <div className="flex gap-1">
                                                         <button
                                                             onClick={handleSaveRate}
-                                                            className="flex-1 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-bold hover:bg-emerald-700"
+                                                            className="flex-1 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition"
                                                         >
-                                                            <Save size={10} className="mx-auto" />
+                                                            <Save className="size-3 mx-auto" />
                                                         </button>
                                                         <button
                                                             onClick={() => setEditingDate(null)}
-                                                            className="flex-1 py-0.5 bg-gray-200 text-gray-700 rounded text-[9px] font-bold hover:bg-gray-300"
+                                                            className="flex-1 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-200 transition"
                                                         >
-                                                            <RotateCcw size={10} className="mx-auto" />
+                                                            <RotateCcw className="size-3 mx-auto" />
                                                         </button>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-1">
-                                                    <div className={`px-1.5 py-0.5 ${getRateColor(dayRate.rate)} rounded-md text-center shadow-2xs`}>
-                                                        <p className="text-[11px] font-bold leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
+                                                    <div className={`px-2 py-1 ${getRateColor(dayRate.rate)} rounded-lg text-center shadow-2xs`}>
+                                                        <p className="text-xs font-bold leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
                                                     </div>
                                                     {dayRate.eventName && (
-                                                        <p className="text-[8px] text-rose-600 font-bold truncate leading-none">{dayRate.eventName}</p>
+                                                        <p className="text-[10px] text-rose-600 font-semibold truncate leading-none mt-1">{dayRate.eventName}</p>
                                                     )}
                                                 </div>
                                             )}
@@ -406,64 +465,64 @@ export default function RateCalendar() {
 
             {/* Bulk Update Modal */}
             {isBulkOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-md w-full p-6 space-y-5 animate-in fade-in duration-200">
-                        <div className="flex justify-between items-center border-b pb-3">
-                            <div className="flex items-center gap-2">
-                                <span className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
-                                    <Calendar size={18} />
-                                </span>
+                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="card-container max-w-md w-full p-6 space-y-5 animate-in fade-in duration-200 shadow-xl">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                                    <Calendar className="size-5" />
+                                </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-gray-900">Bulk Rate Adjustment</h3>
-                                    <p className="text-xs text-gray-500">Apply rates across a date range for {selectedRoomType}</p>
+                                    <h3 className="text-base font-bold text-slate-900">Bulk Rate Adjustment</h3>
+                                    <p className="text-xs text-slate-500">Apply uniform rates for {selectedRoomType}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setIsBulkOpen(false)}
-                                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+                                className="btn-secondary p-1.5"
                             >
-                                <X size={18} />
+                                <X className="size-4 text-slate-500" />
                             </button>
                         </div>
 
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Start Date</label>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Start Date</label>
                                     <input
                                         type="date"
                                         value={bulkStartDate}
                                         onChange={(e) => setBulkStartDate(e.target.value)}
-                                        className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none"
+                                        className="input-standard text-xs py-1.5"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">End Date</label>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">End Date</label>
                                     <input
                                         type="date"
                                         value={bulkEndDate}
                                         onChange={(e) => setBulkEndDate(e.target.value)}
-                                        className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none"
+                                        className="input-standard text-xs py-1.5"
                                     />
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Target Rate (BDT)</label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Target Rate (BDT)</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2 text-gray-500 font-bold text-xs">৳</span>
+                                    <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">৳</span>
                                     <input
                                         type="number"
                                         value={bulkRate}
                                         onChange={(e) => setBulkRate(e.target.value)}
-                                        className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none font-bold text-purple-700 font-mono focus:ring-2 focus:ring-purple-500"
+                                        className="input-standard pl-7 font-mono font-bold"
                                         placeholder="e.g. 3500"
                                     />
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Days Applicable</label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Days Applicable</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {[
                                         { id: 'all', label: 'All Days' },
@@ -474,10 +533,10 @@ export default function RateCalendar() {
                                             key={filter.id}
                                             type="button"
                                             onClick={() => setBulkDayFilter(filter.id as any)}
-                                            className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                                            className={`py-2 text-xs font-semibold rounded-xl border transition ${
                                                 bulkDayFilter === filter.id
-                                                    ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                                    ? 'bg-primary text-white border-primary shadow-xs'
+                                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                                             }`}
                                         >
                                             {filter.label}
@@ -487,19 +546,19 @@ export default function RateCalendar() {
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-3 border-t">
+                        <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                             <button
                                 onClick={() => setIsBulkOpen(false)}
-                                className="px-4 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50"
+                                className="btn-secondary"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleBulkApply}
-                                className="px-5 py-2 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 shadow-xs flex items-center gap-1.5"
+                                className="btn-primary"
                             >
-                                <Check size={14} />
-                                <span>Apply to Calendar</span>
+                                <Check className="size-4 mr-1.5" />
+                                Apply to Calendar
                             </button>
                         </div>
                     </div>

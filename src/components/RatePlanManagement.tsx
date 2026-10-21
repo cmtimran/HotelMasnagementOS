@@ -4,9 +4,10 @@ import {
     Shield, Percent, Star, Calendar as CalendarIcon,
     TrendingUp, AlertCircle, Layers, Coffee, Utensils,
     Moon, Sun, MapPin, Clock, FileText, Search,
-    RefreshCw, AlertTriangle, CheckCircle2
+    RefreshCw, AlertTriangle, CheckCircle2, Tags
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import PageHeader from './common/PageHeader';
 
 interface RatePlan {
     id: number;
@@ -313,87 +314,201 @@ export default function RatePlanManagement() {
         setEditingPlan(null);
     };
 
-    const renderList = () => (
+    const renderList = () => {
+        const totalPlans = ratePlans.length;
+        const activeCount = ratePlans.filter(p => p.status === 'Active').length;
+        const packageLinkedCount = ratePlans.filter(p => p.packageId).length;
+        const seasonalCount = ratePlans.filter(p => p.isSeasonal).length;
+
+        return (
         <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Rate Plan Management</h1>
-                    <p className="text-xs sm:text-sm text-gray-500">Define selling strategies, yield rules, and inventory fencings</p>
+            {/* Standardized PageHeader matching Thesis */}
+            <PageHeader
+                title="Rate Plan Management"
+                subtitle="Define selling strategies, yield rules, market segments, and inventory fencings."
+                icon={<Tags className="size-6 text-primary" />}
+                badge={
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary-subtle text-primary border border-primary-border">
+                        Commercial & Pricing
+                    </span>
+                }
+                actions={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setView('calendar')}
+                            className="btn-secondary"
+                        >
+                            <CalendarIcon className="size-3.5" />
+                            <span>Yield Console</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="btn-primary"
+                        >
+                            <Plus className="size-3.5" />
+                            <span>Define New Plan</span>
+                        </button>
+                    </>
+                }
+            />
+
+            {/* KPI Metric Cards Row matching Thesis */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Total Rate Plans</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Tags className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">{totalPlans}</span>
+                        <span className="text-[11px] font-semibold text-emerald-600">
+                            {activeCount} Active
+                        </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Multi-market rate structures</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                        <input
-                            type="text"
-                            placeholder="Search rate plans..."
-                            className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-56 sm:w-64 transition-all shadow-2xs"
-                            value={searchQuery}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-                        />
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Package Bundled</span>
+                        <div className="size-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                            <Layers className="size-4" />
+                        </div>
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => setView('calendar')} className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold text-xs transition-all shadow-2xs cursor-pointer">
-                            <CalendarIcon size={15} /> Yield Console
-                        </button>
-                        <button onClick={openCreate} className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs transition-all shadow-xs cursor-pointer">
-                            <Plus size={15} /> Define New Plan
-                        </button>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">{packageLinkedCount}</span>
+                        <span className="text-[11px] text-slate-400">Linked packages</span>
                     </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Auto-allocates revenue</p>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Seasonal Strategies</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <TrendingUp className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">{seasonalCount}</span>
+                        <span className="text-[11px] font-semibold text-amber-600">Peak seasons</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Time-locked yield pricing</p>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">System Yield Health</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <CheckCircle2 className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">100%</span>
+                        <span className="text-[11px] font-semibold text-emerald-600">Optimal</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">All fences active & verified</p>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
+            {/* Search & Filter Toolbar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row gap-3 items-center justify-between">
+                <div className="relative w-full md:w-80">
+                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search rate plans, codes, or segments..."
+                        className="input-standard pl-9"
+                        value={searchQuery}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+                <div className="text-xs text-slate-500 font-medium self-end md:self-auto">
+                    Showing <span className="font-bold text-slate-900">{ratePlans.filter((plan: RatePlan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase())).length}</span> strategies
+                </div>
+            </div>
+
+            {/* Table Container */}
+            <div className="table-container">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[960px]">
-                        <thead className="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold text-gray-600">
-                            <tr>
-                                <th className="px-6 py-3.5">Identity & Segment</th>
-                                <th className="px-6 py-3.5">Meal Plan</th>
-                                <th className="px-6 py-3.5">Policies</th>
-                                <th className="px-6 py-3.5">Fencings</th>
-                                <th className="px-6 py-3.5 text-right">Pricing (Base)</th>
-                                <th className="px-6 py-3.5 text-right pr-6">Actions</th>
+                    <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                <th className="py-3.5 px-4">Identity & Segment</th>
+                                <th className="py-3.5 px-4">Meal Plan</th>
+                                <th className="py-3.5 px-4">Policies</th>
+                                <th className="py-3.5 px-4">Fencings</th>
+                                <th className="py-3.5 px-4 text-right">Pricing (Base)</th>
+                                <th className="py-3.5 px-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 text-gray-600">
+                        <tbody className="divide-y divide-slate-100">
                             {ratePlans
                                 .filter((plan: RatePlan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase()))
                                 .map((plan: RatePlan) => (
-                                <tr key={plan.id} className="hover:bg-blue-50/20 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-gray-900">{plan.name}</div>
+                                <tr key={plan.id} className="hover:bg-slate-50/70 transition-colors">
+                                    <td className="py-3.5 px-4">
+                                        <div className="font-bold text-slate-900">{plan.name}</div>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-[10px] font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-bold">{plan.shortCode}</span>
-                                            <span className="text-[10px] text-blue-700 font-bold uppercase tracking-tight">{plan.marketSegment}</span>
+                                            <span className="badge-code">{plan.shortCode}</span>
+                                            <span className="text-[10px] text-primary font-bold uppercase tracking-tight">{plan.marketSegment}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <Coffee size={14} className="text-amber-500" />
-                                            <span className="font-semibold text-gray-800">{plan.mealPlan}</span>
+                                    <td className="py-3.5 px-4">
+                                        <div className="flex items-center gap-1.5">
+                                            <Coffee size={13} className="text-amber-500 shrink-0" />
+                                            <span className="font-semibold text-slate-800">{plan.mealPlan}</span>
                                         </div>
-                                        {plan.packageId && <div className="text-[10px] text-indigo-600 font-semibold mt-1 inline-flex items-center gap-1"><Layers size={10}/> Package Linked</div>}
+                                        {plan.packageId && (
+                                            <div className="text-[10px] text-purple-600 font-semibold mt-1 inline-flex items-center gap-1">
+                                                <Layers size={10}/> Package Linked
+                                            </div>
+                                        )}
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-wrap gap-1">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${plan.policies.cancellationType === 'Non-Refundable' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-                                                {plan.policies.cancellationType}
-                                            </span>
+                                    <td className="py-3.5 px-4">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${plan.policies.cancellationType === 'Non-Refundable' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                                            {plan.policies.cancellationType}
+                                        </span>
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                        <div className="space-y-0.5">
+                                            <div className="text-[11px] flex items-center gap-1.5 font-medium text-slate-700">
+                                                <Clock size={11} className="text-slate-400"/> Min {plan.minNights} Nights
+                                            </div>
+                                            {plan.stopSell && (
+                                                <div className="text-[10px] text-rose-600 font-bold flex items-center gap-1">
+                                                    <AlertCircle size={11}/> STOP SELL
+                                                </div>
+                                            )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="space-y-1">
-                                            <div className="text-[10.5px] flex items-center gap-1.5 font-medium text-gray-700"><Clock size={12} className="text-gray-400"/> Min {plan.minNights} N</div>
-                                            {plan.stopSell && <div className="text-[11px] text-red-600 font-black flex items-center gap-1"><AlertCircle size={12}/> STOP SELL</div>}
+                                    <td className="py-3.5 px-4 text-right">
+                                        <div className="font-bold text-slate-900 font-mono text-sm">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
+                                        <div className="text-[10px] text-slate-400 font-medium">Exc. Tax</div>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => openEdit(plan)}
+                                                className="btn-icon"
+                                                title="Edit Rate Plan"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDelete(plan.id)}
+                                                className="btn-icon-danger"
+                                                title="Delete Rate Plan"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="font-bold text-gray-900 font-mono">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
-                                        <div className="text-[10px] text-gray-400 font-medium">Exc. Tax</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right pr-6 space-x-1.5">
-                                        <button onClick={() => openEdit(plan)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer" title="Edit Plan"><Edit2 size={15} /></button>
-                                        <button onClick={() => handleDelete(plan.id)} className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer" title="Delete Plan"><Trash2 size={15} /></button>
                                     </td>
                                 </tr>
                             ))}
@@ -402,46 +517,66 @@ export default function RatePlanManagement() {
                 </div>
             </div>
         </div>
-    );
+        );
+    };
 
     const renderForm = () => (
-        <div className="h-full flex flex-col bg-gray-50 min-h-screen">
-            <div className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-                <div className="flex items-center gap-6">
-                    <button onClick={() => setView('list')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-all">
-                        <X size={24} />
+        <div className="h-full flex flex-col bg-[#fafafc] min-h-screen">
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-2xs">
+                <div className="flex items-center gap-4">
+                    <button
+                        type="button"
+                        onClick={() => setView('list')}
+                        className="btn-icon size-9 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-rose-600 transition"
+                    >
+                        <X size={20} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-900 uppercase tracking-tight">
-                            {editingPlan ? `Edit Rate Plan: ${editingPlan.shortCode}` : 'Define New Strategy'}
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                            {editingPlan ? `Edit Rate Plan: ${editingPlan.shortCode}` : 'Define New Rate Strategy'}
                         </h1>
-                        <p className="text-xs text-gray-500">Configure inclusions, validity, pricing, and yield fences</p>
+                        <p className="text-xs text-slate-500">Configure inclusions, seasonal validity, room pricing matrix & yield fences</p>
                     </div>
                 </div>
-                <div className="flex gap-3">
-                    <button onClick={() => setView('list')} className="px-5 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg font-bold text-xs uppercase transition-all">Cancel</button>
-                    <button onClick={handleSave} className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md text-sm">
-                        <Save size={18} />
-                        Deploy Strategy
+                <div className="flex items-center gap-2.5">
+                    <button
+                        type="button"
+                        onClick={() => setView('list')}
+                        className="btn-secondary"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        className="btn-primary"
+                    >
+                        <Save size={15} />
+                        <span>Deploy Strategy</span>
                     </button>
                 </div>
             </div>
 
-            <div className="flex border-b bg-white px-8">
+            <div className="flex border-b border-slate-200 bg-white px-6 gap-2">
                 {[
-                    { id: 1, label: 'Identity', icon: <FileText size={16} /> },
-                    { id: 2, label: 'Inclusions', icon: <Utensils size={16} /> },
-                    { id: 3, label: 'Validity', icon: <Calendar size={16} /> },
-                    { id: 4, label: 'Restrictions', icon: <Shield size={16} /> },
-                    { id: 5, label: 'Pricing Matrix', icon: <DollarSign size={16} /> }
+                    { id: 1, label: 'Identity', icon: <FileText size={14} /> },
+                    { id: 2, label: 'Inclusions', icon: <Utensils size={14} /> },
+                    { id: 3, label: 'Validity', icon: <Calendar size={14} /> },
+                    { id: 4, label: 'Restrictions', icon: <Shield size={14} /> },
+                    { id: 5, label: 'Pricing Matrix', icon: <DollarSign size={14} /> }
                 ].map((tab: { id: number; label: string; icon: React.ReactNode }) => (
                     <button
                         key={tab.id}
+                        type="button"
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 px-8 py-4 text-xs font-bold border-b-4 transition-all ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                        className={`flex items-center gap-2 px-5 py-3.5 text-xs font-semibold border-b-2 transition ${
+                            activeTab === tab.id
+                                ? 'border-primary text-primary font-bold bg-primary-subtle/50 rounded-t-xl'
+                                : 'border-transparent text-slate-500 hover:text-slate-800'
+                        }`}
                     >
                         {tab.icon}
-                        {tab.label.toUpperCase()}
+                        <span>{tab.label}</span>
                     </button>
                 ))}
             </div>

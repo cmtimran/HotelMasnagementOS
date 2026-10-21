@@ -680,7 +680,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 font-sans text-gray-900">
+    <div className="flex h-screen overflow-hidden bg-[#fafafc] font-sans text-slate-900">
       {activePage !== 'reports' && (
         <Sidebar
           activePage={activePage}
@@ -693,7 +693,7 @@ function App() {
         {activePage !== 'reports' && (
           <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
         )}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-50 flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0">
           {renderContent()}
         </div>
       </div>

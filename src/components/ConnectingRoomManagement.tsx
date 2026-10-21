@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
-    Layers, Plus, Save, Edit2, Trash2, ChevronLeft, Link, Check, ShieldCheck, Search
+    Layers, Plus, Save, Edit2, Trash2, ChevronLeft, Link as LinkIcon, Check, ShieldCheck, Search, Filter
 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 
 interface ComponentRoom {
     roomTypeId: string;
@@ -110,6 +111,7 @@ const ConnectingRoomManagement = () => {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [formData, setFormData] = useState<ConnectingRoom | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'Active' | 'Inactive'>('all');
 
     const persistRooms = (updated: ConnectingRoom[]) => {
         setConnectingRooms(updated);
@@ -190,333 +192,429 @@ const ConnectingRoomManagement = () => {
 
     const getRoomTypeName = (id: string) => existingRoomTypes.find(rt => rt.id === id)?.name || 'Unknown Room';
 
-    const filteredConnectingRooms = connectingRooms.filter(r =>
-        r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.componentRooms.some(c => (c.roomNumbers || []).some(n => n.includes(searchTerm)))
+    const filteredConnectingRooms = connectingRooms.filter(r => {
+        const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            r.componentRooms.some(c => (c.roomNumbers || []).some(n => n.includes(searchTerm)));
+        const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    // KPI Metrics
+    const totalSuites = connectingRooms.length;
+    const activeSuites = connectingRooms.filter(r => r.status === 'Active').length;
+    const totalLinkedRooms = connectingRooms.reduce((acc, r) =>
+        acc + r.componentRooms.reduce((cAcc, c) => cAcc + (c.roomNumbers?.length || c.count || 1), 0), 0
     );
+    const avgTariff = totalSuites > 0
+        ? Math.round(connectingRooms.reduce((acc, r) => {
+            const price = r.pricingStrategy === 'Fixed Rate' && r.fixedPrice ? r.fixedPrice : calculateSumPrice(r);
+            return acc + price;
+        }, 0) / totalSuites)
+        : 0;
 
     if (view === 'list') {
         return (
             <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200/90 shadow-xs">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                <Layers size={20} />
-                            </span>
-                            <div>
-                                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Connecting & Joint Rooms</h1>
-                                <p className="text-xs sm:text-sm text-gray-500">Virtual interconnecting suites, parent-child inventory locks & synchronized pricing</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                            <input
-                                type="text"
-                                placeholder="Search suites, room #..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-60 shadow-2xs"
-                            />
-                        </div>
+                {/* Standard Page Header */}
+                <PageHeader
+                    title="Connecting & Joint Rooms"
+                    subtitle="Virtual interconnecting suites, parent-child inventory locks & synchronized pricing"
+                    icon={<Layers className="size-6 text-primary" />}
+                    actions={
                         <button
                             onClick={handleAddNew}
-                            className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-1.5 hover:bg-blue-700 font-semibold text-xs transition-colors shadow-xs cursor-pointer"
+                            className="btn-primary flex items-center gap-2 cursor-pointer"
                         >
                             <Plus size={15} /> Add Connecting Suite
                         </button>
+                    }
+                />
+
+                {/* 4 Standardized Thesis KPI Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Suites</span>
+                            <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                                <Layers size={16} />
+                            </div>
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{totalSuites}</div>
+                        <div className="mt-1 text-[11px] text-slate-400 font-medium">Configured suites</div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Suites</span>
+                            <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                <ShieldCheck size={16} />
+                            </div>
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-emerald-600 tracking-tight">{activeSuites}</div>
+                        <div className="mt-1 text-[11px] text-emerald-600/80 font-medium">Bookable across PMS</div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Linked Units</span>
+                            <div className="size-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                                <LinkIcon size={16} />
+                            </div>
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{totalLinkedRooms}</div>
+                        <div className="mt-1 text-[11px] text-slate-400 font-medium">Physical rooms assigned</div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Tariff</span>
+                            <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs font-mono">
+                                ৳
+                            </div>
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight font-mono">
+                            ৳{avgTariff.toLocaleString()}
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400 font-medium">Mean rate per night</div>
                     </div>
                 </div>
 
+                {/* Standardized Search & Filter Toolbar */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap gap-3 items-center justify-between">
+                    <div className="relative flex-1 min-w-[240px] max-w-md">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                        <input
+                            type="text"
+                            placeholder="Search suites, room numbers..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="input-standard pl-10"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                            <Filter size={13} className="text-slate-400" />
+                            <span>Status:</span>
+                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                            className="select-standard !py-1.5 !text-xs !w-auto"
+                        >
+                            <option value="all">All Statuses ({totalSuites})</option>
+                            <option value="Active">Active ({activeSuites})</option>
+                            <option value="Inactive">Inactive ({totalSuites - activeSuites})</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Suites Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filteredConnectingRooms.length === 0 ? (
-                        <div className="col-span-full bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400">
+                        <div className="col-span-full card-container p-12 text-center text-slate-400">
                             No connecting suites found matching your search.
                         </div>
                     ) : (
                         filteredConnectingRooms.map(room => {
-                        const sumPrice = calculateSumPrice(room);
-                        const displayPrice = room.pricingStrategy === 'Fixed Rate' && room.fixedPrice ? room.fixedPrice : sumPrice;
+                            const sumPrice = calculateSumPrice(room);
+                            const displayPrice = room.pricingStrategy === 'Fixed Rate' && room.fixedPrice ? room.fixedPrice : sumPrice;
 
-                        return (
-                            <div key={room.id} className="bg-white p-5 rounded-xl shadow-xs border border-gray-200 hover:shadow-md transition-shadow group flex flex-col justify-between">
-                                <div>
-                                    <div className="flex justify-between items-start mb-3">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${room.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
-                                            {room.status}
-                                        </span>
-                                        <div className="flex gap-1.5 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => handleEdit(room)}
-                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Edit"
-                                            >
-                                                <Edit2 size={15} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(room.id)}
-                                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-base font-bold text-gray-900 leading-snug">{room.name}</h3>
-
-                                    <div className="mt-3 space-y-1.5 bg-gray-50/80 p-3 rounded-lg border border-gray-100">
-                                        <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                                            <Link size={12} className="text-blue-600" /> Linked Physical Rooms
-                                        </div>
-                                        {room.componentRooms.map((comp, idx) => (
-                                            <div key={idx} className="text-xs text-gray-700 flex items-center justify-between">
-                                                <span className="font-medium text-gray-800">
-                                                    {comp.count || comp.roomNumbers?.length || 1}x {getRoomTypeName(comp.roomTypeId)}
-                                                </span>
-                                                {comp.roomNumbers && comp.roomNumbers.length > 0 && (
-                                                    <span className="text-[11px] font-mono font-semibold bg-white border border-gray-200 px-1.5 py-0.5 rounded text-blue-700">
-                                                        Rooms {comp.roomNumbers.join(', ')}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 border-t border-gray-100 pt-3 mt-4">
+                            return (
+                                <div key={room.id} className="card-container p-5 flex flex-col justify-between hover:border-primary/40 transition">
                                     <div>
-                                        <span className="block text-[10px] uppercase font-bold text-gray-400">Rate Strategy</span>
-                                        <span className="font-semibold text-gray-800">{room.pricingStrategy}</span>
+                                        <div className="flex justify-between items-start mb-3">
+                                            <span className={room.status === 'Active' ? 'badge-status-active' : 'badge-status-inactive'}>
+                                                {room.status}
+                                            </span>
+                                            <div className="flex gap-1.5">
+                                                <button
+                                                    onClick={() => handleEdit(room)}
+                                                    className="btn-icon"
+                                                    title="Edit Suite"
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(room.id)}
+                                                    className="btn-icon-danger"
+                                                    title="Delete Suite"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <h3 className="text-base font-bold text-slate-900 leading-snug">{room.name}</h3>
+
+                                        <div className="mt-3.5 space-y-2 bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
+                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                                <LinkIcon size={12} className="text-primary" /> Linked Physical Units
+                                            </div>
+                                            {room.componentRooms.map((comp, idx) => (
+                                                <div key={idx} className="text-xs text-slate-700 flex items-center justify-between">
+                                                    <span className="font-semibold text-slate-800">
+                                                        {comp.count || comp.roomNumbers?.length || 1}x {getRoomTypeName(comp.roomTypeId)}
+                                                    </span>
+                                                    {comp.roomNumbers && comp.roomNumbers.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 justify-end">
+                                                            {comp.roomNumbers.map((num) => (
+                                                                <span key={num} className="badge-code">
+                                                                    #{num}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <span className="block text-[10px] uppercase font-bold text-gray-400">Effective Rate</span>
-                                        <span className="font-bold font-mono text-emerald-700 text-sm">৳{displayPrice.toLocaleString()}</span>
+
+                                    <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 border-t border-slate-100 pt-3.5 mt-4">
+                                        <div>
+                                            <span className="block text-[10px] uppercase font-bold text-slate-400">Rate Strategy</span>
+                                            <span className="font-semibold text-slate-800">{room.pricingStrategy}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="block text-[10px] uppercase font-bold text-slate-400">Effective Rate</span>
+                                            <span className="font-bold font-mono text-emerald-600 text-sm">৳{displayPrice.toLocaleString()}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    }))}
+                            );
+                        })
+                    )}
                 </div>
             </div>
         );
     }
 
+    // FORM / CREATE VIEW
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
-            {/* Header */}
-            <header className="bg-white border-b sticky top-0 z-10 px-4 py-3 flex justify-between items-center shadow-xs">
+        <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
+            {/* Form Page Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200/90">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => setView('list')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors">
-                        <ChevronLeft size={20} />
+                    <button
+                        onClick={() => setView('list')}
+                        className="btn-secondary !p-2 rounded-xl"
+                        title="Back to list"
+                    >
+                        <ChevronLeft size={18} />
                     </button>
                     <div>
-                        <h1 className="text-lg font-bold text-gray-900">{editingId ? 'Edit Connecting Suite' : 'Create New Connecting Suite'}</h1>
-                        <p className="text-xs text-gray-500">Configure virtual interconnected layout, component units and sync rules</p>
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                            {editingId ? 'Edit Connecting Suite' : 'Create New Connecting Suite'}
+                        </h1>
+                        <p className="text-xs text-slate-500">Configure virtual interconnected layout, component units and sync rules</p>
                     </div>
                 </div>
-                <button
-                    onClick={handleSave}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm flex items-center gap-2 shadow-xs transition-colors"
-                >
-                    <Save size={16} /> Save Configuration
-                </button>
-            </header>
 
-            <main className="max-w-3xl mx-auto p-4 sm:p-6">
-                <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6 space-y-6">
+                <div className="flex items-center gap-2.5">
+                    <button
+                        onClick={() => setView('list')}
+                        className="btn-secondary"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        className="btn-primary flex items-center gap-1.5"
+                    >
+                        <Save size={15} /> Save Configuration
+                    </button>
+                </div>
+            </div>
 
-                    {/* Basic Info */}
-                    <div className="space-y-4">
-                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
-                            <Layers size={16} className="text-blue-600" /> Basic Details
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Joint Suite Name *</label>
-                                <input
-                                    type="text"
-                                    value={formData?.name || ''}
-                                    onChange={e => updateField('name', e.target.value)}
-                                    placeholder="e.g. Family Connecting Deluxe (101-102)"
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Operational Status *</label>
-                                <select
-                                    value={formData?.status || 'Active'}
-                                    onChange={e => updateField('status', e.target.value)}
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none"
-                                >
-                                    <option value="Active">Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
-                            </div>
+            <div className="card-container p-6 space-y-6">
+                {/* Basic Info */}
+                <div className="space-y-4">
+                    <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <Layers size={15} className="text-primary" /> Basic Information
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-700">Joint Suite Name *</label>
+                            <input
+                                type="text"
+                                value={formData?.name || ''}
+                                onChange={e => updateField('name', e.target.value)}
+                                placeholder="e.g. Family Connecting Deluxe (101-102)"
+                                className="input-standard"
+                            />
                         </div>
-                    </div>
-
-                    {/* Component Rooms */}
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                                <Link size={16} className="text-blue-600" /> Component Rooms & Numbers
-                            </h2>
-                            <button
-                                onClick={addComponentRoom}
-                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md"
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-700">Operational Status *</label>
+                            <select
+                                value={formData?.status || 'Active'}
+                                onChange={e => updateField('status', e.target.value)}
+                                className="select-standard"
                             >
-                                <Plus size={13} /> Add Room Category
-                            </button>
-                        </div>
-
-                        <div className="space-y-3">
-                            {formData?.componentRooms.map((comp, index) => {
-                                const availableRooms = mockPhysicalRooms.filter(r => r.typeId === comp.roomTypeId);
-
-                                return (
-                                    <div key={index} className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200">
-                                        <div className="flex items-start gap-4">
-                                            {/* Room Type Column */}
-                                            <div className="w-1/3 min-w-[180px] space-y-1">
-                                                <label className="text-[11px] font-bold text-gray-500 uppercase">Room Category</label>
-                                                <select
-                                                    value={comp.roomTypeId}
-                                                    onChange={e => {
-                                                        if (formData) {
-                                                            const updatedComponents = formData.componentRooms.map((c, i) =>
-                                                                i === index ? { ...c, roomTypeId: e.target.value, roomNumbers: [], count: 0 } : c
-                                                            );
-                                                            updateField('componentRooms', updatedComponents);
-                                                        }
-                                                    }}
-                                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white outline-none text-xs font-semibold text-gray-800"
-                                                >
-                                                    <option value="">Select Room Type</option>
-                                                    {existingRoomTypes.map(rt => (
-                                                        <option key={rt.id} value={rt.id}>
-                                                            {rt.name} (৳{rt.price.toLocaleString()})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            {/* Room Selection Column */}
-                                            <div className="flex-1 space-y-1">
-                                                <label className="text-[11px] font-bold text-gray-500 uppercase flex items-center justify-between">
-                                                    <span>Assign Physical Rooms</span>
-                                                    {comp.roomNumbers && comp.roomNumbers.length > 0 && (
-                                                        <span className="text-blue-600 font-bold">({comp.roomNumbers.length} selected)</span>
-                                                    )}
-                                                </label>
-
-                                                {comp.roomTypeId && availableRooms.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1.5 min-h-[38px] items-center pt-1">
-                                                        {availableRooms.map(room => {
-                                                            const isSelected = comp.roomNumbers?.includes(room.number);
-                                                            return (
-                                                                <button
-                                                                    key={room.id}
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        if (formData) {
-                                                                            const newNumbers = isSelected
-                                                                                ? (comp.roomNumbers || []).filter(n => n !== room.number)
-                                                                                : [...(comp.roomNumbers || []), room.number];
-
-                                                                            const updatedComponents = formData.componentRooms.map((c, i) =>
-                                                                                i === index ? { ...c, roomNumbers: newNumbers, count: newNumbers.length } : c
-                                                                            );
-                                                                            updateField('componentRooms', updatedComponents);
-                                                                        }
-                                                                    }}
-                                                                    className={`px-2.5 py-1 rounded-md text-xs font-bold border flex items-center gap-1 transition-all ${
-                                                                        isSelected
-                                                                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                                                                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
-                                                                    }`}
-                                                                >
-                                                                    <span>{room.number}</span>
-                                                                    {isSelected && <Check size={12} />}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                ) : (
-                                                    <div className="h-[38px] flex items-center text-xs text-gray-400 italic px-2">
-                                                        {comp.roomTypeId ? 'No rooms configured for this category' : 'Select a room type first'}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Actions */}
-                                            <button
-                                                type="button"
-                                                onClick={() => removeComponentRoom(index)}
-                                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg mt-5 transition-colors"
-                                                title="Remove Category"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50/80 p-3 rounded-lg border border-blue-100 font-medium">
-                            <ShieldCheck size={16} className="text-blue-600 shrink-0" />
-                            <span><strong>Inventory Auto-Sync:</strong> Booking this joint suite will automatically lock and mark all component physical rooms as occupied across Front Desk and Room Rack.</span>
+                                <option value="Active">Active (Bookable)</option>
+                                <option value="Inactive">Inactive (Suspended)</option>
+                            </select>
                         </div>
                     </div>
-
-                    {/* Pricing Strategy */}
-                    <div className="space-y-4">
-                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
-                            <Save size={16} className="text-blue-600" /> Pricing & Billing Strategy
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Pricing Mode</label>
-                                <select
-                                    value={formData?.pricingStrategy || 'Sum of Rates'}
-                                    onChange={e => updateField('pricingStrategy', e.target.value)}
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none font-semibold text-gray-800"
-                                >
-                                    <option value="Sum of Rates">Sum of Rates (Dynamic Aggregate)</option>
-                                    <option value="Fixed Rate">Fixed Rate (Package Combo Discount)</option>
-                                </select>
-                            </div>
-
-                            {formData?.pricingStrategy === 'Sum of Rates' ? (
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Calculated Suite Rate</label>
-                                    <div className="px-3 py-2 bg-emerald-50/80 border border-emerald-200 rounded-lg text-emerald-800 font-mono font-bold text-sm">
-                                        ৳{calculateSumPrice().toLocaleString()} <span className="text-xs font-normal text-emerald-600">(Sum of component tariffs)</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Fixed Suite Tariff (BDT)</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2 text-gray-500 font-bold">৳</span>
-                                        <input
-                                            type="number"
-                                            value={formData?.fixedPrice || ''}
-                                            onChange={e => updateField('fixedPrice', parseFloat(e.target.value) || 0)}
-                                            placeholder="Enter combo rate"
-                                            className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg outline-none font-bold text-blue-600 text-sm focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
                 </div>
-            </main>
+
+                {/* Component Rooms */}
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                        <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                            <LinkIcon size={15} className="text-primary" /> Component Categories & Room Numbers
+                        </h2>
+                        <button
+                            onClick={addComponentRoom}
+                            className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 text-primary border-primary/30"
+                        >
+                            <Plus size={13} /> Add Category
+                        </button>
+                    </div>
+
+                    <div className="space-y-3">
+                        {formData?.componentRooms.map((comp, index) => {
+                            const availableRooms = mockPhysicalRooms.filter(r => r.typeId === comp.roomTypeId);
+
+                            return (
+                                <div key={index} className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80">
+                                    <div className="flex items-start gap-4">
+                                        {/* Room Type Column */}
+                                        <div className="w-1/3 min-w-[200px] space-y-1.5">
+                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Room Category</label>
+                                            <select
+                                                value={comp.roomTypeId}
+                                                onChange={e => {
+                                                    if (formData) {
+                                                        const updatedComponents = formData.componentRooms.map((c, i) =>
+                                                            i === index ? { ...c, roomTypeId: e.target.value, roomNumbers: [], count: 0 } : c
+                                                        );
+                                                        updateField('componentRooms', updatedComponents);
+                                                    }
+                                                }}
+                                                className="select-standard !text-xs font-semibold"
+                                            >
+                                                <option value="">Select Room Type</option>
+                                                {existingRoomTypes.map(rt => (
+                                                    <option key={rt.id} value={rt.id}>
+                                                        {rt.name} (৳{rt.price.toLocaleString()})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Room Selection Column */}
+                                        <div className="flex-1 space-y-1.5">
+                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                                                <span>Assign Physical Rooms</span>
+                                                {comp.roomNumbers && comp.roomNumbers.length > 0 && (
+                                                    <span className="text-primary font-bold">({comp.roomNumbers.length} selected)</span>
+                                                )}
+                                            </label>
+
+                                            {comp.roomTypeId && availableRooms.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1.5 min-h-[38px] items-center pt-0.5">
+                                                    {availableRooms.map(room => {
+                                                        const isSelected = comp.roomNumbers?.includes(room.number);
+                                                        return (
+                                                            <button
+                                                                key={room.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (formData) {
+                                                                        const newNumbers = isSelected
+                                                                            ? (comp.roomNumbers || []).filter(n => n !== room.number)
+                                                                            : [...(comp.roomNumbers || []), room.number];
+
+                                                                        const updatedComponents = formData.componentRooms.map((c, i) =>
+                                                                            i === index ? { ...c, roomNumbers: newNumbers, count: newNumbers.length } : c
+                                                                        );
+                                                                        updateField('componentRooms', updatedComponents);
+                                                                    }
+                                                                }}
+                                                                className={`px-3 py-1 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                                                                    isSelected
+                                                                        ? 'bg-primary text-white border-primary shadow-2xs'
+                                                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                                                }`}
+                                                            >
+                                                                <span>#{room.number}</span>
+                                                                {isSelected && <Check size={12} />}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <div className="h-[38px] flex items-center text-xs text-slate-400 italic">
+                                                    {comp.roomTypeId ? 'No rooms configured for this category' : 'Select a room type first'}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Actions */}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeComponentRoom(index)}
+                                            className="btn-icon-danger mt-6"
+                                            title="Remove Category"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 text-xs text-primary bg-primary-subtle p-3.5 rounded-xl border border-primary-border font-medium">
+                        <ShieldCheck size={18} className="text-primary shrink-0" />
+                        <span><strong>Inventory Auto-Sync:</strong> Booking this joint suite will automatically lock and mark all component physical rooms as occupied across Front Desk and Room Rack.</span>
+                    </div>
+                </div>
+
+                {/* Pricing Strategy */}
+                <div className="space-y-4">
+                    <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <Save size={15} className="text-primary" /> Pricing & Billing Strategy
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-700">Pricing Mode</label>
+                            <select
+                                value={formData?.pricingStrategy || 'Sum of Rates'}
+                                onChange={e => updateField('pricingStrategy', e.target.value)}
+                                className="select-standard font-semibold"
+                            >
+                                <option value="Sum of Rates">Sum of Rates (Dynamic Aggregate)</option>
+                                <option value="Fixed Rate">Fixed Rate (Package Combo Discount)</option>
+                            </select>
+                        </div>
+
+                        {formData?.pricingStrategy === 'Sum of Rates' ? (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Calculated Suite Rate</label>
+                                <div className="px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-mono font-bold text-sm flex items-center justify-between">
+                                    <span>৳{calculateSumPrice().toLocaleString()}</span>
+                                    <span className="text-xs font-normal text-emerald-600">Sum of component tariffs</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-700">Fixed Suite Tariff (BDT)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold">৳</span>
+                                    <input
+                                        type="number"
+                                        value={formData?.fixedPrice || ''}
+                                        onChange={e => updateField('fixedPrice', parseFloat(e.target.value) || 0)}
+                                        placeholder="Enter combo rate"
+                                        className="input-standard pl-8 font-bold font-mono text-primary text-sm"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

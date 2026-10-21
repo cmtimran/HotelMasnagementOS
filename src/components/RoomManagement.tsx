@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import {
     Search, Plus, Edit2, Trash2, Save, ChevronLeft,
-    MapPin, Key, Layers, CheckCircle2
+    MapPin, Key, Layers, CheckCircle2, Building2, AlertTriangle, Sparkles
 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 
 interface Room {
     id: number;
@@ -256,71 +257,123 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
         }
     };
 
+    const cleanCount = rooms.filter(r => r.housekeepingStatus === 'Clean' || r.housekeepingStatus === 'Inspected').length;
+    const dirtyCount = rooms.filter(r => r.housekeepingStatus === 'Dirty').length;
+    const oooCount = rooms.filter(r => r.status === 'Out of Order' || r.status === 'Maintenance').length;
+
     return (
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 h-[calc(100vh-100px)] flex flex-col font-sans">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 font-sans animate-in fade-in duration-300">
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3 bg-gray-50/70">
-                <div className="flex items-center gap-3">
-                    {view === 'form' && (
-                        <button onClick={() => setView('list')} className="p-2 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors">
-                            <ChevronLeft size={20} />
-                        </button>
-                    )}
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                                {view === 'list' ? 'Physical Room Inventory' : (formData.id === 0 ? 'Add Physical Room' : `Edit Room ${formData.number}`)}
-                            </h1>
-                            {view === 'list' && (
-                                <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200">
-                                    {rooms.length} Total Units
-                                </span>
-                            )}
+            <PageHeader
+                title={view === 'list' ? 'Physical Room Inventory' : (formData.id === 0 ? 'Add Physical Room' : `Edit Room ${formData.number}`)}
+                subtitle={view === 'list' ? 'Manage property room master, floor distributions, door locks & housekeeping status.' : 'Configure room details, technical devices and status'}
+                icon={<Building2 className="size-6 text-primary" />}
+                actions={
+                    <div className="flex items-center gap-2.5">
+                        {onBack && (
+                            <button onClick={onBack} className="btn-secondary">
+                                Back
+                            </button>
+                        )}
+                        {view === 'list' ? (
+                            <button
+                                onClick={handleAddNew}
+                                className="btn-primary"
+                            >
+                                <Plus className="size-4 mr-1.5" />
+                                Add New Room
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setView('list')}
+                                className="btn-secondary"
+                            >
+                                <ChevronLeft className="size-4 mr-1.5" />
+                                Return to List
+                            </button>
+                        )}
+                    </div>
+                }
+            />
+
+            {view === 'list' && (
+                <>
+                    {/* KPI Metric Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Total Rooms</span>
+                                <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                                    <Building2 className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight">{rooms.length}</div>
+                            <div className="text-[11px] text-slate-500 font-medium mt-1">Physical inventory units</div>
                         </div>
-                        <p className="text-xs text-gray-500">
-                            {view === 'list' ? 'Manage property room master, floor distributions, door locks & hardware extensions' : 'Configure room details, technical devices and status'}
-                        </p>
-                    </div>
-                </div>
 
-                {view === 'list' && (
-                    <div className="flex items-center gap-2">
-                        <button onClick={onBack} className="px-3 py-1.5 text-gray-600 hover:bg-gray-200 rounded-lg text-xs font-semibold transition-colors">
-                            Back
-                        </button>
-                        <button
-                            onClick={handleAddNew}
-                            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 text-xs font-semibold transition-colors shadow-2xs"
-                        >
-                            <Plus size={15} />
-                            <span>Add New Room</span>
-                        </button>
-                    </div>
-                )}
-            </div>
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Clean / Inspected</span>
+                                <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                    <CheckCircle2 className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight">{cleanCount}</div>
+                            <div className="text-[11px] text-emerald-600 font-semibold mt-1">Ready for check-in</div>
+                        </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-auto p-4 sm:p-5">
-                {view === 'list' ? (
-                    <div className="space-y-4">
-                        {/* Filters & Floor Tabs */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50/80 p-2.5 rounded-xl border border-gray-200/80">
-                            <div className="relative flex-1 min-w-[220px] max-w-sm">
-                                <Search className="absolute left-3 top-2.5 text-gray-400" size={14} />
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Dirty / Turn-down</span>
+                                <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                                    <Sparkles className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight">{dirtyCount}</div>
+                            <div className="text-[11px] text-amber-700 font-semibold mt-1">Pending housekeeping</div>
+                        </div>
+
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Out of Order (OOO)</span>
+                                <div className="size-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                                    <AlertTriangle className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight">{oooCount}</div>
+                            <div className="text-[11px] text-rose-600 font-semibold mt-1">Maintenance / Blocked</div>
+                        </div>
+                    </div>
+
+                    {/* Filters & Floor Tabs Toolbar */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3">
+                        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+                            <div className="relative w-full md:w-80">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
                                 <input
                                     type="text"
                                     placeholder="Search by room #, name, extension..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="input-standard pl-9"
                                 />
                             </div>
+                            <div className="flex items-center gap-2 w-full md:w-auto justify-end text-xs text-slate-500 font-medium">
+                                Showing <strong className="text-slate-800">{filteredRooms.length}</strong> of {rooms.length} rooms
+                            </div>
+                        </div>
 
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-100">
+                            {/* Floor Filter */}
                             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">Floor:</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Floor:</span>
                                 <button
                                     onClick={() => setSelectedFloor('all')}
-                                    className={`px-2.5 py-1 rounded-md font-bold transition-all ${selectedFloor === 'all' ? 'bg-blue-600 text-white shadow-2xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                                        selectedFloor === 'all'
+                                            ? 'bg-primary text-white shadow-xs'
+                                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                    }`}
                                 >
                                     All ({rooms.length})
                                 </button>
@@ -328,16 +381,27 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                     <button
                                         key={floor.id}
                                         onClick={() => setSelectedFloor(String(floor.id))}
-                                        className={`px-2.5 py-1 rounded-md font-bold transition-all ${selectedFloor === String(floor.id) ? 'bg-blue-600 text-white shadow-2xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                                            selectedFloor === String(floor.id)
+                                                ? 'bg-primary text-white shadow-xs'
+                                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                        }`}
                                     >
                                         {floor.name.includes('Floor') ? floor.name.split('(')[0].trim() : floor.name}
                                     </button>
                                 ))}
+                            </div>
 
-                                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider ml-2 mr-1">Status:</span>
+                            {/* Status Filter */}
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Status:</span>
                                 <button
                                     onClick={() => setSelectedStatus('all')}
-                                    className={`px-2.5 py-1 rounded-md font-bold transition-all ${selectedStatus === 'all' ? 'bg-gray-900 text-white shadow-2xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition ${
+                                        selectedStatus === 'all'
+                                            ? 'bg-slate-900 text-white shadow-xs'
+                                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                    }`}
                                 >
                                     All
                                 </button>
@@ -345,71 +409,77 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                     <button
                                         key={st}
                                         onClick={() => setSelectedStatus(st)}
-                                        className={`px-2 py-1 rounded-md font-semibold transition-all ${selectedStatus === st ? 'bg-gray-900 text-white shadow-2xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
+                                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition ${
+                                            selectedStatus === st
+                                                ? 'bg-slate-900 text-white shadow-xs'
+                                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                        }`}
                                     >
                                         {st}
                                     </button>
                                 ))}
                             </div>
                         </div>
+                    </div>
 
-                        {/* Room Grid */}
-                        {filteredRooms.length === 0 ? (
-                            <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400">
-                                No rooms match the current search or filter criteria.
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {filteredRooms.map(room => {
+                    {/* Room Grid */}
+                    {filteredRooms.length === 0 ? (
+                        <div className="card-container p-12 text-center text-slate-400">
+                            <Building2 className="size-8 mx-auto mb-2 text-slate-300" />
+                            No rooms match the current search or filter criteria.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {filteredRooms.map(room => {
                                 const roomType = mockRoomTypes.find(t => t.id === room.roomTypeId);
                                 const floor = availableFloors.find(f => f.id === room.floorId) || mockFloors.find(f => f.id === room.floorId);
 
                                 return (
-                                    <div key={room.id} className="group border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all bg-white relative flex flex-col justify-between">
+                                    <div key={room.id} className="card-container p-4 hover:shadow-xs transition relative flex flex-col justify-between group">
                                         <div>
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <h3 className="text-lg font-bold text-gray-900 tracking-tight font-mono">{room.number}</h3>
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getStatusColor(room.status)}`}>
+                                                        <h3 className="text-lg font-bold text-slate-900 tracking-tight font-mono">{room.number}</h3>
+                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${getStatusColor(room.status)}`}>
                                                             {room.status}
                                                         </span>
                                                     </div>
-                                                    <p className="text-xs text-blue-600 font-semibold">{roomType?.name || 'Standard'}</p>
+                                                    <p className="text-xs text-primary font-semibold mt-0.5">{roomType?.name || 'Standard'}</p>
                                                 </div>
 
-                                                <div className="flex gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEdit(room)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit">
-                                                        <Edit2 size={14} />
+                                                <div className="flex gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
+                                                    <button onClick={() => handleEdit(room)} className="btn-icon" title="Edit Room">
+                                                        <Edit2 className="size-3.5" />
                                                     </button>
-                                                    <button onClick={() => handleDelete(room.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg" title="Delete">
-                                                        <Trash2 size={14} />
+                                                    <button onClick={() => handleDelete(room.id)} className="btn-icon-danger" title="Delete Room">
+                                                        <Trash2 className="size-3.5" />
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div className="space-y-1.5 my-3 text-xs text-gray-600 bg-gray-50/70 p-2.5 rounded-lg border border-gray-100">
+                                            <div className="space-y-1.5 my-3 text-xs text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
                                                 <div className="flex items-center justify-between text-[11px]">
-                                                    <span className="text-gray-400">Location:</span>
-                                                    <span className="font-semibold text-gray-800">{floor?.name.split(' (')[0] || `Floor ${room.floorId}`}</span>
+                                                    <span className="text-slate-400">Location:</span>
+                                                    <span className="font-semibold text-slate-800">{floor?.name.split(' (')[0] || `Floor ${room.floorId}`}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[11px]">
-                                                    <span className="text-gray-400">Lock RFID:</span>
-                                                    <span className="font-mono font-bold text-gray-700">{room.lockId || `KEY-${room.number}`}</span>
+                                                    <span className="text-slate-400">Lock RFID:</span>
+                                                    <span className="font-mono font-bold text-slate-700">{room.lockId || `KEY-${room.number}`}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[11px]">
-                                                    <span className="text-gray-400">Phone Ext:</span>
-                                                    <span className="font-mono font-semibold text-gray-700">{room.phoneExt || `2${room.number}`}</span>
+                                                    <span className="text-slate-400">Phone Ext:</span>
+                                                    <span className="font-mono font-semibold text-slate-700">{room.phoneExt || `2${room.number}`}</span>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[11px]">
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
                                             <span className={`px-2 py-0.5 rounded-full font-bold ${getHousekeepingBadge(room.housekeepingStatus)}`}>
                                                 HK: {room.housekeepingStatus}
                                             </span>
                                             {room.isConnecting && (
-                                                <span className="text-purple-600 font-bold bg-purple-50 px-1.5 py-0.5 rounded text-[10px]">
+                                                <span className="text-primary font-bold bg-primary-subtle px-2 py-0.5 rounded-md text-[10px] border border-primary-border/40">
                                                     Connecting {room.connectedTo ? `(${room.connectedTo})` : ''}
                                                 </span>
                                             )}
@@ -419,255 +489,274 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                             })}
                         </div>
                     )}
+                </>
+            )}
+
+            {/* Form View */}
+            {view === 'form' && (
+                <div className="max-w-4xl mx-auto space-y-6">
+                    {/* Navigation Tabs */}
+                    <div className="bg-white p-2 rounded-2xl border border-slate-200/90 shadow-2xs flex gap-2 overflow-x-auto text-xs font-semibold">
+                        {[
+                            { id: 'location', label: 'Location & Identity', icon: <MapPin className="size-4" /> },
+                            { id: 'systems', label: 'Technical & Locks', icon: <Key className="size-4" /> },
+                            { id: 'attributes', label: 'Connecting & Specs', icon: <Layers className="size-4" /> },
+                            { id: 'status', label: 'Housekeeping & Status', icon: <CheckCircle2 className="size-4" /> },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition whitespace-nowrap ${
+                                    activeTab === tab.id
+                                        ? 'bg-primary-subtle text-primary font-bold shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                }`}
+                            >
+                                {tab.icon}
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
                     </div>
-                ) : (
-                    <div className="max-w-3xl mx-auto space-y-5">
-                        {/* Tabs */}
-                        <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1 text-xs font-bold">
-                            {[
-                                { id: 'location', label: 'Location & Identity', icon: <MapPin size={14} /> },
-                                { id: 'systems', label: 'Technical & Locks', icon: <Key size={14} /> },
-                                { id: 'attributes', label: 'Interconnection & Attributes', icon: <Layers size={14} /> },
-                                { id: 'status', label: 'Housekeeping & Status', icon: <CheckCircle2 size={14} /> },
-                            ].map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg transition-colors whitespace-nowrap ${
-                                        activeTab === tab.id ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-800'
-                                    }`}
-                                >
-                                    {tab.icon}
-                                    <span>{tab.label}</span>
-                                </button>
-                            ))}
-                        </div>
 
-                        {/* Forms */}
-                        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6 space-y-6">
-
-                            {/* Tab 1: Location & Identity */}
-                            {activeTab === 'location' && (
-                                <div className="space-y-4">
-                                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-2">
-                                        <MapPin className="text-blue-600" size={16} /> Physical Location & Categorization
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Room Number *</label>
-                                            <input
-                                                type="text"
-                                                value={formData.number}
-                                                onChange={e => updateField('number', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold"
-                                                placeholder="e.g. 101"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Room Alias / Name (Optional)</label>
-                                            <input
-                                                type="text"
-                                                value={formData.name || ''}
-                                                onChange={e => updateField('name', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
-                                                placeholder="e.g. Presidential Bay Suite"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Building *</label>
-                                            <select
-                                                value={formData.buildingId}
-                                                onChange={e => updateField('buildingId', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none"
-                                            >
-                                                {availableBuildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Floor Level *</label>
-                                            <select
-                                                value={formData.floorId}
-                                                onChange={e => updateField('floorId', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none"
-                                            >
-                                                {availableFloors.map(f => (
-                                                    <option key={f.id} value={f.id}>{f.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="col-span-2 space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Room Category Type *</label>
-                                            <select
-                                                value={formData.roomTypeId}
-                                                onChange={e => updateField('roomTypeId', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none font-semibold text-gray-800"
-                                            >
-                                                {mockRoomTypes.map(t => (
-                                                    <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
-                                                ))}
-                                            </select>
-                                        </div>
+                    {/* Forms */}
+                    <div className="card-container p-6 space-y-6">
+                        {/* Tab 1: Location & Identity */}
+                        {activeTab === 'location' && (
+                            <div className="space-y-5">
+                                <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
+                                    <MapPin className="size-5 text-primary" />
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900">Physical Location & Categorization</h3>
+                                        <p className="text-xs text-slate-500">Building wing, floor elevation, and room inventory designation</p>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* Tab 2: Technical & Systems */}
-                            {activeTab === 'systems' && (
-                                <div className="space-y-4">
-                                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-2">
-                                        <Key className="text-blue-600" size={16} /> Door Locks & Communication Systems
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">RFID Door Lock Encoder ID</label>
-                                            <input
-                                                type="text"
-                                                value={formData.lockId || ''}
-                                                onChange={e => updateField('lockId', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none font-mono"
-                                                placeholder="e.g. RFID-101"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">PBX Phone Extension</label>
-                                            <input
-                                                type="text"
-                                                value={formData.phoneExt || ''}
-                                                onChange={e => updateField('phoneExt', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none font-mono"
-                                                placeholder="e.g. 2101"
-                                            />
-                                        </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Room Number <span className="text-rose-500">*</span></label>
+                                        <input
+                                            type="text"
+                                            value={formData.number}
+                                            onChange={e => updateField('number', e.target.value)}
+                                            className="input-standard font-mono font-bold"
+                                            placeholder="e.g. 101"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Room Name / Alias (Optional)</label>
+                                        <input
+                                            type="text"
+                                            value={formData.name || ''}
+                                            onChange={e => updateField('name', e.target.value)}
+                                            className="input-standard"
+                                            placeholder="e.g. Bay View Suite"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Building Complex <span className="text-rose-500">*</span></label>
+                                        <select
+                                            value={formData.buildingId}
+                                            onChange={e => updateField('buildingId', e.target.value)}
+                                            className="select-standard"
+                                        >
+                                            {availableBuildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Floor Level <span className="text-rose-500">*</span></label>
+                                        <select
+                                            value={formData.floorId}
+                                            onChange={e => updateField('floorId', e.target.value)}
+                                            className="select-standard"
+                                        >
+                                            {availableFloors.map(f => (
+                                                <option key={f.id} value={f.id}>{f.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="col-span-1 md:col-span-2 space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Room Category Type <span className="text-rose-500">*</span></label>
+                                        <select
+                                            value={formData.roomTypeId}
+                                            onChange={e => updateField('roomTypeId', e.target.value)}
+                                            className="select-standard font-semibold text-slate-800"
+                                        >
+                                            {mockRoomTypes.map(t => (
+                                                <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* Tab 3: Connectivity & Attributes */}
-                            {activeTab === 'attributes' && (
-                                <div className="space-y-4">
-                                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-2">
-                                        <Layers className="text-blue-600" size={16} /> Interconnection & Room Specifications
-                                    </h3>
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-200">
-                                            <div>
-                                                <span className="text-xs font-bold text-gray-800">Connecting Room Facility</span>
-                                                <p className="text-[11px] text-gray-500">Has an internal connecting door to an adjoining room</p>
-                                            </div>
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.isConnecting}
-                                                onChange={e => updateField('isConnecting', e.target.checked)}
-                                                className="w-4 h-4 text-blue-600 rounded"
-                                            />
-                                        </div>
-
-                                        {formData.isConnecting && (
-                                            <div className="space-y-1 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
-                                                <label className="text-xs font-semibold text-gray-700">Connected With Room #</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.connectedTo || ''}
-                                                    onChange={e => updateField('connectedTo', e.target.value)}
-                                                    placeholder="e.g. 102"
-                                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none font-mono bg-white"
-                                                />
-                                            </div>
-                                        )}
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-gray-700">Smoking Policy</label>
-                                                <select
-                                                    value={formData.smokingStatus}
-                                                    onChange={e => updateField('smokingStatus', e.target.value)}
-                                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none"
-                                                >
-                                                    <option value="Non-Smoking">Non-Smoking</option>
-                                                    <option value="Smoking">Smoking Permitted</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-gray-700">Elevator Proximity</label>
-                                                <select
-                                                    value={formData.nearElevator ? 'yes' : 'no'}
-                                                    onChange={e => updateField('nearElevator', e.target.value === 'yes')}
-                                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none"
-                                                >
-                                                    <option value="no">Quiet Area (Away from Elevator)</option>
-                                                    <option value="yes">Near Elevator / Lift Lobby</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Tab 4: Operational Status */}
-                            {activeTab === 'status' && (
-                                <div className="space-y-4">
-                                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-2">
-                                        <CheckCircle2 className="text-blue-600" size={16} /> Operational & Housekeeping States
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Inventory Status *</label>
-                                            <select
-                                                value={formData.status}
-                                                onChange={e => updateField('status', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none font-semibold text-gray-800"
-                                            >
-                                                <option value="Active">Active (Available for Reservation)</option>
-                                                <option value="Out of Order">Out of Order (OOO)</option>
-                                                <option value="Maintenance">Under Maintenance</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Housekeeping Cleanliness</label>
-                                            <select
-                                                value={formData.housekeepingStatus}
-                                                onChange={e => updateField('housekeepingStatus', e.target.value)}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none font-semibold text-gray-800"
-                                            >
-                                                <option value="Clean">Clean (Ready for Check-In)</option>
-                                                <option value="Dirty">Dirty (Needs Cleaning)</option>
-                                                <option value="Inspected">Inspected (Supervisor Approved)</option>
-                                            </select>
-                                        </div>
-                                        <div className="col-span-2 space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Maintenance Remarks / HK Log</label>
-                                            <textarea
-                                                value={formData.remarks || ''}
-                                                onChange={e => updateField('remarks', e.target.value)}
-                                                rows={3}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                                                placeholder="e.g. Deep carpet shampooing completed. AC thermostat calibrated."
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Action Buttons */}
-                            <div className="pt-4 border-t flex justify-end gap-2.5">
-                                <button
-                                    onClick={() => setView('list')}
-                                    className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-700 text-xs font-semibold transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-xs font-bold shadow-xs transition-colors"
-                                >
-                                    <Save size={15} />
-                                    <span>Save Room</span>
-                                </button>
                             </div>
+                        )}
+
+                        {/* Tab 2: Technical & Systems */}
+                        {activeTab === 'systems' && (
+                            <div className="space-y-5">
+                                <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
+                                    <Key className="size-5 text-primary" />
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900">Door Locks & Communication Systems</h3>
+                                        <p className="text-xs text-slate-500">RFID lock encoder bindings and in-room telephony extension</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">RFID Door Lock Encoder ID</label>
+                                        <input
+                                            type="text"
+                                            value={formData.lockId || ''}
+                                            onChange={e => updateField('lockId', e.target.value)}
+                                            className="input-standard font-mono"
+                                            placeholder="e.g. RFID-101"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">PBX Phone Extension</label>
+                                        <input
+                                            type="text"
+                                            value={formData.phoneExt || ''}
+                                            onChange={e => updateField('phoneExt', e.target.value)}
+                                            className="input-standard font-mono"
+                                            placeholder="e.g. 2101"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tab 3: Connectivity & Attributes */}
+                        {activeTab === 'attributes' && (
+                            <div className="space-y-5">
+                                <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
+                                    <Layers className="size-5 text-primary" />
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900">Interconnection & Room Specifications</h3>
+                                        <p className="text-xs text-slate-500">Adjoining door connections, smoking compliance, and elevator proximity</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-800">Connecting Room Facility</span>
+                                            <p className="text-[11px] text-slate-500">Has an internal connecting door to an adjoining room</p>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.isConnecting}
+                                            onChange={e => updateField('isConnecting', e.target.checked)}
+                                            className="size-4 text-primary rounded"
+                                        />
+                                    </div>
+
+                                    {formData.isConnecting && (
+                                        <div className="space-y-1.5 p-3.5 bg-primary-subtle/30 rounded-2xl border border-primary-border/40">
+                                            <label className="text-xs font-semibold text-slate-700">Connected With Adjoining Room #</label>
+                                            <input
+                                                type="text"
+                                                value={formData.connectedTo || ''}
+                                                onChange={e => updateField('connectedTo', e.target.value)}
+                                                placeholder="e.g. 102"
+                                                className="input-standard font-mono bg-white"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold text-slate-700">Smoking Policy</label>
+                                            <select
+                                                value={formData.smokingStatus}
+                                                onChange={e => updateField('smokingStatus', e.target.value)}
+                                                className="select-standard"
+                                            >
+                                                <option value="Non-Smoking">Non-Smoking Throughout</option>
+                                                <option value="Smoking">Smoking Permitted</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold text-slate-700">Elevator Proximity</label>
+                                            <select
+                                                value={formData.nearElevator ? 'yes' : 'no'}
+                                                onChange={e => updateField('nearElevator', e.target.value === 'yes')}
+                                                className="select-standard"
+                                            >
+                                                <option value="no">Quiet Area (Away from Elevator)</option>
+                                                <option value="yes">Near Elevator / Lift Lobby</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tab 4: Operational Status */}
+                        {activeTab === 'status' && (
+                            <div className="space-y-5">
+                                <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
+                                    <CheckCircle2 className="size-5 text-primary" />
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900">Operational & Housekeeping States</h3>
+                                        <p className="text-xs text-slate-500">Live inventory reservation eligibility and housekeeping approval</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Inventory Status <span className="text-rose-500">*</span></label>
+                                        <select
+                                            value={formData.status}
+                                            onChange={e => updateField('status', e.target.value)}
+                                            className="select-standard font-semibold text-slate-800"
+                                        >
+                                            <option value="Active">Active (Available for Reservation)</option>
+                                            <option value="Out of Order">Out of Order (OOO)</option>
+                                            <option value="Maintenance">Under Maintenance</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Housekeeping Cleanliness</label>
+                                        <select
+                                            value={formData.housekeepingStatus}
+                                            onChange={e => updateField('housekeepingStatus', e.target.value)}
+                                            className="select-standard font-semibold text-slate-800"
+                                        >
+                                            <option value="Clean">Clean (Ready for Check-In)</option>
+                                            <option value="Dirty">Dirty (Needs Cleaning)</option>
+                                            <option value="Inspected">Inspected (Supervisor Approved)</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-span-1 md:col-span-2 space-y-1.5">
+                                        <label className="text-xs font-semibold text-slate-700">Maintenance Remarks / HK Log</label>
+                                        <textarea
+                                            value={formData.remarks || ''}
+                                            onChange={e => updateField('remarks', e.target.value)}
+                                            rows={3}
+                                            className="input-standard resize-none py-2"
+                                            placeholder="e.g. Deep carpet shampooing completed. AC thermostat calibrated."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
+                            <button
+                                onClick={() => setView('list')}
+                                className="btn-secondary"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                className="btn-primary"
+                            >
+                                <Save className="size-4 mr-1.5" />
+                                <span>Save Room</span>
+                            </button>
                         </div>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }

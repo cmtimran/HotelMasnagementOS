@@ -5,9 +5,10 @@ import {
     Check, X, Info, DollarSign, Calendar,
     BedDouble, Users, ArrowLeft, Save, Eye, ToggleLeft,
     ToggleRight, AlertCircle, Zap, Shield, Gift, TrendingUp,
-    RefreshCw, AlertTriangle, CheckCircle2
+    RefreshCw, AlertTriangle, CheckCircle2, Sparkles, Clock
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import PageHeader from './common/PageHeader';
 
 // ============================================================
 // DATA TYPES
@@ -713,58 +714,58 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
 
     return (
         <div className="space-y-4">
-            <div className="bg-blue-900/40 p-5 rounded-2xl border border-blue-400/30 backdrop-blur-md">
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
                 <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-sm font-bold text-blue-200 uppercase tracking-widest flex items-center gap-2">
-                        <TrendingUp size={16} /> Revenue Allocation Engine
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <TrendingUp size={15} className="text-primary" /> Revenue Allocation Engine
                     </h4>
-                    <div className="text-[10px] bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full border border-blue-400/20 font-black">FINANCE V1.2</div>
+                    <div className="text-[10px] bg-primary-subtle text-primary px-2.5 py-0.5 rounded-full border border-primary-border font-bold">FINANCE V1.2</div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                     {pkg.finance.revenueAllocations.map((alloc, i) => (
-                        <div key={i} className="flex flex-col gap-1 p-3 bg-blue-950/30 rounded-xl border border-white/5">
-                            <span className="text-[10px] text-blue-400 font-black uppercase tracking-tighter">{alloc.department}</span>
+                        <div key={i} className="flex flex-col gap-1 p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                            <span className="text-[10px] text-primary font-bold uppercase tracking-wider">{alloc.department}</span>
                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-white">
+                                <span className="text-sm font-bold text-slate-900">
                                     {alloc.type === 'Fixed' ? `৳${alloc.amount.toLocaleString()}` : `${alloc.amount}%`}
                                 </span>
-                                <div className="h-1 flex-1 bg-white/5 mx-3 rounded-full overflow-hidden">
-                                    <div className="h-full bg-blue-400 rounded-full" style={{ width: alloc.type === 'Percentage' ? `${alloc.amount}%` : '40%' }}></div>
+                                <div className="h-1.5 flex-1 bg-slate-100 mx-3 rounded-full overflow-hidden">
+                                    <div className="h-full bg-primary rounded-full" style={{ width: alloc.type === 'Percentage' ? `${alloc.amount}%` : '40%' }}></div>
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
                 {pkg.finance.dateBasedSurcharges.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-                        <div className="text-[10px] text-yellow-400 font-black uppercase tracking-widest text-center">Seasonal Peak Rules Appllied</div>
+                    <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-2">
+                        <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider text-center">Seasonal Peak Rules Applied</div>
                         {pkg.finance.dateBasedSurcharges.map((s, i) => (
-                            <div key={i} className="flex justify-between items-center bg-yellow-400/5 p-2 rounded-lg border border-yellow-400/10">
-                                <span className="text-xs text-yellow-100/70 font-medium">{s.reason}</span>
-                                <span className="text-xs font-black text-yellow-400">+৳{s.surchargeAmount.toLocaleString()}</span>
+                            <div key={i} className="flex justify-between items-center bg-amber-50/60 p-2.5 rounded-xl border border-amber-200">
+                                <span className="text-xs text-amber-900 font-medium">{s.reason}</span>
+                                <span className="text-xs font-black text-amber-800 font-mono">+৳{s.surchargeAmount.toLocaleString()}</span>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
-            <div className="bg-gray-900 rounded-xl p-4 text-xs space-y-2">
-                <div className="flex items-center gap-2 mb-3">
-                    <Zap size={14} className="text-yellow-400" />
-                    <span className="text-yellow-400 font-semibold">Allowance Engine — Auto-Routing Rules</span>
+            <div className="bg-slate-50 rounded-2xl border border-slate-200/90 p-5 text-xs space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2 mb-2 text-primary font-bold">
+                    <Zap size={14} className="text-primary" />
+                    <span>Allowance Engine — Auto-Routing Rules</span>
                 </div>
                 {rules.length === 0 && (
-                    <div className="text-gray-500 text-center py-4">No inclusions configured yet</div>
+                    <div className="text-slate-400 text-center py-4">No inclusions configured yet</div>
                 )}
                 {rules.map((r, i) => (
-                    <div key={i} className="flex items-start gap-3 bg-gray-800 rounded-lg p-2.5">
-                        <div className="text-blue-400 mt-0.5 flex-shrink-0">{r.icon}</div>
+                    <div key={i} className="flex items-start gap-3 bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+                        <div className="text-primary mt-0.5 flex-shrink-0">{r.icon}</div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-white font-medium">{r.label}</div>
-                            <div className="text-gray-400 truncate">{r.detail}</div>
+                            <div className="text-slate-900 font-semibold">{r.label}</div>
+                            <div className="text-slate-500 text-[11px] truncate">{r.detail}</div>
                         </div>
                         <div className="text-right flex-shrink-0">
-                            <div className="text-emerald-400 font-mono text-[10px]">{r.code}</div>
-                            <div className="text-gray-500 text-[10px]">{r.dept}</div>
+                            <div className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{r.code}</div>
+                            <div className="text-slate-400 text-[10px] mt-0.5">{r.dept}</div>
                         </div>
                     </div>
                 ))}
@@ -951,48 +952,114 @@ const PackageManagement = () => {
 
     // ── LIST VIEW ──
     if (view === 'list') return (
-        <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Package size={24} className="text-blue-600" /> Package Management
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-1">Build complex packages with Allowance Engine — auto-route inclusions to correct revenue departments</p>
-                </div>
-                <button onClick={openCreate} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm">
-                    <Plus size={16} /> Create Package
-                </button>
-            </div>
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+            {/* Header matching Thesis */}
+            <PageHeader
+                title="Package Builder"
+                subtitle="Build bundled stay packages with the Allowance Engine — auto-route inclusions to correct revenue departments."
+                icon={<Package className="size-6 text-primary" />}
+                badge={
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary-subtle text-primary border border-primary-border">
+                        Hospitality Bundles
+                    </span>
+                }
+                actions={
+                    <button
+                        type="button"
+                        onClick={openCreate}
+                        className="btn-primary"
+                    >
+                        <Plus className="size-3.5" />
+                        <span>Create Package</span>
+                    </button>
+                }
+            />
 
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
-                {[
-                    { label: 'Total Packages', value: packages.length, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Active', value: packages.filter(p => p.status === 'Active').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Draft', value: packages.filter(p => p.status === 'Draft').length, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-                    { label: 'Inactive', value: packages.filter(p => p.status === 'Inactive').length, color: 'text-gray-500', bg: 'bg-gray-100' },
-                ].map(s => (
-                    <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-white`}>
-                        <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                        <div className="text-xs text-gray-600 mt-0.5">{s.label}</div>
+            {/* KPI Stats Row matching Thesis */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Total Packages</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Package className="size-4" />
+                        </div>
                     </div>
-                ))}
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">{packages.length}</span>
+                        <span className="text-[11px] font-semibold text-emerald-600">
+                            {packages.filter(p => p.status === 'Active').length} Active
+                        </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Multi-inclusion packages</p>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Active Selling</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <CheckCircle2 className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">
+                            {packages.filter(p => p.status === 'Active').length}
+                        </span>
+                        <span className="text-[11px] text-emerald-600 font-semibold">Live on booking engine</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Ready for reservations</p>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Draft Proposals</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <Sparkles className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">
+                            {packages.filter(p => p.status === 'Draft').length}
+                        </span>
+                        <span className="text-[11px] text-amber-600 font-semibold">In configuration</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Upcoming promotions</p>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">Inactive Archive</span>
+                        <div className="size-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold">
+                            <Clock className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">
+                            {packages.filter(p => p.status === 'Inactive').length}
+                        </span>
+                        <span className="text-[11px] text-slate-400">Past seasonal</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Preserved for audit</p>
+                </div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search packages by name or code..."
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            {/* Search Toolbar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row gap-3 items-center justify-between">
+                <div className="relative w-full md:w-80">
+                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search packages by name, code or type..."
+                        className="input-standard pl-9"
+                    />
+                </div>
+                <div className="text-xs text-slate-500 font-medium">
+                    Showing <span className="font-bold text-slate-900">{filtered.length}</span> packages
+                </div>
             </div>
 
             {/* Package Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {filtered.map(pkg => {
                     const inclusions = [
                         pkg.mealInclusions.hasBreakfast && '🍳 Breakfast',
@@ -1008,51 +1075,78 @@ const PackageManagement = () => {
                     ].filter(Boolean);
 
                     return (
-                        <div key={pkg.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-all group">
+                        <div key={pkg.id} className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden hover:shadow-md hover:border-primary/40 transition-all duration-200 group flex flex-col justify-between shadow-2xs">
                             {/* Color bar */}
                             <div className="h-1.5" style={{ backgroundColor: pkg.color }} />
-                            <div className="p-5">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-bold text-gray-900 text-base">{pkg.name}</h3>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${typeColors[pkg.packageType] || typeColors.Standard}`}>
-                                                {pkg.packageType}
+                            <div className="p-5 flex-1 flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                <h3 className="font-bold text-slate-900 text-base">{pkg.name}</h3>
+                                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${typeColors[pkg.packageType] || typeColors.Standard}`}>
+                                                    {pkg.packageType}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="badge-code">{pkg.shortCode}</span>
+                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadge[pkg.status]}`}>{pkg.status}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                type="button"
+                                                onClick={() => openEdit(pkg)}
+                                                className="btn-icon"
+                                                title="Edit Package"
+                                            >
+                                                <Edit size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDuplicate(pkg)}
+                                                className="btn-icon"
+                                                title="Duplicate Package"
+                                            >
+                                                <Copy size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDelete(pkg.id)}
+                                                className="btn-icon-danger"
+                                                title="Delete Package"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-xs text-slate-500 mb-3 line-clamp-2">{pkg.description}</p>
+
+                                    {/* Inclusions */}
+                                    <div className="flex flex-wrap gap-1.5 mb-3">
+                                        {inclusions.slice(0, 5).map((inc, i) => (
+                                            <span key={i} className="text-[10.5px] bg-primary-subtle text-primary font-medium px-2 py-0.5 rounded-full border border-primary-border/60">
+                                                {inc as string}
                                             </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{pkg.shortCode}</span>
-                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadge[pkg.status]}`}>{pkg.status}</span>
-                                        </div>
+                                        ))}
+                                        {inclusions.length > 5 && (
+                                            <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full border border-slate-200">
+                                                +{inclusions.length - 5} more
+                                            </span>
+                                        )}
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => openEdit(pkg)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer" title="Edit"><Edit size={14} /></button>
-                                        <button onClick={() => handleDuplicate(pkg)} className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer" title="Duplicate"><Copy size={14} /></button>
-                                        <button onClick={() => handleDelete(pkg.id)} className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer" title="Delete"><Trash2 size={14} /></button>
-                                    </div>
-                                </div>
-
-                                <p className="text-xs text-gray-500 mb-3 line-clamp-1">{pkg.description}</p>
-
-                                {/* Inclusions */}
-                                <div className="flex flex-wrap gap-1.5 mb-3">
-                                    {inclusions.slice(0, 6).map((inc, i) => (
-                                        <span key={i} className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{inc as string}</span>
-                                    ))}
-                                    {inclusions.length > 6 && (
-                                        <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">+{inclusions.length - 6} more</span>
-                                    )}
                                 </div>
 
                                 {/* Footer info */}
-                                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                                        <span className="flex items-center gap-1"><BedDouble size={12} />{pkg.roomConfig.applicableRoomTypes.length || 'All'} room types</span>
-                                        <span className="flex items-center gap-1"><Calendar size={12} />Min {pkg.validity.minNights} nights</span>
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-2">
+                                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                                        <span className="flex items-center gap-1"><BedDouble size={12} className="text-slate-400" />{pkg.roomConfig.applicableRoomTypes.length || 'All'} Room Types</span>
+                                        <span className="flex items-center gap-1"><Calendar size={12} className="text-slate-400" />Min {pkg.validity.minNights}N</span>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-xs text-gray-400">Surcharge</div>
-                                        <div className="text-sm font-bold text-gray-900">৳{pkg.finance.baseSurcharge.toLocaleString()}<span className="text-xs font-normal text-gray-400">/night</span></div>
+                                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Surcharge</span>
+                                        <span className="text-base font-bold text-slate-900 font-mono">৳{pkg.finance.baseSurcharge.toLocaleString()}<span className="text-xs font-normal text-slate-400">/night</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -1061,11 +1155,15 @@ const PackageManagement = () => {
                 })}
 
                 {/* Create new card */}
-                <button onClick={openCreate}
-                    className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center justify-center text-gray-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/30 transition-all group">
-                    <Plus size={32} className="mb-2" />
-                    <span className="text-sm font-medium">Create New Package</span>
-                    <span className="text-xs mt-1">Build complex inclusive packages</span>
+                <button 
+                    onClick={openCreate}
+                    className="border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-primary hover:text-primary hover:bg-primary-subtle/20 transition group min-h-[220px]"
+                >
+                    <div className="size-10 rounded-xl bg-slate-100 group-hover:bg-primary-subtle flex items-center justify-center mb-3 transition">
+                        <Plus className="size-5 text-slate-400 group-hover:text-primary transition" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-700 group-hover:text-primary transition">Create New Package</span>
+                    <span className="text-[11px] text-slate-400 mt-1">Configure amenities & inclusion bundles</span>
                 </button>
             </div>
         </div>

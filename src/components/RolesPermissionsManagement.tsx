@@ -13,6 +13,7 @@ import {
     Copy,
     Save
 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 // ==========================================
@@ -472,26 +473,26 @@ export default function RolesPermissionsManagement() {
     const getColorClass = (color: string) => {
         switch (color) {
             case 'rose':
-                return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
+                return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'blue':
-                return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800';
+                return 'bg-blue-50 text-blue-700 border-blue-200';
             case 'sky':
-                return 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800';
+                return 'bg-sky-50 text-sky-700 border-sky-200';
             case 'emerald':
-                return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800';
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200';
             case 'amber':
-                return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800';
+                return 'bg-amber-50 text-amber-700 border-amber-200';
             case 'purple':
-                return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800';
+                return 'bg-purple-50 text-purple-700 border-purple-200';
             case 'indigo':
-                return 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800';
+                return 'bg-indigo-50 text-indigo-700 border-indigo-200';
             default:
                 return 'bg-slate-50 text-slate-700 border-slate-200';
         }
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto pb-16 p-4 sm:p-6">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans pb-16">
             {/* Toast Alert */}
             {toast && (
                 <div
@@ -504,54 +505,85 @@ export default function RolesPermissionsManagement() {
                 </div>
             )}
 
-            {/* Top Header Card */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-                <div className="flex items-center gap-3">
-                    <div className="size-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
-                        <ShieldCheck className="size-6" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                                Roles & RBAC Access Matrix
-                            </h1>
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                                Security & Governance
-                            </span>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            Role-Based Access Control (RBAC), multi-department permission matrices, front-desk security and cashier PIN safeguards.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+            {/* Standard Page Header */}
+            <PageHeader
+                title="Roles & RBAC Access Matrix"
+                subtitle="Role-Based Access Control (RBAC), multi-department permission matrices, front-desk security and cashier PIN safeguards"
+                icon={<ShieldCheck className="size-6 text-primary" />}
+                actions={
                     <button
                         type="button"
                         onClick={handleOpenCreate}
-                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-xl shadow-xs flex items-center gap-2 transition"
+                        className="btn-primary flex items-center gap-2 cursor-pointer"
                     >
                         <Plus className="size-4" />
                         <span>Create New Role</span>
                     </button>
+                }
+            />
+
+            {/* 4 Standardized Thesis KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Configured Roles</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <ShieldCheck className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{roles.length}</div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Defined staff positions</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">System Standard</span>
+                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <Lock className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{roles.filter(r => r.isSystem).length}</div>
+                    <div className="mt-1 text-[11px] text-indigo-600 font-medium">Protected root presets</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Security Scopes</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <CheckCircle2 className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{ALL_PERMISSION_IDS.length}</div>
+                    <div className="mt-1 text-[11px] text-emerald-600 font-medium">Granular permissions</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Custom Roles</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <Edit2 className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{roles.filter(r => !r.isSystem).length}</div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Custom tailor-made roles</div>
                 </div>
             </div>
 
-            {/* Search and Filters */}
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
-                <div className="relative w-full sm:w-80">
-                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Standardized Search Toolbar */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-4">
+                <div className="relative flex-1 min-w-[240px] max-w-md">
+                    <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search roles, codes, or descriptions..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                        className="input-standard pl-10"
                     />
                 </div>
 
-                <div className="text-xs text-slate-500 font-medium">
-                    Showing <span className="font-bold text-slate-900 dark:text-white">{filteredRoles.length}</span> active roles
+                <div className="text-xs text-slate-500 font-medium hidden sm:block">
+                    Showing <span className="font-bold text-slate-900">{filteredRoles.length}</span> active roles
                 </div>
             </div>
 
@@ -564,11 +596,11 @@ export default function RolesPermissionsManagement() {
                     return (
                         <div
                             key={role.id}
-                            className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 shadow-xs hover:border-blue-300 transition group"
+                            className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-4 shadow-xs hover:border-blue-300 transition group"
                         >
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                                    <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">
                                         {role.code}
                                     </span>
                                     <div className="flex items-center gap-1.5">
@@ -585,7 +617,7 @@ export default function RolesPermissionsManagement() {
                                 </div>
 
                                 <div>
-                                    <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                                    <h3 className="font-bold text-slate-900 text-base">
                                         {role.name}
                                     </h3>
                                     <p className="text-xs text-slate-500 line-clamp-2 mt-1">
@@ -597,11 +629,11 @@ export default function RolesPermissionsManagement() {
                                 <div className="space-y-1 pt-1">
                                     <div className="flex justify-between text-[11px] text-slate-500">
                                         <span>System Privileges Access</span>
-                                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                                        <span className="font-mono font-bold text-slate-800">
                                             {pct}% ({role.permissions.length}/{ALL_PERMISSION_IDS.length})
                                         </span>
                                     </div>
-                                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                         <div
                                             style={{ width: `${pct}%` }}
                                             className="h-full bg-blue-600 rounded-full transition-all duration-300"
@@ -611,11 +643,11 @@ export default function RolesPermissionsManagement() {
                             </div>
 
                             {/* Card Footer Actions */}
-                            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                            <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
                                 <button
                                     type="button"
                                     onClick={() => setSelectedRole(role)}
-                                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1"
+                                    className="text-blue-600 font-semibold hover:underline flex items-center gap-1"
                                 >
                                     <Eye className="size-3.5" />
                                     <span>Inspect Matrix</span>
@@ -625,7 +657,7 @@ export default function RolesPermissionsManagement() {
                                     <button
                                         type="button"
                                         onClick={() => handleDuplicate(role)}
-                                        className="size-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition"
+                                        className="size-8 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center transition"
                                         title="Clone Role"
                                     >
                                         <Copy className="size-3.5" />
@@ -633,7 +665,7 @@ export default function RolesPermissionsManagement() {
                                     <button
                                         type="button"
                                         onClick={() => handleOpenEdit(role)}
-                                        className="size-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition"
+                                        className="size-8 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center transition"
                                         title="Edit Role Permissions"
                                     >
                                         <Edit2 className="size-3.5" />
@@ -658,12 +690,12 @@ export default function RolesPermissionsManagement() {
             {/* Inspect Modal Drawer */}
             {selectedRole && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div className="bg-white w-full max-w-2xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div>
                                 <div className="flex items-center gap-2">
                                     <ShieldCheck className="size-5 text-blue-600" />
-                                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                    <h2 className="text-base font-bold text-slate-900">
                                         {selectedRole.name} ({selectedRole.code})
                                     </h2>
                                 </div>
@@ -693,11 +725,11 @@ export default function RolesPermissionsManagement() {
                                     return (
                                         <div
                                             key={group.id}
-                                            className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 space-y-2"
+                                            className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2"
                                         >
-                                            <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
+                                            <div className="flex items-center justify-between text-xs font-bold text-slate-900">
                                                 <span>{group.name}</span>
-                                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">
+                                                <span className="text-[10px] text-blue-600 font-mono">
                                                     {granted.length}/{group.permissions.length} Granted
                                                 </span>
                                             </div>
@@ -706,7 +738,7 @@ export default function RolesPermissionsManagement() {
                                                 {granted.map(p => (
                                                     <div
                                                         key={p.id}
-                                                        className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300"
+                                                        className="flex items-center gap-1.5 text-xs text-slate-700"
                                                     >
                                                         <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
                                                         <span className="font-medium">{p.label}</span>
@@ -719,11 +751,11 @@ export default function RolesPermissionsManagement() {
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                        <div className="p-4 border-t border-slate-200 flex justify-end">
                             <button
                                 type="button"
                                 onClick={() => setSelectedRole(null)}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 transition"
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-semibold text-slate-800 transition"
                             >
                                 Close View
                             </button>
@@ -735,11 +767,11 @@ export default function RolesPermissionsManagement() {
             {/* Create & Edit Role Modal Builder */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div className="bg-white w-full max-w-3xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="size-5 text-blue-600" />
-                                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                <h2 className="text-base font-bold text-slate-900">
                                     {editingRole ? 'Edit Role Privileges' : 'Create Custom RBAC Role'}
                                 </h2>
                             </div>
@@ -757,7 +789,7 @@ export default function RolesPermissionsManagement() {
                                 {/* Role Details */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1">
                                             Role Name *
                                         </label>
                                         <input
@@ -774,12 +806,12 @@ export default function RolesPermissionsManagement() {
                                                     setCodeError('');
                                                 }
                                             }}
-                                            className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                            className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1">
                                             Role Short Code *
                                         </label>
                                         <input
@@ -790,7 +822,7 @@ export default function RolesPermissionsManagement() {
                                                 setFormCode(e.target.value.toUpperCase());
                                                 setCodeError('');
                                             }}
-                                            className="w-full px-3 py-2 text-xs font-mono font-bold uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                            className="w-full px-3 py-2 text-xs font-mono font-bold uppercase bg-white border border-slate-200 rounded-lg text-slate-900"
                                         />
                                         {codeError && (
                                             <p className="text-[10px] text-rose-500 mt-0.5">{codeError}</p>
@@ -800,7 +832,7 @@ export default function RolesPermissionsManagement() {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div className="sm:col-span-2">
-                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1">
                                             Role Description
                                         </label>
                                         <input
@@ -808,18 +840,18 @@ export default function RolesPermissionsManagement() {
                                             placeholder="Responsibilities and operational scope"
                                             value={formDescription}
                                             onChange={e => setFormDescription(e.target.value)}
-                                            className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                                            className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1">
                                             Badge Theme Color
                                         </label>
                                         <select
                                             value={formColor}
                                             onChange={e => setFormColor(e.target.value)}
-                                            className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                            className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg"
                                         >
                                             <option value="blue">Blue (Corporate)</option>
                                             <option value="sky">Sky (Front Desk)</option>
@@ -833,10 +865,10 @@ export default function RolesPermissionsManagement() {
                                 </div>
 
                                 {/* Permissions Matrix Header */}
-                                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                                <div className="pt-2 border-t border-slate-200 space-y-3">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                         <div>
-                                            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                                                 Select Permissions Matrix ({selectedPermissions.length}/{ALL_PERMISSION_IDS.length} active)
                                             </h4>
                                             <p className="text-[11px] text-slate-400">
@@ -848,14 +880,14 @@ export default function RolesPermissionsManagement() {
                                             <button
                                                 type="button"
                                                 onClick={selectAllPermissions}
-                                                className="px-2.5 py-1 text-[11px] bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold rounded-lg border border-blue-200 dark:border-blue-800"
+                                                className="px-2.5 py-1 text-[11px] bg-blue-50 text-blue-700 font-bold rounded-lg border border-blue-200"
                                             >
                                                 Select All
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={clearAllPermissions}
-                                                className="px-2.5 py-1 text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold rounded-lg"
+                                                className="px-2.5 py-1 text-[11px] bg-slate-100 text-slate-600 font-semibold rounded-lg"
                                             >
                                                 Clear All
                                             </button>
@@ -874,12 +906,12 @@ export default function RolesPermissionsManagement() {
                                             return (
                                                 <div
                                                     key={group.id}
-                                                    className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/40 dark:bg-slate-800/30"
+                                                    className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/40"
                                                 >
                                                     {/* Group Header */}
                                                     <div
                                                         onClick={() => toggleGroup(group)}
-                                                        className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800/80 flex items-center justify-between cursor-pointer hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition"
+                                                        className="px-3.5 py-2 bg-slate-100 flex items-center justify-between cursor-pointer hover:bg-slate-200/70 transition"
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             <input
@@ -888,20 +920,20 @@ export default function RolesPermissionsManagement() {
                                                                 readOnly
                                                                 className="rounded text-blue-600"
                                                             />
-                                                            <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                                            <span className="text-xs font-bold text-slate-900">
                                                                 {group.name}
                                                             </span>
                                                             <span className="text-[10px] text-slate-400">
                                                                 ({group.category})
                                                             </span>
                                                         </div>
-                                                        <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                                                        <span className="text-[10px] font-mono font-bold text-blue-600">
                                                             {countGranted}/{group.permissions.length}
                                                         </span>
                                                     </div>
 
                                                     {/* Group Checklist */}
-                                                    <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white dark:bg-slate-900">
+                                                    <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white">
                                                         {group.permissions.map(perm => {
                                                             const isChecked = selectedPermissions.includes(perm.id);
                                                             return (
@@ -909,8 +941,8 @@ export default function RolesPermissionsManagement() {
                                                                     key={perm.id}
                                                                     className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition ${
                                                                         isChecked
-                                                                            ? 'bg-blue-50/60 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200'
-                                                                            : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                                            ? 'bg-blue-50/60 border-blue-200 text-blue-900'
+                                                                            : 'border-transparent text-slate-600 hover:bg-slate-50'
                                                                     }`}
                                                                 >
                                                                     <input
@@ -941,11 +973,11 @@ export default function RolesPermissionsManagement() {
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-end gap-2">
+                            <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-end gap-2">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                                    className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl"
                                 >
                                     Cancel
                                 </button>

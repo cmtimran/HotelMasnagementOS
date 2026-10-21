@@ -2,13 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-    .no-scrollbar::-webkit-scrollbar {
-        display: none;
-    }
+:root {
+  --background: #fafafc;
+  --foreground: #18181d;
+  --card: #ffffff;
+  --card-foreground: #18181d;
+  --primary: #0074d9;
+  --primary-hover: #0063ba;
+  --primary-active: #00539c;
+  --primary-subtle: #f0f7ff;
+  --primary-border: #b8dcff;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f7;
+  --secondary-foreground: #252530;
+  --muted: #f4f4f7;
+  --muted-foreground: #686871;
+  --accent: #f0f7ff;
+  --accent-foreground: #00539c;
+  --border: #e4e4e7;
+  --input: #e1e1e4;
+  --ring: #0074d9;
+}
 
-    .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-    }
+body {
+  background-color: #fafafc;
+  color: #18181d;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  /* Standardized Primary Action Button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-primary hover:bg-[#0063ba] text-white shadow-xs transition duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Standardized Secondary Action Button */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs transition duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Standardized Small Icon Action Button */
+  .btn-icon {
+    @apply size-7 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition duration-150 cursor-pointer;
+  }
+
+  /* Standardized Danger Icon Action Button */
+  .btn-icon-danger {
+    @apply size-7 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition duration-150 cursor-pointer;
+  }
+
+  /* Standardized Input Field */
+  .input-standard {
+    @apply w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition duration-150;
+  }
+
+  /* Standardized Select Dropdown */
+  .select-standard {
+    @apply w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition duration-150;
+  }
+
+  /* Standardized Active Status Badge */
+  .badge-status-active {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+
+  /* Standardized Inactive Status Badge */
+  .badge-status-inactive {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200;
+  }
+
+  /* Standardized Monospace Short Code Badge */
+  .badge-code {
+    @apply inline-block px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200;
+  }
+
+  /* Standardized Card Container */
+  .card-container {
+    @apply bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs;
+  }
+
+  /* Standardized Table Container */
+  .table-container {
+    @apply bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

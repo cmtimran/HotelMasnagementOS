@@ -15,6 +15,7 @@ import {
     Save,
     TrendingUp
 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 export type HolidayCategory =
@@ -469,132 +470,115 @@ export default function HolidayManagement() {
             case 'PEAK_GALA':
                 return {
                     label: 'Peak Gala / Surge',
-                    bg: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+                    bg: 'bg-amber-50 text-amber-800 border border-amber-200/90',
                 };
             case 'RELIGIOUS':
                 return {
                     label: 'Religious Festival',
-                    bg: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
+                    bg: 'bg-purple-50 text-purple-800 border border-purple-200/90',
                 };
             case 'PUBLIC':
                 return {
                     label: 'Public Statutory',
-                    bg: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
+                    bg: 'bg-emerald-50 text-emerald-800 border border-emerald-200/90',
                 };
             case 'CORPORATE':
                 return {
                     label: 'Hotel Observance',
-                    bg: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
+                    bg: 'bg-blue-50 text-blue-800 border border-blue-200/90',
                 };
         }
     };
 
     return (
-        <div className="p-4 sm:p-6 max-w-[1600px] mx-auto space-y-6">
-            {/* Top Header Card */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-                <div className="flex items-center gap-3">
-                    <div className="size-12 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
-                        <CalendarDays className="size-6" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-                                Holiday & Peak Governance
-                            </h1>
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                Settings & Governance
-                            </span>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            Statutory public holidays, high-demand peak gala dates, room rate surge multipliers & staff overtime wage rules.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans">
+            {/* Standard Page Header */}
+            <PageHeader
+                title="Holiday & Peak Governance"
+                subtitle="Statutory public holidays, high-demand peak gala dates, room rate surge multipliers & staff overtime wage rules"
+                icon={<CalendarDays className="size-6 text-primary" />}
+                actions={
                     <button
                         type="button"
                         onClick={handleOpenCreate}
-                        className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded-xl shadow-xs flex items-center gap-2 transition"
+                        className="btn-primary flex items-center gap-2 cursor-pointer"
                     >
                         <Plus className="size-4" />
                         <span>Add Holiday / Peak Day</span>
                     </button>
+                }
+            />
+
+            {/* 4 Standardized Thesis KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Calendar Holidays</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Calendar className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{stats.total}</div>
+                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{stats.activeCount} Active Observances</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Surge Rate Peaks</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <TrendingUp className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{stats.surgeDays} Days</div>
+                    <div className="mt-1 text-[11px] text-amber-600/90 font-medium">Dynamic revenue yield dates</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Double Wage (2x)</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <DollarSign className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{stats.doubleWageDays} Days</div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Statutory overtime pay required</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Next Observance</span>
+                        <div className="size-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                            <Clock className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-lg font-black text-slate-900 tracking-tight truncate max-w-[180px]">
+                        {filteredHolidays[0]?.name || 'None Scheduled'}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">
+                        {filteredHolidays[0]?.startDate || 'N/A'}
+                    </div>
                 </div>
             </div>
 
-            {/* KPI Metric Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                        <Calendar className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">Calendar Holidays</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">
-                            {stats.total}{' '}
-                            <span className="text-xs font-normal text-emerald-600">({stats.activeCount} Active)</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                        <TrendingUp className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">Surge Rate Peaks</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">
-                            {stats.surgeDays} Days
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                        <DollarSign className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">Double Wage (2x) Days</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">
-                            {stats.doubleWageDays} Days
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                        <Clock className="size-5" />
-                    </div>
-                    <div>
-                        <div className="text-xs text-slate-500 font-medium">Next Major Event</div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[150px]">
-                            {filteredHolidays[0]?.name || 'None Scheduled'}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Filter & Search Bar */}
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-3 items-center justify-between">
-                <div className="relative w-full md:w-80">
-                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Standardized Search & Filter Toolbar */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap gap-3 items-center justify-between">
+                <div className="relative flex-1 min-w-[240px] max-w-md">
+                    <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search holidays, codes, notes..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        className="input-standard pl-10"
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-2.5">
                     {/* Year Filter */}
                     <select
                         value={yearFilter}
                         onChange={e => setYearFilter(e.target.value)}
-                        className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-medium focus:outline-none"
+                        className="select-standard !py-1.5 !text-xs !w-auto"
                     >
                         <option value="ALL">All Years</option>
                         <option value="2025">Year 2025</option>
@@ -606,7 +590,7 @@ export default function HolidayManagement() {
                     <select
                         value={categoryFilter}
                         onChange={e => setCategoryFilter(e.target.value)}
-                        className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-medium focus:outline-none"
+                        className="select-standard !py-1.5 !text-xs !w-auto"
                     >
                         <option value="ALL">All Categories</option>
                         <option value="PUBLIC">Public Statutory</option>
@@ -619,171 +603,165 @@ export default function HolidayManagement() {
                     <button
                         type="button"
                         onClick={() => setSurgeOnly(!surgeOnly)}
-                        className={`px-3 py-2 text-xs rounded-lg border font-medium flex items-center gap-1.5 transition ${
+                        className={`px-3 py-1.5 text-xs rounded-xl border font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             surgeOnly
-                                ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700'
-                                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                                ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs'
+                                : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
                         }`}
                     >
-                        <TrendingUp className="size-3.5" />
+                        <TrendingUp className="size-3.5 text-amber-600" />
                         <span>Surge Rate Only</span>
                     </button>
                 </div>
             </div>
 
-            {/* Holidays Table */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">
-                                <th className="py-3 px-4">Holiday / Event</th>
-                                <th className="py-3 px-4">Code</th>
-                                <th className="py-3 px-4">Date Range & Days</th>
-                                <th className="py-3 px-4">Category</th>
-                                <th className="py-3 px-4">Rate & MLOS</th>
-                                <th className="py-3 px-4">Staff Wage & Duty</th>
-                                <th className="py-3 px-4 text-center">Status</th>
-                                <th className="py-3 px-4 text-right">Actions</th>
+            {/* Holidays Table Container */}
+            <div className="table-container">
+                <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 font-bold uppercase tracking-wider">
+                            <th className="py-3.5 px-4">Holiday / Event</th>
+                            <th className="py-3.5 px-4">Code</th>
+                            <th className="py-3.5 px-4">Date Range & Duration</th>
+                            <th className="py-3.5 px-4">Category</th>
+                            <th className="py-3.5 px-4">Rate & MLOS</th>
+                            <th className="py-3.5 px-4">Staff Wage & Duty</th>
+                            <th className="py-3.5 px-4 text-center">Status</th>
+                            <th className="py-3.5 px-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {filteredHolidays.length === 0 ? (
+                            <tr>
+                                <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
+                                    No holidays found matching your filters.
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                            {filteredHolidays.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="py-10 text-center text-slate-400 text-xs">
-                                        No holidays found matching your filters.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredHolidays.map(item => {
-                                    const catBadge = getCategoryBadge(item.category);
-                                    return (
-                                        <tr
-                                            key={item.id}
-                                            className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition group"
-                                        >
-                                            <td className="py-3 px-4">
-                                                <div className="font-bold text-slate-900 dark:text-white">
-                                                    {item.name}
+                        ) : (
+                            filteredHolidays.map(item => {
+                                const catBadge = getCategoryBadge(item.category);
+                                return (
+                                    <tr
+                                        key={item.id}
+                                        className="hover:bg-slate-50/70 transition group"
+                                    >
+                                        <td className="py-3.5 px-4">
+                                            <div className="font-bold text-slate-900">
+                                                {item.name}
+                                            </div>
+                                            {item.description && (
+                                                <div className="text-[11px] text-slate-400 line-clamp-1 max-w-[280px]">
+                                                    {item.description}
                                                 </div>
-                                                {item.description && (
-                                                    <div className="text-[11px] text-slate-400 line-clamp-1 max-w-[280px]">
-                                                        {item.description}
-                                                    </div>
-                                                )}
-                                            </td>
+                                            )}
+                                        </td>
 
-                                            <td className="py-3 px-4 font-mono font-semibold text-slate-700 dark:text-slate-300">
-                                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                                                    {item.code}
-                                                </span>
-                                            </td>
+                                        <td className="py-3.5 px-4">
+                                            <span className="badge-code">
+                                                {item.code}
+                                            </span>
+                                        </td>
 
-                                            <td className="py-3 px-4">
-                                                <div className="text-slate-900 dark:text-white font-medium">
-                                                    {item.startDate === item.endDate
-                                                        ? item.startDate
-                                                        : `${item.startDate} → ${item.endDate}`}
-                                                </div>
-                                                <div className="text-[11px] text-slate-500">
-                                                    {item.daysCount} {item.daysCount === 1 ? 'day' : 'days duration'}
-                                                </div>
-                                            </td>
+                                        <td className="py-3.5 px-4">
+                                            <div className="text-slate-900 font-semibold font-mono">
+                                                {item.startDate === item.endDate
+                                                    ? item.startDate
+                                                    : `${item.startDate} → ${item.endDate}`}
+                                            </div>
+                                            <div className="text-[11px] text-slate-400 font-medium">
+                                                {item.daysCount} {item.daysCount === 1 ? 'day' : 'days duration'}
+                                            </div>
+                                        </td>
 
-                                            <td className="py-3 px-4">
-                                                <span
-                                                    className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${catBadge.bg}`}
-                                                >
-                                                    {catBadge.label}
-                                                </span>
-                                            </td>
+                                        <td className="py-3.5 px-4">
+                                            <span
+                                                className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${catBadge.bg}`}
+                                            >
+                                                {catBadge.label}
+                                            </span>
+                                        </td>
 
-                                            <td className="py-3 px-4">
-                                                {item.hasSurgeRate ? (
-                                                    <div>
-                                                        <span className="text-amber-600 dark:text-amber-400 font-bold">
-                                                            {item.rateMultiplier}x Rate ({Math.round((item.rateMultiplier - 1) * 100)}% Surge)
-                                                        </span>
-                                                        <div className="text-[10px] text-slate-400">
-                                                            Min Stay: {item.minStayNights}N
-                                                            {item.mandatoryGala && ` • Gala: +$${item.galaDinnerFee}`}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-400 font-normal">
-                                                        Standard Rate (1.0x)
+                                        <td className="py-3.5 px-4">
+                                            {item.hasSurgeRate ? (
+                                                <div>
+                                                    <span className="text-amber-600 font-bold">
+                                                        {item.rateMultiplier}x Rate (+{Math.round((item.rateMultiplier - 1) * 100)}% Surge)
                                                     </span>
-                                                )}
-                                            </td>
-
-                                            <td className="py-3 px-4">
-                                                <div className="font-semibold text-slate-800 dark:text-slate-200">
-                                                    {item.staffWageMultiplier}x Overtime Pay
+                                                    <div className="text-[11px] text-slate-400 font-medium">
+                                                        Min Stay: {item.minStayNights}N
+                                                        {item.mandatoryGala && ` • Gala: +$${item.galaDinnerFee}`}
+                                                    </div>
                                                 </div>
-                                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                                    {item.compOffCredit && <span>+ Comp Off •</span>}
-                                                    <span className="capitalize">{item.minimumStaffingAlert.toLowerCase().replace('_', ' ')}</span>
-                                                </div>
-                                            </td>
+                                            ) : (
+                                                <span className="text-slate-400 font-normal">
+                                                    Standard Rate (1.0x)
+                                                </span>
+                                            )}
+                                        </td>
 
-                                            <td className="py-3 px-4 text-center">
+                                        <td className="py-3.5 px-4">
+                                            <div className="font-semibold text-slate-800">
+                                                {item.staffWageMultiplier}x Overtime Pay
+                                            </div>
+                                            <div className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                                                {item.compOffCredit && <span>+ Comp Off •</span>}
+                                                <span className="capitalize">{item.minimumStaffingAlert.toLowerCase().replace('_', ' ')}</span>
+                                            </div>
+                                        </td>
+
+                                        <td className="py-3.5 px-4 text-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleStatus(item.id)}
+                                                className={item.status === 'ACTIVE' ? 'badge-status-active cursor-pointer' : 'badge-status-inactive cursor-pointer'}
+                                            >
+                                                {item.status}
+                                            </button>
+                                        </td>
+
+                                        <td className="py-3.5 px-4 text-right">
+                                            <div className="flex items-center justify-end gap-1.5">
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleToggleStatus(item.id)}
-                                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition ${
-                                                        item.status === 'ACTIVE'
-                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                                                            : 'bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400'
-                                                    }`}
+                                                    onClick={() => handleOpenEdit(item)}
+                                                    className="btn-icon"
+                                                    title="Edit Holiday"
                                                 >
-                                                    {item.status}
+                                                    <Edit2 className="size-3.5" />
                                                 </button>
-                                            </td>
-
-                                            <td className="py-3 px-4 text-right">
-                                                <div className="flex items-center justify-end gap-1.5 opacity-90 group-hover:opacity-100">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleOpenEdit(item)}
-                                                        className="size-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition"
-                                                        title="Edit Holiday"
-                                                    >
-                                                        <Edit2 className="size-3.5" />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDelete(item.id, item.name)}
-                                                        className="size-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center transition"
-                                                        title="Delete Holiday"
-                                                    >
-                                                        <Trash2 className="size-3.5" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDelete(item.id, item.name)}
+                                                    className="btn-icon-danger"
+                                                    title="Delete Holiday"
+                                                >
+                                                    <Trash2 className="size-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
             </div>
 
             {/* Create / Edit Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-xl rounded-2xl border border-slate-200/90 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/90 bg-slate-50/70">
                             <div className="flex items-center gap-2">
-                                <CalendarDays className="size-5 text-amber-600" />
-                                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                <CalendarDays className="size-5 text-primary" />
+                                <h2 className="text-base font-bold text-slate-900">
                                     {editingItem ? 'Edit Holiday / Peak Rule' : 'Add New Holiday / Peak Season'}
                                 </h2>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
                             >
                                 <X className="size-5" />
                             </button>
@@ -791,8 +769,8 @@ export default function HolidayManagement() {
 
                         <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
                             {/* Holiday Name */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-semibold text-slate-700">
                                     Holiday / Event Name *
                                 </label>
                                 <input
@@ -801,20 +779,20 @@ export default function HolidayManagement() {
                                     placeholder="e.g. New Year Gala, Eid-ul-Fitr, Independence Day"
                                     value={formName}
                                     onChange={e => handleNameChange(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                    className="input-standard"
                                 />
                             </div>
 
                             {/* Short Code with Auto-Generator */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-semibold text-slate-700">
                                         Short Code * (Auto-Generated)
                                     </label>
                                     <button
                                         type="button"
                                         onClick={handleRegenerateCode}
-                                        className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
+                                        className="text-[11px] text-primary hover:underline flex items-center gap-1 font-semibold"
                                     >
                                         <Sparkles className="size-3" />
                                         <span>Auto-Generate</span>
@@ -829,15 +807,13 @@ export default function HolidayManagement() {
                                             setFormCode(e.target.value.toUpperCase());
                                             setCodeError('');
                                         }}
-                                        className={`w-full px-3 py-2 text-xs font-mono font-bold bg-white dark:bg-slate-800 border rounded-lg text-slate-900 dark:text-white uppercase focus:outline-none ${
-                                            codeError
-                                                ? 'border-rose-500 ring-1 ring-rose-500'
-                                                : 'border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-amber-500'
+                                        className={`input-standard font-mono uppercase font-bold ${
+                                            codeError ? 'border-rose-500 ring-1 ring-rose-500' : ''
                                         }`}
                                     />
                                 </div>
                                 {codeError && (
-                                    <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1">
+                                    <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
                                         <AlertCircle className="size-3" />
                                         {codeError}
                                     </p>
@@ -846,14 +822,14 @@ export default function HolidayManagement() {
 
                             {/* Category & Status */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-slate-700">
                                         Category *
                                     </label>
                                     <select
                                         value={formCategory}
                                         onChange={e => setFormCategory(e.target.value as HolidayCategory)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                                        className="select-standard"
                                     >
                                         <option value="PUBLIC">Public Statutory Holiday</option>
                                         <option value="RELIGIOUS">Religious Festival</option>
@@ -862,14 +838,14 @@ export default function HolidayManagement() {
                                     </select>
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-slate-700">
                                         Status
                                     </label>
                                     <select
                                         value={formStatus}
                                         onChange={e => setFormStatus(e.target.value as 'ACTIVE' | 'INACTIVE')}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                                        className="select-standard"
                                     >
                                         <option value="ACTIVE">Active</option>
                                         <option value="INACTIVE">Inactive / Archived</option>
@@ -879,8 +855,8 @@ export default function HolidayManagement() {
 
                             {/* Dates: Start and End */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-slate-700">
                                         Start Date *
                                     </label>
                                     <input
@@ -893,11 +869,11 @@ export default function HolidayManagement() {
                                                 setFormEndDate(e.target.value);
                                             }
                                         }}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                                        className="input-standard font-mono"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-slate-700">
                                         End Date *
                                     </label>
                                     <input
@@ -906,17 +882,17 @@ export default function HolidayManagement() {
                                         value={formEndDate}
                                         min={formStartDate}
                                         onChange={e => setFormEndDate(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                                        className="input-standard font-mono"
                                     />
                                 </div>
                             </div>
 
                             {/* Rate Surcharge & Commercial Section */}
-                            <div className="p-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 rounded-xl space-y-3">
+                            <div className="p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-xl space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <TrendingUp className="size-4 text-amber-600" />
-                                        <span className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                                        <span className="text-xs font-bold text-amber-900">
                                             Yield & Surge Pricing Rules
                                         </span>
                                     </div>
@@ -925,9 +901,9 @@ export default function HolidayManagement() {
                                             type="checkbox"
                                             checked={formHasSurgeRate}
                                             onChange={e => setFormHasSurgeRate(e.target.checked)}
-                                            className="rounded text-amber-600"
+                                            className="rounded text-amber-600 focus:ring-amber-500"
                                         />
-                                        <span className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                                        <span className="text-xs font-semibold text-amber-900">
                                             Enable Surge Rate
                                         </span>
                                     </label>
@@ -935,8 +911,8 @@ export default function HolidayManagement() {
 
                                 {formHasSurgeRate && (
                                     <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <div>
-                                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <div className="space-y-1">
+                                            <label className="block text-[11px] font-semibold text-slate-700">
                                                 Rate Multiplier (e.g. 1.30 = +30%)
                                             </label>
                                             <input
@@ -946,11 +922,11 @@ export default function HolidayManagement() {
                                                 max="3.0"
                                                 value={formRateMultiplier}
                                                 onChange={e => setFormRateMultiplier(parseFloat(e.target.value))}
-                                                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                                className="input-standard !py-1.5"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <div className="space-y-1">
+                                            <label className="block text-[11px] font-semibold text-slate-700">
                                                 Min Stay (MLOS Nights)
                                             </label>
                                             <input
@@ -959,7 +935,7 @@ export default function HolidayManagement() {
                                                 max="7"
                                                 value={formMinStayNights}
                                                 onChange={e => setFormMinStayNights(parseInt(e.target.value))}
-                                                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                                className="input-standard !py-1.5"
                                             />
                                         </div>
                                     </div>
@@ -967,23 +943,23 @@ export default function HolidayManagement() {
                             </div>
 
                             {/* Staffing & HR Compensation Section */}
-                            <div className="p-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/60 rounded-xl space-y-3">
+                            <div className="p-3.5 bg-blue-50/70 border border-blue-200/90 rounded-xl space-y-3">
                                 <div className="flex items-center gap-2">
-                                    <Users className="size-4 text-blue-600" />
-                                    <span className="text-xs font-bold text-blue-900 dark:text-blue-300">
+                                    <Users className="size-4 text-primary" />
+                                    <span className="text-xs font-bold text-slate-900">
                                         Staff Overtime & Statutory Rules
                                     </span>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <div className="space-y-1">
+                                        <label className="block text-[11px] font-semibold text-slate-700">
                                             Overtime Wage Multiplier
                                         </label>
                                         <select
                                             value={formWageMultiplier}
                                             onChange={e => setFormWageMultiplier(parseFloat(e.target.value))}
-                                            className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                            className="select-standard !py-1.5"
                                         >
                                             <option value="1.0">1.0x (Standard Wage)</option>
                                             <option value="1.5">1.5x (Time and a Half)</option>
@@ -992,8 +968,8 @@ export default function HolidayManagement() {
                                         </select>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <div className="space-y-1">
+                                        <label className="block text-[11px] font-semibold text-slate-700">
                                             Staffing Alert Level
                                         </label>
                                         <select
@@ -1003,7 +979,7 @@ export default function HolidayManagement() {
                                                     e.target.value as 'STANDARD' | 'HIGH_ALERT' | 'MAX_PRESENCE'
                                                 )
                                             }
-                                            className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                            className="select-standard !py-1.5"
                                         >
                                             <option value="STANDARD">Standard Shift</option>
                                             <option value="HIGH_ALERT">High Alert (No Leaves)</option>
@@ -1017,17 +993,17 @@ export default function HolidayManagement() {
                                         type="checkbox"
                                         checked={formCompOff}
                                         onChange={e => setFormCompOff(e.target.checked)}
-                                        className="rounded text-blue-600"
+                                        className="rounded text-primary focus:ring-primary"
                                     />
-                                    <span className="text-xs text-slate-700 dark:text-slate-300">
+                                    <span className="text-xs text-slate-700 font-medium">
                                         Grant 1-Day Compensatory Off (Comp-off) Credit to working roster staff
                                     </span>
                                 </label>
                             </div>
 
                             {/* Description / Notes */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-semibold text-slate-700">
                                     Operational Notes / Guidelines
                                 </label>
                                 <textarea
@@ -1035,22 +1011,22 @@ export default function HolidayManagement() {
                                     placeholder="Enter guidelines, protocol requirements, or banqueting arrangements..."
                                     value={formDescription}
                                     onChange={e => setFormDescription(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                                    className="input-standard"
                                 />
                             </div>
 
                             {/* Modal Footer Buttons */}
-                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200/90">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-4 py-2 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                                    className="btn-secondary"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                                    className="btn-primary flex items-center gap-1.5"
                                 >
                                     <Save className="size-4" />
                                     <span>{editingItem ? 'Save Changes' : 'Create Holiday'}</span>

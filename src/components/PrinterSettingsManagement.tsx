@@ -16,6 +16,7 @@ import {
     Receipt,
     X
 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode } from '../utils/codeGenerator';
 
 // ==========================================
@@ -301,7 +302,7 @@ export default function PrinterSettingsManagement() {
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto pb-16 p-4 sm:p-6">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans pb-16">
             {/* Toast Alert */}
             {toast && (
                 <div
@@ -314,36 +315,86 @@ export default function PrinterSettingsManagement() {
                 </div>
             )}
 
-            {/* Top Header Card */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-                <div className="flex items-center gap-3">
-                    <div className="size-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-2xs">
-                        <Printer className="size-6" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                                Hardware & Printer Settings
-                            </h1>
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                ESC/POS & KOT
-                            </span>
+            {/* Standard Page Header */}
+            <PageHeader
+                title="Hardware & Printer Settings"
+                subtitle="ESC/POS thermal printers, 80mm/58mm roll styling, KOT kitchen slips, cash drawer kick & verification QR codes"
+                icon={<Printer className="size-6 text-primary" />}
+                actions={
+                    activeTab === 'printers' ? (
+                        <button
+                            type="button"
+                            onClick={() => openCreatePrinter()}
+                            className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <Plus className="size-4" />
+                            <span>Add Thermal Printer</span>
+                        </button>
+                    ) : null
+                }
+            />
+
+            {/* 4 Standardized Thesis KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Connected Devices</span>
+                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Printer className="size-4" />
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            ESC/POS thermal printers, 80mm/58mm roll styling, KOT kitchen slips, cash drawer kick & verification QR codes.
-                        </p>
                     </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{printers.length}</div>
+                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{printers.filter(p => p.status === 'online').length} Online Terminals</div>
                 </div>
 
-                {/* Tabs Selector */}
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold border border-slate-200/60 dark:border-slate-700/60 self-start sm:self-auto">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Default Roll Width</span>
+                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold font-mono text-xs">
+                            {config.paperSize}
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight font-mono">{config.paperSize}</div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Standard thermal roll</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">QR Verification</span>
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <CheckCircle2 className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-emerald-600 tracking-tight">
+                        {config.printQrCode ? 'Active' : 'Disabled'}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Digital folio authenticity</div>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">KOT Automation</span>
+                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <Utensils className="size-4" />
+                        </div>
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">
+                        {config.kotAutoPrint ? 'Auto Print' : 'Manual Dispatch'}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 font-medium">{config.kotLargeRoomBadge ? 'Large Table Badge ON' : 'Standard'}</div>
+                </div>
+            </div>
+
+            {/* Standardized Navigation Tabs */}
+            <div className="bg-white p-2 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
                     <button
                         type="button"
                         onClick={() => setActiveTab('layout')}
-                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                             activeTab === 'layout'
-                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold'
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
                         <Receipt className="size-3.5" />
@@ -353,10 +404,10 @@ export default function PrinterSettingsManagement() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('kot')}
-                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                             activeTab === 'kot'
-                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold'
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
                         <Utensils className="size-3.5" />
@@ -366,14 +417,17 @@ export default function PrinterSettingsManagement() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('printers')}
-                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                             activeTab === 'printers'
-                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold'
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
                         <Layers className="size-3.5" />
-                        <span>Hardware Printers ({printers.length})</span>
+                        <span>Hardware Printers</span>
+                        <span className="badge-code !py-0 !px-1.5 !text-[10px]">
+                            {printers.length}
+                        </span>
                     </button>
                 </div>
             </div>
@@ -385,10 +439,10 @@ export default function PrinterSettingsManagement() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     {/* Controls Form (7 Cols) */}
                     <div className="lg:col-span-7 space-y-4">
-                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
-                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                    <h3 className="text-sm font-bold text-slate-900">
                                         Thermal Receipt Layout Options
                                     </h3>
                                     <p className="text-xs text-slate-500">
@@ -408,7 +462,7 @@ export default function PrinterSettingsManagement() {
                             {/* Paper Size & Font Sizing */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Paper Roll Width
                                     </label>
                                     <div className="grid grid-cols-2 gap-2">
@@ -417,8 +471,8 @@ export default function PrinterSettingsManagement() {
                                             onClick={() => setConfig({ ...config, paperSize: '80mm' })}
                                             className={`py-2 text-xs font-bold rounded-lg border transition ${
                                                 config.paperSize === '80mm'
-                                                    ? 'bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
-                                                    : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700'
+                                                    ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
+                                                    : 'bg-slate-50 border-slate-200 text-slate-600'
                                             }`}
                                         >
                                             80mm (Standard POS)
@@ -428,8 +482,8 @@ export default function PrinterSettingsManagement() {
                                             onClick={() => setConfig({ ...config, paperSize: '58mm' })}
                                             className={`py-2 text-xs font-bold rounded-lg border transition ${
                                                 config.paperSize === '58mm'
-                                                    ? 'bg-indigo-50 border-indigo-400 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
-                                                    : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700'
+                                                    ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
+                                                    : 'bg-slate-50 border-slate-200 text-slate-600'
                                             }`}
                                         >
                                             58mm (Mobile POS)
@@ -438,7 +492,7 @@ export default function PrinterSettingsManagement() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Typography Base Size
                                     </label>
                                     <select
@@ -449,7 +503,7 @@ export default function PrinterSettingsManagement() {
                                                 fontSize: e.target.value as HotelPrinterConfig['fontSize'],
                                             })
                                         }
-                                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                     >
                                         <option value="11px">11px Compact Dense</option>
                                         <option value="12px">12px Standard Receipt</option>
@@ -462,32 +516,32 @@ export default function PrinterSettingsManagement() {
                             {/* Header & Footer Custom Text */}
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Receipt Top Header Banner
                                     </label>
                                     <input
                                         type="text"
                                         value={config.headerText}
                                         onChange={e => setConfig({ ...config, headerText: e.target.value })}
-                                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Receipt Bottom Footer Greeting
                                     </label>
                                     <textarea
                                         rows={2}
                                         value={config.footerText}
                                         onChange={e => setConfig({ ...config, footerText: e.target.value })}
-                                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                     />
                                 </div>
                             </div>
 
                             {/* Toggles */}
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-3 text-xs">
+                            <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-3 text-xs">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -720,10 +774,10 @@ export default function PrinterSettingsManagement() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     {/* Controls (7 Cols) */}
                     <div className="lg:col-span-7 space-y-4">
-                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
-                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                    <h3 className="text-sm font-bold text-slate-900">
                                         Kitchen & Room Service Order Ticket (KOT)
                                     </h3>
                                     <p className="text-xs text-slate-500">
@@ -742,7 +796,7 @@ export default function PrinterSettingsManagement() {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         KOT Typography Size
                                     </label>
                                     <select
@@ -753,7 +807,7 @@ export default function PrinterSettingsManagement() {
                                                 kotFontSize: e.target.value as HotelPrinterConfig['kotFontSize'],
                                             })
                                         }
-                                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                     >
                                         <option value="12px">12px Standard</option>
                                         <option value="14px">14px Large High Visibility</option>
@@ -762,7 +816,7 @@ export default function PrinterSettingsManagement() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Print Copies per KOT Order
                                     </label>
                                     <input
@@ -773,12 +827,12 @@ export default function PrinterSettingsManagement() {
                                         onChange={e =>
                                             setConfig({ ...config, kotPrintCopies: parseInt(e.target.value) || 1 })
                                         }
-                                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                     />
                                 </div>
                             </div>
 
-                            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                            <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -907,9 +961,9 @@ export default function PrinterSettingsManagement() {
             {/* ============================================================== */}
             {activeTab === 'printers' && (
                 <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                         <div>
-                            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                            <h2 className="text-sm font-bold text-slate-900">
                                 Registered Physical Hardware Printers
                             </h2>
                             <p className="text-xs text-slate-500">
@@ -930,11 +984,11 @@ export default function PrinterSettingsManagement() {
                         {printers.map(p => (
                             <div
                                 key={p.id}
-                                className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs hover:border-indigo-300 transition"
+                                className="bg-white p-5 rounded-2xl border border-slate-200 space-y-3 shadow-xs hover:border-indigo-300 transition"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <div className="size-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                                        <div className="size-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
                                             {p.type === 'Network' ? (
                                                 <Wifi className="size-4" />
                                             ) : p.type === 'USB' ? (
@@ -945,7 +999,7 @@ export default function PrinterSettingsManagement() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                                                <h4 className="font-bold text-slate-900 text-sm">
                                                     {p.name}
                                                 </h4>
                                                 {p.isDefault && (
@@ -969,28 +1023,28 @@ export default function PrinterSettingsManagement() {
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800 font-mono">
+                                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100 font-mono">
                                     <div>
                                         <span className="text-slate-400 text-[10px] block">STATION:</span>
-                                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                        <span className="font-semibold text-slate-800">
                                             {p.station}
                                         </span>
                                     </div>
                                     <div>
                                         <span className="text-slate-400 text-[10px] block">CONNECTION:</span>
-                                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                        <span className="font-semibold text-slate-800">
                                             {p.type === 'Network' ? `${p.ipAddress}:${p.port}` : p.type}
                                         </span>
                                     </div>
                                     <div>
                                         <span className="text-slate-400 text-[10px] block">ROLL SIZE:</span>
-                                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                        <span className="font-semibold text-slate-800">
                                             {p.paperSize} Thermal Roll
                                         </span>
                                     </div>
                                     <div>
                                         <span className="text-slate-400 text-[10px] block">CODE:</span>
-                                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                        <span className="font-semibold text-indigo-600">
                                             {p.code}
                                         </span>
                                     </div>
@@ -1001,7 +1055,7 @@ export default function PrinterSettingsManagement() {
                                         type="button"
                                         disabled={testingPrinterId === p.id}
                                         onClick={() => handlePingPrinter(p.id)}
-                                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
+                                        className="text-xs text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
                                     >
                                         <RefreshCw
                                             className={`size-3 ${testingPrinterId === p.id ? 'animate-spin' : ''}`}
@@ -1035,11 +1089,11 @@ export default function PrinterSettingsManagement() {
             {/* Hardware Printer Modal */}
             {showPrinterModal && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <Printer className="size-5 text-indigo-600" />
-                                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                <h2 className="text-base font-bold text-slate-900">
                                     {editingPrinter ? 'Edit Hardware Printer' : 'Register Hardware Printer'}
                                 </h2>
                             </div>
@@ -1054,7 +1108,7 @@ export default function PrinterSettingsManagement() {
 
                         <form onSubmit={handleSavePrinter} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
                                     Printer Name *
                                 </label>
                                 <input
@@ -1070,13 +1124,13 @@ export default function PrinterSettingsManagement() {
                                             );
                                         }
                                     }}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg"
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Short Code *
                                     </label>
                                     <input
@@ -1084,12 +1138,12 @@ export default function PrinterSettingsManagement() {
                                         required
                                         value={formPrnCode}
                                         onChange={e => setFormPrnCode(e.target.value.toUpperCase())}
-                                        className="w-full px-3 py-2 text-xs font-mono font-bold uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs font-mono font-bold uppercase bg-white border border-slate-200 rounded-lg"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                                         Connection Interface *
                                     </label>
                                     <select
@@ -1097,7 +1151,7 @@ export default function PrinterSettingsManagement() {
                                         onChange={e =>
                                             setFormPrnType(e.target.value as 'Network' | 'USB' | 'Bluetooth')
                                         }
-                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg"
                                     >
                                         <option value="Network">Network Ethernet / IP</option>
                                         <option value="USB">Direct USB Plug</option>
@@ -1109,7 +1163,7 @@ export default function PrinterSettingsManagement() {
                             {formPrnType === 'Network' && (
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1">
                                             IP Address *
                                         </label>
                                         <input
@@ -1118,11 +1172,11 @@ export default function PrinterSettingsManagement() {
                                             value={formPrnIp}
                                             onChange={e => setFormPrnIp(e.target.value)}
                                             placeholder="192.168.1.101"
-                                            className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                            className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-200 rounded-lg"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1">
                                             Port
                                         </label>
                                         <input
@@ -1131,14 +1185,14 @@ export default function PrinterSettingsManagement() {
                                             value={formPrnPort}
                                             onChange={e => setFormPrnPort(e.target.value)}
                                             placeholder="9100"
-                                            className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                            className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-200 rounded-lg"
                                         />
                                     </div>
                                 </div>
                             )}
 
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
                                     Assigned Hotel Dispatch Station
                                 </label>
                                 <select
@@ -1146,7 +1200,7 @@ export default function PrinterSettingsManagement() {
                                     onChange={e =>
                                         setFormPrnStation(e.target.value as HardwarePrinter['station'])
                                     }
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg"
                                 >
                                     <option value="Front Desk Cashier">Front Desk Cashier</option>
                                     <option value="Main Kitchen KOT">Main Kitchen KOT</option>
@@ -1156,7 +1210,7 @@ export default function PrinterSettingsManagement() {
                                 </select>
                             </div>
 
-                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                                 <button
                                     type="button"
                                     onClick={() => setShowPrinterModal(false)}
