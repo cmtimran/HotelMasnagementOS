@@ -35,3 +35,5 @@ This directory contains the reference UI screenshots provided by the client, ren
 - `28-stayview-15-days-overflow-and-icon-cutoff.png`: 15 days window width overflow & icon clipping reference.
 - `29-stayview-backdates-today-holidays-marking.png`: Distinct markings for Today (blue), Backdates/Past dates (grey background, audit locked read-only), and Weekends/Holidays (red/pink headers and cell washes).
 - `30-add-reservation-stepper-and-check-availability-box.png`: Add Reservation 3-step wizard bar and check availability parameters box optimization reference.
+- `31-single-date-range-picker-checkin-checkout-nights.png`: Consolidated single Date Range / Stay Period selector request for Check-in, Nights, and Check-out across Add Reservation and Quick Reservation.
+- `32-interactive-date-range-calendar-picker.png`: Visual Interactive Month Calendar Date Range Picker showing Check-in (solid blue left pill), duration stay days (shaded background), and Check-out (solid blue right pill).

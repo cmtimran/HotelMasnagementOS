@@ -14,6 +14,7 @@ import {
     Plus
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
+import StayPeriodPicker from './common/StayPeriodPicker';
 
 interface RoomRow {
     id: number;
@@ -41,12 +42,13 @@ export const AddReservation: React.FC = () => {
     // STEP 1 STATE
     // ==========================================
     const [checkIn, setCheckIn] = useState<string>(() => {
-        const d = new Date();
-        return d.toISOString().split('T')[0];
+        const sys = localStorage.getItem('hotel_system_date');
+        return sys || '2026-07-01';
     });
     const [nights, setNights] = useState<number>(1);
     const [checkOut, setCheckOut] = useState<string>(() => {
-        const d = new Date();
+        const sys = localStorage.getItem('hotel_system_date');
+        const d = sys ? new Date(sys) : new Date('2026-07-01');
         d.setDate(d.getDate() + 1);
         return d.toISOString().split('T')[0];
     });
@@ -70,31 +72,7 @@ export const AddReservation: React.FC = () => {
         }
     ]);
 
-    // Update nights when checkout changes
-    const handleCheckOutChange = (val: string) => {
-        setCheckOut(val);
-        const start = new Date(checkIn);
-        const end = new Date(val);
-        const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        setNights(diff > 0 ? diff : 1);
-    };
 
-    // Update checkout when nights changes
-    const handleNightsChange = (val: number) => {
-        const n = Math.max(1, val);
-        setNights(n);
-        const start = new Date(checkIn);
-        start.setDate(start.getDate() + n);
-        setCheckOut(start.toISOString().split('T')[0]);
-    };
-
-    // Update checkout when checkIn changes
-    const handleCheckInChange = (val: string) => {
-        setCheckIn(val);
-        const start = new Date(val);
-        start.setDate(start.getDate() + nights);
-        setCheckOut(start.toISOString().split('T')[0]);
-    };
 
     // ==========================================
     // STEP 2 STATE
@@ -435,50 +413,25 @@ export const AddReservation: React.FC = () => {
                         <div className="space-y-3 animate-in fade-in duration-150">
                             {/* Parameters Card Container */}
                             <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2.5">
-                                {/* Top 6-Field Grid */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-                                            <Calendar size={11} className="text-blue-600" />
-                                            <span>Check in</span>
-                                            <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={checkIn}
-                                            onChange={e => handleCheckInChange(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
+                                {/* Top Parameters Row: Consolidated Stay Period Picker + Room(s) + Business Source + Business Agent */}
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end">
+                                    {/* Consolidated Single Stay Dates Controller (Spans 6 cols) */}
+                                    <div className="md:col-span-6">
+                                        <StayPeriodPicker
+                                            checkIn={checkIn}
+                                            checkOut={checkOut}
+                                            nights={nights}
+                                            onDateChange={(newIn, newOut, newNights) => {
+                                                setCheckIn(newIn);
+                                                setCheckOut(newOut);
+                                                setNights(newNights);
+                                            }}
+                                            label="Stay Period (Check In - Check Out)"
                                         />
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-                                            <span>Nights</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={nights}
-                                            onChange={e => handleNightsChange(Number(e.target.value))}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none text-center font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-                                            <Calendar size={11} className="text-blue-600" />
-                                            <span>Check out</span>
-                                            <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={checkOut}
-                                            onChange={e => handleCheckOutChange(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
-                                        />
-                                    </div>
-
-                                    <div className="flex flex-col gap-1">
+                                    {/* Room(s) (Spans 2 cols) */}
+                                    <div className="md:col-span-2 flex flex-col gap-1">
                                         <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Room(s)</span>
                                         </label>
@@ -486,18 +439,19 @@ export const AddReservation: React.FC = () => {
                                             type="text"
                                             value={roomsList.length}
                                             disabled
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-slate-100 text-slate-600 cursor-not-allowed text-center font-bold"
+                                            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[11px] bg-slate-100 text-slate-600 cursor-not-allowed text-center font-bold"
                                         />
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
+                                    {/* Business Source (Spans 2 cols) */}
+                                    <div className="md:col-span-2 flex flex-col gap-1">
                                         <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Business Source</span>
                                         </label>
                                         <select
                                             value={businessSource}
                                             onChange={e => setBusinessSource(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
+                                            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
                                         >
                                             <option value="Direct">Direct</option>
                                             <option value="Booking.com">Booking.com</option>
@@ -507,14 +461,15 @@ export const AddReservation: React.FC = () => {
                                         </select>
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
+                                    {/* Business Agent (Spans 2 cols) */}
+                                    <div className="md:col-span-2 flex flex-col gap-1">
                                         <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Business Agent</span>
                                         </label>
                                         <select
                                             value={businessAgent}
                                             onChange={e => setBusinessAgent(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
+                                            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
                                         >
                                             <option value="Direct">Direct</option>
                                             <option value="Front Desk">Front Desk</option>

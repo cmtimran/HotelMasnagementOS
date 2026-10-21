@@ -5,6 +5,7 @@ import {
     X,
     Building2
 } from 'lucide-react';
+import { StayPeriodPicker } from '../common/StayPeriodPicker';
 
 export interface QuickReservationModalProps {
     isOpen: boolean;
@@ -56,9 +57,28 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const [taxApplicable, setTaxApplicable] = useState<boolean>(true);
 
     // Reservation Details
-    const [checkInDate, setCheckInDate] = useState<string>('2026-07-01');
+    const [checkInDate, setCheckInDate] = useState<string>(() => {
+        try {
+            return localStorage.getItem('hotel_system_date') || '2026-07-01';
+        } catch {
+            return '2026-07-01';
+        }
+    });
     const [nights, setNights] = useState<number>(1);
-    const [checkOutDate, setCheckOutDate] = useState<string>('2026-07-02');
+    const [checkOutDate, setCheckOutDate] = useState<string>(() => {
+        try {
+            const sysDate = localStorage.getItem('hotel_system_date') || '2026-07-01';
+            const parts = sysDate.split('-');
+            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            d.setDate(d.getDate() + 1);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch {
+            return '2026-07-02';
+        }
+    });
     const [businessSource, setBusinessSource] = useState<string>('Direct');
     const [businessAgent, setBusinessAgent] = useState<string>('Direct');
 
@@ -106,29 +126,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         }
     }, [roomInfo, isOpen]);
 
-    // Update Checkout date when check-in or nights change
-    const handleCheckInChange = (newDate: string) => {
-        setCheckInDate(newDate);
-        try {
-            const d = new Date(newDate);
-            d.setDate(d.getDate() + nights);
-            setCheckOutDate(d.toISOString().split('T')[0]);
-        } catch {
-            // keep existing
-        }
-    };
-
-    const handleNightsChange = (newNights: number) => {
-        const safeNights = Math.max(1, newNights);
-        setNights(safeNights);
-        try {
-            const d = new Date(checkInDate);
-            d.setDate(d.getDate() + safeNights);
-            setCheckOutDate(d.toISOString().split('T')[0]);
-        } catch {
-            // keep existing
-        }
-    };
 
     // Calculate financials
     const totalAmount = roomsList.reduce((acc, r) => acc + (r.rate * r.noOfRooms * nights), 0);
@@ -309,50 +306,25 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                         <div className="space-y-3 animate-in fade-in duration-100">
                             {/* Parameters Card Container (matching Add Reservation) */}
                             <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2.5">
-                                {/* Top 5 Grid Fields */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-                                            <CalendarIcon size={11} className="text-blue-600" />
-                                            <span>Check-in</span>
-                                            <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={checkInDate}
-                                            onChange={e => handleCheckInChange(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 font-medium transition-all"
+                                {/* Top Grid Fields: Consolidated Stay Period Picker + Source + Agent */}
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end">
+                                    {/* Consolidated Single Stay Dates Controller */}
+                                    <div className="md:col-span-6">
+                                        <StayPeriodPicker
+                                            checkIn={checkInDate}
+                                            checkOut={checkOutDate}
+                                            nights={nights}
+                                            onDateChange={(newIn, newOut, newNights) => {
+                                                setCheckInDate(newIn);
+                                                setCheckOutDate(newOut);
+                                                setNights(newNights);
+                                            }}
+                                            compact
+                                            label="Stay Period (Check In - Check Out)"
                                         />
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-                                            <span>Nights</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={nights}
-                                            onChange={e => handleNightsChange(parseInt(e.target.value) || 1)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 text-center font-bold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-                                            <CalendarIcon size={11} className="text-blue-600" />
-                                            <span>Check-out</span>
-                                            <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={checkOutDate}
-                                            onChange={e => setCheckOutDate(e.target.value)}
-                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 font-medium transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="flex flex-col gap-1">
+                                    <div className="md:col-span-3 flex flex-col gap-1">
                                         <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Source</span>
                                             <span className="text-red-500">*</span>
@@ -371,7 +343,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </select>
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
+                                    <div className="md:col-span-3 flex flex-col gap-1">
                                         <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Agent</span>
                                             <span className="text-red-500">*</span>
