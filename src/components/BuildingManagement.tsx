@@ -3,12 +3,24 @@ import {
     Building2, Layers, MapPin, Plus, Search, Edit2, Trash2,
     Save, X, LayoutGrid, Table as TableIcon,
     ArrowRight, BedDouble, ShieldCheck, RefreshCw,
-    Sparkles, Compass
+    Sparkles, Compass, AlertTriangle, CheckCircle2
 } from 'lucide-react';
+import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 // ============================================================================
 // DATA MODELS & INTERFACES
 // ============================================================================
+
+export interface AmenityItem {
+    id: string; // unique code/id, e.g. 'FIRE-EXT', 'ELEV', 'AED'
+    name: string; // e.g. 'Emergency Fire Extinguishers & Hose Reel'
+    category: 'Safety & Emergency' | 'Vertical Transport & Access' | 'Housekeeping & Operations' | 'Guest Amenities & Comfort' | 'Security & Surveillance';
+    icon: string; // emoji icon
+    type: 'safety' | 'amenity' | 'operational';
+    description: string;
+    isMandatory?: boolean; // statutory compliance requirement
+    scope: 'floor' | 'building' | 'both';
+}
 
 export interface Building {
     id: string;
@@ -28,6 +40,7 @@ export interface Building {
     openingDate: string;
     renovationEnds?: string;
     remarks: string;
+    amenityIds?: string[];
 }
 
 export interface Floor {
@@ -43,6 +56,7 @@ export interface Floor {
     hasLinenCloset: boolean;
     hasServiceStation: boolean;
     hasIceMachine: boolean;
+    amenityIds: string[]; // Dynamic list of assigned amenity IDs
     status: 'Open' | 'Maintenance' | 'Restricted' | 'Closed';
     description: string;
     sortOrder: number;
@@ -58,8 +72,180 @@ interface RoomSummary {
 }
 
 // ============================================================================
-// INITIAL SEED DATA (Synchronized with 34-room Hotel Master)
+// INITIAL SEED DATA
 // ============================================================================
+
+export const INITIAL_AMENITIES_SAFETY: AmenityItem[] = [
+    // Safety & Emergency
+    {
+        id: 'FIRE-EXIT',
+        name: 'Fire Exit & Pressurized Stairwell',
+        category: 'Safety & Emergency',
+        icon: '🚪',
+        type: 'safety',
+        isMandatory: true,
+        scope: 'floor',
+        description: 'Illuminated photoluminescent exit signage and double-leaf fire-rated exit doors.'
+    },
+    {
+        id: 'FIRE-EXT',
+        name: 'Fire Hose Reel & Extinguishers',
+        category: 'Safety & Emergency',
+        icon: '🧯',
+        type: 'safety',
+        isMandatory: true,
+        scope: 'both',
+        description: 'Dry chemical CO2 and wet foam multi-purpose fire extinguishers every 20 meters.'
+    },
+    {
+        id: 'SMK-DET',
+        name: 'Smoke Detectors & Sprinklers',
+        category: 'Safety & Emergency',
+        icon: '🚨',
+        type: 'safety',
+        isMandatory: true,
+        scope: 'both',
+        description: 'Automated optical smoke detection with ceiling concealed fire suppression sprinkler heads.'
+    },
+    {
+        id: 'AED-KIT',
+        name: 'Automated Defibrillator (AED) & Trauma Kit',
+        category: 'Safety & Emergency',
+        icon: '🩺',
+        type: 'safety',
+        isMandatory: false,
+        scope: 'both',
+        description: 'Wall-mounted emergency AED shock unit and trauma medical first aid kit.'
+    },
+    {
+        id: 'EMRG-LGT',
+        name: 'Emergency Battery Backup Lighting',
+        category: 'Safety & Emergency',
+        icon: '⚡',
+        type: 'safety',
+        isMandatory: true,
+        scope: 'both',
+        description: '90-minute sustained LED egress lighting path during electrical power outages.'
+    },
+
+    // Vertical Transport & Accessibility
+    {
+        id: 'ELEV-GST',
+        name: 'Guest High-Speed Elevator Landing',
+        category: 'Vertical Transport & Access',
+        icon: '🛗',
+        type: 'amenity',
+        isMandatory: false,
+        scope: 'both',
+        description: 'Keycard-secured elevator landing with voice floor annunciator.'
+    },
+    {
+        id: 'SRV-LIFT',
+        name: 'Dedicated Service / Freight Lift',
+        category: 'Vertical Transport & Access',
+        icon: '📦',
+        type: 'operational',
+        isMandatory: false,
+        scope: 'both',
+        description: 'Heavy-duty housekeeping luggage and linen elevator bank.'
+    },
+    {
+        id: 'ADA-RMP',
+        name: 'Wheelchair ADA Accessible Ramp',
+        category: 'Vertical Transport & Access',
+        icon: '♿',
+        type: 'amenity',
+        isMandatory: true,
+        scope: 'both',
+        description: 'Gentle gradient handrail ramps compliant with ADA physical accessibility codes.'
+    },
+
+    // Housekeeping & Operations
+    {
+        id: 'LIN-CLST',
+        name: 'Housekeeping Linen & Supply Pantry',
+        category: 'Housekeeping & Operations',
+        icon: '🧺',
+        type: 'operational',
+        isMandatory: false,
+        scope: 'floor',
+        description: 'Secured floor staging closet for fresh bed linen, towels, and guestroom toiletries.'
+    },
+    {
+        id: 'SRV-STN',
+        name: 'Room Service Pantry / Collection Station',
+        category: 'Housekeeping & Operations',
+        icon: '🍽️',
+        type: 'operational',
+        isMandatory: false,
+        scope: 'floor',
+        description: 'Thermal food warmer bay and dirty tray clearing collection hub.'
+    },
+    {
+        id: 'LIN-CHUT',
+        name: 'Linen / Laundry Gravity Chute',
+        category: 'Housekeeping & Operations',
+        icon: '🗑️',
+        type: 'operational',
+        isMandatory: false,
+        scope: 'floor',
+        description: 'Fire-damped stainless steel gravity chute leading directly to laundry sort room.'
+    },
+
+    // Guest Amenities & Comfort
+    {
+        id: 'ICE-MCH',
+        name: 'Ice Dispenser & Vending Nook',
+        category: 'Guest Amenities & Comfort',
+        icon: '🧊',
+        type: 'amenity',
+        isMandatory: false,
+        scope: 'floor',
+        description: 'Touchless sanitary cube ice maker with sparkling water station.'
+    },
+    {
+        id: 'LNG-TER',
+        name: 'Floor Lounge / Sky Terrace',
+        category: 'Guest Amenities & Comfort',
+        icon: '☕',
+        type: 'amenity',
+        isMandatory: false,
+        scope: 'floor',
+        description: 'Casual sitting lobby with plush seating and panoramic ocean view glass.'
+    },
+    {
+        id: 'WTR-FLTR',
+        name: 'Reverse Osmosis Filtered Water Station',
+        category: 'Guest Amenities & Comfort',
+        icon: '💧',
+        type: 'amenity',
+        isMandatory: false,
+        scope: 'both',
+        description: 'Eco-friendly touchless chilled and ambient mineral water bottle refilling tap.'
+    },
+
+    // Security & Surveillance
+    {
+        id: 'CCTV-247',
+        name: '24/7 HD CCTV Security Coverage',
+        category: 'Security & Surveillance',
+        icon: '📹',
+        type: 'safety',
+        isMandatory: true,
+        scope: 'both',
+        description: 'Corridor and lift lobby dome cameras monitored by central security control.'
+    },
+    {
+        id: 'SMART-LCK',
+        name: 'RFID / Mobile Keycard Corridor Access',
+        category: 'Security & Surveillance',
+        icon: '🔑',
+        type: 'safety',
+        isMandatory: false,
+        scope: 'both',
+        description: 'Floor-lock security preventing unauthorized non-resident guests from entry.'
+    }
+];
 
 export const INITIAL_BUILDINGS: Building[] = [
     {
@@ -78,7 +264,8 @@ export const INITIAL_BUILDINGS: Building[] = [
         specificAddress: 'Wing A, Sea Breeze Boulevard, Marine Drive',
         status: 'Active',
         openingDate: '2021-01-15',
-        remarks: 'Main accommodation hub with 24 guest rooms across Floors 1-3'
+        remarks: 'Main accommodation hub with 24 guest rooms across Floors 1-3',
+        amenityIds: ['ELEV-GST', 'ADA-RMP', 'FIRE-EXT', 'SMK-DET', 'EMRG-LGT', 'CCTV-247', 'WTR-FLTR']
     },
     {
         id: '2',
@@ -96,7 +283,8 @@ export const INITIAL_BUILDINGS: Building[] = [
         specificAddress: 'Wing B, East Garden Promenade',
         status: 'Active',
         openingDate: '2022-06-01',
-        remarks: 'High-yield VIP suite wing with 10 club rooms & penthouses across Floors 4-5'
+        remarks: 'High-yield VIP suite wing with 10 club rooms & penthouses across Floors 4-5',
+        amenityIds: ['ELEV-GST', 'SRV-LIFT', 'ADA-RMP', 'FIRE-EXT', 'SMK-DET', 'AED-KIT', 'EMRG-LGT', 'CCTV-247', 'SMART-LCK']
     }
 ];
 
@@ -114,6 +302,7 @@ export const INITIAL_FLOORS: Floor[] = [
         hasLinenCloset: true,
         hasServiceStation: true,
         hasIceMachine: true,
+        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'WTR-FLTR', 'CCTV-247'],
         status: 'Open',
         description: 'Ground garden veranda access rooms with direct walkway to the pool & courtyard.',
         sortOrder: 1
@@ -131,6 +320,7 @@ export const INITIAL_FLOORS: Floor[] = [
         hasLinenCloset: true,
         hasServiceStation: true,
         hasIceMachine: true,
+        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'CCTV-247'],
         status: 'Open',
         description: 'Mid-level standard and deluxe balcony guest rooms overlooking the bay.',
         sortOrder: 2
@@ -148,6 +338,7 @@ export const INITIAL_FLOORS: Floor[] = [
         hasLinenCloset: true,
         hasServiceStation: true,
         hasIceMachine: false,
+        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'LIN-CLST', 'SRV-STN', 'CCTV-247'],
         status: 'Open',
         description: 'Upper floor superior view rooms with quiet zone acoustical doors.',
         sortOrder: 3
@@ -165,6 +356,7 @@ export const INITIAL_FLOORS: Floor[] = [
         hasLinenCloset: true,
         hasServiceStation: true,
         hasIceMachine: true,
+        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'AED-KIT', 'ELEV-GST', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'LNG-TER', 'WTR-FLTR', 'CCTV-247', 'SMART-LCK'],
         status: 'Open',
         description: 'Executive club level with dedicated concierge station and private breakfast lounge.',
         sortOrder: 4
@@ -182,6 +374,7 @@ export const INITIAL_FLOORS: Floor[] = [
         hasLinenCloset: true,
         hasServiceStation: true,
         hasIceMachine: true,
+        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'AED-KIT', 'EMRG-LGT', 'ELEV-GST', 'SRV-LIFT', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'LNG-TER', 'CCTV-247', 'SMART-LCK'],
         status: 'Open',
         description: 'Top-tier luxury presidential suites with private Jacuzzi terraces and butler quarters.',
         sortOrder: 5
@@ -190,9 +383,10 @@ export const INITIAL_FLOORS: Floor[] = [
 
 const STORAGE_KEY_BUILDINGS = 'hotel_buildings_v2';
 const STORAGE_KEY_FLOORS = 'hotel_floors_v2';
+const STORAGE_KEY_AMENITIES = 'hotel_amenities_safety_catalog_v1';
 const STORAGE_KEY_ROOMS = 'hotel_rooms_inventory_v1';
 
-// Initial fallback rooms if localStorage is empty
+// Initial fallback rooms
 const INITIAL_ROOM_SUMMARIES: RoomSummary[] = [
     { id: 1, number: '101', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 2, number: '102', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Clean' },
@@ -231,12 +425,12 @@ const INITIAL_ROOM_SUMMARIES: RoomSummary[] = [
 ];
 
 interface BuildingManagementProps {
-    initialTab?: 'buildings' | 'floors' | 'matrix';
+    initialTab?: 'buildings' | 'floors' | 'amenities' | 'matrix';
 }
 
 const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'buildings' }) => {
     // Navigation / View Tabs
-    const [mainTab, setMainTab] = useState<'buildings' | 'floors' | 'matrix'>(initialTab);
+    const [mainTab, setMainTab] = useState<'buildings' | 'floors' | 'amenities' | 'matrix'>(initialTab);
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
     // Keep mainTab in sync if parent changes initialTab
@@ -274,7 +468,21 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         return INITIAL_FLOORS;
     });
 
-    // State: Rooms (Read from actual hotel room inventory)
+    // State: Dynamic Amenities & Safety Catalog
+    const [amenitiesCatalog, setAmenitiesCatalog] = useState<AmenityItem[]>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY_AMENITIES);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {
+            console.error('Failed to load amenities catalog', e);
+        }
+        return INITIAL_AMENITIES_SAFETY;
+    });
+
+    // State: Rooms
     const [rooms, setRooms] = useState<RoomSummary[]>(() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY_ROOMS);
@@ -288,7 +496,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         return INITIAL_ROOM_SUMMARIES;
     });
 
-    // Refresh rooms whenever component is focused
+    // Refresh rooms whenever storage updates
     useEffect(() => {
         const handleStorageChange = () => {
             try {
@@ -310,13 +518,25 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
     const [floorCategoryFilter, setFloorCategoryFilter] = useState<string>('all');
     const [floorStatusFilter, setFloorStatusFilter] = useState<string>('all');
 
+    const [amenitySearch, setAmenitySearch] = useState('');
+    const [amenityCategoryFilter, setAmenityCategoryFilter] = useState<string>('all');
+    const [amenityTypeFilter, setAmenityTypeFilter] = useState<string>('all');
+
     // Modals
     const [isBuildingModalOpen, setIsBuildingModalOpen] = useState(false);
     const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
-    const [buildingFormTab, setBuildingFormTab] = useState<'basic' | 'specs' | 'location' | 'status'>('basic');
+    const [buildingFormTab, setBuildingFormTab] = useState<'basic' | 'specs' | 'amenities' | 'location' | 'status'>('basic');
+    const [isBuildingCodeManual, setIsBuildingCodeManual] = useState(false);
 
     const [isFloorModalOpen, setIsFloorModalOpen] = useState(false);
     const [editingFloor, setEditingFloor] = useState<Floor | null>(null);
+    const [floorFormTab, setFloorFormTab] = useState<'general' | 'amenities'>('general');
+    const [isFloorCodeManual, setIsFloorCodeManual] = useState(false);
+
+    // Modal: Amenity Master Add/Edit
+    const [isAmenityModalOpen, setIsAmenityModalOpen] = useState(false);
+    const [editingAmenity, setEditingAmenity] = useState<AmenityItem | null>(null);
+    const [isAmenityCodeManual, setIsAmenityCodeManual] = useState(false);
 
     // Toast notification
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -345,6 +565,21 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         }
     };
 
+    // Save helper: Amenities
+    const saveAmenitiesCatalog = (updated: AmenityItem[]) => {
+        setAmenitiesCatalog(updated);
+        try {
+            localStorage.setItem(STORAGE_KEY_AMENITIES, JSON.stringify(updated));
+        } catch (e) {
+            console.error('Failed to save amenities to localStorage', e);
+        }
+    };
+
+    // Existing short codes for duplicate checking
+    const existingBuildingCodes = useMemo(() => buildings.map(b => b.shortCode), [buildings]);
+    const existingFloorCodes = useMemo(() => floors.map(f => f.code), [floors]);
+    const existingAmenityCodes = useMemo(() => amenitiesCatalog.map(a => a.id), [amenitiesCatalog]);
+
     // ========================================================================
     // DERIVED COMPUTATIONS & METRICS
     // ========================================================================
@@ -356,15 +591,17 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         const totalRooms = rooms.length;
         const cleanRooms = rooms.filter(r => r.housekeepingStatus === 'Clean' || r.housekeepingStatus === 'Inspected').length;
         const readinessRate = totalRooms > 0 ? Math.round((cleanRooms / totalRooms) * 100) : 100;
+        const totalSafetyAssets = amenitiesCatalog.filter(a => a.type === 'safety').length;
 
         return {
             totalBuildings,
             activeBuildings,
             totalFloors,
             totalRooms,
-            readinessRate
+            readinessRate,
+            totalSafetyAssets
         };
-    }, [buildings, floors, rooms]);
+    }, [buildings, floors, rooms, amenitiesCatalog]);
 
     // Filtered Buildings
     const filteredBuildings = useMemo(() => {
@@ -391,6 +628,18 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         }).sort((a, b) => a.sortOrder - b.sortOrder);
     }, [floors, floorSearch, floorBuildingFilter, floorCategoryFilter, floorStatusFilter]);
 
+    // Filtered Amenities Catalog
+    const filteredAmenities = useMemo(() => {
+        return amenitiesCatalog.filter(a => {
+            const matchesSearch = a.name.toLowerCase().includes(amenitySearch.toLowerCase()) ||
+                a.id.toLowerCase().includes(amenitySearch.toLowerCase()) ||
+                a.description.toLowerCase().includes(amenitySearch.toLowerCase());
+            const matchesCat = amenityCategoryFilter === 'all' || a.category === amenityCategoryFilter;
+            const matchesType = amenityTypeFilter === 'all' || a.type === amenityTypeFilter;
+            return matchesSearch && matchesCat && matchesType;
+        });
+    }, [amenitiesCatalog, amenitySearch, amenityCategoryFilter, amenityTypeFilter]);
+
     // Helper: Rooms by Floor
     const getRoomsForFloor = (floorId: string) => {
         return rooms.filter(r => r.floorId === floorId);
@@ -413,15 +662,68 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
     };
 
     // ========================================================================
+    // AUTO SHORT CODE GENERATION LOGIC
+    // ========================================================================
+
+    // Handle Title change for Building: auto-generates shortCode with duplicate prevention
+    const handleBuildingTitleChange = (newTitle: string) => {
+        if (!editingBuilding) return;
+        const updated = { ...editingBuilding, title: newTitle };
+
+        if (!isBuildingCodeManual || !editingBuilding.shortCode) {
+            const autoCode = generateUniqueShortCode(newTitle, existingBuildingCodes, {
+                currentCode: editingBuilding.shortCode,
+                maxLength: 7
+            });
+            updated.shortCode = autoCode;
+        }
+        setEditingBuilding(updated);
+    };
+
+    // Handle Floor Name/Number change: auto-generates code with duplicate prevention
+    const handleFloorNameChange = (newName: string) => {
+        if (!editingFloor) return;
+        const updated = { ...editingFloor, name: newName };
+
+        if (!isFloorCodeManual || !editingFloor.code) {
+            const autoCode = generateUniqueShortCode(newName, existingFloorCodes, {
+                prefix: 'FL',
+                currentCode: editingFloor.code,
+                maxLength: 8
+            });
+            updated.code = autoCode;
+        }
+        setEditingFloor(updated);
+    };
+
+    // Handle Amenity Name change: auto-generates code with duplicate prevention
+    const handleAmenityNameChange = (newName: string) => {
+        if (!editingAmenity) return;
+        const updated = { ...editingAmenity, name: newName };
+
+        if (!isAmenityCodeManual || !editingAmenity.id) {
+            const autoCode = generateUniqueShortCode(newName, existingAmenityCodes, {
+                currentCode: editingAmenity.id,
+                maxLength: 10
+            });
+            updated.id = autoCode;
+        }
+        setEditingAmenity(updated);
+    };
+
+    // ========================================================================
     // BUILDING CRUD HANDLERS
     // ========================================================================
 
     const handleOpenAddBuilding = () => {
         const nextId = String(Date.now());
+        const defaultTitle = 'New Wing';
+        const autoCode = generateUniqueShortCode(defaultTitle, existingBuildingCodes);
+
         setEditingBuilding({
             id: nextId,
-            title: '',
-            shortCode: '',
+            title: defaultTitle,
+            shortCode: autoCode,
             type: 'Main Tower',
             description: '',
             totalFloors: 1,
@@ -434,14 +736,17 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             specificAddress: '',
             status: 'Active',
             openingDate: new Date().toISOString().split('T')[0],
-            remarks: ''
+            remarks: '',
+            amenityIds: ['ELEV-GST', 'FIRE-EXT', 'SMK-DET', 'EMRG-LGT']
         });
+        setIsBuildingCodeManual(false);
         setBuildingFormTab('basic');
         setIsBuildingModalOpen(true);
     };
 
     const handleOpenEditBuilding = (b: Building) => {
         setEditingBuilding({ ...b });
+        setIsBuildingCodeManual(true);
         setBuildingFormTab('basic');
         setIsBuildingModalOpen(true);
     };
@@ -454,14 +759,21 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             return;
         }
 
+        // Duplicate code validation
+        const origBuilding = buildings.find(b => b.id === editingBuilding.id);
+        if (isShortCodeDuplicate(editingBuilding.shortCode, existingBuildingCodes, origBuilding?.shortCode)) {
+            alert(`Short Code "${editingBuilding.shortCode}" is already in use by another building! Please provide a unique code.`);
+            return;
+        }
+
         const exists = buildings.some(b => b.id === editingBuilding.id);
         let updated: Building[];
         if (exists) {
             updated = buildings.map(b => b.id === editingBuilding.id ? editingBuilding : b);
-            showToast(`Building "${editingBuilding.title}" updated successfully!`);
+            showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) updated!`);
         } else {
             updated = [...buildings, editingBuilding];
-            showToast(`Building "${editingBuilding.title}" added to property structure!`);
+            showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) created!`);
         }
 
         saveBuildings(updated);
@@ -490,7 +802,6 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         showToast(`Building "${building.title}" removed.`);
     };
 
-    // Quick navigation: Jump from Building Card to Floor Tab with pre-filter
     const handleJumpToFloorsForBuilding = (buildingId: string) => {
         setFloorBuildingFilter(buildingId);
         setMainTab('floors');
@@ -503,11 +814,14 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
     const handleOpenAddFloor = (preselectedBuildingId?: string) => {
         const defaultBId = preselectedBuildingId || (buildings[0]?.id ?? '1');
         const nextFloorNum = floors.filter(f => f.buildingId === defaultBId).length + 1;
+        const defaultName = `Floor ${nextFloorNum}`;
+        const autoCode = generateUniqueShortCode(defaultName, existingFloorCodes, { prefix: 'FL' });
+
         setEditingFloor({
             id: String(Date.now()),
-            name: `Floor ${nextFloorNum}`,
+            name: defaultName,
             floorNumber: nextFloorNum,
-            code: `FL-0${nextFloorNum}`,
+            code: autoCode,
             buildingId: defaultBId,
             category: 'Guest Rooms',
             roomCapacity: 8,
@@ -516,15 +830,25 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             hasLinenCloset: true,
             hasServiceStation: true,
             hasIceMachine: false,
+            amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'LIN-CLST', 'CCTV-247'],
             status: 'Open',
             description: `Floor ${nextFloorNum} guest rooms`,
             sortOrder: floors.length + 1
         });
+        setIsFloorCodeManual(false);
+        setFloorFormTab('general');
         setIsFloorModalOpen(true);
     };
 
-    const handleOpenEditFloor = (f: Floor) => {
-        setEditingFloor({ ...f });
+    const handleOpenEditFloor = (f: Floor, defaultSubTab: 'general' | 'amenities' = 'general') => {
+        // Ensure amenityIds array exists
+        const safeFloor: Floor = {
+            ...f,
+            amenityIds: f.amenityIds || ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'LIN-CLST', 'CCTV-247']
+        };
+        setEditingFloor(safeFloor);
+        setIsFloorCodeManual(true);
+        setFloorFormTab(defaultSubTab);
         setIsFloorModalOpen(true);
     };
 
@@ -536,14 +860,21 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             return;
         }
 
+        // Duplicate code validation
+        const origFloor = floors.find(f => f.id === editingFloor.id);
+        if (isShortCodeDuplicate(editingFloor.code, existingFloorCodes, origFloor?.code)) {
+            alert(`Floor Code "${editingFloor.code}" is already in use by another floor! Please provide a unique code.`);
+            return;
+        }
+
         const exists = floors.some(f => f.id === editingFloor.id);
         let updated: Floor[];
         if (exists) {
             updated = floors.map(f => f.id === editingFloor.id ? editingFloor : f);
-            showToast(`Floor "${editingFloor.name}" updated successfully!`);
+            showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) updated!`);
         } else {
             updated = [...floors, editingFloor];
-            showToast(`Floor "${editingFloor.name}" added to building!`);
+            showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) created!`);
         }
 
         saveFloors(updated);
@@ -566,6 +897,116 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         showToast(`Floor "${floor.name}" deleted.`);
     };
 
+    // Toggle amenity selection on editing floor
+    const toggleFloorAmenity = (amenityId: string) => {
+        if (!editingFloor) return;
+        const current = editingFloor.amenityIds || [];
+        const next = current.includes(amenityId)
+            ? current.filter(id => id !== amenityId)
+            : [...current, amenityId];
+        setEditingFloor({ ...editingFloor, amenityIds: next });
+    };
+
+    // Toggle amenity selection on editing building
+    const toggleBuildingAmenity = (amenityId: string) => {
+        if (!editingBuilding) return;
+        const current = editingBuilding.amenityIds || [];
+        const next = current.includes(amenityId)
+            ? current.filter(id => id !== amenityId)
+            : [...current, amenityId];
+        setEditingBuilding({ ...editingBuilding, amenityIds: next });
+    };
+
+    // ========================================================================
+    // AMENITY CATALOG CRUD HANDLERS
+    // ========================================================================
+
+    const handleOpenAddAmenity = () => {
+        const defaultName = 'New Safety Asset';
+        const autoCode = generateUniqueShortCode(defaultName, existingAmenityCodes, { maxLength: 8 });
+
+        setEditingAmenity({
+            id: autoCode,
+            name: defaultName,
+            category: 'Safety & Emergency',
+            icon: '🛡️',
+            type: 'safety',
+            description: '',
+            isMandatory: false,
+            scope: 'floor'
+        });
+        setIsAmenityCodeManual(false);
+        setIsAmenityModalOpen(true);
+    };
+
+    const handleOpenEditAmenity = (item: AmenityItem) => {
+        setEditingAmenity({ ...item });
+        setIsAmenityCodeManual(true);
+        setIsAmenityModalOpen(true);
+    };
+
+    const handleSaveAmenity = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingAmenity) return;
+        if (!editingAmenity.name.trim()) {
+            alert('Amenity / Safety Name is required');
+            return;
+        }
+
+        // Duplicate code check
+        const origAmenity = amenitiesCatalog.find(a => a.id === editingAmenity.id);
+        if (isShortCodeDuplicate(editingAmenity.id, existingAmenityCodes, origAmenity?.id)) {
+            alert(`Short Code / ID "${editingAmenity.id}" is already in use by another item!`);
+            return;
+        }
+
+        const exists = amenitiesCatalog.some(a => a.id === editingAmenity.id);
+        let updated: AmenityItem[];
+        if (exists) {
+            updated = amenitiesCatalog.map(a => a.id === editingAmenity.id ? editingAmenity : a);
+            showToast(`Asset "${editingAmenity.name}" (${editingAmenity.id}) updated!`);
+        } else {
+            updated = [...amenitiesCatalog, editingAmenity];
+            showToast(`New Asset "${editingAmenity.name}" added to master library!`);
+
+            // If user is currently editing a floor, auto-check it for that floor
+            if (editingFloor) {
+                setEditingFloor(prev => prev ? ({
+                    ...prev,
+                    amenityIds: [...(prev.amenityIds || []), editingAmenity.id]
+                }) : null);
+            }
+        }
+
+        saveAmenitiesCatalog(updated);
+        setIsAmenityModalOpen(false);
+        setEditingAmenity(null);
+    };
+
+    const handleDeleteAmenity = (item: AmenityItem) => {
+        const floorsUsing = floors.filter(f => (f.amenityIds || []).includes(item.id)).length;
+        const buildingsUsing = buildings.filter(b => (b.amenityIds || []).includes(item.id)).length;
+
+        if (floorsUsing > 0 || buildingsUsing > 0) {
+            if (!confirm(`Warning: "${item.name}" is currently assigned to ${floorsUsing} floor(s) and ${buildingsUsing} building(s). Deleting will remove it from all configurations. Continue?`)) {
+                return;
+            }
+        } else {
+            if (!confirm(`Delete asset "${item.name}" from catalog?`)) return;
+        }
+
+        const updated = amenitiesCatalog.filter(a => a.id !== item.id);
+        saveAmenitiesCatalog(updated);
+        showToast(`Asset "${item.name}" deleted.`);
+    };
+
+    // Calculate usage of an amenity
+    const getAmenityUsage = (amenityId: string) => {
+        const floorCount = floors.filter(f => (f.amenityIds || []).includes(amenityId)).length;
+        const buildingCount = buildings.filter(b => (b.amenityIds || []).includes(amenityId)).length;
+        return { floorCount, buildingCount, total: floorCount + buildingCount };
+    };
+
     return (
         <div className="bg-white rounded-xl shadow-xs border border-gray-200 min-h-[calc(100vh-100px)] flex flex-col font-sans">
             {/* Toast Notification */}
@@ -580,13 +1021,13 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             <div className="p-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3 bg-gray-50/70">
                 <div>
                     <div className="flex items-center gap-2">
-                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">Property Structure & Architecture</h1>
+                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">Property Structure & Amenities Master</h1>
                         <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200">
-                            {buildingMetrics.totalBuildings} Buildings • {buildingMetrics.totalFloors} Floors
+                            {buildingMetrics.totalBuildings} Wings • {buildingMetrics.totalFloors} Floors • {amenitiesCatalog.length} Amenities
                         </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        Manage wings, towers, building metadata, floor levels, amenities, and room capacity distribution
+                        Manage wings, towers, floor levels, room capacity, and dynamic life safety assets with duplicate-free short codes
                     </p>
                 </div>
 
@@ -623,6 +1064,20 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             </span>
                         </button>
                         <button
+                            onClick={() => setMainTab('amenities')}
+                            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
+                                mainTab === 'amenities'
+                                    ? 'bg-white text-blue-700 shadow-xs font-bold'
+                                    : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        >
+                            <ShieldCheck size={13} className="text-emerald-600" />
+                            <span>Amenities & Safety</span>
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 font-mono px-1 rounded">
+                                {amenitiesCatalog.length}
+                            </span>
+                        </button>
+                        <button
                             onClick={() => setMainTab('matrix')}
                             className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
                                 mainTab === 'matrix'
@@ -631,11 +1086,11 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             }`}
                         >
                             <Compass size={13} />
-                            <span>Capacity Matrix</span>
+                            <span>Matrix</span>
                         </button>
                     </div>
 
-                    {/* Add Buttons depending on active tab */}
+                    {/* Dynamic Add Buttons */}
                     {mainTab === 'buildings' && (
                         <button
                             onClick={handleOpenAddBuilding}
@@ -650,6 +1105,14 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             className="h-8 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                         >
                             <Plus size={14} /> Add Floor
+                        </button>
+                    )}
+                    {mainTab === 'amenities' && (
+                        <button
+                            onClick={handleOpenAddAmenity}
+                            className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        >
+                            <Plus size={14} /> Add Amenity / Safety Asset
                         </button>
                     )}
                 </div>
@@ -687,27 +1150,29 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
                 <div className="bg-white p-3 rounded-lg border border-gray-200/80 flex items-center justify-between">
                     <div>
-                        <span className="text-gray-500 text-[11px] font-medium block">Attached Physical Rooms</span>
+                        <span className="text-gray-500 text-[11px] font-medium block">Life Safety & Assets</span>
                         <div className="text-lg font-bold text-gray-900 mt-0.5 flex items-baseline gap-1.5">
-                            {buildingMetrics.totalRooms}
-                            <span className="text-[10px] text-blue-600 font-semibold font-mono">Keys</span>
+                            {amenitiesCatalog.length}
+                            <span className="text-[10px] text-emerald-600 font-semibold font-mono">
+                                ({buildingMetrics.totalSafetyAssets} Safety)
+                            </span>
                         </div>
                     </div>
                     <div className="p-2 bg-emerald-50 text-emerald-600 rounded-md">
-                        <BedDouble size={16} />
+                        <ShieldCheck size={16} />
                     </div>
                 </div>
 
                 <div className="bg-white p-3 rounded-lg border border-gray-200/80 flex items-center justify-between">
                     <div>
-                        <span className="text-gray-500 text-[11px] font-medium block">Clean / Inspected Ready</span>
+                        <span className="text-gray-500 text-[11px] font-medium block">Physical Room Inventory</span>
                         <div className="text-lg font-bold text-gray-900 mt-0.5 flex items-baseline gap-1.5">
-                            {buildingMetrics.readinessRate}%
-                            <span className="text-[10px] text-emerald-600 font-semibold">Housekeeping</span>
+                            {buildingMetrics.totalRooms}
+                            <span className="text-[10px] text-blue-600 font-semibold font-mono">Keys</span>
                         </div>
                     </div>
                     <div className="p-2 bg-amber-50 text-amber-600 rounded-md">
-                        <ShieldCheck size={16} />
+                        <BedDouble size={16} />
                     </div>
                 </div>
             </div>
@@ -818,6 +1283,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                 const buildingFloors = floors.filter(f => f.buildingId === building.id);
                                 const buildingRooms = getRoomsForBuilding(building.id);
                                 const cleanRoomsCount = buildingRooms.filter(r => r.housekeepingStatus === 'Clean' || r.housekeepingStatus === 'Inspected').length;
+                                const bAmenities = (building.amenityIds || []).map(id => amenitiesCatalog.find(a => a.id === id)).filter(Boolean) as AmenityItem[];
 
                                 return (
                                     <div
@@ -891,27 +1357,30 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                 </div>
                                             </div>
 
-                                            {/* Feature Badges */}
-                                            <div className="flex flex-wrap gap-1.5 mb-3 text-[10px]">
-                                                {building.hasElevator && (
-                                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md font-medium border border-blue-100">
-                                                        🛗 Elevator
-                                                    </span>
-                                                )}
-                                                {building.wheelchairAccess && (
-                                                    <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md font-medium border border-purple-100">
-                                                        ♿ Wheelchair ADA
-                                                    </span>
-                                                )}
-                                                {building.hasBasement && (
-                                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-md font-medium border border-gray-200">
-                                                        Sub-Basement
-                                                    </span>
-                                                )}
-                                                <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md font-medium border border-amber-100">
-                                                    ⏱ {building.distanceFromLobby || 'Near Lobby'}
-                                                </span>
-                                            </div>
+                                            {/* Dynamic Building Amenities Badges */}
+                                            {bAmenities.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mb-3 text-[10px]">
+                                                    {bAmenities.slice(0, 5).map(item => (
+                                                        <span
+                                                            key={item.id}
+                                                            className={`px-1.5 py-0.5 rounded font-medium border flex items-center gap-1 ${
+                                                                item.type === 'safety'
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                            }`}
+                                                            title={item.name}
+                                                        >
+                                                            <span>{item.icon}</span>
+                                                            <span className="truncate max-w-[90px]">{item.name}</span>
+                                                        </span>
+                                                    ))}
+                                                    {bAmenities.length > 5 && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-bold">
+                                                            +{bAmenities.length - 5}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* Address / Location snippet */}
                                             {building.specificAddress && (
@@ -951,7 +1420,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                             <th className="py-2.5 px-3">Type</th>
                                             <th className="py-2.5 px-3">Floors</th>
                                             <th className="py-2.5 px-3">Rooms Attached</th>
-                                            <th className="py-2.5 px-3">Accessibility</th>
+                                            <th className="py-2.5 px-3">Safety & Amenities</th>
                                             <th className="py-2.5 px-3">Status</th>
                                             <th className="py-2.5 px-3 text-right">Actions</th>
                                         </tr>
@@ -960,6 +1429,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                         {filteredBuildings.map((building) => {
                                             const buildingFloors = floors.filter(f => f.buildingId === building.id);
                                             const buildingRooms = getRoomsForBuilding(building.id);
+                                            const bAmenities = (building.amenityIds || []).map(id => amenitiesCatalog.find(a => a.id === id)).filter(Boolean) as AmenityItem[];
 
                                             return (
                                                 <tr key={building.id} className="hover:bg-gray-50/80 transition-colors">
@@ -980,9 +1450,15 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         </span>
                                                     </td>
                                                     <td className="py-2 px-3">
-                                                        <div className="flex gap-1 text-[10px]">
-                                                            {building.hasElevator && <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">🛗 Lift</span>}
-                                                            {building.wheelchairAccess && <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">♿ ADA</span>}
+                                                        <div className="flex gap-1 text-[11px]">
+                                                            {bAmenities.slice(0, 4).map(item => (
+                                                                <span key={item.id} title={item.name}>{item.icon}</span>
+                                                            ))}
+                                                            {bAmenities.length > 4 && (
+                                                                <span className="text-[10px] font-bold text-gray-500 font-mono">
+                                                                    +{bAmenities.length - 4}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="py-2 px-3">
@@ -1150,6 +1626,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             {filteredFloors.map((floor) => {
                                 const parentBuilding = buildings.find(b => b.id === floor.buildingId);
                                 const floorRooms = getRoomsForFloor(floor.id);
+                                const fAmenities = (floor.amenityIds || []).map(id => amenitiesCatalog.find(a => a.id === id)).filter(Boolean) as AmenityItem[];
 
                                 return (
                                     <div
@@ -1172,7 +1649,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                             <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.2 rounded">
                                                                 {parentBuilding?.title || 'Unknown Building'}
                                                             </span>
-                                                            <span className="text-[10px] text-gray-400 font-mono">
+                                                            <span className="text-[10px] text-gray-400 font-mono font-bold">
                                                                 {floor.code}
                                                             </span>
                                                         </div>
@@ -1218,28 +1695,44 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                 {floor.description || 'Standard floor layout.'}
                                             </p>
 
-                                            {/* Amenities Badges */}
-                                            <div className="flex flex-wrap gap-1 mb-3 text-[10px]">
-                                                {floor.hasElevatorAccess && (
-                                                    <span className="px-1.5 py-0.5 bg-gray-50 text-gray-700 rounded border border-gray-200">
-                                                        🛗 Elevator
+                                            {/* Dynamic Amenities Badges with Click-to-Manage shortcut */}
+                                            <div className="mb-3">
+                                                <div className="flex justify-between items-center text-[10px] font-semibold text-gray-500 mb-1">
+                                                    <span className="flex items-center gap-1">
+                                                        <ShieldCheck size={11} className="text-emerald-600" />
+                                                        <span>Amenities & Safety ({fAmenities.length})</span>
                                                     </span>
-                                                )}
-                                                {floor.hasFireExit && (
-                                                    <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-100">
-                                                        🚪 Fire Exit
-                                                    </span>
-                                                )}
-                                                {floor.hasLinenCloset && (
-                                                    <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-100">
-                                                        🧺 Linen Pantry
-                                                    </span>
-                                                )}
-                                                {floor.hasIceMachine && (
-                                                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100">
-                                                        🧊 Ice Machine
-                                                    </span>
-                                                )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenEditFloor(floor, 'amenities')}
+                                                        className="text-[10px] text-blue-600 hover:underline cursor-pointer"
+                                                    >
+                                                        + Edit
+                                                    </button>
+                                                </div>
+                                                <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                                                    {fAmenities.map(item => (
+                                                        <span
+                                                            key={item.id}
+                                                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium border flex items-center gap-1 ${
+                                                                item.type === 'safety'
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                    : item.type === 'operational'
+                                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                            }`}
+                                                            title={`${item.name} (${item.category})`}
+                                                        >
+                                                            <span>{item.icon}</span>
+                                                            <span className="truncate max-w-[85px]">{item.name}</span>
+                                                        </span>
+                                                    ))}
+                                                    {fAmenities.length === 0 && (
+                                                        <span className="text-[10px] text-gray-400 italic">
+                                                            No specific amenities attached.
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* Attached Rooms Roster */}
@@ -1282,7 +1775,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     ) : (
                         /* Table View for Floors */
                         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-                            <div className="overflow-x-auto min-w-[700px]">
+                            <div className="overflow-x-auto min-w-[720px]">
                                 <table className="w-full text-left text-xs text-gray-700 divide-y divide-gray-200">
                                     <thead className="bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500">
                                         <tr>
@@ -1291,7 +1784,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                             <th className="py-2.5 px-3">Building Assignment</th>
                                             <th className="py-2.5 px-3">Category</th>
                                             <th className="py-2.5 px-3">Rooms / Capacity</th>
-                                            <th className="py-2.5 px-3">Amenities</th>
+                                            <th className="py-2.5 px-3">Life Safety & Amenities</th>
                                             <th className="py-2.5 px-3">Status</th>
                                             <th className="py-2.5 px-3 text-right">Actions</th>
                                         </tr>
@@ -1300,6 +1793,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                         {filteredFloors.map((floor) => {
                                             const parentBuilding = buildings.find(b => b.id === floor.buildingId);
                                             const floorRooms = getRoomsForFloor(floor.id);
+                                            const fAmenities = (floor.amenityIds || []).map(id => amenitiesCatalog.find(a => a.id === id)).filter(Boolean) as AmenityItem[];
 
                                             return (
                                                 <tr key={floor.id} className="hover:bg-gray-50/80 transition-colors">
@@ -1324,11 +1818,15 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         {floorRooms.length} / {floor.roomCapacity} Rooms
                                                     </td>
                                                     <td className="py-2 px-3">
-                                                        <div className="flex gap-1 text-[10px]">
-                                                            {floor.hasElevatorAccess && <span title="Elevator">🛗</span>}
-                                                            {floor.hasFireExit && <span title="Fire Exit">🚪</span>}
-                                                            {floor.hasLinenCloset && <span title="Linen Closet">🧺</span>}
-                                                            {floor.hasIceMachine && <span title="Ice Machine">🧊</span>}
+                                                        <div className="flex items-center gap-1 text-[11px]">
+                                                            {fAmenities.slice(0, 5).map(item => (
+                                                                <span key={item.id} title={item.name}>{item.icon}</span>
+                                                            ))}
+                                                            {fAmenities.length > 5 && (
+                                                                <span className="text-[10px] font-bold text-gray-500 font-mono">
+                                                                    +{fAmenities.length - 5}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="py-2 px-3">
@@ -1369,7 +1867,162 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                 </div>
             )}
 
-            {/* TAB CONTENT 3: CAPACITY & ARCHITECTURAL MATRIX */}
+            {/* TAB CONTENT 3: AMENITIES & LIFE SAFETY MASTER */}
+            {mainTab === 'amenities' && (
+                <div className="flex-1 flex flex-col p-4">
+                    {/* Control Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <div className="flex flex-wrap items-center gap-2 flex-1">
+                            {/* Search */}
+                            <div className="relative flex-1 min-w-[200px] max-w-sm">
+                                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={amenitySearch}
+                                    onChange={(e) => setAmenitySearch(e.target.value)}
+                                    placeholder="Search amenities or safety features by name, code..."
+                                    className="w-full h-8 pl-8 pr-3 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                />
+                                {amenitySearch && (
+                                    <button
+                                        onClick={() => setAmenitySearch('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Category Filter */}
+                            <select
+                                value={amenityCategoryFilter}
+                                onChange={(e) => setAmenityCategoryFilter(e.target.value)}
+                                className="h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white text-gray-700 outline-none"
+                            >
+                                <option value="all">All Categories ({amenitiesCatalog.length})</option>
+                                <option value="Safety & Emergency">Safety & Emergency</option>
+                                <option value="Vertical Transport & Access">Vertical Transport & Access</option>
+                                <option value="Housekeeping & Operations">Housekeeping & Operations</option>
+                                <option value="Guest Amenities & Comfort">Guest Amenities & Comfort</option>
+                                <option value="Security & Surveillance">Security & Surveillance</option>
+                            </select>
+
+                            {/* Type Filter */}
+                            <select
+                                value={amenityTypeFilter}
+                                onChange={(e) => setAmenityTypeFilter(e.target.value)}
+                                className="h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white text-gray-700 outline-none"
+                            >
+                                <option value="all">All Types</option>
+                                <option value="safety">Safety Items Only</option>
+                                <option value="amenity">Guest Amenities</option>
+                                <option value="operational">Operational Assets</option>
+                            </select>
+                        </div>
+
+                        {/* Reset defaults helper */}
+                        <button
+                            onClick={() => {
+                                if (confirm('Reset amenities catalog back to international hotel safety defaults?')) {
+                                    saveAmenitiesCatalog(INITIAL_AMENITIES_SAFETY);
+                                    showToast('Amenities catalog restored to statutory defaults.');
+                                }
+                            }}
+                            className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1 font-semibold hover:underline"
+                        >
+                            <RefreshCw size={12} /> Reset to Defaults
+                        </button>
+                    </div>
+
+                    {/* Amenities Cards Grid */}
+                    {filteredAmenities.length === 0 ? (
+                        <div className="text-center py-16 bg-gray-50/50 rounded-xl border border-dashed border-gray-300">
+                            <ShieldCheck size={36} className="mx-auto text-gray-300 mb-2" />
+                            <h3 className="text-sm font-bold text-gray-700">No amenities or safety assets found</h3>
+                            <p className="text-xs text-gray-400 mt-1">Try refining your search keyword or reset filters.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {filteredAmenities.map((item) => {
+                                const usage = getAmenityUsage(item.id);
+
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
+                                    >
+                                        <div>
+                                            {/* Header */}
+                                            <div className="flex items-start justify-between gap-2 mb-2">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="text-2xl p-1 bg-gray-50 rounded-lg border border-gray-100 flex-shrink-0">
+                                                        {item.icon}
+                                                    </span>
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                                                                {item.id}
+                                                            </span>
+                                                            {item.isMandatory && (
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200 uppercase">
+                                                                    Statutory
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="text-xs font-bold text-gray-900 mt-1 line-clamp-1">
+                                                            {item.name}
+                                                        </h4>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100">
+                                                    <button
+                                                        onClick={() => handleOpenEditAmenity(item)}
+                                                        className="p-1 text-gray-400 hover:text-blue-600 rounded"
+                                                        title="Edit Asset"
+                                                    >
+                                                        <Edit2 size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteAmenity(item)}
+                                                        className="p-1 text-gray-400 hover:text-rose-600 rounded"
+                                                        title="Delete Asset"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Category & Scope */}
+                                            <div className="flex items-center justify-between text-[10px] mb-2">
+                                                <span className="text-gray-500 font-medium">{item.category}</span>
+                                                <span className="text-[9px] font-semibold uppercase px-1.5 py-0.2 bg-gray-100 text-gray-600 rounded">
+                                                    Scope: {item.scope}
+                                                </span>
+                                            </div>
+
+                                            {/* Description */}
+                                            <p className="text-[11px] text-gray-600 line-clamp-2 mb-3">
+                                                {item.description || 'No detailed specifications recorded.'}
+                                            </p>
+                                        </div>
+
+                                        {/* Usage Footer */}
+                                        <div className="border-t border-gray-100 pt-2 flex justify-between items-center text-[10px] text-gray-500 font-medium">
+                                            <span>Type: <strong className="capitalize">{item.type}</strong></span>
+                                            <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                                                In {usage.floorCount} Floors • {usage.buildingCount} Wings
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* TAB CONTENT 4: CAPACITY & ARCHITECTURAL MATRIX */}
             {mainTab === 'matrix' && (
                 <div className="flex-1 p-4 space-y-6">
                     <div className="bg-blue-50/60 border border-blue-200/80 p-4 rounded-xl flex items-start gap-3">
@@ -1388,7 +2041,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                         {buildings.map((building) => {
                             const buildingFloors = floors
                                 .filter(f => f.buildingId === building.id)
-                                .sort((a, b) => b.floorNumber - a.floorNumber); // top floor down to ground
+                                .sort((a, b) => b.floorNumber - a.floorNumber);
                             const buildingRooms = getRoomsForBuilding(building.id);
 
                             return (
@@ -1489,18 +2142,19 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                         </div>
 
                         {/* Modal Navigation Sub-tabs */}
-                        <div className="px-5 pt-3 border-b border-gray-200 flex gap-4 text-xs font-semibold">
+                        <div className="px-5 pt-3 border-b border-gray-200 flex gap-4 text-xs font-semibold overflow-x-auto">
                             {[
                                 { id: 'basic', label: '1. Identity & Info' },
                                 { id: 'specs', label: '2. Structural Specs' },
-                                { id: 'location', label: '3. Location & GPS' },
-                                { id: 'status', label: '4. Operations & Dates' }
+                                { id: 'amenities', label: '3. Wing Amenities & Safety' },
+                                { id: 'location', label: '4. Location & GPS' },
+                                { id: 'status', label: '5. Operations' }
                             ].map((tb) => (
                                 <button
                                     key={tb.id}
                                     type="button"
                                     onClick={() => setBuildingFormTab(tb.id as any)}
-                                    className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
+                                    className={`pb-2.5 border-b-2 transition-colors cursor-pointer flex-shrink-0 ${
                                         buildingFormTab === tb.id
                                             ? 'border-blue-600 text-blue-700 font-bold'
                                             : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -1523,22 +2177,69 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                 type="text"
                                                 required
                                                 value={editingBuilding.title}
-                                                onChange={e => setEditingBuilding({ ...editingBuilding, title: e.target.value })}
+                                                onChange={e => handleBuildingTitleChange(e.target.value)}
                                                 placeholder="e.g. Ocean View Tower, Executive Wing"
                                                 className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
                                             />
                                         </div>
 
+                                        {/* Short Code Field with Auto-Generation & Duplicate Detection */}
                                         <div className="space-y-1">
-                                            <label className="text-xs font-semibold text-gray-700">Short Code *</label>
-                                            <input
-                                                type="text"
-                                                required
-                                                value={editingBuilding.shortCode}
-                                                onChange={e => setEditingBuilding({ ...editingBuilding, shortCode: e.target.value.toUpperCase() })}
-                                                placeholder="e.g. OCN, EW"
-                                                className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg font-mono focus:ring-1 focus:ring-blue-500 outline-none uppercase"
-                                            />
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-xs font-semibold text-gray-700">Short Code *</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const auto = generateUniqueShortCode(editingBuilding.title, existingBuildingCodes, {
+                                                            currentCode: editingBuilding.shortCode,
+                                                            maxLength: 7
+                                                        });
+                                                        setEditingBuilding({ ...editingBuilding, shortCode: auto });
+                                                        setIsBuildingCodeManual(false);
+                                                        showToast(`Auto-created unique code: ${auto}`);
+                                                    }}
+                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                                >
+                                                    <RefreshCw size={10} /> Auto-Generate
+                                                </button>
+                                            </div>
+
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    value={editingBuilding.shortCode}
+                                                    onChange={e => {
+                                                        setIsBuildingCodeManual(true);
+                                                        setEditingBuilding({ ...editingBuilding, shortCode: e.target.value.toUpperCase() });
+                                                    }}
+                                                    placeholder="e.g. OCN, EW"
+                                                    className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono focus:ring-1 outline-none uppercase font-bold ${
+                                                        isShortCodeDuplicate(editingBuilding.shortCode, existingBuildingCodes, buildings.find(b => b.id === editingBuilding.id)?.shortCode)
+                                                            ? 'border-rose-500 bg-rose-50 text-rose-700 focus:ring-rose-500'
+                                                            : 'border-gray-300 focus:ring-blue-500 text-blue-700'
+                                                    }`}
+                                                />
+                                                {/* Duplicate warning icon */}
+                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                    {isShortCodeDuplicate(editingBuilding.shortCode, existingBuildingCodes, buildings.find(b => b.id === editingBuilding.id)?.shortCode) ? (
+                                                        <AlertTriangle size={14} className="text-rose-500" />
+                                                    ) : editingBuilding.shortCode ? (
+                                                        <CheckCircle2 size={14} className="text-emerald-500" />
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            {/* Duplicate Feedback Message */}
+                                            {isShortCodeDuplicate(editingBuilding.shortCode, existingBuildingCodes, buildings.find(b => b.id === editingBuilding.id)?.shortCode) ? (
+                                                <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                                                    <AlertTriangle size={11} /> Short Code already in use! Must be unique.
+                                                </p>
+                                            ) : (
+                                                <p className="text-[10px] text-gray-400">
+                                                    Auto-created uniquely from title. You can customize anytime.
+                                                </p>
+                                            )}
                                         </div>
 
                                         <div className="space-y-1">
@@ -1636,7 +2337,65 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                 </div>
                             )}
 
-                            {/* TAB 3: LOCATION */}
+                            {/* TAB 3: WING AMENITIES & SAFETY */}
+                            {buildingFormTab === 'amenities' && (
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h4 className="text-xs font-bold text-gray-800">Assign Building-Wide Safety & Amenities</h4>
+                                            <p className="text-[11px] text-gray-500">Check all facilities that apply across this entire building</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleOpenAddAmenity}
+                                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                                        >
+                                            <Plus size={12} /> Add New Asset to Library
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto border border-gray-200 rounded-lg p-2.5 bg-gray-50/50">
+                                        {amenitiesCatalog.map((item) => {
+                                            const isSelected = (editingBuilding.amenityIds || []).includes(item.id);
+
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => toggleBuildingAmenity(item.id)}
+                                                    className={`p-2 rounded-lg border flex items-start gap-2.5 cursor-pointer transition-all ${
+                                                        isSelected
+                                                            ? 'bg-blue-50/70 border-blue-300 text-blue-900 shadow-2xs'
+                                                            : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => {}} // Handled by container onClick
+                                                        className="w-4 h-4 text-blue-600 rounded mt-0.5 pointer-events-none"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span>{item.icon}</span>
+                                                            <span className="text-xs font-bold truncate">{item.name}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                            <span className="text-[9px] font-mono px-1 rounded bg-gray-100 text-gray-600">
+                                                                {item.id}
+                                                            </span>
+                                                            <span className="text-[9px] text-gray-400 capitalize">
+                                                                {item.category}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB 4: LOCATION */}
                             {buildingFormTab === 'location' && (
                                 <div className="space-y-4">
                                     <div className="space-y-1">
@@ -1674,7 +2433,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                 </div>
                             )}
 
-                            {/* TAB 4: STATUS */}
+                            {/* TAB 5: STATUS */}
                             {buildingFormTab === 'status' && (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
@@ -1739,7 +2498,8 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+                                    disabled={isShortCodeDuplicate(editingBuilding.shortCode, existingBuildingCodes, buildings.find(b => b.id === editingBuilding.id)?.shortCode)}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
                                 >
                                     <Save size={14} /> Save Building
                                 </button>
@@ -1754,14 +2514,14 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             {/* ================================================================ */}
             {isFloorModalOpen && editingFloor && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-xl max-h-[90vh] flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150">
                         {/* Header */}
                         <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/70 rounded-t-xl">
                             <div>
                                 <h3 className="text-base font-bold text-gray-900">
                                     {floors.some(f => f.id === editingFloor.id) ? 'Edit Floor Configuration' : 'Add New Floor Level'}
                                 </h3>
-                                <p className="text-xs text-gray-500">Assign floor to a building, configure capacity and services</p>
+                                <p className="text-xs text-gray-500">Assign floor to a building, configure capacity and dynamic safety amenities</p>
                             </div>
                             <button
                                 onClick={() => setIsFloorModalOpen(false)}
@@ -1771,169 +2531,277 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             </button>
                         </div>
 
+                        {/* Sub-tabs: General vs Dynamic Amenities */}
+                        <div className="px-5 pt-3 border-b border-gray-200 flex gap-4 text-xs font-semibold">
+                            <button
+                                type="button"
+                                onClick={() => setFloorFormTab('general')}
+                                className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
+                                    floorFormTab === 'general'
+                                        ? 'border-blue-600 text-blue-700 font-bold'
+                                        : 'border-transparent text-gray-500 hover:text-gray-900'
+                                }`}
+                            >
+                                1. General & Capacity
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFloorFormTab('amenities')}
+                                className={`pb-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                                    floorFormTab === 'amenities'
+                                        ? 'border-emerald-600 text-emerald-700 font-bold'
+                                        : 'border-transparent text-gray-500 hover:text-gray-900'
+                                }`}
+                            >
+                                <ShieldCheck size={13} className="text-emerald-600" />
+                                <span>2. Dynamic Amenities & Safety ({(editingFloor.amenityIds || []).length})</span>
+                            </button>
+                        </div>
+
                         {/* Form */}
                         <form onSubmit={handleSaveFloor} className="flex-1 overflow-y-auto p-5 space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Building Assignment *</label>
-                                <select
-                                    required
-                                    value={editingFloor.buildingId}
-                                    onChange={e => setEditingFloor({ ...editingFloor, buildingId: e.target.value })}
-                                    className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none font-semibold text-gray-800"
-                                >
-                                    {buildings.map(b => (
-                                        <option key={b.id} value={b.id}>
-                                            🏢 {b.title} ({b.shortCode})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            {floorFormTab === 'general' && (
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-700">Building Assignment *</label>
+                                        <select
+                                            required
+                                            value={editingFloor.buildingId}
+                                            onChange={e => setEditingFloor({ ...editingFloor, buildingId: e.target.value })}
+                                            className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none font-semibold text-gray-800"
+                                        >
+                                            {buildings.map(b => (
+                                                <option key={b.id} value={b.id}>
+                                                    🏢 {b.title} ({b.shortCode})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Floor Number *</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        value={editingFloor.floorNumber}
-                                        onChange={e => setEditingFloor({ ...editingFloor, floorNumber: parseInt(e.target.value) || 1 })}
-                                        className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
-                                    />
-                                </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-700">Floor Number *</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                value={editingFloor.floorNumber}
+                                                onChange={e => {
+                                                    const num = parseInt(e.target.value) || 1;
+                                                    const updatedName = editingFloor.name.startsWith('Floor ') ? `Floor ${num}` : editingFloor.name;
+                                                    setEditingFloor({ ...editingFloor, floorNumber: num, name: updatedName });
+                                                }}
+                                                className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
+                                            />
+                                        </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Floor Code *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={editingFloor.code}
-                                        onChange={e => setEditingFloor({ ...editingFloor, code: e.target.value.toUpperCase() })}
-                                        placeholder="e.g. FL-01"
-                                        className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg font-mono outline-none uppercase"
-                                    />
-                                </div>
-                            </div>
+                                        {/* Floor Code Field with Auto-Generation & Duplicate Detection */}
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-xs font-semibold text-gray-700">Floor Code *</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const auto = generateUniqueShortCode(editingFloor.name, existingFloorCodes, {
+                                                            prefix: 'FL',
+                                                            currentCode: editingFloor.code,
+                                                            maxLength: 8
+                                                        });
+                                                        setEditingFloor({ ...editingFloor, code: auto });
+                                                        setIsFloorCodeManual(false);
+                                                        showToast(`Auto-created unique code: ${auto}`);
+                                                    }}
+                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                                >
+                                                    <RefreshCw size={10} /> Auto
+                                                </button>
+                                            </div>
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Floor Name / Label *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={editingFloor.name}
-                                    onChange={e => setEditingFloor({ ...editingFloor, name: e.target.value })}
-                                    placeholder="e.g. Floor 1 (Ground & Garden), Floor 5 (VIP Penthouse)"
-                                    className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
-                                />
-                            </div>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    value={editingFloor.code}
+                                                    onChange={e => {
+                                                        setIsFloorCodeManual(true);
+                                                        setEditingFloor({ ...editingFloor, code: e.target.value.toUpperCase() });
+                                                    }}
+                                                    placeholder="e.g. FL-01"
+                                                    className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono outline-none uppercase font-bold ${
+                                                        isShortCodeDuplicate(editingFloor.code, existingFloorCodes, floors.find(f => f.id === editingFloor.id)?.code)
+                                                            ? 'border-rose-500 bg-rose-50 text-rose-700'
+                                                            : 'border-gray-300 text-indigo-700'
+                                                    }`}
+                                                />
+                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                    {isShortCodeDuplicate(editingFloor.code, existingFloorCodes, floors.find(f => f.id === editingFloor.id)?.code) ? (
+                                                        <AlertTriangle size={14} className="text-rose-500" />
+                                                    ) : editingFloor.code ? (
+                                                        <CheckCircle2 size={14} className="text-emerald-500" />
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                            {isShortCodeDuplicate(editingFloor.code, existingFloorCodes, floors.find(f => f.id === editingFloor.id)?.code) && (
+                                                <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                                                    <AlertTriangle size={11} /> Floor code already exists! Must be unique.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Category</label>
-                                    <select
-                                        value={editingFloor.category}
-                                        onChange={e => setEditingFloor({ ...editingFloor, category: e.target.value as any })}
-                                        className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none"
-                                    >
-                                        <option value="Guest Rooms">Guest Rooms</option>
-                                        <option value="Public & Guest">Public & Guest</option>
-                                        <option value="Executive Club">Executive Club</option>
-                                        <option value="VIP Penthouse">VIP Penthouse</option>
-                                        <option value="Service & Admin">Service & Admin</option>
-                                    </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Room Capacity Target</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        max={200}
-                                        value={editingFloor.roomCapacity}
-                                        onChange={e => setEditingFloor({ ...editingFloor, roomCapacity: parseInt(e.target.value) || 8 })}
-                                        className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Operational Status</label>
-                                    <select
-                                        value={editingFloor.status}
-                                        onChange={e => setEditingFloor({ ...editingFloor, status: e.target.value as any })}
-                                        className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none"
-                                    >
-                                        <option value="Open">Open</option>
-                                        <option value="Maintenance">Maintenance</option>
-                                        <option value="Restricted">Restricted</option>
-                                        <option value="Closed">Closed</option>
-                                    </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-700">Sort Priority</label>
-                                    <input
-                                        type="number"
-                                        value={editingFloor.sortOrder}
-                                        onChange={e => setEditingFloor({ ...editingFloor, sortOrder: parseInt(e.target.value) || 1 })}
-                                        className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Service & Facilities Checklist */}
-                            <div className="pt-2 border-t border-gray-100">
-                                <label className="text-xs font-semibold text-gray-700 block mb-2">Service Amenities & Safety</label>
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <label className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-700">Floor Display Label *</label>
                                         <input
-                                            type="checkbox"
-                                            checked={editingFloor.hasElevatorAccess}
-                                            onChange={e => setEditingFloor({ ...editingFloor, hasElevatorAccess: e.target.checked })}
-                                            className="w-4 h-4 text-blue-600 rounded"
+                                            type="text"
+                                            required
+                                            value={editingFloor.name}
+                                            onChange={e => handleFloorNameChange(e.target.value)}
+                                            placeholder="e.g. Floor 1 (Ground & Garden), Floor 5 (VIP Penthouse)"
+                                            className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
                                         />
-                                        <span>Elevator Access</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={editingFloor.hasFireExit}
-                                            onChange={e => setEditingFloor({ ...editingFloor, hasFireExit: e.target.checked })}
-                                            className="w-4 h-4 text-blue-600 rounded"
-                                        />
-                                        <span>Fire Exit Route</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={editingFloor.hasLinenCloset}
-                                            onChange={e => setEditingFloor({ ...editingFloor, hasLinenCloset: e.target.checked })}
-                                            className="w-4 h-4 text-blue-600 rounded"
-                                        />
-                                        <span>Linen Pantry</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={editingFloor.hasIceMachine}
-                                            onChange={e => setEditingFloor({ ...editingFloor, hasIceMachine: e.target.checked })}
-                                            className="w-4 h-4 text-blue-600 rounded"
-                                        />
-                                        <span>Ice Machine Station</span>
-                                    </label>
-                                </div>
-                            </div>
+                                    </div>
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-700">Floor Layout Notes</label>
-                                <textarea
-                                    rows={2}
-                                    value={editingFloor.description}
-                                    onChange={e => setEditingFloor({ ...editingFloor, description: e.target.value })}
-                                    placeholder="e.g. Garden terrace access, soundproof corridor..."
-                                    className="w-full p-2.5 text-xs border border-gray-300 rounded-lg outline-none"
-                                />
-                            </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-700">Category</label>
+                                            <select
+                                                value={editingFloor.category}
+                                                onChange={e => setEditingFloor({ ...editingFloor, category: e.target.value as any })}
+                                                className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none"
+                                            >
+                                                <option value="Guest Rooms">Guest Rooms</option>
+                                                <option value="Public & Guest">Public & Guest</option>
+                                                <option value="Executive Club">Executive Club</option>
+                                                <option value="VIP Penthouse">VIP Penthouse</option>
+                                                <option value="Service & Admin">Service & Admin</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-700">Target Room Capacity</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={200}
+                                                value={editingFloor.roomCapacity}
+                                                onChange={e => setEditingFloor({ ...editingFloor, roomCapacity: parseInt(e.target.value) || 8 })}
+                                                className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-700">Operational Status</label>
+                                            <select
+                                                value={editingFloor.status}
+                                                onChange={e => setEditingFloor({ ...editingFloor, status: e.target.value as any })}
+                                                className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none"
+                                            >
+                                                <option value="Open">Open</option>
+                                                <option value="Maintenance">Maintenance</option>
+                                                <option value="Restricted">Restricted</option>
+                                                <option value="Closed">Closed</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-700">Sort Priority</label>
+                                            <input
+                                                type="number"
+                                                value={editingFloor.sortOrder}
+                                                onChange={e => setEditingFloor({ ...editingFloor, sortOrder: parseInt(e.target.value) || 1 })}
+                                                className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-700">Floor Layout Notes</label>
+                                        <textarea
+                                            rows={2}
+                                            value={editingFloor.description}
+                                            onChange={e => setEditingFloor({ ...editingFloor, description: e.target.value })}
+                                            placeholder="e.g. Garden terrace access, soundproof corridor..."
+                                            className="w-full p-2.5 text-xs border border-gray-300 rounded-lg outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SUB-TAB 2: DYNAMIC AMENITIES & SAFETY CHECKLIST */}
+                            {floorFormTab === 'amenities' && (
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h4 className="text-xs font-bold text-gray-800">Dynamic Floor Amenities & Safety</h4>
+                                            <p className="text-[11px] text-gray-500">Select life safety assets and amenities active on this floor</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleOpenAddAmenity}
+                                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                                        >
+                                            <Plus size={12} /> + Add Custom Asset
+                                        </button>
+                                    </div>
+
+                                    {/* Categorized Checkbox Grid */}
+                                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                                        {['Safety & Emergency', 'Vertical Transport & Access', 'Housekeeping & Operations', 'Guest Amenities & Comfort', 'Security & Surveillance'].map(category => {
+                                            const catItems = amenitiesCatalog.filter(a => a.category === category);
+                                            if (catItems.length === 0) return null;
+
+                                            return (
+                                                <div key={category} className="border border-gray-200 rounded-lg p-2.5 bg-gray-50/40">
+                                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">
+                                                        {category}
+                                                    </span>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        {catItems.map(item => {
+                                                            const isSelected = (editingFloor.amenityIds || []).includes(item.id);
+
+                                                            return (
+                                                                <div
+                                                                    key={item.id}
+                                                                    onClick={() => toggleFloorAmenity(item.id)}
+                                                                    className={`p-2 rounded-lg border flex items-start gap-2.5 cursor-pointer transition-all ${
+                                                                        isSelected
+                                                                            ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 shadow-2xs'
+                                                                            : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                                                    }`}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={() => {}}
+                                                                        className="w-4 h-4 text-emerald-600 rounded mt-0.5 pointer-events-none"
+                                                                    />
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span>{item.icon}</span>
+                                                                            <span className="text-xs font-bold truncate">{item.name}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                                            <span className="text-[9px] font-mono px-1 rounded bg-gray-100 text-gray-600">
+                                                                                {item.id}
+                                                                            </span>
+                                                                            {item.isMandatory && (
+                                                                                <span className="text-[8.5px] font-bold text-rose-600 bg-rose-50 px-1 rounded">
+                                                                                    Mandatory
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Footer */}
                             <div className="pt-4 border-t border-gray-200 flex justify-end gap-2">
@@ -1946,9 +2814,213 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+                                    disabled={isShortCodeDuplicate(editingFloor.code, existingFloorCodes, floors.find(f => f.id === editingFloor.id)?.code)}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
                                 >
                                     <Save size={14} /> Save Floor
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ================================================================ */}
+            {/* MODAL: ADD / EDIT AMENITY & SAFETY ASSET (CATALOG MASTER) */}
+            {/* ================================================================ */}
+            {isAmenityModalOpen && editingAmenity && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md max-h-[90vh] flex flex-col font-sans animate-in fade-in zoom-in-95 duration-150">
+                        {/* Header */}
+                        <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/70 rounded-t-xl">
+                            <div>
+                                <h3 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                                    <ShieldCheck size={16} className="text-emerald-600" />
+                                    <span>{amenitiesCatalog.some(a => a.id === editingAmenity.id) ? 'Edit Life Safety / Amenity' : 'Create New Amenity / Safety Asset'}</span>
+                                </h3>
+                                <p className="text-xs text-gray-500">Define dynamic asset with automatic unique code generation</p>
+                            </div>
+                            <button
+                                onClick={() => setIsAmenityModalOpen(false)}
+                                className="p-1 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Form */}
+                        <form onSubmit={handleSaveAmenity} className="flex-1 overflow-y-auto p-5 space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-700">Asset / Feature Name *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editingAmenity.name}
+                                    onChange={e => handleAmenityNameChange(e.target.value)}
+                                    placeholder="e.g. Emergency Eye Wash Station, Water Purifier"
+                                    className="w-full h-8 px-3 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+
+                            {/* Short Code / ID with Auto-generation */}
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-semibold text-gray-700">Unique Identifier Code *</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const auto = generateUniqueShortCode(editingAmenity.name, existingAmenityCodes, {
+                                                currentCode: editingAmenity.id,
+                                                maxLength: 10
+                                            });
+                                            setEditingAmenity({ ...editingAmenity, id: auto });
+                                            setIsAmenityCodeManual(false);
+                                            showToast(`Auto-created code: ${auto}`);
+                                        }}
+                                        className="text-[10px] text-emerald-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                    >
+                                        <RefreshCw size={10} /> Auto-Code
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editingAmenity.id}
+                                        onChange={e => {
+                                            setIsAmenityCodeManual(true);
+                                            setEditingAmenity({ ...editingAmenity, id: e.target.value.toUpperCase() });
+                                        }}
+                                        placeholder="e.g. EYE-WASH, AED-01"
+                                        className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono outline-none uppercase font-bold ${
+                                            isShortCodeDuplicate(editingAmenity.id, existingAmenityCodes, amenitiesCatalog.find(a => a.id === editingAmenity.id)?.id)
+                                                ? 'border-rose-500 bg-rose-50 text-rose-700'
+                                                : 'border-gray-300 text-gray-800'
+                                        }`}
+                                    />
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        {isShortCodeDuplicate(editingAmenity.id, existingAmenityCodes, amenitiesCatalog.find(a => a.id === editingAmenity.id)?.id) ? (
+                                            <AlertTriangle size={14} className="text-rose-500" />
+                                        ) : editingAmenity.id ? (
+                                            <CheckCircle2 size={14} className="text-emerald-500" />
+                                        ) : null}
+                                    </div>
+                                </div>
+                                {isShortCodeDuplicate(editingAmenity.id, existingAmenityCodes, amenitiesCatalog.find(a => a.id === editingAmenity.id)?.id) && (
+                                    <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                                        <AlertTriangle size={11} /> Asset Code already exists! Must be unique.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Icon Emoji Selector */}
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-700">Display Icon Emoji</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={editingAmenity.icon}
+                                        onChange={e => setEditingAmenity({ ...editingAmenity, icon: e.target.value })}
+                                        className="w-14 h-8 text-center text-lg border border-gray-300 rounded-lg outline-none"
+                                    />
+                                    <div className="flex flex-wrap gap-1 flex-1">
+                                        {['🚪', '🧯', '🚨', '🛗', '♿', '🧺', '🧊', '🍽️', '☕', '💧', '📹', '🔑', '🩺', '⚡', '🛡️', '📦'].map(ic => (
+                                            <button
+                                                key={ic}
+                                                type="button"
+                                                onClick={() => setEditingAmenity({ ...editingAmenity, icon: ic })}
+                                                className={`p-1 text-sm rounded hover:bg-gray-100 transition-colors ${editingAmenity.icon === ic ? 'bg-emerald-50 ring-1 ring-emerald-500' : ''}`}
+                                            >
+                                                {ic}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-gray-700">Category</label>
+                                    <select
+                                        value={editingAmenity.category}
+                                        onChange={e => setEditingAmenity({ ...editingAmenity, category: e.target.value as any })}
+                                        className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none"
+                                    >
+                                        <option value="Safety & Emergency">Safety & Emergency</option>
+                                        <option value="Vertical Transport & Access">Vertical Transport & Access</option>
+                                        <option value="Housekeeping & Operations">Housekeeping & Operations</option>
+                                        <option value="Guest Amenities & Comfort">Guest Amenities & Comfort</option>
+                                        <option value="Security & Surveillance">Security & Surveillance</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-gray-700">Asset Type</label>
+                                    <select
+                                        value={editingAmenity.type}
+                                        onChange={e => setEditingAmenity({ ...editingAmenity, type: e.target.value as any })}
+                                        className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none"
+                                    >
+                                        <option value="safety">Life Safety Asset</option>
+                                        <option value="amenity">Guest Amenity</option>
+                                        <option value="operational">Operational Equipment</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-gray-700">Deployment Scope</label>
+                                    <select
+                                        value={editingAmenity.scope}
+                                        onChange={e => setEditingAmenity({ ...editingAmenity, scope: e.target.value as any })}
+                                        className="w-full h-8 px-2.5 text-xs border border-gray-300 rounded-lg bg-white outline-none"
+                                    >
+                                        <option value="floor">Floor Level</option>
+                                        <option value="building">Building Wide</option>
+                                        <option value="both">Both Floor & Building</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center pt-5">
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs">
+                                        <input
+                                            type="checkbox"
+                                            checked={editingAmenity.isMandatory}
+                                            onChange={e => setEditingAmenity({ ...editingAmenity, isMandatory: e.target.checked })}
+                                            className="w-4 h-4 text-rose-600 rounded"
+                                        />
+                                        <span className="font-semibold text-gray-800">Statutory Mandatory</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-700">Description / Specifications</label>
+                                <textarea
+                                    rows={2}
+                                    value={editingAmenity.description}
+                                    onChange={e => setEditingAmenity({ ...editingAmenity, description: e.target.value })}
+                                    placeholder="Operational guidelines, maintenance or compliance info..."
+                                    className="w-full p-2.5 text-xs border border-gray-300 rounded-lg outline-none"
+                                />
+                            </div>
+
+                            {/* Footer */}
+                            <div className="pt-4 border-t border-gray-200 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAmenityModalOpen(false)}
+                                    className="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isShortCodeDuplicate(editingAmenity.id, existingAmenityCodes, amenitiesCatalog.find(a => a.id === editingAmenity.id)?.id)}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+                                >
+                                    <Save size={14} /> Save Asset
                                 </button>
                             </div>
                         </form>

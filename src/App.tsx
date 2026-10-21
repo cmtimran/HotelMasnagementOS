@@ -501,6 +501,9 @@ function App() {
       case 'building-floor':
       case 'building-management':
       case 'floor-management':
+      case 'amenities-safety':
+      case 'amenities':
+      case 'safety':
       case 'buildings':
       case 'floors':
       case 'buildings-floors':
@@ -511,6 +514,8 @@ function App() {
             initialTab={
               activePage === 'floor-management' || activePage === 'floors' || activePage === 'floor-setup'
                 ? 'floors'
+                : activePage === 'amenities-safety' || activePage === 'amenities' || activePage === 'safety'
+                ? 'amenities'
                 : 'buildings'
             }
           />

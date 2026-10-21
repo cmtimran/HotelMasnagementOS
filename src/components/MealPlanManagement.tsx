@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Utensils,
-    DollarSign, Clock, FileText, Search
+    DollarSign, Clock, FileText, Search, RefreshCw, AlertTriangle, CheckCircle2
 } from 'lucide-react';
+import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 interface MealPlan {
     id: number;
@@ -336,8 +337,12 @@ export default function MealPlanManagement() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('identity');
     const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
+    const [isCodeManual, setIsCodeManual] = useState(false);
+
+    const existingCodes = useMemo(() => mealPlans.map(p => p.shortCode), [mealPlans]);
 
     const openCreate = () => {
+        setIsCodeManual(false);
         setFormData({
             status: 'Active',
             servingType: 'Buffet',
@@ -383,7 +388,17 @@ export default function MealPlanManagement() {
     const openEdit = (plan: MealPlan) => {
         setFormData({ ...plan });
         setEditingPlan(plan);
+        setIsCodeManual(true);
         setView('form');
+    };
+
+    const handleNameChange = (name: string) => {
+        const currentCode = editingPlan?.shortCode;
+        let nextCode = formData.shortCode;
+        if (!isCodeManual || !nextCode) {
+            nextCode = generateUniqueShortCode(name, existingCodes, { currentCode, maxLength: 6 });
+        }
+        setFormData(prev => ({ ...prev, name, shortCode: nextCode }));
     };
 
     const persistMealPlans = (updated: MealPlan[]) => {
@@ -396,20 +411,29 @@ export default function MealPlanManagement() {
     };
 
     const handleSave = () => {
-        if (formData.name && formData.shortCode) {
-            let updated: MealPlan[];
-            if (editingPlan) {
-                updated = mealPlans.map(p => p.id === editingPlan.id ? { ...formData, id: editingPlan.id } as MealPlan : p);
-            } else {
-                const newPlan = { ...formData, id: Date.now() } as MealPlan;
-                updated = [...mealPlans, newPlan];
-            }
-            persistMealPlans(updated);
-            setView('list');
-            setFormData({});
-            setEditingPlan(null);
-            setActiveTab('identity');
+        if (!formData.name || !formData.shortCode) {
+            alert('Please provide Plan Name and Short Code.');
+            return;
         }
+
+        const currentCode = editingPlan?.shortCode;
+        if (isShortCodeDuplicate(formData.shortCode, existingCodes, currentCode)) {
+            alert(`Short Code "${formData.shortCode}" is already in use by another Meal Plan! Please use a unique code.`);
+            return;
+        }
+
+        let updated: MealPlan[];
+        if (editingPlan) {
+            updated = mealPlans.map(p => p.id === editingPlan.id ? { ...formData, id: editingPlan.id } as MealPlan : p);
+        } else {
+            const newPlan = { ...formData, id: Date.now() } as MealPlan;
+            updated = [...mealPlans, newPlan];
+        }
+        persistMealPlans(updated);
+        setView('list');
+        setFormData({});
+        setEditingPlan(null);
+        setActiveTab('identity');
     };
 
     const handleDelete = (id: number) => {
@@ -589,7 +613,7 @@ export default function MealPlanManagement() {
                                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all"
                                     placeholder="e.g. Continental Plan"
                                     value={formData.name || ''}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    onChange={e => handleNameChange(e.target.value)}
                                 />
                             </div>
                             <div className="space-y-2 text-xs">
@@ -603,14 +627,51 @@ export default function MealPlanManagement() {
                                 />
                             </div>
                             <div className="space-y-2 text-xs">
-                                <label className="font-bold text-gray-700">Short Code <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono transition-all"
-                                    placeholder="e.g. CP"
-                                    value={formData.shortCode || ''}
-                                    onChange={e => setFormData({ ...formData, shortCode: e.target.value.toUpperCase() })}
-                                />
+                                <div className="flex justify-between items-center">
+                                    <label className="font-bold text-gray-700">Short Code <span className="text-red-500">*</span></label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const auto = generateUniqueShortCode(formData.name || '', existingCodes, {
+                                                currentCode: editingPlan?.shortCode,
+                                                maxLength: 6
+                                            });
+                                            setFormData(prev => ({ ...prev, shortCode: auto }));
+                                            setIsCodeManual(false);
+                                        }}
+                                        className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                    >
+                                        <RefreshCw size={10} /> Auto-Generate
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className={`w-full px-3 py-2 pr-8 border rounded-lg outline-none text-sm font-mono font-bold uppercase transition-all ${
+                                            isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode)
+                                                ? 'border-rose-500 bg-rose-50 text-rose-700'
+                                                : 'border-gray-200 text-blue-700 focus:ring-2 focus:ring-blue-500'
+                                        }`}
+                                        placeholder="e.g. CP"
+                                        value={formData.shortCode || ''}
+                                        onChange={e => {
+                                            setIsCodeManual(true);
+                                            setFormData({ ...formData, shortCode: e.target.value.toUpperCase() });
+                                        }}
+                                    />
+                                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        {isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode) ? (
+                                            <AlertTriangle size={14} className="text-rose-500" />
+                                        ) : formData.shortCode ? (
+                                            <CheckCircle2 size={14} className="text-emerald-500" />
+                                        ) : null}
+                                    </div>
+                                </div>
+                                {isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode) && (
+                                    <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                                        <AlertTriangle size={10} /> Short Code already in use! Must be unique.
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2 text-xs">
                                 <label className="font-bold text-gray-700">Status <span className="text-red-500">*</span></label>

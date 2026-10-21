@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import {
-    Tags, Users, BedDouble, Star, ChevronLeft, Plus, Save, Edit2, Trash2, Upload, X, Search
+    Tags, Users, BedDouble, Star, ChevronLeft, Plus, Save, Edit2, Trash2, Upload, X, Search,
+    RefreshCw, AlertTriangle, CheckCircle2
 } from 'lucide-react';
+import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 interface RoomType {
     id: number;
@@ -194,6 +196,7 @@ const RoomTypeManagement = () => {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [formData, setFormData] = useState<RoomType | null>(null);
     const [activeTab, setActiveTab] = useState('identity');
+    const [isCodeManual, setIsCodeManual] = useState(false);
 
     const persistRoomTypes = (updated: RoomType[]) => {
         setRoomTypes(updated);
@@ -204,11 +207,15 @@ const RoomTypeManagement = () => {
         }
     };
 
+    const existingCodes = useMemo(() => roomTypes.map(rt => rt.shortCode), [roomTypes]);
+
     const handleAddNew = () => {
         setEditingId(null);
+        setIsCodeManual(false);
+        const defaultName = '';
         setFormData({
             id: Date.now(),
-            name: '',
+            name: defaultName,
             shortCode: '',
             description: '',
             size: 350,
@@ -240,9 +247,20 @@ const RoomTypeManagement = () => {
 
     const handleEdit = (roomType: RoomType) => {
         setEditingId(roomType.id);
+        setIsCodeManual(true);
         setFormData({ ...roomType });
         setView('form');
         setActiveTab('identity');
+    };
+
+    const handleNameChange = (name: string) => {
+        if (!formData) return;
+        const currentCode = editingId ? roomTypes.find(rt => rt.id === editingId)?.shortCode : undefined;
+        let nextCode = formData.shortCode;
+        if (!isCodeManual || !nextCode) {
+            nextCode = generateUniqueShortCode(name, existingCodes, { currentCode, maxLength: 6 });
+        }
+        setFormData({ ...formData, name, shortCode: nextCode });
     };
 
     const handleSave = () => {
@@ -250,6 +268,13 @@ const RoomTypeManagement = () => {
             alert('Please provide a Room Type Name and Short Code.');
             return;
         }
+
+        const currentCode = editingId ? roomTypes.find(rt => rt.id === editingId)?.shortCode : undefined;
+        if (isShortCodeDuplicate(formData.shortCode, existingCodes, currentCode)) {
+            alert(`Short Code "${formData.shortCode}" is already in use by another Room Type! Please use a unique code.`);
+            return;
+        }
+
         let updated: RoomType[];
         if (editingId) {
             updated = roomTypes.map(rt => rt.id === editingId ? formData : rt);
@@ -473,20 +498,57 @@ const RoomTypeManagement = () => {
                                         <input
                                             type="text"
                                             value={formData?.name || ''}
-                                            onChange={e => updateField('name', e.target.value)}
+                                            onChange={e => handleNameChange(e.target.value)}
                                             placeholder="e.g. Superior King"
                                             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs font-semibold text-gray-700">Short Code *</label>
-                                        <input
-                                            type="text"
-                                            value={formData?.shortCode || ''}
-                                            onChange={e => updateField('shortCode', e.target.value.toUpperCase())}
-                                            placeholder="e.g. SUPK"
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none font-mono font-bold"
-                                        />
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-xs font-semibold text-gray-700">Short Code *</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const auto = generateUniqueShortCode(formData?.name || '', existingCodes, {
+                                                        currentCode: editingId ? roomTypes.find(rt => rt.id === editingId)?.shortCode : undefined,
+                                                        maxLength: 6
+                                                    });
+                                                    setFormData(prev => prev ? ({ ...prev, shortCode: auto }) : null);
+                                                    setIsCodeManual(false);
+                                                }}
+                                                className="text-[10px] text-purple-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                            >
+                                                <RefreshCw size={10} /> Auto-Generate
+                                            </button>
+                                        </div>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={formData?.shortCode || ''}
+                                                onChange={e => {
+                                                    setIsCodeManual(true);
+                                                    updateField('shortCode', e.target.value.toUpperCase());
+                                                }}
+                                                placeholder="e.g. SUPK"
+                                                className={`w-full px-3 py-2 pr-8 text-sm border rounded-lg outline-none font-mono font-bold uppercase ${
+                                                    isShortCodeDuplicate(formData?.shortCode || '', existingCodes, editingId ? roomTypes.find(rt => rt.id === editingId)?.shortCode : undefined)
+                                                        ? 'border-rose-500 bg-rose-50 text-rose-700'
+                                                        : 'border-gray-200 text-purple-700 focus:ring-2 focus:ring-purple-500'
+                                                }`}
+                                            />
+                                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                {isShortCodeDuplicate(formData?.shortCode || '', existingCodes, editingId ? roomTypes.find(rt => rt.id === editingId)?.shortCode : undefined) ? (
+                                                    <AlertTriangle size={14} className="text-rose-500" />
+                                                ) : formData?.shortCode ? (
+                                                    <CheckCircle2 size={14} className="text-emerald-500" />
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        {isShortCodeDuplicate(formData?.shortCode || '', existingCodes, editingId ? roomTypes.find(rt => rt.id === editingId)?.shortCode : undefined) && (
+                                            <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                                                <AlertTriangle size={10} /> Short Code already in use! Must be unique.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="space-y-1">

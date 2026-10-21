@@ -95,7 +95,8 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
         const inventoryPages = [
             'rate-plans', 'package-builder', 'meal-plans', 'rate-calendar',
             'manage-room-type', 'manage-room', 'joint-room',
-            'building-management', 'floor-management', 'building-floor', 'buildings', 'floors', 'buildings-floors'
+            'building-management', 'floor-management', 'amenities-safety', 'amenities', 'safety',
+            'building-floor', 'buildings', 'floors', 'buildings-floors'
         ];
         if (inventoryPages.includes(activePage)) {
             setOpenMenus(prev => ({ ...prev, inventoryMod: true }));
@@ -247,6 +248,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             items: [
                 { id: 'building-management', label: 'Building Management', icon: <Building2 size={12} />},
                 { id: 'floor-management', label: 'Floor Management', icon: <Layers size={12} /> },
+                { id: 'amenities-safety', label: 'Amenities & Safety', icon: <ShieldCheck size={12} />, badge: 'Safety', badgeColor: 'bg-emerald-50 text-emerald-700' },
                 { id: 'manage-room-type', label: 'Room Types', icon: <Tags size={12} /> },
                 { id: 'manage-room', label: 'Rooms Master', icon: <BedDouble size={12} /> },
                 { id: 'joint-room', label: 'Connecting Rooms', icon: <Layers size={12} /> },
@@ -366,6 +368,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             if (activePage === id) return true;
             if (id === 'building-management' && (activePage === 'buildings' || activePage === 'building-floor' || activePage === 'buildings-floors' || activePage === 'building-management')) return true;
             if (id === 'floor-management' && (activePage === 'floors' || activePage === 'floor-management')) return true;
+            if (id === 'amenities-safety' && (activePage === 'amenities-safety' || activePage === 'amenities' || activePage === 'safety')) return true;
             return false;
         };
         const isActive = isItemActive(item.id);

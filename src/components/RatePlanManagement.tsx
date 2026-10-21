@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Calendar, DollarSign,
     Shield, Percent, Star, Calendar as CalendarIcon,
     TrendingUp, AlertCircle, Layers, Coffee, Utensils,
-    Moon, Sun, MapPin, Clock, FileText, Search
+    Moon, Sun, MapPin, Clock, FileText, Search,
+    RefreshCw, AlertTriangle, CheckCircle2
 } from 'lucide-react';
+import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 interface RatePlan {
     id: number;
@@ -209,6 +211,9 @@ export default function RatePlanManagement() {
     const [activeTab, setActiveTab] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [editingPlan, setEditingPlan] = useState<RatePlan | null>(null);
+    const [isCodeManual, setIsCodeManual] = useState(false);
+
+    const existingCodes = useMemo(() => ratePlans.map(p => p.shortCode), [ratePlans]);
 
     const toggleDay = (day: string) => {
         const currentDays = formData.validDays || [];
@@ -220,6 +225,7 @@ export default function RatePlanManagement() {
     };
 
     const openCreate = () => {
+        setIsCodeManual(false);
         setFormData({
             status: 'Active',
             currency: 'BDT',
@@ -252,8 +258,18 @@ export default function RatePlanManagement() {
     const openEdit = (plan: RatePlan) => {
         setFormData({ ...plan });
         setEditingPlan(plan);
+        setIsCodeManual(true);
         setView('form');
         setActiveTab(1);
+    };
+
+    const handleNameChange = (name: string) => {
+        const currentCode = editingPlan?.shortCode;
+        let nextCode = formData.shortCode;
+        if (!isCodeManual || !nextCode) {
+            nextCode = generateUniqueShortCode(name, existingCodes, { currentCode, maxLength: 8 });
+        }
+        setFormData(prev => ({ ...prev, name, shortCode: nextCode }));
     };
 
     const persistRatePlans = (updated: RatePlan[]) => {
@@ -273,19 +289,28 @@ export default function RatePlanManagement() {
     };
 
     const handleSave = () => {
-        if (formData.name && formData.shortCode) {
-            const finalData = { ...formData, id: editingPlan?.id || Date.now() } as RatePlan;
-            let updated: RatePlan[];
-            if (editingPlan) {
-                updated = ratePlans.map((p: RatePlan) => p.id === editingPlan.id ? finalData : p);
-            } else {
-                updated = [...ratePlans, finalData];
-            }
-            persistRatePlans(updated);
-            setView('list');
-            setFormData({});
-            setEditingPlan(null);
+        if (!formData.name || !formData.shortCode) {
+            alert('Please provide Plan Name and Short Code.');
+            return;
         }
+
+        const currentCode = editingPlan?.shortCode;
+        if (isShortCodeDuplicate(formData.shortCode, existingCodes, currentCode)) {
+            alert(`Short Code "${formData.shortCode}" is already in use by another Rate Plan! Please use a unique code.`);
+            return;
+        }
+
+        const finalData = { ...formData, id: editingPlan?.id || Date.now() } as RatePlan;
+        let updated: RatePlan[];
+        if (editingPlan) {
+            updated = ratePlans.map((p: RatePlan) => p.id === editingPlan.id ? finalData : p);
+        } else {
+            updated = [...ratePlans, finalData];
+        }
+        persistRatePlans(updated);
+        setView('list');
+        setFormData({});
+        setEditingPlan(null);
     };
 
     const renderList = () => (
@@ -432,11 +457,53 @@ export default function RatePlanManagement() {
                             <div className="grid grid-cols-2 gap-8">
                                 <div className="space-y-2 text-xs">
                                     <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Plan Name <span className="text-red-500">*</span></label>
-                                    <input className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all" value={formData.name || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})} placeholder="e.g. Best Available Rate" />
+                                    <input className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all" value={formData.name || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNameChange(e.target.value)} placeholder="e.g. Best Available Rate" />
                                 </div>
                                 <div className="space-y-2 text-xs">
-                                    <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Short Code</label>
-                                    <input className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono tracking-widest font-bold text-blue-600" value={formData.shortCode || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, shortCode: e.target.value.toUpperCase()})} placeholder="BAR-01" />
+                                    <div className="flex justify-between items-center">
+                                        <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Short Code <span className="text-red-500">*</span></label>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const auto = generateUniqueShortCode(formData.name || '', existingCodes, {
+                                                    currentCode: editingPlan?.shortCode,
+                                                    maxLength: 8
+                                                });
+                                                setFormData(prev => ({ ...prev, shortCode: auto }));
+                                                setIsCodeManual(false);
+                                            }}
+                                            className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                        >
+                                            <RefreshCw size={10} /> Auto-Generate
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            className={`w-full px-4 py-3 pr-9 border rounded-lg outline-none text-sm font-mono tracking-widest font-bold uppercase transition-all ${
+                                                isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode)
+                                                    ? 'border-rose-500 bg-rose-50 text-rose-700'
+                                                    : 'border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500'
+                                            }`}
+                                            value={formData.shortCode || ''}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                setIsCodeManual(true);
+                                                setFormData({ ...formData, shortCode: e.target.value.toUpperCase() });
+                                            }}
+                                            placeholder="BAR-01"
+                                        />
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                            {isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode) ? (
+                                                <AlertTriangle size={15} className="text-rose-500" />
+                                            ) : formData.shortCode ? (
+                                                <CheckCircle2 size={15} className="text-emerald-500" />
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    {isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode) && (
+                                        <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                                            <AlertTriangle size={10} /> Short Code already in use! Must be unique.
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-2 text-xs">
                                     <label className="font-black text-gray-700 uppercase tracking-widest pl-1">Market Segment</label>

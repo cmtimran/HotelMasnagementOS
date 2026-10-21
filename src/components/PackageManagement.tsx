@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Plus, Search, Package, Edit, Copy, Trash2,
     Utensils, Waves, Car, Shirt, Wine, Dumbbell, Star,
     Check, X, Info, DollarSign, Calendar,
     BedDouble, Users, ArrowLeft, Save, Eye, ToggleLeft,
-    ToggleRight, AlertCircle, Zap, Shield, Gift, TrendingUp
+    ToggleRight, AlertCircle, Zap, Shield, Gift, TrendingUp,
+    RefreshCw, AlertTriangle, CheckCircle2
 } from 'lucide-react';
+import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 
 // ============================================================
 // DATA TYPES
@@ -845,9 +847,13 @@ const PackageManagement = () => {
         p.shortCode.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const [isCodeManual, setIsCodeManual] = useState(false);
+    const existingCodes = useMemo(() => packages.map(p => p.shortCode), [packages]);
+
     const openCreate = () => {
         setFormData(defaultPackage());
         setEditingPackage(null);
+        setIsCodeManual(false);
         setActiveTab('basic');
         setView('form');
     };
@@ -855,12 +861,23 @@ const PackageManagement = () => {
     const openEdit = (pkg: HotelPackage) => {
         setFormData({ ...pkg });
         setEditingPackage(pkg);
+        setIsCodeManual(true);
         setActiveTab('basic');
         setView('form');
     };
 
+    const handlePackageNameChange = (name: string) => {
+        const currentCode = editingPackage?.shortCode;
+        let nextCode = formData.shortCode;
+        if (!isCodeManual || !nextCode) {
+            nextCode = generateUniqueShortCode(name, existingCodes, { currentCode, maxLength: 8 });
+        }
+        setFormData(prev => ({ ...prev, name, shortCode: nextCode }));
+    };
+
     const handleDuplicate = (pkg: HotelPackage) => {
-        const newPkg: HotelPackage = { ...pkg, id: Date.now(), name: `${pkg.name} (Copy)`, shortCode: `${pkg.shortCode}2`, status: 'Draft' };
+        const uniqueCode = generateUniqueShortCode(`${pkg.shortCode}-CPY`, existingCodes, { maxLength: 8 });
+        const newPkg: HotelPackage = { ...pkg, id: Date.now(), name: `${pkg.name} (Copy)`, shortCode: uniqueCode, status: 'Draft' };
         persistPackages([...packages, newPkg]);
     };
 
@@ -872,6 +889,15 @@ const PackageManagement = () => {
     };
 
     const handleSave = () => {
+        if (!formData.name || !formData.shortCode) {
+            alert('Package Name and Short Code are required.');
+            return;
+        }
+        const currentCode = editingPackage?.shortCode;
+        if (isShortCodeDuplicate(formData.shortCode, existingCodes, currentCode)) {
+            alert(`Short Code "${formData.shortCode}" is already in use by another package! Please provide a unique code.`);
+            return;
+        }
         let updated: HotelPackage[];
         if (editingPackage) {
             updated = packages.map(p => p.id === editingPackage.id ? { ...formData, id: editingPackage.id } : p);
@@ -1116,13 +1142,56 @@ const PackageManagement = () => {
                                         <div className="col-span-2">
                                             <Field label="Package Name *">
                                                 <input className={inp} placeholder="e.g. Ultimate Honeymoon Experience"
-                                                    value={fm.name} onChange={e => upd('name', e.target.value)} />
+                                                    value={fm.name} onChange={e => handlePackageNameChange(e.target.value)} />
                                             </Field>
                                         </div>
-                                        <Field label="Short Code *" hint="max 8 chars">
-                                            <input className={inp} placeholder="e.g. HONEY" maxLength={8}
-                                                value={fm.shortCode} onChange={e => upd('shortCode', e.target.value.toUpperCase())} />
-                                        </Field>
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <label className="text-xs font-semibold text-gray-700">Short Code *</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const auto = generateUniqueShortCode(fm.name, existingCodes, {
+                                                            currentCode: editingPackage?.shortCode,
+                                                            maxLength: 8
+                                                        });
+                                                        upd('shortCode', auto);
+                                                        setIsCodeManual(false);
+                                                    }}
+                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                                >
+                                                    <RefreshCw size={10} /> Auto-Generate
+                                                </button>
+                                            </div>
+                                            <div className="relative">
+                                                <input
+                                                    className={`${inp} pr-8 uppercase font-mono font-bold ${
+                                                        isShortCodeDuplicate(fm.shortCode, existingCodes, editingPackage?.shortCode)
+                                                            ? 'border-rose-500 bg-rose-50 text-rose-700'
+                                                            : ''
+                                                    }`}
+                                                    placeholder="e.g. HONEY"
+                                                    maxLength={8}
+                                                    value={fm.shortCode}
+                                                    onChange={e => {
+                                                        setIsCodeManual(true);
+                                                        upd('shortCode', e.target.value.toUpperCase());
+                                                    }}
+                                                />
+                                                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                    {isShortCodeDuplicate(fm.shortCode, existingCodes, editingPackage?.shortCode) ? (
+                                                        <AlertTriangle size={14} className="text-rose-500" />
+                                                    ) : fm.shortCode ? (
+                                                        <CheckCircle2 size={14} className="text-emerald-500" />
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                            {isShortCodeDuplicate(fm.shortCode, existingCodes, editingPackage?.shortCode) && (
+                                                <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1 mt-1">
+                                                    <AlertTriangle size={10} /> Short Code already in use! Must be unique.
+                                                </p>
+                                            )}
+                                        </div>
                                         <Field label="Package Type">
                                             <select className={sel} value={fm.packageType} onChange={e => upd('packageType', e.target.value)}>
                                                 <option>Standard</option><option>Honeymoon</option><option>Family</option>
