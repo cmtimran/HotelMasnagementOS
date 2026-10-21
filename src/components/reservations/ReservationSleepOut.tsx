@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from '../../context/ToastContext';
 import {
     Moon,
     Plus,
@@ -62,7 +63,7 @@ export const ReservationSleepOut: React.FC = () => {
     const handleCreateSleepOut = (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.guestName || !form.reservationNumber) {
-            alert('Please provide guest name and reservation number.');
+            toast.warning('Please provide guest name and reservation number.');
             return;
         }
 

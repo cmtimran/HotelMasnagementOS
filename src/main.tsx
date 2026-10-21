@@ -3,12 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { NavigationProvider } from './context/NavigationContext.tsx'
+import { ToastProvider } from './context/ToastContext.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <NavigationProvider>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </NavigationProvider>
   </StrictMode>,
 )
-

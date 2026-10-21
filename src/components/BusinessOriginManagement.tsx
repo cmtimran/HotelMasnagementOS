@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Target, Plus, Edit, Trash2, Search, X, Save } from 'lucide-react';
+import { toast } from '../context/ToastContext';
 
 interface BusinessSource {
     id: number;
@@ -169,7 +170,7 @@ const BusinessOriginManagement = () => {
     // Source handlers
     const handleSaveSource = () => {
         if (!sourceForm.sourceName) {
-            alert('Source name is required!');
+            toast.error('Source name is required!');
             return;
         }
 
@@ -217,7 +218,7 @@ const BusinessOriginManagement = () => {
     // Segment handlers
     const handleSaveSegment = () => {
         if (!segmentForm.marketCode) {
-            alert('Market code is required!');
+            toast.error('Market code is required!');
             return;
         }
 

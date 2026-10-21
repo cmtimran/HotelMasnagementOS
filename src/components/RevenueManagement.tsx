@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from '../context/ToastContext';
 import {
     TrendingUp,
     Database,
@@ -235,7 +236,7 @@ export const RevenueManagement: React.FC = () => {
     const handleDeleteGroup = (id: number) => {
         const headsInGroup = revenueHeads.filter(h => h.groupId === id);
         if (headsInGroup.length > 0) {
-            alert(`Cannot delete group! It contains ${headsInGroup.length} active revenue heads. Reassign or delete those heads first.`);
+            toast.error(`Cannot delete group! It contains ${headsInGroup.length} active revenue heads. Reassign or delete those heads first.`);
             return;
         }
         if (window.confirm('Are you sure you want to delete this revenue group?')) {

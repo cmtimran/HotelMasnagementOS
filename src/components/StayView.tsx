@@ -8,7 +8,6 @@ import {
     Building2,
     BedDouble,
     X,
-    CheckCircle2,
     Crown,
     Users,
     DollarSign,
@@ -19,6 +18,7 @@ import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
 import type { AmendBookingData } from './modals/AmendStayModal';
 import ReservationActionDrawer, { type DrawerMode } from './modals/ReservationActionDrawer';
+import { toast } from '../context/ToastContext';
 
 interface TimelineBooking {
     id: string;
@@ -200,11 +200,15 @@ export const StayView: React.FC = () => {
     });
     const [activeAssigningId, setActiveAssigningId] = useState<string | null>(null);
     const [selectedRoomNumber, setSelectedRoomNumber] = useState<string>('');
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     const showToast = (msg: string) => {
-        setToastMessage(msg);
-        setTimeout(() => setToastMessage(null), 3500);
+        if (msg.includes('🔒') || msg.toLowerCase().includes('cannot') || msg.toLowerCase().includes('locked')) {
+            toast.warning(msg);
+        } else if (msg.toLowerCase().includes('cancelled') || msg.toLowerCase().includes('voided')) {
+            toast.error(msg);
+        } else {
+            toast.success(msg);
+        }
     };
 
     const toggleAccordion = (id: string) => {
@@ -981,14 +985,6 @@ export const StayView: React.FC = () => {
 
     return (
         <div className="p-2 space-y-1.5 max-w-full h-full flex flex-col overflow-hidden animate-in fade-in duration-150 select-none relative">
-            {/* Toast Notification */}
-            {toastMessage && (
-                <div className="fixed top-4 right-4 z-[9999] bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-xl border border-gray-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-                    <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0" />
-                    <span>{toastMessage}</span>
-                </div>
-            )}
-
             {/* Header Controls Bar */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-2.5 py-1.5 flex items-center justify-between gap-2 flex-shrink-0">
                 {/* Left Title - Clean without extra badges as requested */}

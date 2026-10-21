@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Building2, Plus, Edit, Trash2, Search, X, Save } from 'lucide-react';
+import { toast } from '../context/ToastContext';
 
 interface CorporateProfile {
     id: number;
@@ -124,7 +125,7 @@ const CorporateProfileManagement = () => {
 
     const handleSave = () => {
         if (!formData.companyName || !formData.billingEmail) {
-            alert('Company name and billing email are required!');
+            toast.error('Company name and billing email are required!');
             return;
         }
 

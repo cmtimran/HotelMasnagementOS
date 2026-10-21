@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from '../context/ToastContext';
 import {
     Percent,
     Plus,
@@ -121,7 +122,7 @@ export const DiscountManagement: React.FC = () => {
         if (!formData.code || !formData.name) return;
 
         if (formData.applicableOn.length === 0) {
-            alert('Please select at least one applicable division (Rooms, F&B, Spa, etc.)');
+            toast.warning('Please select at least one applicable division (Rooms, F&B, Spa, etc.)');
             return;
         }
 
