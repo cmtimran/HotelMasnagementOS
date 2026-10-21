@@ -3,7 +3,7 @@ import {
     Plus, Edit2, Trash2, Save, X, Calendar, DollarSign,
     Shield, Percent, Star, Calendar as CalendarIcon,
     TrendingUp, AlertCircle, Layers, Coffee, Utensils,
-    Moon, Sun, MapPin, Clock, FileText
+    Moon, Sun, MapPin, Clock, FileText, Search
 } from 'lucide-react';
 
 interface RatePlan {
@@ -289,90 +289,92 @@ export default function RatePlanManagement() {
     };
 
     const renderList = () => (
-        <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Rate Plan Management</h1>
-                    <p className="text-sm text-gray-500">Define selling strategies, yield rules, and inventory fencings</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Rate Plan Management</h1>
+                    <p className="text-xs sm:text-sm text-gray-500">Define selling strategies, yield rules, and inventory fencings</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
                         <input
                             type="text"
-                            placeholder="Search strategy..."
-                            className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64 transition-all"
+                            placeholder="Search rate plans..."
+                            className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-56 sm:w-64 transition-all shadow-2xs"
                             value={searchQuery}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                         />
-                        <Star className="absolute left-3 top-2.5 text-gray-400" size={16} />
                     </div>
-                    <div className="flex gap-3">
-                        <button onClick={() => setView('calendar')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-all shadow-sm">
-                            <CalendarIcon size={18} /> Yield Console
+                    <div className="flex gap-2">
+                        <button onClick={() => setView('calendar')} className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold text-xs transition-all shadow-2xs cursor-pointer">
+                            <CalendarIcon size={15} /> Yield Console
                         </button>
-                        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md">
-                            <Plus size={18} /> Define New Plan
+                        <button onClick={openCreate} className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs transition-all shadow-xs cursor-pointer">
+                            <Plus size={15} /> Define New Plan
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 border-b">
-                        <tr>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Identity & Segment</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Meal Plan</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Policies</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Fencings</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700 text-right">Pricing (Base)</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y text-gray-600">
-                        {ratePlans
-                            .filter((plan: RatePlan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase()))
-                            .map((plan: RatePlan) => (
-                            <tr key={plan.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="font-bold text-gray-900">{plan.name}</div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[10px] font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{plan.shortCode}</span>
-                                        <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">{plan.marketSegment}</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <Coffee size={14} className="text-amber-500" />
-                                        <span className="font-semibold">{plan.mealPlan}</span>
-                                    </div>
-                                    {plan.packageId && <div className="text-[10px] text-indigo-500 font-medium mt-1 inline-flex items-center gap-1"><Layers size={10}/> Package Linked</div>}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-wrap gap-1">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${plan.policies.cancellationType === 'Non-Refundable' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                                            {plan.policies.cancellationType}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="space-y-1">
-                                        <div className="text-[10px] flex items-center gap-1.5 font-medium"><Clock size={12} className="text-gray-400"/> Min {plan.minNights} N</div>
-                                        {plan.stopSell && <div className="text-[11px] text-red-600 font-black flex items-center gap-1"><AlertCircle size={12}/> STOP SELL</div>}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="font-bold text-gray-900">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
-                                    <div className="text-[10px] text-gray-400">Exc. Tax</div>
-                                </td>
-                                <td className="px-6 py-4 text-right space-x-2">
-                                    <button onClick={() => openEdit(plan)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Edit Plan"><Edit2 size={16} /></button>
-                                    <button onClick={() => handleDelete(plan.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Delete Plan"><Trash2 size={16} /></button>
-                                </td>
+            <div className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[960px]">
+                        <thead className="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold text-gray-600">
+                            <tr>
+                                <th className="px-6 py-3.5">Identity & Segment</th>
+                                <th className="px-6 py-3.5">Meal Plan</th>
+                                <th className="px-6 py-3.5">Policies</th>
+                                <th className="px-6 py-3.5">Fencings</th>
+                                <th className="px-6 py-3.5 text-right">Pricing (Base)</th>
+                                <th className="px-6 py-3.5 text-right pr-6">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 text-gray-600">
+                            {ratePlans
+                                .filter((plan: RatePlan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase()))
+                                .map((plan: RatePlan) => (
+                                <tr key={plan.id} className="hover:bg-blue-50/20 transition-colors">
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-gray-900">{plan.name}</div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[10px] font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-bold">{plan.shortCode}</span>
+                                            <span className="text-[10px] text-blue-700 font-bold uppercase tracking-tight">{plan.marketSegment}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            <Coffee size={14} className="text-amber-500" />
+                                            <span className="font-semibold text-gray-800">{plan.mealPlan}</span>
+                                        </div>
+                                        {plan.packageId && <div className="text-[10px] text-indigo-600 font-semibold mt-1 inline-flex items-center gap-1"><Layers size={10}/> Package Linked</div>}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-wrap gap-1">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${plan.policies.cancellationType === 'Non-Refundable' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                                                {plan.policies.cancellationType}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="space-y-1">
+                                            <div className="text-[10.5px] flex items-center gap-1.5 font-medium text-gray-700"><Clock size={12} className="text-gray-400"/> Min {plan.minNights} N</div>
+                                            {plan.stopSell && <div className="text-[11px] text-red-600 font-black flex items-center gap-1"><AlertCircle size={12}/> STOP SELL</div>}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="font-bold text-gray-900 font-mono">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
+                                        <div className="text-[10px] text-gray-400 font-medium">Exc. Tax</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right pr-6 space-x-1.5">
+                                        <button onClick={() => openEdit(plan)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer" title="Edit Plan"><Edit2 size={15} /></button>
+                                        <button onClick={() => handleDelete(plan.id)} className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer" title="Delete Plan"><Trash2 size={15} /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

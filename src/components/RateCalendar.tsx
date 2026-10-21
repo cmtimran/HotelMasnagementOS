@@ -314,89 +314,93 @@ export default function RateCalendar() {
 
             {/* Calendar Grid */}
             <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
-                <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider py-2">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri (W)', 'Sat (W)'].map(day => (
-                        <div key={day}>{day}</div>
-                    ))}
-                </div>
+                <div className="overflow-x-auto">
+                    <div className="min-w-[720px]">
+                        <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider py-2">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri (W)', 'Sat (W)'].map(day => (
+                                <div key={day}>{day}</div>
+                            ))}
+                        </div>
 
-                <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
-                    {days.map((day, index) => {
-                        if (!day) {
-                            return <div key={`empty-${index}`} className="h-20 bg-gray-50/40" />;
-                        }
+                        <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
+                            {days.map((day, index) => {
+                                if (!day) {
+                                    return <div key={`empty-${index}`} className="h-20 bg-gray-50/40" />;
+                                }
 
-                        const dayRate = getRateForDate(day);
-                        const dateStr = formatDate(day);
-                        const isEditing = editingDate === dateStr;
-                        const isToday = '2026-07-01' === dateStr;
+                                const dayRate = getRateForDate(day);
+                                const dateStr = formatDate(day);
+                                const isEditing = editingDate === dateStr;
+                                const isToday = '2026-07-01' === dateStr;
 
-                        return (
-                            <div
-                                key={dateStr}
-                                onClick={() => !isEditing && handleCellClick(day)}
-                                className={`h-20 p-2 cursor-pointer transition-all hover:bg-blue-50/30 ${
-                                    isToday ? 'bg-purple-50/30 ring-1 ring-purple-500 inset-0' : 'bg-white'
-                                }`}
-                            >
-                                <div className="h-full flex flex-col justify-between">
-                                    <div className="flex items-center justify-between leading-none">
-                                        <span className={`text-xs font-bold ${isToday ? 'text-purple-700' : 'text-gray-800'}`}>
-                                            {day.getDate()}
-                                        </span>
-                                        {dayRate.occupancy > 0 && (
-                                            <span className="flex items-center gap-1 text-[9px] text-gray-400 font-semibold">
-                                                <span className={`w-1.5 h-1.5 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
-                                                {dayRate.occupancy}%
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {isEditing ? (
-                                        <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                                            <div className="relative">
-                                                <span className="absolute left-1 top-0.5 text-[10px] text-gray-400 font-bold">৳</span>
-                                                <input
-                                                    type="number"
-                                                    value={tempRate}
-                                                    onChange={(e) => setTempRate(e.target.value)}
-                                                    className="w-full pl-3.5 pr-1 py-0.5 border border-purple-500 rounded text-xs font-bold outline-none"
-                                                    autoFocus
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') handleSaveRate();
-                                                        if (e.key === 'Escape') setEditingDate(null);
-                                                    }}
-                                                />
+                                return (
+                                    <div
+                                        key={dateStr}
+                                        onClick={() => !isEditing && handleCellClick(day)}
+                                        className={`h-20 p-2 cursor-pointer transition-all hover:bg-blue-50/30 ${
+                                            isToday ? 'bg-purple-50/30 ring-1 ring-purple-500 inset-0' : 'bg-white'
+                                        }`}
+                                    >
+                                        <div className="h-full flex flex-col justify-between">
+                                            <div className="flex items-center justify-between leading-none">
+                                                <span className={`text-xs font-bold ${isToday ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                    {day.getDate()}
+                                                </span>
+                                                {dayRate.occupancy > 0 && (
+                                                    <span className="flex items-center gap-1 text-[9px] text-gray-400 font-semibold">
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
+                                                        {dayRate.occupancy}%
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="flex gap-1">
-                                                <button
-                                                    onClick={handleSaveRate}
-                                                    className="flex-1 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-bold hover:bg-emerald-700"
-                                                >
-                                                    <Save size={10} className="mx-auto" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setEditingDate(null)}
-                                                    className="flex-1 py-0.5 bg-gray-200 text-gray-700 rounded text-[9px] font-bold hover:bg-gray-300"
-                                                >
-                                                    <RotateCcw size={10} className="mx-auto" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-1">
-                                            <div className={`px-1.5 py-0.5 ${getRateColor(dayRate.rate)} rounded-md text-center shadow-2xs`}>
-                                                <p className="text-[11px] font-bold leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
-                                            </div>
-                                            {dayRate.eventName && (
-                                                <p className="text-[8px] text-rose-600 font-bold truncate leading-none">{dayRate.eventName}</p>
+
+                                            {isEditing ? (
+                                                <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="relative">
+                                                        <span className="absolute left-1 top-0.5 text-[10px] text-gray-400 font-bold">৳</span>
+                                                        <input
+                                                            type="number"
+                                                            value={tempRate}
+                                                            onChange={(e) => setTempRate(e.target.value)}
+                                                            className="w-full pl-3.5 pr-1 py-0.5 border border-purple-500 rounded text-xs font-bold outline-none"
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleSaveRate();
+                                                                if (e.key === 'Escape') setEditingDate(null);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button
+                                                            onClick={handleSaveRate}
+                                                            className="flex-1 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-bold hover:bg-emerald-700"
+                                                        >
+                                                            <Save size={10} className="mx-auto" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingDate(null)}
+                                                            className="flex-1 py-0.5 bg-gray-200 text-gray-700 rounded text-[9px] font-bold hover:bg-gray-300"
+                                                        >
+                                                            <RotateCcw size={10} className="mx-auto" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <div className={`px-1.5 py-0.5 ${getRateColor(dayRate.rate)} rounded-md text-center shadow-2xs`}>
+                                                        <p className="text-[11px] font-bold leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
+                                                    </div>
+                                                    {dayRate.eventName && (
+                                                        <p className="text-[8px] text-rose-600 font-bold truncate leading-none">{dayRate.eventName}</p>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
             </div>
 

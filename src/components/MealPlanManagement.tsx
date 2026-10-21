@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Utensils,
-    DollarSign, Clock, FileText
+    DollarSign, Clock, FileText, Search
 } from 'lucide-react';
 
 interface MealPlan {
@@ -333,6 +333,7 @@ export default function MealPlanManagement() {
         ];
     });
     const [formData, setFormData] = useState<Partial<MealPlan>>({});
+    const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('identity');
     const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
 
@@ -422,76 +423,106 @@ export default function MealPlanManagement() {
         setFormData({ ...formData, [field]: !formData[field] });
     };
 
+    const filteredMealPlans = mealPlans.filter(p =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.shortCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.marketingName && p.marketingName.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
     const renderList = () => (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Meal Plan Master Data</h1>
-                    <p className="text-sm text-gray-500">Define base meal templates for use in Packages and Rate Plans</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meal Plan Master Data</h1>
+                    <p className="text-xs sm:text-sm text-gray-500">Define base meal templates for use in Packages and Rate Plans</p>
                 </div>
-                <button
-                    onClick={openCreate}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-medium"
-                >
-                    <Plus size={18} />
-                    Add Meal Plan
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                        <input
+                            type="text"
+                            placeholder="Search meal plans..."
+                            className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-56 sm:w-64 transition-all shadow-2xs"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        onClick={openCreate}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold text-xs shadow-xs cursor-pointer"
+                    >
+                        <Plus size={15} />
+                        Add Meal Plan
+                    </button>
+                </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 border-b">
-                        <tr>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Identity</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700">Inclusions</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700 font-mono text-[10px] uppercase">Menus Assigned</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700 text-right text-[10px] uppercase">Pricing</th>
-                            <th className="px-6 py-4 font-semibold text-gray-700 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y text-gray-600">
-                        {mealPlans.map(plan => (
-                            <tr key={plan.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="font-bold text-gray-900">{plan.name}</div>
-                                    <div className="text-xs font-mono text-gray-400">{plan.shortCode}</div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-wrap gap-1">
-                                        {plan.hasBreakfast && <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded text-[10px] font-bold">B</span>}
-                                        {plan.hasLunch && <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold">L</span>}
-                                        {plan.hasDinner && <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 rounded text-[10px] font-bold">D</span>}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="space-y-1">
-                                        {plan.hasBreakfast && <div className="text-[10px] flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-yellow-400"/> {plan.breakfastMenu} <span className="text-gray-300">({plan.breakfastStyle})</span></div>}
-                                        {plan.hasLunch && <div className="text-[10px] flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-400"/> {plan.lunchMenu} <span className="text-gray-300">({plan.lunchStyle})</span></div>}
-                                        {plan.hasDinner && <div className="text-[10px] flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-indigo-400"/> {plan.dinnerMenu} <span className="text-gray-300">({plan.dinnerStyle})</span></div>}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="font-semibold text-gray-900">৳{plan.sellingPriceAdult} / ৳{plan.sellingPriceChild}</div>
-                                    <div className="text-[10px] text-gray-400">{plan.revenueCode}</div>
-                                </td>
-                                <td className="px-6 py-4 text-right space-x-2">
-                                    <button 
-                                        onClick={() => openEdit(plan)}
-                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                    >
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(plan.id)}
-                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </td>
+            <div className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[850px]">
+                        <thead className="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold text-gray-600">
+                            <tr>
+                                <th className="px-6 py-3.5">Identity</th>
+                                <th className="px-6 py-3.5">Inclusions</th>
+                                <th className="px-6 py-3.5 font-mono text-[10px] uppercase">Menus Assigned</th>
+                                <th className="px-6 py-3.5 text-right text-[10px] uppercase">Pricing</th>
+                                <th className="px-6 py-3.5 text-right pr-6">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 text-gray-600">
+                            {filteredMealPlans.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                                        No meal plans match your search query.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredMealPlans.map(plan => (
+                                    <tr key={plan.id} className="hover:bg-blue-50/20 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-gray-900">{plan.name}</div>
+                                            <div className="text-xs font-mono text-gray-500 font-bold mt-0.5">{plan.shortCode}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-wrap gap-1">
+                                                {plan.hasBreakfast && <span className="px-2 py-0.5 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded text-[10px] font-bold">Breakfast</span>}
+                                                {plan.hasLunch && <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[10px] font-bold">Lunch</span>}
+                                                {plan.hasDinner && <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded text-[10px] font-bold">Dinner</span>}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1">
+                                                {plan.hasBreakfast && <div className="text-[10.5px] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-yellow-500"/> <span className="font-medium text-gray-800">{plan.breakfastMenu}</span> <span className="text-gray-400">({plan.breakfastStyle})</span></div>}
+                                                {plan.hasLunch && <div className="text-[10.5px] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"/> <span className="font-medium text-gray-800">{plan.lunchMenu}</span> <span className="text-gray-400">({plan.lunchStyle})</span></div>}
+                                                {plan.hasDinner && <div className="text-[10.5px] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/> <span className="font-medium text-gray-800">{plan.dinnerMenu}</span> <span className="text-gray-400">({plan.dinnerStyle})</span></div>}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="font-bold font-mono text-gray-900">৳{plan.sellingPriceAdult} / ৳{plan.sellingPriceChild}</div>
+                                            <div className="text-[10px] text-gray-400 font-mono">{plan.revenueCode}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right pr-6 space-x-1.5">
+                                            <button 
+                                                onClick={() => openEdit(plan)}
+                                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                                title="Edit"
+                                            >
+                                                <Edit2 size={15} />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDelete(plan.id)}
+                                                className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                title="Delete"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

@@ -999,10 +999,10 @@ const PackageManagement = () => {
                                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadge[pkg.status]}`}>{pkg.status}</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => openEdit(pkg)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Edit"><Edit size={14} /></button>
-                                        <button onClick={() => handleDuplicate(pkg)} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all" title="Duplicate"><Copy size={14} /></button>
-                                        <button onClick={() => handleDelete(pkg.id)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Delete"><Trash2 size={14} /></button>
+                                    <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => openEdit(pkg)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer" title="Edit"><Edit size={14} /></button>
+                                        <button onClick={() => handleDuplicate(pkg)} className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer" title="Duplicate"><Copy size={14} /></button>
+                                        <button onClick={() => handleDelete(pkg.id)} className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer" title="Delete"><Trash2 size={14} /></button>
                                     </div>
                                 </div>
 

@@ -325,8 +325,13 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                         </div>
 
                         {/* Room Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {filteredRooms.map(room => {
+                        {filteredRooms.length === 0 ? (
+                            <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400">
+                                No rooms match the current search or filter criteria.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {filteredRooms.map(room => {
                                 const roomType = mockRoomTypes.find(t => t.id === room.roomTypeId);
                                 const floor = mockFloors.find(f => f.id === room.floorId);
 
@@ -384,6 +389,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 );
                             })}
                         </div>
+                    )}
                     </div>
                 ) : (
                     <div className="max-w-3xl mx-auto space-y-5">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-    Layers, Plus, Save, Edit2, Trash2, ChevronLeft, Link, Check, ShieldCheck
+    Layers, Plus, Save, Edit2, Trash2, ChevronLeft, Link, Check, ShieldCheck, Search
 } from 'lucide-react';
 
 interface ComponentRoom {
@@ -109,6 +109,7 @@ const ConnectingRoomManagement = () => {
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [formData, setFormData] = useState<ConnectingRoom | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const persistRooms = (updated: ConnectingRoom[]) => {
         setConnectingRooms(updated);
@@ -189,9 +190,14 @@ const ConnectingRoomManagement = () => {
 
     const getRoomTypeName = (id: string) => existingRoomTypes.find(rt => rt.id === id)?.name || 'Unknown Room';
 
+    const filteredConnectingRooms = connectingRooms.filter(r =>
+        r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.componentRooms.some(c => (c.roomNumbers || []).some(n => n.includes(searchTerm)))
+    );
+
     if (view === 'list') {
         return (
-            <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+            <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200/90 shadow-xs">
                     <div>
                         <div className="flex items-center gap-2">
@@ -204,16 +210,33 @@ const ConnectingRoomManagement = () => {
                             </div>
                         </div>
                     </div>
-                    <button
-                        onClick={handleAddNew}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 font-semibold text-sm transition-colors shadow-xs"
-                    >
-                        <Plus size={16} /> Add Connecting Suite
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                            <input
+                                type="text"
+                                placeholder="Search suites, room #..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-60 shadow-2xs"
+                            />
+                        </div>
+                        <button
+                            onClick={handleAddNew}
+                            className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-1.5 hover:bg-blue-700 font-semibold text-xs transition-colors shadow-xs cursor-pointer"
+                        >
+                            <Plus size={15} /> Add Connecting Suite
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {connectingRooms.map(room => {
+                    {filteredConnectingRooms.length === 0 ? (
+                        <div className="col-span-full bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400">
+                            No connecting suites found matching your search.
+                        </div>
+                    ) : (
+                        filteredConnectingRooms.map(room => {
                         const sumPrice = calculateSumPrice(room);
                         const displayPrice = room.pricingStrategy === 'Fixed Rate' && room.fixedPrice ? room.fixedPrice : sumPrice;
 
@@ -275,7 +298,7 @@ const ConnectingRoomManagement = () => {
                                 </div>
                             </div>
                         );
-                    })}
+                    }))}
                 </div>
             </div>
         );
