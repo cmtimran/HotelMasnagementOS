@@ -197,12 +197,13 @@ export const ReservationHold: React.FC = () => {
 
     // Filter Logic
     const filtered = useMemo(() => {
+        const q = (searchQuery || '').toLowerCase().trim();
         return holds.filter(h => {
-            const matchesQuery =
-                h.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                h.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                h.roomType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                h.reason.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesQuery = !q ||
+                (h.guestName || '').toLowerCase().includes(q) ||
+                (h.reservationNumber || '').toLowerCase().includes(q) ||
+                (h.roomType || '').toLowerCase().includes(q) ||
+                (h.reason || '').toLowerCase().includes(q);
             const matchesStatus = filterStatus === 'all' || h.status === filterStatus;
             return matchesQuery && matchesStatus;
         });

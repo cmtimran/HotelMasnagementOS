@@ -7,7 +7,8 @@ import {
 } from './routesRegistry';
 
 export const parseLocation = (): NavigationState => {
-  const pathname = window.location.pathname.toLowerCase();
+  const rawPathname = window.location.pathname.toLowerCase();
+  const pathname = (rawPathname.length > 1 && rawPathname.endsWith('/')) ? rawPathname.slice(0, -1) : rawPathname;
   const searchParams = new URLSearchParams(window.location.search);
   const pageParam = searchParams.get('page')?.toLowerCase();
   const reportParam = searchParams.get('report')?.toLowerCase();
@@ -48,7 +49,7 @@ export const parseLocation = (): NavigationState => {
 
   // 2. Check for Main Panel Routes by Pathname
   if (pathname && pathname !== '/') {
-    const matchedRoute = getRouteBySlug(pathname);
+    const matchedRoute = getRouteBySlug(pathname) || getRouteByPageId(pathname.replace(/^\//, ''));
     if (matchedRoute) {
       return {
         currentSlug: matchedRoute.slug,

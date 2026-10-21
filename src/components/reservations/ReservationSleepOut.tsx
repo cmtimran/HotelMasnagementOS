@@ -144,12 +144,13 @@ export const ReservationSleepOut: React.FC = () => {
 
     // Filter Logic
     const filtered = useMemo(() => {
+        const q = (searchQuery || '').toLowerCase().trim();
         return sleepOuts.filter(s => {
-            const matchesQuery =
-                s.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                s.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                s.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                s.reason.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesQuery = !q ||
+                (s.guestName || '').toLowerCase().includes(q) ||
+                (s.reservationNumber || '').toLowerCase().includes(q) ||
+                (s.roomNumber || '').toLowerCase().includes(q) ||
+                (s.reason || '').toLowerCase().includes(q);
             const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
             return matchesQuery && matchesStatus;
         });

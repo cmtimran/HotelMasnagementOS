@@ -909,6 +909,10 @@ if (unassignedRoute) {
 const cancelRoute = SLUG_TO_ROUTE_MAP.get('/reservations/cancel');
 if (cancelRoute) {
   SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/cancel', cancelRoute);
+  SLUG_TO_ROUTE_MAP.set('/reservations-cancel', cancelRoute);
+  SLUG_TO_ROUTE_MAP.set('/reservations/cancelled', cancelRoute);
+  SLUG_TO_ROUTE_MAP.set('/cancel', cancelRoute);
+  SLUG_TO_ROUTE_MAP.set('/cancelled', cancelRoute);
 }
 
 const stayViewRoute = SLUG_TO_ROUTE_MAP.get('/stay-view');

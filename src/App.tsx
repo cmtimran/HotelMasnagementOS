@@ -510,12 +510,21 @@ function App() {
       case 'reservations-view':
         return <ReservationsView />;
       case 'reservations-sleep-out':
+      case 'reservations/sleep-out':
+      case 'reservations/sleepout':
         return <ReservationSleepOut />;
       case 'reservations-hold':
+      case 'reservations/hold':
         return <ReservationHold />;
       case 'reservations-unassigned':
+      case 'reservations/unassigned':
         return <ReservationUnassigned />;
       case 'reservations-cancel':
+      case 'reservations/cancel':
+      case 'reservations/cancelled':
+      case 'reservations-cancelled':
+      case 'cancel':
+      case 'cancelled':
         return <ReservationCancel />;
       case 'housekeeping':
         return <HousekeepingGrid />;

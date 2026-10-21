@@ -131,14 +131,48 @@ export const ReservationCancel: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state
+    // Hydrate state with complete defensive mapping against legacy localStorage schemas
     const [cancelledList, setCancelledList] = useState<CancelledItem[]>(() => {
-        const saved = localStorage.getItem('hotel_cancelled_v2');
-        return saved ? JSON.parse(saved) : INITIAL_CANCELLED;
+        try {
+            const saved = localStorage.getItem('hotel_cancelled_v2');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed.map((c: any, index: number) => ({
+                        id: c.id || index + 1,
+                        reservationNumber: c.reservationNumber || `RES-00918${index}`,
+                        guestName: c.guestName || 'Valued Guest',
+                        phone: c.phone || '+880 1712-000000',
+                        email: c.email || 'guest@hospitality.com',
+                        roomType: c.roomType || 'Deluxe Room',
+                        roomNumber: c.roomNumber || undefined,
+                        stayDates: c.stayDates || '2026-06-25 → 2026-06-28',
+                        checkIn: c.checkIn || '2026-06-25',
+                        checkOut: c.checkOut || '2026-06-28',
+                        nights: typeof c.nights === 'number' ? c.nights : 2,
+                        cancellationDate: c.cancellationDate || '2026-06-24 14:30',
+                        reason: c.reason || 'Reservation cancelled by guest request.',
+                        reasonCategory: c.reasonCategory || 'Guest Request',
+                        cancelledBy: c.cancelledBy || 'Front Office Supervisor',
+                        retentionFeeBDT: typeof c.retentionFeeBDT === 'number' ? c.retentionFeeBDT : 0,
+                        originalTotalBDT: typeof c.originalTotalBDT === 'number' ? c.originalTotalBDT : ((typeof c.retentionFeeBDT === 'number' ? c.retentionFeeBDT : 0) + 12000),
+                        refundStatus: c.refundStatus || (c.retentionFeeBDT > 0 ? 'Partial 50% Fee Applied' : 'Full Refund Processed'),
+                        refundMethod: c.refundMethod || 'Original Payment'
+                    }));
+                }
+            }
+        } catch (e) {
+            console.error('Error hydrating hotel_cancelled_v2:', e);
+        }
+        return INITIAL_CANCELLED;
     });
 
     useEffect(() => {
-        localStorage.setItem('hotel_cancelled_v2', JSON.stringify(cancelledList));
+        try {
+            localStorage.setItem('hotel_cancelled_v2', JSON.stringify(cancelledList));
+        } catch (e) {
+            console.error('Failed to save hotel_cancelled_v2:', e);
+        }
     }, [cancelledList]);
 
     const handleReinstate = (id: number) => {
@@ -154,20 +188,22 @@ export const ReservationCancel: React.FC = () => {
                 const existingRes = localStorage.getItem('hotel_reservations_v2');
                 const resList = existingRes ? JSON.parse(existingRes) : [];
                 
+                const origTotal = item.originalTotalBDT || 12000;
+                const retFee = item.retentionFeeBDT || 0;
                 const restoredReservation = {
                     id: Date.now(),
                     reservationNumber: item.reservationNumber,
                     guestName: item.guestName,
-                    phone: item.phone,
-                    email: item.email,
-                    roomType: item.roomType,
+                    phone: item.phone || '+880 1712-000000',
+                    email: item.email || 'guest@hospitality.com',
+                    roomType: item.roomType || 'Deluxe Room',
                     roomNumber: item.roomNumber || 'UNASSIGNED',
-                    checkIn: item.checkIn,
-                    checkOut: item.checkOut,
-                    nights: item.nights,
+                    checkIn: item.checkIn || '2026-06-25',
+                    checkOut: item.checkOut || '2026-06-28',
+                    nights: item.nights || 2,
                     status: 'CONFIRMED',
-                    paidAmount: item.originalTotalBDT - item.retentionFeeBDT,
-                    totalAmount: item.originalTotalBDT,
+                    paidAmount: Math.max(0, origTotal - retFee),
+                    totalAmount: origTotal,
                     notes: `Reinstated on ${new Date().toLocaleDateString('en-GB')} by FOM. Reason: Guest renewed arrival.`
                 };
                 
@@ -182,28 +218,30 @@ export const ReservationCancel: React.FC = () => {
     };
 
     const filtered = cancelledList.filter(c => {
-        const matchesQuery =
-            c.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.reservationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.phone.toLowerCase().includes(searchQuery.toLowerCase());
+        const q = (searchQuery || '').toLowerCase().trim();
+        const matchesQuery = !q ||
+            (c.guestName || '').toLowerCase().includes(q) ||
+            (c.reservationNumber || '').toLowerCase().includes(q) ||
+            (c.reason || '').toLowerCase().includes(q) ||
+            (c.phone || '').toLowerCase().includes(q) ||
+            (c.roomType || '').toLowerCase().includes(q);
 
         const matchesCategory =
             selectedCategory === 'ALL' || c.reasonCategory === selectedCategory;
 
         const matchesRefund =
             selectedRefundFilter === 'ALL' ||
-            (selectedRefundFilter === 'FULL' && c.refundStatus === 'Full Refund Processed') ||
-            (selectedRefundFilter === 'PARTIAL' && c.refundStatus === 'Partial 50% Fee Applied') ||
-            (selectedRefundFilter === 'FORFEITED' && c.refundStatus === 'Non-Refundable Retained');
+            (selectedRefundFilter === 'FULL' && (c.refundStatus || '').includes('Full')) ||
+            (selectedRefundFilter === 'PARTIAL' && (c.refundStatus || '').includes('Partial')) ||
+            (selectedRefundFilter === 'FORFEITED' && (c.refundStatus || '').includes('Non-Refundable'));
 
         return matchesQuery && matchesCategory && matchesRefund;
     });
 
-    const totalRetainedBDT = cancelledList.reduce((acc, c) => acc + c.retentionFeeBDT, 0);
-    const totalOriginalBDT = cancelledList.reduce((acc, c) => acc + c.originalTotalBDT, 0);
-    const fullRefundsCount = cancelledList.filter(c => c.refundStatus === 'Full Refund Processed').length;
-    const penaltyAppliedCount = cancelledList.filter(c => c.retentionFeeBDT > 0).length;
+    const totalRetainedBDT = cancelledList.reduce((acc, c) => acc + (c.retentionFeeBDT || 0), 0);
+    const totalOriginalBDT = cancelledList.reduce((acc, c) => acc + (c.originalTotalBDT || 0), 0);
+    const fullRefundsCount = cancelledList.filter(c => (c.refundStatus || '').includes('Full')).length;
+    const penaltyAppliedCount = cancelledList.filter(c => (c.retentionFeeBDT || 0) > 0).length;
 
     const handlePrintVoucher = () => {
         window.print();
@@ -443,23 +481,23 @@ export const ReservationCancel: React.FC = () => {
                                         </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">
                                             <div className="font-mono font-bold text-rose-700">
-                                                ৳ {c.retentionFeeBDT.toLocaleString()}
+                                                ৳ {(c.retentionFeeBDT || 0).toLocaleString()}
                                             </div>
                                             <div className="text-[9.5px] text-gray-400 font-mono">
-                                                Orig: ৳ {c.originalTotalBDT.toLocaleString()}
+                                                Orig: ৳ {(c.originalTotalBDT || 0).toLocaleString()}
                                             </div>
                                         </td>
                                         <td className="px-3 py-2 whitespace-nowrap">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                c.refundStatus.includes('Full')
+                                                (c.refundStatus || '').includes('Full')
                                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                    : c.refundStatus.includes('Partial')
+                                                    : (c.refundStatus || '').includes('Partial')
                                                     ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                                     : 'bg-rose-50 text-rose-700 border border-rose-200'
                                             }`}>
-                                                {c.refundStatus}
+                                                {c.refundStatus || 'Refund Pending'}
                                             </span>
-                                            <span className="block text-[9px] text-gray-400 mt-0.5">{c.refundMethod}</span>
+                                            <span className="block text-[9px] text-gray-400 mt-0.5">{c.refundMethod || 'Direct Method'}</span>
                                         </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap space-x-1">
                                             <button
@@ -557,7 +595,7 @@ export const ReservationCancel: React.FC = () => {
                                 <div className="text-right">
                                     <span className="text-[9.5px] font-bold text-gray-400 uppercase">GL Retention Fee</span>
                                     <p className="text-base font-bold text-rose-700 font-mono leading-none mt-0.5">
-                                        ৳ {viewVoucherItem.retentionFeeBDT.toLocaleString()}
+                                        ৳ {(viewVoucherItem.retentionFeeBDT || 0).toLocaleString()}
                                     </p>
                                 </div>
                             </div>
