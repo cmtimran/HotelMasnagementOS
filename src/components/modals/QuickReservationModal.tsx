@@ -5,7 +5,8 @@ import {
     X,
     Building2
 } from 'lucide-react';
-import { StayPeriodPicker } from '../common/StayPeriodPicker';
+import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
+import { ChildAgeSelector } from '../common/ChildAgeSelector';
 
 export interface QuickReservationModalProps {
     isOpen: boolean;
@@ -35,6 +36,7 @@ interface RoomItem {
     roomNumber: string;
     adults: number;
     children: number;
+    childrenAges?: number[];
     rate: number;
 }
 
@@ -57,28 +59,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const [taxApplicable, setTaxApplicable] = useState<boolean>(true);
 
     // Reservation Details
-    const [checkInDate, setCheckInDate] = useState<string>(() => {
-        try {
-            return localStorage.getItem('hotel_system_date') || '2026-07-01';
-        } catch {
-            return '2026-07-01';
-        }
-    });
+    const [checkInDate, setCheckInDate] = useState<string>(() => getSystemDateISO());
     const [nights, setNights] = useState<number>(1);
-    const [checkOutDate, setCheckOutDate] = useState<string>(() => {
-        try {
-            const sysDate = localStorage.getItem('hotel_system_date') || '2026-07-01';
-            const parts = sysDate.split('-');
-            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-            d.setDate(d.getDate() + 1);
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
-        } catch {
-            return '2026-07-02';
-        }
-    });
+    const [checkOutDate, setCheckOutDate] = useState<string>(() => getNextDayISO(getSystemDateISO(), 1));
     const [businessSource, setBusinessSource] = useState<string>('Direct');
     const [businessAgent, setBusinessAgent] = useState<string>('Direct');
 
@@ -92,9 +75,23 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             roomNumber: '101',
             adults: 2,
             children: 1,
+            childrenAges: [5],
             rate: 3000
         }
     ]);
+
+    // Handle Day Use toggle
+    const handleDayUseToggle = (isDayUse: boolean) => {
+        setDayUse(isDayUse);
+        if (isDayUse) {
+            setCheckOutDate(checkInDate);
+            setNights(0);
+        } else {
+            const nextDay = getNextDayISO(checkInDate, 1);
+            setCheckOutDate(nextDay);
+            setNights(1);
+        }
+    };
 
     // Guest Info
     const [title, setTitle] = useState<string>('Mr.');
@@ -128,7 +125,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
 
     // Calculate financials
-    const totalAmount = roomsList.reduce((acc, r) => acc + (r.rate * r.noOfRooms * nights), 0);
+    const nightMultiplier = dayUse ? 1 : Math.max(1, nights);
+    const totalAmount = roomsList.reduce((acc, r) => acc + (r.rate * r.noOfRooms * nightMultiplier), 0);
     const discountedAmount = discountType === 'Percentage'
         ? (totalAmount * (discountValue || 0)) / 100
         : (discountValue || 0);
@@ -314,10 +312,16 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             checkIn={checkInDate}
                                             checkOut={checkOutDate}
                                             nights={nights}
+                                            dayUse={dayUse}
                                             onDateChange={(newIn, newOut, newNights) => {
                                                 setCheckInDate(newIn);
-                                                setCheckOutDate(newOut);
-                                                setNights(newNights);
+                                                if (dayUse) {
+                                                    setCheckOutDate(newIn);
+                                                    setNights(0);
+                                                } else {
+                                                    setCheckOutDate(newOut);
+                                                    setNights(newNights);
+                                                }
                                             }}
                                             compact
                                             label="Stay Period (Check In - Check Out)"
@@ -367,7 +371,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         <input
                                             type="checkbox"
                                             checked={dayUse}
-                                            onChange={e => setDayUse(e.target.checked)}
+                                            onChange={e => handleDayUseToggle(e.target.checked)}
                                             className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
                                         <span>Day Use</span>
@@ -404,7 +408,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {roomsList.map(item => {
-                                                const lineTotal = item.rate * item.noOfRooms * nights;
+                                                const lineTotal = item.rate * item.noOfRooms * (dayUse ? 1 : Math.max(1, nights));
                                                 return (
                                                     <tr key={item.id} className="hover:bg-blue-50/20 transition-colors">
                                                         <td className="py-1.5 px-3">
@@ -457,12 +461,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                             />
                                                         </td>
                                                         <td className="py-1.5 px-2 text-center">
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                value={item.children}
-                                                                onChange={e => handleRoomFieldChange(item.id, 'children', parseInt(e.target.value) || 0)}
-                                                                className="w-10 h-7 px-1 border border-slate-200 rounded text-[11px] text-center outline-none"
+                                                            <ChildAgeSelector
+                                                                childrenCount={item.children}
+                                                                childrenAges={item.childrenAges}
+                                                                onChange={(count, ages) => {
+                                                                    setRoomsList(prev => prev.map(r => r.id === item.id ? { ...r, children: count, childrenAges: ages } : r));
+                                                                }}
+                                                                compact
                                                             />
                                                         </td>
                                                         <td className="py-1.5 px-2.5 text-right">

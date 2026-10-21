@@ -18,7 +18,76 @@ export interface StayPeriodPickerProps {
     minDate?: string;
     label?: string;
     compact?: boolean;
+    dayUse?: boolean;
 }
+
+/**
+ * Normalizes any format (e.g. "01 Jul 2026", "1 Jul 2026", or "2026-07-01")
+ * into strict ISO YYYY-MM-DD string.
+ */
+export const normalizeToISO = (val: string): string => {
+    if (!val) return '';
+    const trimmed = val.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+    // Parse format like "01 Jul 2026" or "1 Jul 2026"
+    const parts = trimmed.split(/\s+/);
+    if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const monthStr = parts[1].toLowerCase().slice(0, 3);
+        const year = parseInt(parts[2], 10);
+        const monthMap: Record<string, number> = {
+            jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+            jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+        };
+        if (!isNaN(day) && !isNaN(year) && monthMap[monthStr] !== undefined) {
+            const y = year;
+            const m = String(monthMap[monthStr] + 1).padStart(2, '0');
+            const d = String(day).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+    }
+
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dStr = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dStr}`;
+    }
+    return '';
+};
+
+/**
+ * Returns Hotel Operating System Date in strict YYYY-MM-DD
+ */
+export const getSystemDateISO = (): string => {
+    try {
+        const raw = localStorage.getItem('hotel_system_date');
+        const norm = normalizeToISO(raw || '');
+        return norm || '2026-07-01';
+    } catch {
+        return '2026-07-01';
+    }
+};
+
+/**
+ * Calculates next day or n days from given ISO date
+ */
+export const getNextDayISO = (dateISO: string, daysToAdd: number = 1): string => {
+    try {
+        const norm = normalizeToISO(dateISO) || '2026-07-01';
+        const parts = norm.split('-').map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        d.setDate(d.getDate() + Math.max(1, daysToAdd));
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    } catch {
+        return '2026-07-02';
+    }
+};
 
 export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
     checkIn,
@@ -27,10 +96,27 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
     onDateChange,
     minDate,
     label = 'Stay Period (Check In - Check Out)',
-    compact = false
+    compact = false,
+    dayUse = false
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Minimum allowed booking date is System Date (No Backdate bookings allowed)
+    const systemDateISO = useMemo(() => getSystemDateISO(), []);
+    const effectiveMinDate = minDate ? normalizeToISO(minDate) : systemDateISO;
+
+    // Strict sanitized check-in and check-out values
+    const safeCheckIn = useMemo(() => {
+        const norm = normalizeToISO(checkIn);
+        return norm || effectiveMinDate;
+    }, [checkIn, effectiveMinDate]);
+
+    const safeCheckOut = useMemo(() => {
+        if (dayUse) return safeCheckIn;
+        const norm = normalizeToISO(checkOut);
+        return norm || getNextDayISO(safeCheckIn, Math.max(1, nights));
+    }, [checkOut, safeCheckIn, dayUse, nights]);
 
     // Parse YYYY-MM-DD safely into [year, monthIndex, day]
     const parseYMD = (ymdStr: string) => {
@@ -49,44 +135,74 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
         return `${y}-${m}-${d}`;
     };
 
-    // Calendar navigation state (which month/year is being viewed)
+    // Calendar navigation state (which month/year is currently displayed)
     const initialNav = useMemo(() => {
-        const parsed = parseYMD(checkIn);
+        const parsed = parseYMD(safeCheckIn);
         if (parsed) return { year: parsed.year, month: parsed.month };
+        const sysParsed = parseYMD(effectiveMinDate);
+        if (sysParsed) return { year: sysParsed.year, month: sysParsed.month };
         return { year: 2026, month: 6 }; // Default July 2026
-    }, [checkIn]);
+    }, [safeCheckIn, effectiveMinDate]);
 
     const [viewYear, setViewYear] = useState<number>(initialNav.year);
     const [viewMonth, setViewMonth] = useState<number>(initialNav.month);
 
-    // Keep calendar view synced when checkIn changes externally and popup is closed
+    // Keep calendar view synced when checkIn changes externally
     useEffect(() => {
         if (!isOpen) {
-            const p = parseYMD(checkIn);
+            const p = parseYMD(safeCheckIn);
             if (p) {
                 setViewYear(p.year);
                 setViewMonth(p.month);
             }
         }
-    }, [checkIn, isOpen]);
+    }, [safeCheckIn, isOpen]);
 
-    // Interactive range picking state
-    // 'idle' -> user clicks first date to pick checkIn
-    // 'picking_checkout' -> user clicked checkIn, next click sets checkOut
+    const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+
+    // Calculate fixed viewport coordinates when opened so container overflow NEVER clips the calendar
+    useEffect(() => {
+        if (isOpen && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const popoverWidth = 275;
+            const popoverHeight = 240;
+
+            let left = rect.left;
+            if (left + popoverWidth > window.innerWidth - 10) {
+                left = window.innerWidth - popoverWidth - 10;
+            }
+            if (left < 10) left = 10;
+
+            const spaceBelow = window.innerHeight - rect.bottom;
+            let top = rect.bottom + 6;
+            if (spaceBelow < popoverHeight && rect.top > popoverHeight) {
+                top = rect.top - popoverHeight - 6;
+            }
+
+            setPopoverStyle({
+                position: 'fixed',
+                top: `${top}px`,
+                left: `${left}px`,
+                width: `${popoverWidth}px`,
+                zIndex: 100095
+            });
+        }
+    }, [isOpen]);
+
+    // Range picking state
     const [rangePhase, setRangePhase] = useState<'idle' | 'picking_checkout'>('idle');
-    const [tempCheckIn, setTempCheckIn] = useState<string>(checkIn);
+    const [tempCheckIn, setTempCheckIn] = useState<string>(safeCheckIn);
     const [hoverDate, setHoverDate] = useState<string | null>(null);
 
-    // Reset range selection phase when opening/closing
     useEffect(() => {
         if (isOpen) {
-            setTempCheckIn(checkIn);
+            setTempCheckIn(safeCheckIn);
             setRangePhase('idle');
             setHoverDate(null);
         }
-    }, [isOpen, checkIn]);
+    }, [isOpen, safeCheckIn]);
 
-    // Close popover when clicking outside
+    // Close on outside click
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -101,13 +217,22 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
         };
     }, [isOpen]);
 
-    // Format display helpers
+    // Display helpers
     const formatDisplayDate = (isoStr: string) => {
         if (!isoStr) return '--';
         const p = parseYMD(isoStr);
         if (!p) return isoStr;
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return `${String(p.day).padStart(2, '0')} ${months[p.month]} ${p.year}`;
+    };
+
+    const formatInputDate = (isoStr: string) => {
+        if (!isoStr) return '--/--/----';
+        const p = parseYMD(isoStr);
+        if (!p) return isoStr;
+        const m = String(p.month + 1).padStart(2, '0');
+        const d = String(p.day).padStart(2, '0');
+        return `${m}/${d}/${p.year}`;
     };
 
     const getDayName = (isoStr: string) => {
@@ -117,16 +242,10 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
         return d.toLocaleDateString('en-US', { weekday: 'short' });
     };
 
-    // Calculate checkout from checkin + nights
     const calculateCheckOut = (inDate: string, n: number): string => {
-        const p = parseYMD(inDate);
-        if (!p) return checkOut;
-        const d = new Date(p.year, p.month, p.day);
-        d.setDate(d.getDate() + Math.max(1, n));
-        return toYMD(d.getFullYear(), d.getMonth(), d.getDate());
+        return getNextDayISO(inDate, n);
     };
 
-    // Calculate nights between two dates
     const calculateNights = (inDate: string, outDate: string): number => {
         const pIn = parseYMD(inDate);
         const pOut = parseYMD(outDate);
@@ -137,25 +256,23 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
         return Math.max(1, diffDays);
     };
 
-    // Fast Stepper Handlers
+    // Stepper Handlers (Disabled during Day Use)
     const handleNightsChange = (newNights: number) => {
+        if (dayUse) return;
         const safeNights = Math.max(1, newNights);
-        const newOut = calculateCheckOut(checkIn, safeNights);
-        onDateChange(checkIn, newOut, safeNights);
+        const newOut = calculateCheckOut(safeCheckIn, safeNights);
+        onDateChange(safeCheckIn, newOut, safeNights);
     };
 
-    const handleDirectCheckInChange = (newIn: string) => {
-        const newOut = calculateCheckOut(newIn, nights);
-        onDateChange(newIn, newOut, nights);
-    };
+    // Month Navigation: Disable navigating to months prior to system date
+    const isAtOrBeforeSystemMonth = useMemo(() => {
+        const p = parseYMD(effectiveMinDate);
+        if (!p) return false;
+        return (viewYear < p.year) || (viewYear === p.year && viewMonth <= p.month);
+    }, [viewYear, viewMonth, effectiveMinDate]);
 
-    const handleDirectCheckOutChange = (newOut: string) => {
-        const safeNights = calculateNights(checkIn, newOut);
-        onDateChange(checkIn, newOut, safeNights);
-    };
-
-    // Month Navigation
     const handlePrevMonth = () => {
+        if (isAtOrBeforeSystemMonth) return;
         if (viewMonth === 0) {
             setViewMonth(11);
             setViewYear(v => v - 1);
@@ -174,28 +291,22 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
     };
 
     const handleJumpToSystemDate = () => {
-        const sys = localStorage.getItem('hotel_system_date') || '2026-07-01';
-        const p = parseYMD(sys);
+        const p = parseYMD(effectiveMinDate);
         if (p) {
             setViewYear(p.year);
             setViewMonth(p.month);
         }
     };
 
-    // Calendar Grid Days Calculation
     const monthNames = [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
 
+    // Calendar Days (Monday as start of week)
     const calendarDays = useMemo(() => {
-        // Days in viewed month
         const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-        
-        // Day of week for 1st of month: 0=Sun, 1=Mon, ..., 6=Sat
-        // Screenshot starts with Monday! (Mon Tue Wed Thu Fri Sat Sun)
         const firstDayDow = new Date(viewYear, viewMonth, 1).getDay();
-        // Convert to Mon=0 ... Sun=6
         const leadingEmptyDays = (firstDayDow + 6) % 7;
 
         const days: Array<{ day: number; dateStr: string } | null> = [];
@@ -211,50 +322,58 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
         return days;
     }, [viewYear, viewMonth]);
 
-    // Active Range for rendering (handles hover preview when selecting checkout)
-    const effectiveStart = rangePhase === 'picking_checkout' ? tempCheckIn : checkIn;
+    // Active Range for Rendering
+    const effectiveStart = rangePhase === 'picking_checkout' ? tempCheckIn : safeCheckIn;
     const effectiveEnd = useMemo(() => {
+        if (dayUse) return effectiveStart;
         if (rangePhase === 'picking_checkout') {
             if (hoverDate && hoverDate > effectiveStart) {
                 return hoverDate;
             }
             return effectiveStart;
         }
-        return checkOut;
-    }, [rangePhase, hoverDate, effectiveStart, checkOut]);
+        return safeCheckOut;
+    }, [dayUse, rangePhase, hoverDate, effectiveStart, safeCheckOut]);
 
-    // Interactive Day Click Handler (Exact Range Picker flow like Screenshot)
+    // Day Click Handler with Strict Backdate Protection & Day Use Support
     const handleDayClick = (dateStr: string) => {
+        // Disallow clicking backdates
+        if (dateStr < effectiveMinDate) {
+            return;
+        }
+
+        if (dayUse) {
+            // Day Use: Click sets both check-in and check-out to same day
+            onDateChange(dateStr, dateStr, 0);
+            setIsOpen(false);
+            return;
+        }
+
         if (rangePhase === 'idle') {
-            // First click: sets Check-in, prompts user to click Check-out
             setTempCheckIn(dateStr);
             setRangePhase('picking_checkout');
         } else {
-            // Second click:
             if (dateStr > tempCheckIn) {
-                // Valid checkout selected
                 const newNights = calculateNights(tempCheckIn, dateStr);
                 onDateChange(tempCheckIn, dateStr, newNights);
                 setRangePhase('idle');
                 setIsOpen(false);
             } else if (dateStr === tempCheckIn) {
-                // Same day clicked: default to 1 night stay
+                // Same day clicked: default to 1 night
                 const nextDayOut = calculateCheckOut(dateStr, 1);
                 onDateChange(dateStr, nextDayOut, 1);
                 setRangePhase('idle');
                 setIsOpen(false);
             } else {
-                // Clicked earlier date: reset check-in to this new date
+                // Clicked earlier valid date: restart range from this date
                 setTempCheckIn(dateStr);
             }
         }
     };
 
-    const quickNightPresets = [1, 2, 3, 4, 5, 7, 14];
-
     return (
         <div ref={containerRef} className="relative flex flex-col gap-1 select-none">
-            {/* Top Label & Day-of-Week Summary */}
+            {/* Top Label & Day Summary */}
             {label && (
                 <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
@@ -262,138 +381,195 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                         <span>{label}</span>
                         <span className="text-red-500">*</span>
                     </label>
-                    <span className="text-[9.5px] font-semibold text-blue-700">
-                        {getDayName(checkIn)} ➔ {getDayName(checkOut)} ({nights}N)
+                    <span className="text-[9px] font-semibold text-blue-700">
+                        {dayUse ? (
+                            <span className="text-amber-700 font-bold bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                                {getDayName(safeCheckIn)} (Day Use)
+                            </span>
+                        ) : (
+                            <span>
+                                {getDayName(safeCheckIn)} ➔ {getDayName(safeCheckOut)} ({nights}N)
+                            </span>
+                        )}
                     </span>
                 </div>
             )}
 
-            {/* Single Consolidated Control Bar */}
+            {/* Single Consolidated Custom Control Bar (NO native input to avoid browser datepicker overlapping) */}
             <div
                 className={`flex items-center bg-white border border-slate-200 hover:border-blue-400 rounded-md shadow-2xs transition-all ${
                     compact ? 'h-7.5' : 'h-8'
-                } overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500`}
+                } overflow-hidden cursor-pointer focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500`}
             >
-                {/* 1. Check In Date Input */}
-                <div className="flex-1 flex items-center gap-1.5 px-2 min-w-0">
+                {/* 1. Custom Check In Date Display Button */}
+                <button
+                    type="button"
+                    onClick={() => {
+                        setRangePhase('idle');
+                        setIsOpen(!isOpen);
+                    }}
+                    className="flex-1 flex items-center gap-1.5 px-2.5 h-full text-left hover:bg-blue-50/40 transition-colors cursor-pointer"
+                    title={`Check-In Date: ${formatDisplayDate(safeCheckIn)} (Click to select)`}
+                >
                     <CalendarIcon size={12} className="text-blue-600 flex-shrink-0" />
-                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <input
-                            type="date"
-                            value={checkIn}
-                            min={minDate}
-                            onChange={e => handleDirectCheckInChange(e.target.value)}
-                            className="w-full text-[11px] font-bold text-slate-800 bg-transparent outline-none cursor-pointer p-0"
-                            title="Check-In Date"
-                        />
-                    </div>
+                    <span className="text-[11px] font-bold text-slate-800 tracking-tight">
+                        {formatInputDate(safeCheckIn)}
+                    </span>
+                </button>
+
+                {/* 2. Middle Nights Stepper / Day Use Badge & Calendar Popover Trigger */}
+                <div className="flex items-center gap-0.5 px-1 py-0.5 bg-slate-100 border-x border-slate-200 flex-shrink-0 h-full">
+                    {dayUse ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsOpen(!isOpen)}
+                            className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-black text-[10px] tracking-tight cursor-pointer hover:bg-amber-200 transition-colors"
+                            title="Day Use Active: Check-In and Check-Out are same day"
+                        >
+                            Day Use
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    handleNightsChange(nights - 1);
+                                }}
+                                disabled={nights <= 1}
+                                className="w-4 h-4 rounded flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                title="Decrease 1 night"
+                            >
+                                <Minus size={9} className="stroke-[2.5]" />
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsOpen(!isOpen)}
+                                className={`px-1.5 py-0.5 rounded text-center cursor-pointer transition-all ${
+                                    isOpen
+                                        ? 'bg-blue-600 text-white shadow-xs'
+                                        : 'hover:bg-white text-blue-900'
+                                }`}
+                                title="Click to open Date Range Calendar"
+                            >
+                                <span className="text-[10.5px] font-black font-mono flex items-center gap-0.5">
+                                    <span>{nights}N</span>
+                                    <span className="text-[8px] opacity-75">📅</span>
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    handleNightsChange(nights + 1);
+                                }}
+                                className="w-4 h-4 rounded flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-700 cursor-pointer transition-colors"
+                                title="Increase 1 night"
+                            >
+                                <Plus size={9} className="stroke-[2.5]" />
+                            </button>
+                        </>
+                    )}
                 </div>
 
-                {/* 2. Middle Nights Stepper & Calendar Popover Trigger */}
-                <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-100 border-x border-slate-200 flex-shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => handleNightsChange(nights - 1)}
-                        disabled={nights <= 1}
-                        className="w-4.5 h-4.5 rounded flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                        title="Decrease 1 night"
-                    >
-                        <Minus size={10} className="stroke-[2.5]" />
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setIsOpen(!isOpen)}
-                        className={`px-2 py-0.5 rounded text-center cursor-pointer transition-all ${
-                            isOpen
-                                ? 'bg-blue-600 text-white shadow-xs'
-                                : 'hover:bg-white text-blue-900'
-                        }`}
-                        title="Click to open interactive Date Range Calendar"
-                    >
-                        <span className="text-[11px] font-black font-mono flex items-center gap-1">
-                            <span>{nights}N</span>
-                            <span className="text-[8px] opacity-75">📅</span>
-                        </span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => handleNightsChange(nights + 1)}
-                        className="w-4.5 h-4.5 rounded flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-700 cursor-pointer transition-colors"
-                        title="Increase 1 night"
-                    >
-                        <Plus size={10} className="stroke-[2.5]" />
-                    </button>
-                </div>
-
-                {/* 3. Check Out Date Input with automatic sync */}
-                <div className="flex-1 flex items-center gap-1.5 px-2 min-w-0 bg-slate-50/50">
-                    <ArrowRight size={11} className="text-slate-400 flex-shrink-0" />
-                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <input
-                            type="date"
-                            value={checkOut}
-                            min={checkIn}
-                            onChange={e => handleDirectCheckOutChange(e.target.value)}
-                            className="w-full text-[11px] font-bold text-slate-800 bg-transparent outline-none cursor-pointer p-0"
-                            title="Check-Out Date (Auto-calculated or custom departure)"
-                        />
-                    </div>
-                </div>
+                {/* 3. Custom Check Out Date Display Button */}
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (!dayUse) {
+                            setRangePhase('picking_checkout');
+                            setIsOpen(true);
+                        }
+                    }}
+                    disabled={dayUse}
+                    className={`flex-1 flex items-center gap-1.5 px-2.5 h-full text-left transition-colors ${
+                        dayUse
+                            ? 'bg-amber-50/50 cursor-not-allowed text-amber-900'
+                            : 'bg-slate-50/50 hover:bg-blue-50/40 cursor-pointer text-slate-800'
+                    }`}
+                    title={
+                        dayUse
+                            ? 'Check-Out date matches Check-In for Day Use'
+                            : `Check-Out Date: ${formatDisplayDate(safeCheckOut)} (Click to select departure)`
+                    }
+                >
+                    <ArrowRight size={11} className={`${dayUse ? 'text-amber-500' : 'text-slate-400'} flex-shrink-0`} />
+                    <span className="text-[11px] font-bold tracking-tight">
+                        {formatInputDate(safeCheckOut)}
+                    </span>
+                </button>
             </div>
 
-            {/* Interactive Visual Date Range Calendar Popover (Matches Client Screenshot) */}
+            {/* Ultra-Compact Visual Date Range Calendar Popover (Fixed in Viewport - NEVER clipped by container overflow) */}
             {isOpen && (
-                <div className="absolute top-full left-0 z-[100060] mt-1.5 w-[330px] sm:w-[350px] bg-white rounded-xl shadow-2xl border border-slate-200 p-3 animate-in fade-in zoom-in-95 duration-100">
-                    {/* Top Blue Accent Line (matching reference screenshot) */}
-                    <div className="h-1 bg-blue-600 rounded-t-lg -mx-3 -mt-3 mb-2.5"></div>
+                <>
+                    {/* Transparent Click-Catcher Backdrop */}
+                    <div
+                        className="fixed inset-0 z-[100090]"
+                        onClick={() => setIsOpen(false)}
+                    />
+
+                    {/* Popover Card */}
+                    <div
+                        style={popoverStyle}
+                        className="bg-white rounded-xl shadow-2xl border border-slate-200 p-2 select-none animate-in fade-in zoom-in-95 duration-100"
+                    >
+                    {/* Top Blue Accent Line */}
+                    <div className="h-0.5 bg-blue-600 rounded-t-lg -mx-2 -mt-2 mb-1.5"></div>
 
                     {/* Month Header with Navigation */}
-                    <div className="flex items-center justify-between px-1 mb-2">
+                    <div className="flex items-center justify-between px-0.5 mb-1">
                         <button
                             type="button"
                             onClick={handlePrevMonth}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer transition-colors"
-                            title="Previous Month"
+                            disabled={isAtOrBeforeSystemMonth}
+                            className="w-5.5 h-5.5 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            title={isAtOrBeforeSystemMonth ? 'Cannot view past months' : 'Previous Month'}
                         >
-                            <ChevronLeft size={16} />
+                            <ChevronLeft size={14} />
                         </button>
 
                         <div className="text-center">
-                            <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                            <h3 className="text-xs font-bold text-slate-900 tracking-tight leading-tight">
                                 {monthNames[viewMonth]} {viewYear}
                             </h3>
-                            {rangePhase === 'picking_checkout' && (
-                                <p className="text-[9.5px] font-bold text-blue-600 animate-pulse">
-                                    Click departure date (Check-out)
+                            {rangePhase === 'picking_checkout' && !dayUse && (
+                                <p className="text-[8.5px] font-bold text-blue-600 leading-none">
+                                    Click Check-Out Date
+                                </p>
+                            )}
+                            {dayUse && (
+                                <p className="text-[8.5px] font-bold text-amber-700 leading-none">
+                                    Click date for Day Use
                                 </p>
                             )}
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
                             <button
                                 type="button"
                                 onClick={handleJumpToSystemDate}
-                                className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
-                                title="Jump to Hotel System Operating Date"
+                                className="px-1 py-0.2 rounded text-[8.5px] font-semibold text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
+                                title="Jump to System Date"
                             >
-                                <RotateCcw size={10} className="inline mr-0.5" />
+                                <RotateCcw size={8} className="inline mr-0.5" />
                                 Today
                             </button>
                             <button
                                 type="button"
                                 onClick={handleNextMonth}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer transition-colors"
+                                className="w-5.5 h-5.5 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer transition-colors"
                                 title="Next Month"
                             >
-                                <ChevronRight size={16} />
+                                <ChevronRight size={14} />
                             </button>
                         </div>
                     </div>
 
-                    {/* Weekday Names Header (Mon Tue Wed Thu Fri Sat Sun - matching reference) */}
-                    <div className="grid grid-cols-7 text-center text-[11px] font-medium text-slate-500 py-1 mb-1">
+                    {/* Weekday Names Header (Mon - Sun) */}
+                    <div className="grid grid-cols-7 text-center text-[9.5px] font-semibold text-slate-400 py-0.5 mb-0.5 border-b border-slate-100">
                         <div>Mon</div>
                         <div>Tue</div>
                         <div>Wed</div>
@@ -403,46 +579,61 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                         <div>Sun</div>
                     </div>
 
-                    {/* Calendar Day Grid */}
-                    <div className="grid grid-cols-7 gap-y-1 text-center select-none">
+                    {/* Calendar Day Grid (Compact) */}
+                    <div className="grid grid-cols-7 gap-y-0.5 text-center">
                         {calendarDays.map((item, idx) => {
                             if (!item) {
-                                return <div key={`empty-${idx}`} className="h-8"></div>;
+                                return <div key={`empty-${idx}`} className="h-6"></div>;
                             }
 
                             const { day, dateStr } = item;
+                            const isPastDate = dateStr < effectiveMinDate;
                             const isStart = dateStr === effectiveStart;
-                            const isEnd = dateStr === effectiveEnd && effectiveEnd > effectiveStart;
-                            const isInRange = dateStr > effectiveStart && dateStr < effectiveEnd;
-                            const isSingleSelected = isStart && effectiveStart === effectiveEnd;
-                            const isToday = dateStr === (localStorage.getItem('hotel_system_date') || '2026-07-01');
+                            const isEnd = !dayUse && dateStr === effectiveEnd && effectiveEnd > effectiveStart;
+                            const isInRange = !dayUse && dateStr > effectiveStart && dateStr < effectiveEnd;
+                            const isSingleSelected = isStart && (dayUse || effectiveStart === effectiveEnd);
+                            const isToday = dateStr === effectiveMinDate;
+
+                            if (isPastDate) {
+                                return (
+                                    <div
+                                        key={dateStr}
+                                        className="h-6 flex items-center justify-center"
+                                        title={`Backdate (${dateStr}) cannot be booked. Audit locked.`}
+                                    >
+                                        <span className="w-6 h-6 rounded text-[10px] text-slate-300 font-normal line-through cursor-not-allowed flex items-center justify-center select-none opacity-40">
+                                            {day}
+                                        </span>
+                                    </div>
+                                );
+                            }
 
                             return (
                                 <div
                                     key={dateStr}
                                     onMouseEnter={() => setHoverDate(dateStr)}
-                                    className={`relative h-8 flex items-center justify-center ${
+                                    className={`relative h-6 flex items-center justify-center ${
                                         isInRange ? 'bg-slate-100/90' : ''
                                     } ${
-                                        isStart && effectiveEnd > effectiveStart
-                                            ? 'rounded-l-lg bg-gradient-to-r from-transparent to-slate-100/90'
+                                        isStart && effectiveEnd > effectiveStart && !dayUse
+                                            ? 'rounded-l-md bg-gradient-to-r from-transparent to-slate-100/90'
                                             : ''
                                     } ${
                                         isEnd && effectiveEnd > effectiveStart
-                                            ? 'rounded-r-lg bg-gradient-to-l from-transparent to-slate-100/90'
+                                            ? 'rounded-r-md bg-gradient-to-l from-transparent to-slate-100/90'
                                             : ''
                                     }`}
                                 >
                                     <button
                                         type="button"
                                         onClick={() => handleDayClick(dateStr)}
-                                        className={`w-7.5 h-7.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center relative ${
+                                        className={`w-6 h-6 rounded-md text-[10.5px] font-bold transition-all cursor-pointer flex items-center justify-center relative ${
                                             isStart || isEnd
                                                 ? 'bg-[#0066ff] text-white shadow-xs font-black z-10 scale-105'
                                                 : isInRange
                                                     ? 'text-slate-900 font-bold hover:bg-slate-200/80'
                                                     : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
-                                        } ${isSingleSelected ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
+                                        } ${isSingleSelected ? 'ring-2 ring-blue-500 ring-offset-0' : ''}`}
                                     >
                                         {day}
                                         {isToday && !isStart && !isEnd && (
@@ -454,58 +645,66 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                         })}
                     </div>
 
-                    {/* Quick Presets Chips */}
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                            Presets:
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                            {quickNightPresets.map(presetNights => {
-                                const isSelected = nights === presetNights;
-                                return (
+                    {/* Integrated Presets & Done Bar (Single Line) */}
+                    <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1">
+                        {!dayUse ? (
+                            <div className="flex items-center gap-0.5">
+                                <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-tight mr-0.5">
+                                    Nights:
+                                </span>
+                                {[1, 2, 3, 5, 7].map(n => (
                                     <button
-                                        key={presetNights}
+                                        key={n}
                                         type="button"
                                         onClick={() => {
-                                            handleNightsChange(presetNights);
+                                            handleNightsChange(n);
                                             setIsOpen(false);
                                         }}
-                                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                            isSelected
-                                                ? 'bg-[#1e3a8a] text-white shadow-2xs'
+                                        className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold transition-all cursor-pointer ${
+                                            nights === n
+                                                ? 'bg-blue-600 text-white shadow-2xs'
                                                 : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700'
                                         }`}
                                     >
-                                        {presetNights}N
+                                        {n}N
                                     </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Bottom Status / Summary & Actions Bar */}
-                    <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                        <div className="text-slate-600">
-                            <span>
-                                <strong className="text-slate-900">{formatDisplayDate(effectiveStart)}</strong>
-                                {' ➔ '}
-                                <strong className="text-slate-900">{formatDisplayDate(effectiveEnd)}</strong>
-                            </span>
-                            <span className="ml-1.5 text-blue-700 font-bold">
-                                ({calculateNights(effectiveStart, effectiveEnd)} {calculateNights(effectiveStart, effectiveEnd) > 1 ? 'Nights' : 'Night'})
-                            </span>
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-[9.5px] font-bold text-amber-800">
+                                Single-Day Use (No Overnight)
+                            </div>
+                        )}
 
                         <button
                             type="button"
                             onClick={() => setIsOpen(false)}
-                            className="px-2.5 py-1 rounded-md bg-[#1e3a8a] text-white font-bold text-[10.5px] hover:bg-blue-900 cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                            className="px-2 py-0.5 rounded bg-[#1e3a8a] text-white text-[9.5px] font-bold hover:bg-blue-900 shadow-2xs cursor-pointer flex items-center gap-0.5 transition-colors"
                         >
-                            <Check size={11} className="stroke-[3]" />
+                            <Check size={9} className="stroke-[3]" />
                             <span>Done</span>
                         </button>
                     </div>
-                </div>
+
+                    {/* Subtle Summary Row */}
+                    <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-500">
+                        {dayUse ? (
+                            <span className="font-semibold text-amber-800">
+                                {formatDisplayDate(effectiveStart)} (Same Day Check-in & Check-out)
+                            </span>
+                        ) : (
+                            <>
+                                <span>
+                                    {formatDisplayDate(effectiveStart)} ➔ {formatDisplayDate(effectiveEnd)}
+                                </span>
+                                <span className="text-blue-700 font-bold">
+                                    {calculateNights(effectiveStart, effectiveEnd)} Night{calculateNights(effectiveStart, effectiveEnd) > 1 ? 's' : ''}
+                                </span>
+                            </>
+                        )}
+                    </div>
+                    </div>
+                </>
             )}
         </div>
     );

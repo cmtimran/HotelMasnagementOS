@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     ChevronDown,
     ChevronUp,
@@ -14,7 +14,8 @@ import {
     Plus
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
-import StayPeriodPicker from './common/StayPeriodPicker';
+import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from './common/StayPeriodPicker';
+import { ChildAgeSelector } from './common/ChildAgeSelector';
 
 interface RoomRow {
     id: number;
@@ -24,6 +25,7 @@ interface RoomRow {
     roomNumber: string;
     adults: number;
     children: number;
+    childrenAges?: number[];
     rate: number;
     isAssign: boolean;
 }
@@ -34,6 +36,19 @@ interface PaymentRow {
     amount: number;
 }
 
+const AVAILABLE_ROOMS_MAP: Record<string, string[]> = {
+    'Deluxe Double': ['101', '102', '201', '301', '302'],
+    'Superior King': ['103', '202', '507'],
+    'Executive Suite': ['104', '203', '502'],
+    'Presidential Suite': ['501', '503'],
+    'Winter Rate Plan': ['101', '102', '505'],
+    'Standard Single': ['105', '205']
+};
+
+const getAvailableRooms = (roomType: string): string[] => {
+    return AVAILABLE_ROOMS_MAP[roomType] || ['101', '102', '103', '104', '105', '201', '202'];
+};
+
 export const AddReservation: React.FC = () => {
     const { setActivePage } = useNavigation();
     const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -41,17 +56,9 @@ export const AddReservation: React.FC = () => {
     // ==========================================
     // STEP 1 STATE
     // ==========================================
-    const [checkIn, setCheckIn] = useState<string>(() => {
-        const sys = localStorage.getItem('hotel_system_date');
-        return sys || '2026-07-01';
-    });
+    const [checkIn, setCheckIn] = useState<string>(() => getSystemDateISO());
     const [nights, setNights] = useState<number>(1);
-    const [checkOut, setCheckOut] = useState<string>(() => {
-        const sys = localStorage.getItem('hotel_system_date');
-        const d = sys ? new Date(sys) : new Date('2026-07-01');
-        d.setDate(d.getDate() + 1);
-        return d.toISOString().split('T')[0];
-    });
+    const [checkOut, setCheckOut] = useState<string>(() => getNextDayISO(getSystemDateISO(), 1));
     const [businessSource, setBusinessSource] = useState('Direct');
     const [businessAgent, setBusinessAgent] = useState('Direct');
     const [dayUse, setDayUse] = useState(false);
@@ -67,12 +74,29 @@ export const AddReservation: React.FC = () => {
             roomNumber: '101',
             adults: 2,
             children: 1,
+            childrenAges: [5],
             rate: 3000,
             isAssign: true
         }
     ]);
 
+    // Total actual room count across all rows (sums each row's roomsCount)
+    const totalRoomsCount = useMemo(() => {
+        return roomsList.reduce((acc, r) => acc + (Number(r.roomsCount) || 1), 0);
+    }, [roomsList]);
 
+    // Handle Day Use toggle
+    const handleDayUseToggle = (isDayUse: boolean) => {
+        setDayUse(isDayUse);
+        if (isDayUse) {
+            setCheckOut(checkIn);
+            setNights(0);
+        } else {
+            const nextDay = getNextDayISO(checkIn, 1);
+            setCheckOut(nextDay);
+            setNights(1);
+        }
+    };
 
     // ==========================================
     // STEP 2 STATE
@@ -137,7 +161,8 @@ export const AddReservation: React.FC = () => {
     const [createdReservation, setCreatedReservation] = useState<any | null>(null);
 
     // Calculations
-    const grossTotal = roomsList.reduce((acc, r) => acc + (r.rate * r.roomsCount * nights), 0);
+    const nightMultiplier = dayUse ? 1 : Math.max(1, nights);
+    const grossTotal = roomsList.reduce((acc, r) => acc + (r.rate * r.roomsCount * nightMultiplier), 0);
     const discountedAmount = discountType === 'Percentage'
         ? (grossTotal * discountValue) / 100
         : discountValue;
@@ -148,6 +173,10 @@ export const AddReservation: React.FC = () => {
     // Handlers
     const handleAddRoomRow = () => {
         const nextId = roomsList.length > 0 ? Math.max(...roomsList.map(r => r.id)) + 1 : 1;
+        const usedRooms = new Set(roomsList.map(r => r.roomNumber));
+        const pool = getAvailableRooms('Deluxe Double');
+        const nextRoom = pool.find(rn => !usedRooms.has(rn)) || String(100 + nextId);
+
         setRoomsList([
             ...roomsList,
             {
@@ -155,9 +184,10 @@ export const AddReservation: React.FC = () => {
                 roomType: 'Deluxe Double',
                 roomsCount: 1,
                 ratePlan: 'BAR Rack Rate',
-                roomNumber: '102',
+                roomNumber: nextRoom,
                 adults: 1,
                 children: 0,
+                childrenAges: [],
                 rate: 3000,
                 isAssign: true
             }
@@ -166,7 +196,19 @@ export const AddReservation: React.FC = () => {
 
     const handleCopyRoomRow = (row: RoomRow) => {
         const nextId = Math.max(...roomsList.map(r => r.id)) + 1;
-        setRoomsList([...roomsList, { ...row, id: nextId }]);
+        const usedRooms = new Set(roomsList.map(r => r.roomNumber));
+        const pool = getAvailableRooms(row.roomType);
+        const nextRoom = pool.find(rn => !usedRooms.has(rn)) || String(100 + nextId);
+
+        setRoomsList([
+            ...roomsList,
+            {
+                ...row,
+                id: nextId,
+                roomNumber: nextRoom,
+                childrenAges: [...(row.childrenAges || [])]
+            }
+        ]);
     };
 
     const handleRemoveRoomRow = (id: number) => {
@@ -175,7 +217,16 @@ export const AddReservation: React.FC = () => {
     };
 
     const updateRoomRow = (id: number, field: keyof RoomRow, value: any) => {
-        setRoomsList(roomsList.map(r => r.id === id ? { ...r, [field]: value } : r));
+        setRoomsList(roomsList.map(r => {
+            if (r.id !== id) return r;
+            if (field === 'roomType') {
+                const used = new Set(roomsList.filter(other => other.id !== id).map(other => other.roomNumber));
+                const pool = getAvailableRooms(value);
+                const nextRoom = pool.find(rn => !used.has(rn)) || pool[0] || '101';
+                return { ...r, roomType: value, roomNumber: nextRoom };
+            }
+            return { ...r, [field]: value };
+        }));
     };
 
     // Payment Handlers
@@ -216,7 +267,18 @@ export const AddReservation: React.FC = () => {
     // Save Reservation to LocalStorage
     const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
         const reservationNumber = `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
+        
+        // Auto assign available rooms upon saving for rows with isAssign === true
+        const allocatedRoomNumbers = roomsList.map((r, idx) => {
+            if (r.isAssign) {
+                const pool = getAvailableRooms(r.roomType);
+                return pool[idx % pool.length] || r.roomNumber;
+            }
+            return r.roomNumber;
+        });
+
         const mainRoom = roomsList[0] || { roomNumber: '101', roomType: 'Deluxe Double' };
+        const primaryRoomNumber = allocatedRoomNumbers[0] || mainRoom.roomNumber;
 
         const newReservation = {
             id: Date.now(),
@@ -224,11 +286,14 @@ export const AddReservation: React.FC = () => {
             guestName: `${salutation} ${guestName.trim() || 'Valued Guest'}`,
             phone: mobile || phone || '+880 1711-000000',
             email: email || 'guest@hospitality.com',
-            roomNumber: mainRoom.roomNumber,
+            roomNumber: primaryRoomNumber,
             roomType: mainRoom.roomType,
+            allocatedRooms: allocatedRoomNumbers,
+            roomsCount: totalRoomsCount,
             checkIn,
             checkOut,
             nights,
+            dayUse,
             adults: mainRoom.adults,
             children: mainRoom.children,
             status: actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : 'arriving',
@@ -280,6 +345,11 @@ export const AddReservation: React.FC = () => {
 
     const resetForm = () => {
         setStep(1);
+        const sys = getSystemDateISO();
+        setCheckIn(sys);
+        setNights(1);
+        setCheckOut(getNextDayISO(sys, 1));
+        setDayUse(false);
         setGuestName('');
         setMobile('');
         setEmail('');
@@ -421,23 +491,29 @@ export const AddReservation: React.FC = () => {
                                             checkIn={checkIn}
                                             checkOut={checkOut}
                                             nights={nights}
+                                            dayUse={dayUse}
                                             onDateChange={(newIn, newOut, newNights) => {
                                                 setCheckIn(newIn);
-                                                setCheckOut(newOut);
-                                                setNights(newNights);
+                                                if (dayUse) {
+                                                    setCheckOut(newIn);
+                                                    setNights(0);
+                                                } else {
+                                                    setCheckOut(newOut);
+                                                    setNights(newNights);
+                                                }
                                             }}
                                             label="Stay Period (Check In - Check Out)"
                                         />
                                     </div>
 
-                                    {/* Room(s) (Spans 2 cols) */}
+                                    {/* Room(s) (Spans 2 cols) - Displays total room count across all rows */}
                                     <div className="md:col-span-2 flex flex-col gap-1">
                                         <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Room(s)</span>
                                         </label>
                                         <input
                                             type="text"
-                                            value={roomsList.length}
+                                            value={totalRoomsCount}
                                             disabled
                                             className="w-full h-8 px-2 border border-slate-200 rounded-md text-[11px] bg-slate-100 text-slate-600 cursor-not-allowed text-center font-bold"
                                         />
@@ -485,7 +561,7 @@ export const AddReservation: React.FC = () => {
                                         <input
                                             type="checkbox"
                                             checked={dayUse}
-                                            onChange={e => setDayUse(e.target.checked)}
+                                            onChange={e => handleDayUseToggle(e.target.checked)}
                                             className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
                                         <span>Day Use</span>
@@ -569,13 +645,31 @@ export const AddReservation: React.FC = () => {
                                                             <option value="Weekend Special">Weekend Special</option>
                                                         </select>
                                                     </td>
-                                                    <td className="p-1.5">
-                                                        <input
-                                                            type="text"
-                                                            value={row.roomNumber}
-                                                            onChange={e => updateRoomRow(row.id, 'roomNumber', e.target.value)}
-                                                            className="w-14 h-7 px-1 border border-gray-200 rounded text-[11px] text-center font-bold outline-none"
-                                                        />
+                                                    <td className="p-1.5 text-center">
+                                                        {row.isAssign ? (
+                                                            <div
+                                                                className="w-20 h-7 px-1 border border-slate-200 bg-slate-100 text-slate-600 rounded text-[10.5px] font-bold flex items-center justify-center cursor-not-allowed select-none shadow-2xs mx-auto"
+                                                                title="Auto-Assign active: Room(s) will be assigned automatically upon saving"
+                                                            >
+                                                                <span className="text-blue-700">Auto</span>
+                                                                <span className="text-slate-500 ml-1 font-mono">
+                                                                    {row.roomsCount > 1 ? `(${row.roomsCount} Rms)` : `(${row.roomNumber})`}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <select
+                                                                value={row.roomNumber}
+                                                                onChange={e => updateRoomRow(row.id, 'roomNumber', e.target.value)}
+                                                                className="w-20 h-7 px-1 border border-blue-400 bg-white text-blue-900 rounded text-[11px] font-bold text-center outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs mx-auto"
+                                                                title="Manual Room Selection: Select room"
+                                                            >
+                                                                {getAvailableRooms(row.roomType).map(rm => (
+                                                                    <option key={rm} value={rm}>
+                                                                        Room {rm}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        )}
                                                     </td>
                                                     <td className="p-1.5">
                                                         <input
@@ -586,13 +680,13 @@ export const AddReservation: React.FC = () => {
                                                             className="w-11 h-7 px-1 border border-gray-200 rounded text-[11px] text-center outline-none"
                                                         />
                                                     </td>
-                                                    <td className="p-1.5">
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            value={row.children}
-                                                            onChange={e => updateRoomRow(row.id, 'children', Number(e.target.value))}
-                                                            className="w-11 h-7 px-1 border border-gray-200 rounded text-[11px] text-center outline-none"
+                                                    <td className="p-1.5 text-center">
+                                                        <ChildAgeSelector
+                                                            childrenCount={row.children}
+                                                            childrenAges={row.childrenAges}
+                                                            onChange={(count, ages) => {
+                                                                setRoomsList(prev => prev.map(r => r.id === row.id ? { ...r, children: count, childrenAges: ages } : r));
+                                                            }}
                                                         />
                                                     </td>
                                                     <td className="p-1.5 text-right">
@@ -604,7 +698,7 @@ export const AddReservation: React.FC = () => {
                                                         />
                                                     </td>
                                                     <td className="p-1.5 font-bold text-gray-900 text-right">
-                                                        {(row.rate * row.roomsCount * nights).toFixed(2)}
+                                                        {(row.rate * row.roomsCount * nightMultiplier).toFixed(2)}
                                                     </td>
                                                     <td className="p-1.5 pr-3 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
@@ -642,18 +736,25 @@ export const AddReservation: React.FC = () => {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="p-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between">
-                                    <button
-                                        type="button"
-                                        onClick={handleAddRoomRow}
-                                        className="px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-50 text-blue-700 font-bold rounded text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                    >
-                                        <Plus size={12} />
-                                        <span>Add Room</span>
-                                    </button>
-                                    <div className="text-[11px] text-gray-600">
-                                        Total Estimated: <strong className="text-gray-900 font-mono text-xs">{grossTotal.toFixed(2)}</strong> BDT
-                                    </div>
+                                <div className="px-3 py-1.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between text-[10.5px] text-gray-500">
+                                    <span>Total Allocated: <strong className="text-gray-800 font-bold">{totalRoomsCount} Room(s)</strong> across {roomsList.length} row(s)</span>
+                                    <span>Rate Mode: <strong className="text-gray-800">{ratePerNight}</strong></span>
+                                </div>
+                            </div>
+
+                            {/* Below-Table Action Bar with "+ Add Room" Button (Positioned lower with clean breathing room) */}
+                            <div className="flex items-center justify-between pt-1">
+                                <button
+                                    type="button"
+                                    onClick={handleAddRoomRow}
+                                    className="h-8 px-3.5 bg-white border border-blue-400 hover:border-blue-600 hover:bg-blue-50/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                                >
+                                    <Plus size={13} className="text-blue-600 stroke-[2.5]" />
+                                    <span>Add Room</span>
+                                </button>
+
+                                <div className="text-xs text-gray-600">
+                                    Total Estimated: <strong className="text-gray-900 font-mono text-sm font-bold">{grossTotal.toFixed(2)}</strong> BDT
                                 </div>
                             </div>
                         </div>
