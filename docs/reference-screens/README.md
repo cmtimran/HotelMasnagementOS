@@ -45,3 +45,4 @@ This directory contains the reference UI screenshots provided by the client, ren
 - `38-duplicate-room-allocation-auto-assign-clash.png`: Both rows in table showing `Auto (102)` instead of unique auto-allocated room numbers (`Auto (101)`, `Auto (102)`, `Auto (201)` etc.).
 - `39-calendar-popover-cutoff-at-screen-bottom-in-quick-reservation-modal.png`: Calendar popover in Quick Reservation modal jumping down to the bottom edge of the screen and getting cut off due to `position: fixed` relative to transformed modal container.
 - `40-calendar-popover-cutoff-at-bottom-in-add-reservation.png`: Calendar popover in Add Reservation page jumping down to bottom-left corner and getting cut off below the viewport.
+- `41-horizontal-scrollbar-in-rooms-table-of-quick-reservation-modal.png`: Horizontal scrollbar appearing across the Rooms table in Quick Reservation modal on Windows viewports.

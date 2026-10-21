@@ -239,7 +239,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 select-none animate-in fade-in duration-150">
-            <div className="bg-white w-[96%] max-w-[840px] max-h-[88vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 border border-slate-200">
+            <div className="bg-white w-[96%] max-w-[880px] max-h-[88vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 border border-slate-200">
                 {/* Modern Light Header */}
                 <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-2xs">
                     <div className="flex items-center gap-2.5">
@@ -389,21 +389,21 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* Rooms Table */}
+                            {/* Rooms Table (Compact & Perfectly Sized - Zero Horizontal Overflow) */}
                             <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse text-[11px]">
+                                <div className="overflow-x-hidden">
+                                    <table className="w-full text-left border-collapse text-[11px] table-auto">
                                         <thead>
                                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
-                                                <th className="py-2 px-3">Room Type</th>
-                                                <th className="py-2 px-2 text-center">Qty</th>
-                                                <th className="py-2 px-2.5">Rate Plan</th>
-                                                <th className="py-2 px-2.5">Room No.</th>
-                                                <th className="py-2 px-2 text-center">Adult</th>
-                                                <th className="py-2 px-2 text-center">Child</th>
-                                                <th className="py-2 px-2.5 text-right">Rate</th>
-                                                <th className="py-2 px-2.5 text-right">Total</th>
-                                                <th className="py-2 px-2 text-center">Del</th>
+                                                <th className="py-2 px-2.5 min-w-[110px]">Room Type</th>
+                                                <th className="py-2 px-1 text-center w-11">Qty</th>
+                                                <th className="py-2 px-2 min-w-[120px]">Rate Plan</th>
+                                                <th className="py-2 px-1 text-center w-16">Room No.</th>
+                                                <th className="py-2 px-1 text-center w-11">Adult</th>
+                                                <th className="py-2 px-1 text-center w-22">Child</th>
+                                                <th className="py-2 px-1.5 text-right w-20">Rate</th>
+                                                <th className="py-2 px-2 text-right w-20">Total</th>
+                                                <th className="py-2 px-1 text-center w-8">Del</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -411,11 +411,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                 const lineTotal = item.rate * item.noOfRooms * (dayUse ? 1 : Math.max(1, nights));
                                                 return (
                                                     <tr key={item.id} className="hover:bg-blue-50/20 transition-colors">
-                                                        <td className="py-1.5 px-3">
+                                                        <td className="py-1.5 px-2.5">
                                                             <select
                                                                 value={item.roomType}
                                                                 onChange={e => handleRoomFieldChange(item.id, 'roomType', e.target.value)}
-                                                                className="w-32 h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                                className="w-full min-w-[105px] max-w-[130px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
                                                             >
                                                                 <option value="Winter Rate Plan">Winter Rate Plan</option>
                                                                 <option value="Deluxe Double">Deluxe Double</option>
@@ -423,44 +423,44 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                 <option value="Standard Single">Standard Single</option>
                                                             </select>
                                                         </td>
-                                                        <td className="py-1.5 px-2 text-center">
+                                                        <td className="py-1.5 px-1 text-center">
                                                             <input
                                                                 type="number"
                                                                 min={1}
                                                                 value={item.noOfRooms}
                                                                 onChange={e => handleRoomFieldChange(item.id, 'noOfRooms', parseInt(e.target.value) || 1)}
-                                                                className="w-10 h-7 px-1 border border-slate-200 rounded text-[11px] text-center font-bold outline-none"
+                                                                className="w-9 h-7 px-0.5 border border-slate-200 rounded text-[11px] text-center font-bold outline-none mx-auto block"
                                                             />
                                                         </td>
-                                                        <td className="py-1.5 px-2.5">
+                                                        <td className="py-1.5 px-2">
                                                             <select
                                                                 value={item.ratePlan}
                                                                 onChange={e => handleRoomFieldChange(item.id, 'ratePlan', e.target.value)}
-                                                                className="w-32 h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                                className="w-full min-w-[115px] max-w-[140px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
                                                             >
                                                                 <option value="Summer Vacation">Summer Vacation</option>
                                                                 <option value="Standard EP">Standard EP (Room Only)</option>
                                                                 <option value="Corporate CP">Corporate CP (Bed & Breakfast)</option>
                                                             </select>
                                                         </td>
-                                                        <td className="py-1.5 px-2.5">
+                                                        <td className="py-1.5 px-1 text-center">
                                                             <input
                                                                 type="text"
                                                                 value={item.roomNumber}
                                                                 onChange={e => handleRoomFieldChange(item.id, 'roomNumber', e.target.value)}
-                                                                className="w-20 h-7 px-1.5 border border-slate-200 rounded text-[11px] font-mono font-bold text-blue-700 outline-none text-center"
+                                                                className="w-14 h-7 px-1 border border-slate-200 rounded text-[11px] font-mono font-bold text-blue-700 outline-none text-center mx-auto block"
                                                             />
                                                         </td>
-                                                        <td className="py-1.5 px-2 text-center">
+                                                        <td className="py-1.5 px-1 text-center">
                                                             <input
                                                                 type="number"
                                                                 min={1}
                                                                 value={item.adults}
                                                                 onChange={e => handleRoomFieldChange(item.id, 'adults', parseInt(e.target.value) || 1)}
-                                                                className="w-10 h-7 px-1 border border-slate-200 rounded text-[11px] text-center outline-none"
+                                                                className="w-9 h-7 px-0.5 border border-slate-200 rounded text-[11px] text-center outline-none mx-auto block"
                                                             />
                                                         </td>
-                                                        <td className="py-1.5 px-2 text-center">
+                                                        <td className="py-1.5 px-1 text-center">
                                                             <ChildAgeSelector
                                                                 childrenCount={item.children}
                                                                 childrenAges={item.childrenAges}
@@ -470,23 +470,23 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                 compact
                                                             />
                                                         </td>
-                                                        <td className="py-1.5 px-2.5 text-right">
+                                                        <td className="py-1.5 px-1.5 text-right">
                                                             <input
                                                                 type="number"
                                                                 value={item.rate}
                                                                 onChange={e => handleRoomFieldChange(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                                                                className="w-20 h-7 px-1.5 border border-slate-200 rounded text-[11px] font-semibold text-right outline-none"
+                                                                className="w-16 h-7 px-1 border border-slate-200 rounded text-[11px] font-semibold text-right outline-none ml-auto block"
                                                             />
                                                         </td>
-                                                        <td className="py-1.5 px-2.5 text-right font-bold text-slate-800">
+                                                        <td className="py-1.5 px-2 text-right font-bold text-slate-800 whitespace-nowrap text-[11px]">
                                                             ৳{lineTotal.toLocaleString()}
                                                         </td>
-                                                        <td className="py-1.5 px-2 text-center">
+                                                        <td className="py-1.5 px-1 text-center">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleRemoveRoom(item.id)}
                                                                 disabled={roomsList.length <= 1}
-                                                                className="text-red-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-1 transition-colors"
+                                                                className="text-red-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-1 transition-colors mx-auto block"
                                                                 title="Delete Room Row"
                                                             >
                                                                 <Trash2 size={13} />
