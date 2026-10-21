@@ -158,37 +158,6 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
         }
     }, [safeCheckIn, isOpen]);
 
-    const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
-
-    // Calculate fixed viewport coordinates when opened so container overflow NEVER clips the calendar
-    useEffect(() => {
-        if (isOpen && containerRef.current) {
-            const rect = containerRef.current.getBoundingClientRect();
-            const popoverWidth = 275;
-            const popoverHeight = 240;
-
-            let left = rect.left;
-            if (left + popoverWidth > window.innerWidth - 10) {
-                left = window.innerWidth - popoverWidth - 10;
-            }
-            if (left < 10) left = 10;
-
-            const spaceBelow = window.innerHeight - rect.bottom;
-            let top = rect.bottom + 6;
-            if (spaceBelow < popoverHeight && rect.top > popoverHeight) {
-                top = rect.top - popoverHeight - 6;
-            }
-
-            setPopoverStyle({
-                position: 'fixed',
-                top: `${top}px`,
-                left: `${left}px`,
-                width: `${popoverWidth}px`,
-                zIndex: 100095
-            });
-        }
-    }, [isOpen]);
-
     // Range picking state
     const [rangePhase, setRangePhase] = useState<'idle' | 'picking_checkout'>('idle');
     const [tempCheckIn, setTempCheckIn] = useState<string>(safeCheckIn);
@@ -372,7 +341,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
     };
 
     return (
-        <div ref={containerRef} className="relative flex flex-col gap-1 select-none">
+        <div ref={containerRef} className={`relative flex flex-col gap-1 select-none ${isOpen ? 'z-40' : ''}`}>
             {/* Top Label & Day Summary */}
             {label && (
                 <div className="flex items-center justify-between">
@@ -502,22 +471,13 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                 </button>
             </div>
 
-            {/* Ultra-Compact Visual Date Range Calendar Popover (Fixed in Viewport - NEVER clipped by container overflow) */}
+            {/* Visual Date Range Calendar Popover (Directly anchored below input) */}
             {isOpen && (
-                <>
-                    {/* Transparent Click-Catcher Backdrop */}
-                    <div
-                        className="fixed inset-0 z-[100090]"
-                        onClick={() => setIsOpen(false)}
-                    />
-
-                    {/* Popover Card */}
-                    <div
-                        style={popoverStyle}
-                        className="bg-white rounded-xl shadow-2xl border border-slate-200 p-2 select-none animate-in fade-in zoom-in-95 duration-100"
-                    >
+                <div
+                    className="absolute top-full left-0 mt-1 z-50 w-[285px] bg-white rounded-xl shadow-2xl border border-slate-200 p-2.5 select-none animate-in fade-in zoom-in-95 duration-100"
+                >
                     {/* Top Blue Accent Line */}
-                    <div className="h-0.5 bg-blue-600 rounded-t-lg -mx-2 -mt-2 mb-1.5"></div>
+                    <div className="h-0.5 bg-blue-600 rounded-t-lg -mx-2.5 -mt-2.5 mb-1.5"></div>
 
                     {/* Month Header with Navigation */}
                     <div className="flex items-center justify-between px-0.5 mb-1">
@@ -703,8 +663,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                             </>
                         )}
                     </div>
-                    </div>
-                </>
+                </div>
             )}
         </div>
     );
