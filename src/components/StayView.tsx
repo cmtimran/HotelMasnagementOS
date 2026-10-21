@@ -13,6 +13,7 @@ import {
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
 import AmendStayModal, { type AmendBookingData } from './modals/AmendStayModal';
+import ReservationDetailsDrawer from './modals/ReservationDetailsDrawer';
 
 interface TimelineBooking {
     id: string;
@@ -147,8 +148,11 @@ export const StayView: React.FC = () => {
     } | null>(null);
 
     // =========================================================================
-    // EXTEND STAY (DRAG-TO-EXTEND & AMEND STAY MODAL)
+    // RESERVATION / STAY DETAILS DRAWER (NORMAL CLICK) & AMEND STAY MODAL
     // =========================================================================
+    const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
+    const [detailsBookingData, setDetailsBookingData] = useState<AmendBookingData | null>(null);
+
     const [extendDrag, setExtendDrag] = useState<{
         booking: TimelineBooking;
         originalEndIndex: number;
@@ -471,10 +475,39 @@ export const StayView: React.FC = () => {
 
     const todayAvailableCount = Math.max(0, totalRoomsCount - todayAssignedCount);
 
+    // Open Single-Column Reservation Details Drawer on Normal Click (matching media_1792541210487_8b5ecb8d.png)
+    const handleOpenDetailsDrawer = (booking: TimelineBooking) => {
+        const arrivalDateStr = days[booking.startIndex]?.date || '2026-07-04';
+        const currentDepDateStr = days[booking.endIndex]?.date || '2026-07-06';
+        const start = new Date(arrivalDateStr);
+        const end = new Date(currentDepDateStr);
+        const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const currentNights = Math.max(1, diffDays > 0 ? diffDays : booking.endIndex - booking.startIndex);
+
+        setDetailsBookingData({
+            id: booking.id,
+            reservationNumber: booking.reservationNumber,
+            guestName: booking.guestName,
+            roomNumber: booking.roomNumber,
+            roomType: 'Winter Rate Plan',
+            ratePlan: 'Summer Vacation',
+            arrivalDate: arrivalDateStr,
+            departureDate: currentDepDateStr,
+            nights: currentNights,
+            avgDailyRate: 3000,
+            status: booking.status.toUpperCase()
+        });
+        setIsDetailsDrawerOpen(true);
+    };
+
+    // Open Amend Stay Modal on Drag-to-Extend or Resize Handle Click (matching media_1792541010797_b7d6f151.png)
     const handleOpenAmendModal = (booking: TimelineBooking, customTargetDep?: string, customTargetNights?: number) => {
         const arrivalDateStr = days[booking.startIndex]?.date || '2026-07-04';
         const currentDepDateStr = days[booking.endIndex]?.date || '2026-07-06';
-        const currentNights = Math.max(1, booking.endIndex - booking.startIndex + 1);
+        const start = new Date(arrivalDateStr);
+        const end = new Date(currentDepDateStr);
+        const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const currentNights = Math.max(1, diffDays > 0 ? diffDays : booking.endIndex - booking.startIndex);
 
         let targetDeparture = customTargetDep;
         let targetNights = customTargetNights;
@@ -1068,11 +1101,11 @@ export const StayView: React.FC = () => {
                                                                     <div
                                                                         key={booking.id}
                                                                         style={{ left: `${left}px`, width: `${width}px` }}
-                                                                        onClick={() => handleOpenAmendModal(booking)}
+                                                                        onClick={() => handleOpenDetailsDrawer(booking)}
                                                                         className={`absolute top-1 bottom-1 ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 truncate cursor-pointer hover:brightness-105 transition-all select-none ${
                                                                             isBeingExtended ? 'ring-2 ring-white shadow-lg' : ''
                                                                         }`}
-                                                                        title={`${booking.guestName} (${booking.reservationNumber}) • Click to Amend Stay • Drag right edge to extend`}
+                                                                        title={`${booking.guestName} (${booking.reservationNumber}) • Click to view reservation details • Drag right edge to extend`}
                                                                     >
                                                                         {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] */}
                                                                         <div className="flex items-center -space-x-0.5 absolute -top-2 left-2 z-20 pointer-events-auto">
@@ -1511,7 +1544,24 @@ export const StayView: React.FC = () => {
                 }}
             />
 
-            {/* Amend Stay Modal matching media_1792539676402_f4f7269d.png */}
+            {/* Single-Column Reservation Details Drawer on Normal Click (matching media_1792541210487_8b5ecb8d.png) */}
+            <ReservationDetailsDrawer
+                isOpen={isDetailsDrawerOpen}
+                onClose={() => {
+                    setIsDetailsDrawerOpen(false);
+                    setDetailsBookingData(null);
+                }}
+                booking={detailsBookingData}
+                onAmendStay={(b) => {
+                    setIsDetailsDrawerOpen(false);
+                    const targetBooking = bookings.find(item => item.id === b.id);
+                    if (targetBooking) {
+                        handleOpenAmendModal(targetBooking);
+                    }
+                }}
+            />
+
+            {/* Amend Stay Modal on Drag-to-Extend matching media_1792541010797_b7d6f151.png */}
             <AmendStayModal
                 isOpen={isAmendStayOpen}
                 onClose={() => {
