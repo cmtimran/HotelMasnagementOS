@@ -18,7 +18,8 @@ import {
     CheckSquare,
     Receipt,
     Printer as PrintIcon,
-    AlertCircle
+    AlertCircle,
+    MoveHorizontal
 } from 'lucide-react';
 import type { AmendBookingData } from './AmendStayModal';
 
@@ -27,6 +28,7 @@ interface ReservationDetailsDrawerProps {
     onClose: () => void;
     booking: AmendBookingData | null;
     onAmendStay?: (booking: AmendBookingData) => void;
+    onRoomMove?: (booking: AmendBookingData) => void;
     onEdit?: (booking: AmendBookingData) => void;
 }
 
@@ -35,6 +37,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
     onClose,
     booking,
     onAmendStay,
+    onRoomMove,
     onEdit
 }) => {
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
@@ -123,6 +126,17 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                     </button>
                                     <button
                                         type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onRoomMove) onRoomMove(booking);
+                                        }}
+                                        className="w-full px-3 py-2 text-left text-xs font-bold hover:bg-blue-50 text-[#0e3592] flex items-center gap-2 cursor-pointer transition-colors"
+                                    >
+                                        <MoveHorizontal size={14} className="text-blue-600" />
+                                        <span>Room Move</span>
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={() => setIsOptionsOpen(false)}
                                         className="w-full px-3 py-2 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
                                     >
@@ -191,10 +205,14 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setIsSelectOpen(false)}
-                                        className="w-full px-3 py-2 text-left text-xs font-medium hover:bg-blue-50 text-gray-800 cursor-pointer"
+                                        onClick={() => {
+                                            setIsSelectOpen(false);
+                                            if (onRoomMove) onRoomMove(booking);
+                                        }}
+                                        className="w-full px-3 py-2 text-left text-xs font-medium hover:bg-blue-50 text-gray-800 cursor-pointer flex items-center justify-between"
                                     >
-                                        Assign / Move Room
+                                        <span>Assign / Move Room</span>
+                                        <MoveHorizontal size={12} className="text-blue-600" />
                                     </button>
                                 </div>
                             )}
