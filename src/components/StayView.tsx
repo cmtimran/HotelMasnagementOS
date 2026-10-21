@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Calendar as CalendarIcon,
@@ -8,7 +8,11 @@ import {
     Building2,
     BedDouble,
     X,
-    CheckCircle2
+    CheckCircle2,
+    Crown,
+    Users,
+    DollarSign,
+    Star
 } from 'lucide-react';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
@@ -248,6 +252,65 @@ export const StayView: React.FC = () => {
         }
         return list;
     }, [startDate, daysWindow]);
+
+    // =========================================================================
+    // DYNAMIC TIMELINE GRID RESPONSIVENESS (15 DAYS FIT ON SCREEN WITHOUT SCROLL)
+    // =========================================================================
+    const timelineContainerRef = useRef<HTMLDivElement>(null);
+    const [containerWidth, setContainerWidth] = useState<number>(0);
+
+    useEffect(() => {
+        const el = timelineContainerRef.current;
+        if (!el) return;
+
+        const updateSize = () => {
+            if (el.clientWidth > 0) {
+                setContainerWidth(el.clientWidth);
+            }
+        };
+
+        updateSize();
+
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                if (width > 0) {
+                    setContainerWidth(Math.floor(width));
+                }
+            }
+        });
+
+        resizeObserver.observe(el);
+        window.addEventListener('resize', updateSize);
+
+        return () => {
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', updateSize);
+        };
+    }, []);
+
+    const TREE_COL_WIDTH = 176; // matches w-44 (11rem = 176px)
+
+    const colWidth = useMemo(() => {
+        if (!containerWidth || containerWidth <= TREE_COL_WIDTH) {
+            return daysWindow === 7 ? 96 : daysWindow === 15 ? 54 : 44;
+        }
+        const available = containerWidth - TREE_COL_WIDTH;
+        if (daysWindow === 7) {
+            // Stretch across full width, min 70px
+            return Math.max(70, Math.floor(available / 7));
+        }
+        if (daysWindow === 15) {
+            // Math.floor ensures 15 * colWidth <= available, guaranteeing 100% fit on screen with 0 horizontal scroll!
+            return Math.max(38, Math.floor(available / 15));
+        }
+        // 30 days: minimum 42px for clean readable layout
+        return Math.max(42, Math.floor(available / 30));
+    }, [containerWidth, daysWindow]);
+
+    const gridWidth = useMemo(() => {
+        return colWidth * daysWindow;
+    }, [colWidth, daysWindow]);
 
     // Initial Rooms Structure
     const roomTree = useMemo(() => [
@@ -955,19 +1018,27 @@ export const StayView: React.FC = () => {
                                                 <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">4 Booking Floating Icons</div>
                                                 <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-4 h-4 rounded-full bg-amber-400 text-gray-900 border border-white flex items-center justify-center text-[8.5px]">👑</span>
+                                                        <span className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 border border-white flex items-center justify-center shadow-xs flex-shrink-0">
+                                                            <Crown size={9} className="stroke-[2.5]" />
+                                                        </span>
                                                         <span className="text-gray-700">Group Owner</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-4 h-4 rounded-full bg-rose-500 text-white border border-white flex items-center justify-center text-[8px]">👥</span>
+                                                        <span className="w-4 h-4 rounded-full bg-rose-500 text-white border border-white flex items-center justify-center shadow-xs flex-shrink-0">
+                                                            <Users size={9} className="stroke-[2.5]" />
+                                                        </span>
                                                         <span className="text-gray-700">Group Booking</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-4 h-4 rounded-full bg-red-600 text-white border border-white flex items-center justify-center text-[9px] font-black">$</span>
+                                                        <span className="w-4 h-4 rounded-full bg-red-600 text-white border border-white flex items-center justify-center shadow-xs flex-shrink-0">
+                                                            <DollarSign size={9} className="stroke-[3]" />
+                                                        </span>
                                                         <span className="text-gray-700">Payment Due</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-4 h-4 rounded-full bg-amber-500 text-white border border-white flex items-center justify-center text-[8.5px]">⭐</span>
+                                                        <span className="w-4 h-4 rounded-full bg-amber-500 text-white border border-white flex items-center justify-center shadow-xs flex-shrink-0">
+                                                            <Star size={9} className="fill-white stroke-[1.5]" />
+                                                        </span>
                                                         <span className="text-gray-700">VIP / Single Lady</span>
                                                     </div>
                                                 </div>
@@ -1025,22 +1096,23 @@ export const StayView: React.FC = () => {
 
             {/* Stay View Interactive Timeline Board */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden text-xs flex-1 min-h-0 flex flex-col">
-                <div className="overflow-auto flex-1 min-h-0 relative select-none">
-                    <div className="w-full min-w-full">
+                <div ref={timelineContainerRef} className="overflow-auto flex-1 min-h-0 relative select-none">
+                    <div style={{ width: `${TREE_COL_WIDTH + gridWidth}px`, minWidth: '100%' }} className="flex flex-col min-h-full">
                         {/* Header Row: Room Info Column + Date Columns */}
                         <div className="flex border-b border-gray-200 bg-gray-50/95 font-bold sticky top-0 z-30 shadow-xs">
                             {/* Room Info Header */}
-                            <div className="w-44 px-2 py-1 border-r border-gray-200 flex items-center justify-between text-gray-700 text-[11px] sticky left-0 z-40 bg-gray-100 flex-shrink-0">
+                            <div style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }} className="px-2 py-1 border-r border-gray-200 flex items-center justify-between text-gray-700 text-[11px] sticky left-0 z-40 bg-gray-100 flex-shrink-0">
                                 <span>Rooms &amp; Types</span>
                                 <span className="text-[9px] text-gray-400 font-mono">Tree</span>
                             </div>
 
                             {/* Date Columns with exact Legend Colors */}
-                            <div className="flex flex-1 min-w-max">
+                            <div className="flex flex-1" style={{ width: `${gridWidth}px` }}>
                                 {days.map((d) => (
                                     <div
                                         key={d.index}
-                                        className={`w-16 px-1 py-0.5 border-r border-gray-200 text-center flex-shrink-0 transition-colors ${
+                                        style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
+                                        className={`px-0.5 py-0.5 border-r border-gray-200 text-center flex-shrink-0 transition-colors overflow-hidden ${
                                             d.isToday
                                                 ? 'bg-blue-100/90 text-blue-900 font-black border-b-2 border-b-blue-600'
                                                 : d.isWeekend
@@ -1048,7 +1120,7 @@ export const StayView: React.FC = () => {
                                                     : 'bg-gray-50/90 text-gray-700 font-medium'
                                         }`}
                                     >
-                                        <div className="text-[8.5px] uppercase tracking-wider font-semibold opacity-80 leading-none">
+                                        <div className="text-[8.5px] uppercase tracking-wider font-semibold opacity-80 leading-none truncate">
                                             {d.dayName}
                                         </div>
                                         <div className="text-[12px] font-bold leading-tight mt-0.5">
@@ -1060,22 +1132,27 @@ export const StayView: React.FC = () => {
                         </div>
 
                         {/* Room Hierarchy Tree & Timeline Grid */}
-                        <div className="divide-y divide-gray-100 min-w-max">
+                        <div className="divide-y divide-gray-100 flex-1">
                             {roomTree.map(building => (
                                 <React.Fragment key={building.id}>
                                     {/* Building Header Row */}
                                     <div className="flex bg-slate-50/90 border-b border-gray-200/90 font-bold text-gray-800 sticky left-0 z-20">
                                         <div
                                             onClick={() => toggleNode(building.id)}
-                                            className="w-44 px-2 py-1 border-r border-gray-200 flex items-center gap-1.5 cursor-pointer hover:bg-slate-100 transition-colors sticky left-0 z-20 bg-slate-50 flex-shrink-0"
+                                            style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }}
+                                            className="px-2 py-1 border-r border-gray-200 flex items-center gap-1.5 cursor-pointer hover:bg-slate-100 transition-colors sticky left-0 z-20 bg-slate-50 flex-shrink-0"
                                         >
                                             {expandedNodes[building.id] ? <ChevronDown size={13} className="text-gray-500" /> : <ChevronRight size={13} className="text-gray-500" />}
                                             <Building2 size={13} className="text-blue-700 flex-shrink-0" />
                                             <span className="text-[11px] truncate tracking-tight">{building.name}</span>
                                         </div>
-                                        <div className="flex flex-1">
+                                        <div className="flex flex-1" style={{ width: `${gridWidth}px` }}>
                                             {days.map(d => (
-                                                <div key={d.index} className="w-16 border-r border-gray-100/80 bg-slate-50/40 flex-shrink-0"></div>
+                                                <div
+                                                    key={d.index}
+                                                    style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
+                                                    className="border-r border-gray-100/80 bg-slate-50/40 flex-shrink-0"
+                                                ></div>
                                             ))}
                                         </div>
                                     </div>
@@ -1087,14 +1164,15 @@ export const StayView: React.FC = () => {
                                             <div className="flex bg-gray-50/80 border-b border-gray-100 text-gray-700 font-semibold">
                                                 <div
                                                     onClick={() => toggleNode(floor.id)}
-                                                    className="w-44 px-2 py-0.5 pl-4 border-r border-gray-200 flex items-center gap-1 cursor-pointer hover:bg-gray-100 transition-colors sticky left-0 z-20 bg-gray-50/90 flex-shrink-0"
+                                                    style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }}
+                                                    className="px-2 py-0.5 pl-4 border-r border-gray-200 flex items-center gap-1 cursor-pointer hover:bg-gray-100 transition-colors sticky left-0 z-20 bg-gray-50/90 flex-shrink-0"
                                                 >
                                                     {expandedNodes[floor.id] ? <ChevronDown size={11} className="text-gray-400" /> : <ChevronRight size={11} className="text-gray-400" />}
                                                     <span className="text-[10.5px] font-bold text-gray-700 tracking-tight">{floor.name}</span>
                                                 </div>
 
                                                 {/* Floor Daily Breakdown Badges: [Available] [Assigned] [Unassigned] */}
-                                                <div className="flex flex-1">
+                                                <div className="flex flex-1" style={{ width: `${gridWidth}px` }}>
                                                     {days.map(d => {
                                                         const floorRooms = floor.rooms;
                                                         const assignedCount = floorRooms.filter(r =>
@@ -1116,13 +1194,14 @@ export const StayView: React.FC = () => {
                                                         return (
                                                             <div
                                                                 key={d.index}
-                                                                className="w-16 px-0.5 border-r border-gray-100 flex items-center justify-center flex-shrink-0 min-h-[22px] bg-gray-50/30"
+                                                                style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
+                                                                className="px-0.5 border-r border-gray-100 flex items-center justify-center flex-shrink-0 min-h-[22px] bg-gray-50/30 overflow-hidden"
                                                             >
-                                                                <div className="flex items-center gap-0.5">
+                                                                <div className="flex items-center justify-center gap-[2px]">
                                                                     {/* 1. Available Badge (Green) */}
                                                                     {availableCount > 0 && (
                                                                         <span
-                                                                            className="min-w-[14px] h-3.5 px-0.5 rounded-xs bg-[#00cc00] text-white font-black text-[8.5px] flex items-center justify-center leading-none shadow-2xs"
+                                                                            className="min-w-[13px] h-3.5 px-0.5 rounded-xs bg-[#00cc00] text-white font-black text-[8px] flex items-center justify-center leading-none shadow-2xs"
                                                                             title={`${floor.name}: ${availableCount} Available`}
                                                                         >
                                                                             {availableCount}
@@ -1131,7 +1210,7 @@ export const StayView: React.FC = () => {
                                                                     {/* 2. Assigned Badge (Blue) */}
                                                                     {assignedCount > 0 && (
                                                                         <span
-                                                                            className="min-w-[14px] h-3.5 px-0.5 rounded-xs bg-[#1e3a8a] text-white font-black text-[8.5px] flex items-center justify-center leading-none shadow-2xs"
+                                                                            className="min-w-[13px] h-3.5 px-0.5 rounded-xs bg-[#1e3a8a] text-white font-black text-[8px] flex items-center justify-center leading-none shadow-2xs"
                                                                             title={`${floor.name}: ${assignedCount} Assigned`}
                                                                         >
                                                                             {assignedCount}
@@ -1140,7 +1219,7 @@ export const StayView: React.FC = () => {
                                                                     {/* 3. Unassigned Badge (Red) */}
                                                                     {unassignedCount > 0 && (
                                                                         <span
-                                                                            className="min-w-[14px] h-3.5 px-0.5 rounded-xs bg-[#ff3333] text-white font-black text-[8.5px] flex items-center justify-center leading-none shadow-2xs"
+                                                                            className="min-w-[13px] h-3.5 px-0.5 rounded-xs bg-[#ff3333] text-white font-black text-[8px] flex items-center justify-center leading-none shadow-2xs"
                                                                             title={`${floor.name}: ${unassignedCount} Unassigned`}
                                                                         >
                                                                             {unassignedCount}
@@ -1155,11 +1234,14 @@ export const StayView: React.FC = () => {
 
                                             {/* Rooms */}
                                             {expandedNodes[floor.id] && floor.rooms.map(room => (
-                                                <div key={room.id} className="flex border-b border-gray-100/90 hover:bg-blue-50/20 transition-colors group relative">
+                                                <div key={room.id} className="flex border-b border-gray-100/90 hover:bg-blue-50/20 transition-colors group relative overflow-visible min-h-[36px]">
                                                     {/* Room Info Cell */}
-                                                    <div className={`w-44 px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0 transition-colors ${
-                                                        moveDrag && moveDrag.isDragging && moveDrag.targetRoomNumber === room.roomNumber ? 'bg-blue-100 ring-2 ring-blue-500' : ''
-                                                    }`}>
+                                                    <div
+                                                        style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }}
+                                                        className={`px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0 transition-colors min-h-[36px] ${
+                                                            moveDrag && moveDrag.isDragging && moveDrag.targetRoomNumber === room.roomNumber ? 'bg-blue-100 ring-2 ring-blue-500' : ''
+                                                        }`}
+                                                    >
                                                         <div className="flex items-center gap-1.5 min-w-0">
                                                             <BedDouble size={12} className="text-gray-400 flex-shrink-0" />
                                                             <div className="truncate">
@@ -1178,10 +1260,11 @@ export const StayView: React.FC = () => {
                                                     </div>
 
                                                     {/* Day Cells & Bookings Overlay */}
-                                                    <div className="flex flex-1 relative min-h-[30px]">
+                                                    <div className="flex flex-1 relative min-h-[36px] overflow-visible" style={{ width: `${gridWidth}px` }}>
                                                         {days.map(d => (
                                                             <div
                                                                 key={d.index}
+                                                                style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
                                                                 onMouseDown={(e) => {
                                                                     const rect = e.currentTarget.getBoundingClientRect();
                                                                     setDragState({
@@ -1223,7 +1306,7 @@ export const StayView: React.FC = () => {
                                                                         }) : null);
                                                                     }
                                                                 }}
-                                                                className={`w-16 border-r border-gray-100 flex-shrink-0 cursor-pointer transition-colors relative ${
+                                                                className={`border-r border-gray-100 flex-shrink-0 cursor-pointer transition-colors relative ${
                                                                     d.isToday ? 'bg-blue-50/30' : d.isWeekend ? 'bg-gray-50/40' : ''
                                                                 } hover:bg-blue-100/40`}
                                                             ></div>
@@ -1233,10 +1316,10 @@ export const StayView: React.FC = () => {
                                                         {moveDrag && moveDrag.isDragging && moveDrag.targetRoomNumber === room.roomNumber && (
                                                             <div
                                                                 style={{
-                                                                    left: `${moveDrag.targetStartIndex * 64 + 2}px`,
-                                                                    width: `${Math.max(24, (moveDrag.targetEndIndex - moveDrag.targetStartIndex + 1) * 64 - 4)}px`
+                                                                    left: `${moveDrag.targetStartIndex * colWidth + 2}px`,
+                                                                    width: `${Math.max(20, (moveDrag.targetEndIndex - moveDrag.targetStartIndex + 1) * colWidth - 4)}px`
                                                                 }}
-                                                                className="absolute top-1 bottom-1 bg-blue-600/70 border-2 border-dashed border-white text-white rounded px-2 py-0.5 text-[10px] font-bold flex items-center gap-1 shadow-lg z-20 pointer-events-none animate-pulse"
+                                                                className="absolute top-[6px] bottom-[4px] bg-blue-600/70 border-2 border-dashed border-white text-white rounded px-2 py-0.5 text-[10px] font-bold flex items-center gap-1 shadow-lg z-20 pointer-events-none animate-pulse"
                                                             >
                                                                 <span className="truncate">Move: {moveDrag.booking.guestName} → Room A-({room.roomNumber})</span>
                                                             </div>
@@ -1246,7 +1329,6 @@ export const StayView: React.FC = () => {
                                                         {bookings
                                                             .filter(b => b.roomNumber === room.roomNumber)
                                                             .map(booking => {
-                                                                const colWidth = 64; // w-16 is 64px
                                                                 const isBeingExtended = extendDrag && extendDrag.booking.id === booking.id;
                                                                 const isBeingMoved = moveDrag && moveDrag.booking.id === booking.id && moveDrag.isDragging;
                                                                 const isAnyDragActive = Boolean(extendDrag || (moveDrag && moveDrag.isDragging));
@@ -1259,7 +1341,7 @@ export const StayView: React.FC = () => {
                                                                 if (start > daysWindow - 1 || end < 0) return null;
 
                                                                 const left = start * colWidth + 2;
-                                                                const width = Math.max(24, (end - start + 1) * colWidth - 4);
+                                                                const width = Math.max(20, (end - start + 1) * colWidth - 4);
                                                                 const colorClass = getStatusBadgeColor(booking.status);
 
                                                                 return (
@@ -1280,7 +1362,7 @@ export const StayView: React.FC = () => {
                                                                                 targetEndIndex: booking.endIndex
                                                                             });
                                                                         }}
-                                                                        className={`absolute top-1 bottom-1 ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 truncate transition-all select-none ${
+                                                                        className={`absolute top-[6px] bottom-[4px] ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 overflow-visible transition-all select-none ${
                                                                             isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto cursor-grab hover:brightness-105'
                                                                         } ${isBeingExtended ? 'ring-2 ring-white shadow-lg z-30' : ''} ${
                                                                             isBeingMoved ? 'opacity-40 ring-2 ring-dashed ring-amber-300' : ''
@@ -1288,42 +1370,42 @@ export const StayView: React.FC = () => {
                                                                         title={`${booking.guestName} (${booking.reservationNumber}) • Click to view details • Drag right edge to extend/shorten • Drag to move`}
                                                                     >
                                                                         {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] */}
-                                                                        <div className="flex items-center -space-x-0.5 absolute -top-2 left-2 z-20 pointer-events-auto">
+                                                                        <div className="flex items-center -space-x-1 absolute -top-2 left-1.5 z-20 pointer-events-auto">
                                                                             {booking.isGroupOwner && (
                                                                                 <span
-                                                                                    className="w-4 h-4 rounded-full bg-amber-400 text-gray-900 border border-white flex items-center justify-center text-[8.5px] font-bold shadow-xs"
+                                                                                    className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
                                                                                     title="Group Owner / Leader"
                                                                                 >
-                                                                                    👑
+                                                                                    <Crown size={9} className="stroke-[2.5]" />
                                                                                 </span>
                                                                             )}
                                                                             {booking.isGroupBooking && (
                                                                                 <span
-                                                                                    className="w-4 h-4 rounded-full bg-rose-500 text-white border border-white flex items-center justify-center text-[8px] font-bold shadow-xs"
+                                                                                    className="w-4 h-4 rounded-full bg-rose-500 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
                                                                                     title="Group Booking"
                                                                                 >
-                                                                                    👥
+                                                                                    <Users size={9} className="stroke-[2.5]" />
                                                                                 </span>
                                                                             )}
                                                                             {booking.isPaymentDue && (
                                                                                 <span
-                                                                                    className="w-4 h-4 rounded-full bg-red-600 text-white border border-white flex items-center justify-center text-[9px] font-black shadow-xs"
+                                                                                    className="w-4 h-4 rounded-full bg-red-600 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
                                                                                     title="Payment Due / Pending"
                                                                                 >
-                                                                                    $
+                                                                                    <DollarSign size={9} className="stroke-[3]" />
                                                                                 </span>
                                                                             )}
                                                                             {booking.isVipOrSingleLady && (
                                                                                 <span
-                                                                                    className="w-4 h-4 rounded-full bg-amber-500 text-white border border-white flex items-center justify-center text-[8.5px] font-bold shadow-xs"
+                                                                                    className="w-4 h-4 rounded-full bg-amber-500 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
                                                                                     title="VIP / Single Lady"
                                                                                 >
-                                                                                    ⭐
+                                                                                    <Star size={9} className="fill-white stroke-[1.5]" />
                                                                                 </span>
                                                                             )}
                                                                         </div>
 
-                                                                        <div className="flex items-center gap-1 min-w-0 truncate">
+                                                                        <div className="flex items-center gap-1 min-w-0 flex-1 truncate">
                                                                             <span className="truncate">{booking.guestName}</span>
                                                                         </div>
                                                                         {booking.indicator && (
@@ -1367,10 +1449,10 @@ export const StayView: React.FC = () => {
                                                         {dragState && dragState.room === room.roomNumber && (
                                                             <div
                                                                 style={{
-                                                                    left: `${Math.min(dragState.startIndex, dragState.endIndex) * 64}px`,
-                                                                    width: `${(Math.abs(dragState.endIndex - dragState.startIndex) + 1) * 64}px`
+                                                                    left: `${Math.min(dragState.startIndex, dragState.endIndex) * colWidth}px`,
+                                                                    width: `${(Math.abs(dragState.endIndex - dragState.startIndex) + 1) * colWidth}px`
                                                                 }}
-                                                                className="absolute top-0.5 bottom-0.5 bg-blue-500/30 border-2 border-blue-600 rounded z-20 pointer-events-none animate-pulse"
+                                                                className="absolute top-1 bottom-1 bg-blue-500/30 border-2 border-blue-600 rounded z-20 pointer-events-none animate-pulse"
                                                             ></div>
                                                         )}
                                                     </div>
@@ -1381,28 +1463,32 @@ export const StayView: React.FC = () => {
                                 </React.Fragment>
                             ))}
                         </div>
-                    </div>
-                </div>
 
-                {/* Occupancy Summary Strip (Fixed at Bottom of Timeline) */}
-                <div className="bg-[#1e3a8a] text-white flex border-t border-blue-900 sticky bottom-0 z-30 font-bold select-none shadow-md">
-                    <div className="w-44 px-2 py-1 border-r border-blue-800 text-[10.5px] sticky left-0 z-40 bg-[#1e3a8a] flex-shrink-0 flex flex-col justify-center">
-                        <div className="leading-tight">Occupancy (%)</div>
-                        <div className="text-[9px] font-normal text-blue-200">Available</div>
-                    </div>
-                    <div className="flex flex-1 overflow-hidden min-w-max">
-                        {days.map(d => {
-                            const occupiedOnDay = bookings.filter(b => d.index >= b.startIndex && d.index <= b.endIndex).length;
-                            const pct = Math.round((occupiedOnDay / totalRoomsCount) * 100);
-                            const avail = Math.max(0, totalRoomsCount - occupiedOnDay);
+                        {/* Occupancy Summary Strip (Fixed at Bottom of Timeline) */}
+                        <div className="bg-[#1e3a8a] text-white flex border-t border-blue-900 sticky bottom-0 z-30 font-bold select-none shadow-md">
+                            <div style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }} className="px-2 py-1 border-r border-blue-800 text-[10.5px] sticky left-0 z-40 bg-[#1e3a8a] flex-shrink-0 flex flex-col justify-center">
+                                <div className="leading-tight">Occupancy (%)</div>
+                                <div className="text-[9px] font-normal text-blue-200">Available</div>
+                            </div>
+                            <div className="flex flex-1" style={{ width: `${gridWidth}px` }}>
+                                {days.map(d => {
+                                    const occupiedOnDay = bookings.filter(b => d.index >= b.startIndex && d.index <= b.endIndex).length;
+                                    const pct = Math.round((occupiedOnDay / totalRoomsCount) * 100);
+                                    const avail = Math.max(0, totalRoomsCount - occupiedOnDay);
 
-                            return (
-                                <div key={d.index} className="w-16 px-1 py-1 border-r border-blue-800/80 text-center flex-shrink-0 flex flex-col justify-center">
-                                    <div className="text-[10px] font-bold leading-tight">{pct}%</div>
-                                    <div className="text-[8.5px] font-mono text-blue-200 leading-tight">[{avail}]</div>
-                                </div>
-                            );
-                        })}
+                                    return (
+                                        <div
+                                            key={d.index}
+                                            style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
+                                            className="px-0.5 py-1 border-r border-blue-800/80 text-center flex-shrink-0 flex flex-col justify-center overflow-hidden"
+                                        >
+                                            <div className="text-[10px] font-bold leading-tight">{pct}%</div>
+                                            <div className="text-[8.5px] font-mono text-blue-200 leading-tight">[{avail}]</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
