@@ -9,6 +9,7 @@ import {
 import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
 import { QuickReservationModal } from './modals/QuickReservationModal';
+import PageHeader from './common/PageHeader';
 
 export interface FrontDeskGuestRecord {
     id: string | number;
@@ -466,77 +467,71 @@ export const FrontDesk: React.FC = () => {
 
     return (
         <div className="p-3 sm:p-4 max-w-[1400px] mx-auto space-y-3 font-sans select-none animate-in fade-in duration-150">
-            {/* Top Operational Header Bar */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
-                        <Monitor size={20} />
+            {/* Standardized Thesis Page Header */}
+            <PageHeader
+                title="Front Desk Operations Hub"
+                subtitle={
+                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 font-medium">
+                        <span className="flex items-center gap-1 font-semibold text-slate-700">
+                            <Calendar size={12} className="text-primary" /> System Date: <strong>{systemDate}</strong>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                            <Clock size={12} className="text-amber-600" /> Morning Shift (07:00 - 15:00)
+                        </span>
+                        <span>•</span>
+                        <span className="text-primary font-semibold">Cashier Drawer #1</span>
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
-                                Front Desk Operations Hub
-                            </h1>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Live Desk Active
-                            </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 font-medium mt-1">
-                            <span className="flex items-center gap-1 font-semibold text-slate-700">
-                                <Calendar size={12} className="text-blue-600" /> System Date: <strong>{systemDate}</strong>
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                                <Clock size={12} className="text-amber-600" /> Morning Shift (07:00 - 15:00)
-                            </span>
-                            <span>•</span>
-                            <span className="text-blue-700 font-semibold">Cashier Drawer #1</span>
-                        </div>
-                    </div>
-                </div>
+                }
+                icon={<Monitor size={22} />}
+                badge={
+                    <span className="badge-status-active">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Live Desk Active
+                    </span>
+                }
+                actions={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setIsQuickReserveOpen(true)}
+                            className="btn-primary"
+                        >
+                            <Plus size={14} className="stroke-[2.5]" />
+                            <span>Walk-In Booking</span>
+                        </button>
 
-                {/* Primary Front Office Fast Actions */}
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    <button
-                        type="button"
-                        onClick={() => setIsQuickReserveOpen(true)}
-                        className="h-8.5 px-3 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
-                    >
-                        <Plus size={14} className="stroke-[2.5]" />
-                        <span>Walk-In Booking</span>
-                    </button>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('add-reservation')}
+                            className="btn-secondary text-primary font-semibold border-primary/30 hover:bg-primary-subtle"
+                        >
+                            <Calendar size={13} className="text-primary" />
+                            <span>Add Reservation</span>
+                        </button>
 
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('add-reservation')}
-                        className="h-8.5 px-3 bg-white border border-blue-300 hover:border-blue-500 hover:bg-blue-50/70 text-blue-800 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-                    >
-                        <Calendar size={13} className="text-blue-600" />
-                        <span>Add Reservation</span>
-                    </button>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('room-rack')}
+                            className="btn-secondary"
+                            title="Open Interactive Room Rack Grid"
+                        >
+                            <BedDouble size={13} className="text-slate-500" />
+                            <span>Room Rack</span>
+                        </button>
 
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('room-rack')}
-                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-                        title="Open Interactive Room Rack Grid"
-                    >
-                        <BedDouble size={13} className="text-slate-600" />
-                        <span>Room Rack</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('stay-view')}
-                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-                        title="Open Stay View Tape Chart"
-                    >
-                        <Calendar size={13} className="text-slate-600" />
-                        <span>Stay View</span>
-                    </button>
-                </div>
-            </div>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('stay-view')}
+                            className="btn-secondary"
+                            title="Open Stay View Tape Chart"
+                        >
+                            <Calendar size={13} className="text-slate-500" />
+                            <span>Stay View</span>
+                        </button>
+                    </>
+                }
+            />
 
             {/* Real-Time Front Office Operational Metric Tiles */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
@@ -623,16 +618,16 @@ export const FrontDesk: React.FC = () => {
                 </div>
 
                 {/* 6. Today's Collections */}
-                <div className="bg-gradient-to-br from-slate-900 to-[#1e3a8a] text-white p-3 rounded-xl shadow-xs">
-                    <div className="flex items-center justify-between text-blue-200">
+                <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between text-slate-500">
                         <span className="text-[10px] font-bold uppercase tracking-wider">Shift Collections</span>
-                        <Wallet size={13} />
+                        <Wallet size={13} className="text-primary" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1">
-                        <span className="text-[11px] font-bold opacity-80">BDT</span>
-                        <span className="text-lg font-black font-mono tracking-tight">{totalCollectionsToday.toLocaleString()}</span>
+                        <span className="text-[11px] font-bold text-slate-400">BDT</span>
+                        <span className="text-lg font-black font-mono tracking-tight text-slate-900">{totalCollectionsToday.toLocaleString()}</span>
                     </div>
-                    <p className="text-[9.5px] text-blue-200/80 mt-1.5">Cash: ৳15k • Card: ৳18k</p>
+                    <p className="text-[10px] text-slate-500 mt-1.5 font-medium">Cash: ৳15k • Card: ৳18k</p>
                 </div>
             </div>
 
@@ -646,14 +641,14 @@ export const FrontDesk: React.FC = () => {
                             onClick={() => setActiveTab('arrivals')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                 activeTab === 'arrivals'
-                                    ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                    ? 'bg-primary text-white shadow-xs'
                                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                         >
                             <LogIn size={13} />
                             <span>1. Arrivals / Due-In</span>
                             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                                activeTab === 'arrivals' ? 'bg-blue-800 text-blue-100' : 'bg-slate-100 text-slate-600'
+                                activeTab === 'arrivals' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
                             }`}>
                                 {arrivalsList.length}
                             </span>
@@ -664,14 +659,14 @@ export const FrontDesk: React.FC = () => {
                             onClick={() => setActiveTab('in-house')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                 activeTab === 'in-house'
-                                    ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                    ? 'bg-primary text-white shadow-xs'
                                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                         >
                             <User size={13} />
                             <span>2. In-House Guests</span>
                             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                                activeTab === 'in-house' ? 'bg-blue-800 text-blue-100' : 'bg-slate-100 text-slate-600'
+                                activeTab === 'in-house' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
                             }`}>
                                 {inHouseList.length}
                             </span>
@@ -682,14 +677,14 @@ export const FrontDesk: React.FC = () => {
                             onClick={() => setActiveTab('departures')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                 activeTab === 'departures'
-                                    ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                    ? 'bg-primary text-white shadow-xs'
                                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                         >
                             <LogOut size={13} />
                             <span>3. Departures / Due-Out</span>
                             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                                activeTab === 'departures' ? 'bg-blue-800 text-blue-100' : 'bg-slate-100 text-slate-600'
+                                activeTab === 'departures' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
                             }`}>
                                 {departuresList.length}
                             </span>
@@ -700,7 +695,7 @@ export const FrontDesk: React.FC = () => {
                             onClick={() => setActiveTab('cashier')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                 activeTab === 'cashier'
-                                    ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                    ? 'bg-primary text-white shadow-xs'
                                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                         >
@@ -921,7 +916,7 @@ export const FrontDesk: React.FC = () => {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleOpenCheckInModal(item)}
-                                                                className="h-7 px-3 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                                className="h-7 px-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                                             >
                                                                 <LogIn size={11} className="stroke-[2.5]" />
                                                                 <span>Check In</span>
@@ -1044,7 +1039,7 @@ export const FrontDesk: React.FC = () => {
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[500px] w-full p-4 space-y-3.5 animate-in zoom-in-95 duration-150">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center font-bold">
+                                <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-bold">
                                     <LogIn size={15} />
                                 </div>
                                 <div>
@@ -1170,7 +1165,7 @@ export const FrontDesk: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={handleConfirmCheckIn}
-                                className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                className="h-8 px-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
                                 <Check size={14} className="stroke-[3]" />
                                 <span>Complete Check-In</span>
@@ -1327,7 +1322,7 @@ export const FrontDesk: React.FC = () => {
                                 type="button"
                                 onClick={handlePostCharge}
                                 disabled={chargeAmount <= 0 || !chargeDesc.trim()}
-                                className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer shadow-xs"
+                                className="h-8 px-4 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer shadow-xs"
                             >
                                 Post to Folio
                             </button>
@@ -1397,7 +1392,7 @@ export const FrontDesk: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => window.print()}
-                                className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                className="h-8 px-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
                                 <Printer size={13} />
                                 <span>Print Reg Card</span>

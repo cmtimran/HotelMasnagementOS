@@ -4,6 +4,7 @@ import {
     ArrowRight, Check, RefreshCw
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
+import PageHeader from '../common/PageHeader';
 
 export interface HoldItem {
     id: number;
@@ -222,75 +223,66 @@ export const ReservationHold: React.FC = () => {
                 </div>
             )}
 
-            {/* Top Operational Header */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-amber-700 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
-                        <Clock size={20} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
-                                Reservation Hold &amp; Tentative Block Queue
-                            </h1>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                                {activeHolds.length} Active Holds
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
-                            Manages tentative room blocks pending purchase orders, embassy visas, or advance bank transfers
-                        </p>
-                    </div>
-                </div>
+            {/* Standardized Thesis Page Header */}
+            <PageHeader
+                title="Reservation Hold & Tentative Block Queue"
+                subtitle="Manages tentative room blocks pending purchase orders, embassy visas, or advance bank transfers"
+                icon={<Clock size={22} />}
+                badge={
+                    <span className="badge-status-active">
+                        <span className="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        {activeHolds.length} Active Holds
+                    </span>
+                }
+                actions={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(true)}
+                            className="btn-primary"
+                        >
+                            <Plus size={14} className="stroke-[2.5]" />
+                            <span>New Hold Block</span>
+                        </button>
 
-                {/* Primary Actions */}
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    <button
-                        type="button"
-                        onClick={() => setIsModalOpen(true)}
-                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
-                    >
-                        <Plus size={14} className="stroke-[2.5]" />
-                        <span>New Hold Block</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('front-desk')}
-                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-                    >
-                        <span>Front Desk</span>
-                        <ArrowRight size={13} />
-                    </button>
-                </div>
-            </div>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('front-desk')}
+                            className="btn-secondary"
+                        >
+                            <span>Front Desk</span>
+                            <ArrowRight size={13} />
+                        </button>
+                    </>
+                }
+            />
 
             {/* Metric KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Holds</span>
-                    <div className="text-xl font-black text-amber-900 font-mono mt-0.5">{activeHolds.length} Rooms</div>
-                    <p className="text-[10px] text-slate-500 mt-1">Temporarily blocked from sale</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Active Holds</span>
+                    <div className="text-2xl font-black text-amber-900 font-mono mt-1">{activeHolds.length} Rooms</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Temporarily blocked from sale</p>
                 </div>
 
-                <div className="bg-rose-50/70 p-3 rounded-xl border border-rose-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Expiring Today</span>
-                    <div className="text-xl font-black text-rose-900 font-mono mt-0.5">{expiringTodayCount} Deadline</div>
-                    <p className="text-[10px] text-rose-700 mt-1">Requires confirmation or release</p>
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Expiring Today</span>
+                    <div className="text-2xl font-black text-rose-700 font-mono mt-1">{expiringTodayCount} Deadline</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Requires confirmation or release</p>
                 </div>
 
-                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Converted to Confirmed</span>
-                    <div className="text-xl font-black text-emerald-950 font-mono mt-0.5">
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Converted to Confirmed</span>
+                    <div className="text-2xl font-black text-emerald-700 font-mono mt-1">
                         {holds.filter(h => h.status === 'Confirmed').length} Bookings
                     </div>
-                    <p className="text-[10px] text-emerald-700 mt-1">Successfully booked</p>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Successfully booked</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-slate-900 to-[#1e3a8a] text-white p-3 rounded-xl shadow-xs">
-                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">Potential Revenue</span>
-                    <div className="text-xl font-black font-mono mt-0.5">BDT {totalPotentialRevenue.toLocaleString()}</div>
-                    <p className="text-[10px] text-blue-200/80 mt-1">Held inventory value</p>
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Potential Revenue</span>
+                    <div className="text-2xl font-black text-slate-900 font-mono mt-1">BDT {totalPotentialRevenue.toLocaleString()}</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Held inventory value</p>
                 </div>
             </div>
 
@@ -612,7 +604,7 @@ export const ReservationHold: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer shadow-xs"
+                                    className="btn-primary"
                                 >
                                     <Check size={13} className="stroke-[3]" />
                                     <span>Create Hold Block</span>

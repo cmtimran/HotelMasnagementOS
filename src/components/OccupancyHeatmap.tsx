@@ -107,21 +107,21 @@ export const OccupancyHeatmap: React.FC = () => {
     return (
         <div className="h-full min-h-[calc(100vh-48px)] bg-gray-50 flex flex-col font-sans text-xs select-none animate-in fade-in duration-150">
             {/* Master Header */}
-            <header className="bg-white border-b border-gray-200 px-3.5 py-2 flex items-center justify-between shadow-2xs z-20">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 flex items-center justify-center flex-shrink-0">
+            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex items-center justify-between shadow-2xs z-20">
+                <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
                         <TrendingUp size={18} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-gray-900 tracking-tight">
+                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
                                 Occupancy Heatmap & Revenue Forecast
                             </h1>
-                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-orange-50 text-orange-700 border border-orange-200">
+                            <span className="badge-status-active">
                                 30-Day Yield Matrix
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-500">
+                        <p className="text-xs text-slate-500 mt-0.5">
                             Calendar heat distribution of room inventory occupancy, daily revenue pacing, and dynamic yield pricing.
                         </p>
                     </div>
@@ -129,19 +129,19 @@ export const OccupancyHeatmap: React.FC = () => {
 
                 {/* Month Navigator */}
                 <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/90">
                         <button
                             onClick={prevMonth}
-                            className="p-1 hover:bg-white rounded text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                            className="p-1 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                         >
                             <ChevronLeft size={14} />
                         </button>
-                        <span className="font-bold text-gray-900 px-3 text-xs">
+                        <span className="font-bold text-slate-900 px-3 text-xs">
                             {monthNames[month]} {year}
                         </span>
                         <button
                             onClick={nextMonth}
-                            className="p-1 hover:bg-white rounded text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                            className="p-1 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                         >
                             <ChevronRight size={14} />
                         </button>
@@ -150,33 +150,33 @@ export const OccupancyHeatmap: React.FC = () => {
             </header>
 
             {/* Top KPI Metrics */}
-            <div className="bg-white border-b border-gray-200 px-3.5 py-2 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+            <div className="bg-white border-b border-slate-200 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Avg Occupancy</span>
-                        <p className="text-base font-bold text-gray-900 mt-0.5">{avgOccupancy}%</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Occupancy</span>
+                        <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{avgOccupancy}%</p>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         +4.2% vs May
                     </span>
                 </div>
 
-                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Forecast Revenue</span>
-                        <p className="text-base font-bold text-blue-700 font-mono mt-0.5">৳ {(totalMonthRevenue / 100000).toFixed(2)}L</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Forecast Revenue</span>
+                        <p className="text-lg font-black text-primary font-mono mt-0.5">৳ {(totalMonthRevenue / 100000).toFixed(2)}L</p>
                     </div>
-                    <span className="text-[10px] font-mono font-bold text-gray-500">
+                    <span className="text-[10.5px] font-mono font-semibold text-slate-500">
                         {daysInMonth} Days
                     </span>
                 </div>
 
-                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Avg Daily Rate (ADR)</span>
-                        <p className="text-base font-bold text-gray-900 font-mono mt-0.5">৳ {avgADR.toLocaleString()}</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Daily Rate (ADR)</span>
+                        <p className="text-lg font-black text-slate-900 font-mono mt-0.5">৳ {avgADR.toLocaleString()}</p>
                     </div>
-                    <span className="text-[9.5px] text-gray-400 uppercase">Per Room</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Per Room</span>
                 </div>
 
                 <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">

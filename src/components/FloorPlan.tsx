@@ -131,28 +131,28 @@ export const FloorPlan: React.FC = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-3.5 py-2 flex items-center justify-between shadow-2xs z-20">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center flex-shrink-0">
+            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs z-20">
+                <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
                         <Building2 size={18} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-gray-900 tracking-tight">
+                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
                                 Floor Plan Architectural CAD View
                             </h1>
-                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="badge-status-active">
                                 Live Spatial Map
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-500">
+                        <p className="text-xs text-slate-500 mt-0.5">
                             Spatial visualization of room occupancy, corridor logistics, turnover status, and quick room inspection.
                         </p>
                     </div>
                 </div>
 
                 {/* Floor Switcher Buttons */}
-                <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200 gap-1 shadow-2xs">
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/90 gap-1 shadow-2xs overflow-x-auto">
                     {[
                         { floor: 1, label: 'Floor 1 (Deluxe)' },
                         { floor: 2, label: 'Floor 2 (Executive)' },
@@ -169,10 +169,10 @@ export const FloorPlan: React.FC = () => {
                                     setSelectedFloor(f.floor);
                                     setSelectedRoom(null);
                                 }}
-                                className={`h-7 px-3 rounded-md font-bold text-[11px] cursor-pointer transition-all ${
+                                className={`h-7 px-3 rounded-lg font-bold text-xs cursor-pointer transition-all ${
                                     isActive
-                                        ? 'bg-[#1e3a8a] text-white shadow-xs'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/70'
+                                        ? 'bg-primary text-white shadow-xs'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
                                 }`}
                             >
                                 {f.label}

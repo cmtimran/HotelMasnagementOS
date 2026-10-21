@@ -200,14 +200,14 @@ const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
                     <button
                         type="button"
                         onClick={() => handleSave('draft')}
-                        className="px-3.5 py-1.5 hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 transition-all cursor-pointer shadow-2xs"
+                        className="btn-secondary"
                     >
                         Save Draft
                     </button>
                     <button
                         type="button"
                         onClick={() => handleSave('publish')}
-                        className="px-4 py-1.5 bg-[#0052cc] hover:bg-[#0047b3] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+                        className="btn-primary"
                     >
                         <CheckCircle2 size={14} /> Save & Publish
                     </button>
@@ -224,9 +224,9 @@ const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
                                 key={tab.id}
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all text-left ${activeTab === tab.id ? 'bg-[#e9f0ff] text-[#0052cc] border-l-4 border-[#0052cc]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'}`}
+                                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all text-left ${activeTab === tab.id ? 'bg-primary-subtle text-primary border-l-4 border-primary' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'}`}
                             >
-                                <span className={activeTab === tab.id ? 'text-[#0052cc]' : 'text-gray-400'}>{tab.icon}</span>
+                                <span className={activeTab === tab.id ? 'text-primary' : 'text-gray-400'}>{tab.icon}</span>
                                 <span className="truncate">{tab.label}</span>
                             </button>
                         ))}

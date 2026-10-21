@@ -363,24 +363,24 @@ export const FolioOperations: React.FC = () => {
             )}
 
             {/* Master Header Bar */}
-            <header className="bg-slate-900 text-white px-3.5 py-2 flex items-center justify-between shadow-2xs z-20 border-b border-slate-800">
+            <header className="bg-white text-slate-900 px-4 py-3 flex items-center justify-between shadow-2xs z-20 border-b border-slate-200/90">
                 <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-md bg-blue-600/30 text-blue-400 border border-blue-500/40 flex items-center justify-center">
-                        <FileText size={15} />
+                    <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
+                        <FileText size={18} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold tracking-tight text-white">
+                            <h1 className="text-base font-bold tracking-tight text-slate-900">
                                 {activeFolio.guestName}
                             </h1>
-                            <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">
+                            <span className="badge-code">
                                 Room {activeFolio.roomNumber} ({activeFolio.roomType})
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
+                            <span className="text-[11px] text-slate-400 font-mono">
                                 {activeFolio.folioNumber}
                             </span>
                         </div>
-                        <p className="text-[10.5px] text-slate-400">
+                        <p className="text-xs text-slate-500 mt-0.5">
                             Stay: {activeFolio.checkIn} → {activeFolio.checkOut} • {activeFolio.company || 'Direct FIT'}
                         </p>
                     </div>
@@ -388,89 +388,89 @@ export const FolioOperations: React.FC = () => {
 
                 <div className="flex items-center gap-4">
                     <div className="text-right">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block leading-none">Window 1 (Master)</span>
-                        <span className={`text-xs font-bold font-mono mt-0.5 block leading-tight ${calcWindowNet(1) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Window 1 (Master)</span>
+                        <span className={`text-xs font-bold font-mono mt-1 block leading-tight ${calcWindowNet(1) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             ৳ {calcWindowNet(1).toLocaleString()}
                         </span>
                     </div>
 
-                    <div className="text-right border-l border-slate-800 pl-3">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block leading-none">Window 2 (Extras)</span>
-                        <span className={`text-xs font-bold font-mono mt-0.5 block leading-tight ${calcWindowNet(2) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <div className="text-right border-l border-slate-200 pl-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Window 2 (Extras)</span>
+                        <span className={`text-xs font-bold font-mono mt-1 block leading-tight ${calcWindowNet(2) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             ৳ {calcWindowNet(2).toLocaleString()}
                         </span>
                     </div>
 
-                    <div className="text-right border-l border-slate-800 pl-3">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block leading-none">Net Guest Balance</span>
-                        <span className={`text-sm font-bold font-mono mt-0.5 block leading-tight ${calcTotalBalance() >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                    <div className="text-right border-l border-slate-200 pl-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Net Guest Balance</span>
+                        <span className={`text-sm font-bold font-mono mt-1 block leading-tight ${calcTotalBalance() >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             ৳ {calcTotalBalance().toLocaleString()}
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-1 border-l border-slate-800 pl-3">
+                    <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
                         <button
                             onClick={() => setActiveTab('invoice-preview')}
-                            className="p-1.5 bg-slate-800 hover:bg-blue-600 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            className="btn-icon"
                             title="Print GST Tax Invoice"
                         >
-                            <Printer size={13} />
+                            <Printer size={15} />
                         </button>
                         <button
                             onClick={() => showToast('Folio statement dispatched to guest email.')}
-                            className="p-1.5 bg-slate-800 hover:bg-emerald-600 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            className="btn-icon"
                             title="Send Email Folio"
                         >
-                            <Send size={13} />
+                            <Send size={15} />
                         </button>
                     </div>
                 </div>
             </header>
 
             {/* Sub-header Navigation */}
-            <div className="bg-white border-b border-gray-200 flex items-center justify-between px-3 z-10">
+            <div className="bg-white border-b border-slate-200 px-4 flex items-center justify-between z-10">
                 <div className="flex">
                     <button
                         onClick={() => setActiveTab('folio-operations')}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all border-b-2 cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold transition-all border-b-2 cursor-pointer ${
                             activeTab === 'folio-operations'
-                                ? 'border-blue-600 text-blue-600 bg-blue-50/20'
-                                : 'border-transparent text-gray-500 hover:text-gray-900'
+                                ? 'border-primary text-primary bg-primary-subtle/50'
+                                : 'border-transparent text-slate-500 hover:text-slate-900'
                         }`}
                     >
-                        <FileText size={12} />
+                        <FileText size={13} />
                         Folio Billing & Ledger
                     </button>
                     <button
                         onClick={() => setActiveTab('allowances')}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all border-b-2 cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold transition-all border-b-2 cursor-pointer ${
                             activeTab === 'allowances'
-                                ? 'border-blue-600 text-blue-600 bg-blue-50/20'
-                                : 'border-transparent text-gray-500 hover:text-gray-900'
+                                ? 'border-primary text-primary bg-primary-subtle/50'
+                                : 'border-transparent text-slate-500 hover:text-slate-900'
                         }`}
                     >
-                        <ShieldCheck size={12} />
+                        <ShieldCheck size={13} />
                         Allowances & Inclusions ({activeFolio.allowances.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('invoice-preview')}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all border-b-2 cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold transition-all border-b-2 cursor-pointer ${
                             activeTab === 'invoice-preview'
-                                ? 'border-blue-600 text-blue-600 bg-blue-50/20'
-                                : 'border-transparent text-gray-500 hover:text-gray-900'
+                                ? 'border-primary text-primary bg-primary-subtle/50'
+                                : 'border-transparent text-slate-500 hover:text-slate-900'
                         }`}
                     >
-                        <Printer size={12} />
+                        <Printer size={13} />
                         Official Tax Invoice
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1.5 py-1">
+                <div className="flex items-center gap-2 py-1.5">
                     <button
                         onClick={() => setShowPostChargeModal(true)}
-                        className="flex items-center gap-1 h-6 px-2.5 bg-blue-600 text-white rounded text-[10.5px] font-semibold hover:bg-blue-700 transition-colors shadow-2xs cursor-pointer"
+                        className="btn-primary py-1.5 px-3 text-xs"
                     >
-                        <Plus size={12} /> Post Charge / Credit
+                        <Plus size={13} /> Post Charge / Credit
                     </button>
                     <button
                         onClick={() => {
@@ -481,9 +481,9 @@ export const FolioOperations: React.FC = () => {
                             });
                             setShowSettleModal(true);
                         }}
-                        className="flex items-center gap-1 h-6 px-2.5 bg-slate-900 text-white rounded text-[10.5px] font-semibold hover:bg-slate-800 transition-colors shadow-2xs cursor-pointer"
+                        className="btn-secondary py-1.5 px-3 text-xs"
                     >
-                        <CreditCard size={12} /> Settle Window {activeWindow}
+                        <CreditCard size={13} /> Settle Window {activeWindow}
                     </button>
                 </div>
             </div>

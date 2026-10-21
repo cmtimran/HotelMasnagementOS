@@ -4,6 +4,7 @@ import {
     Sparkles, RefreshCw
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
+import PageHeader from '../common/PageHeader';
 
 export interface UnassignedItem {
     id: string | number;
@@ -310,86 +311,76 @@ export const ReservationUnassigned: React.FC = () => {
                 </div>
             )}
 
-            {/* Top Operational Header */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 to-rose-700 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
-                        <BedDouble size={20} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
-                                Unassigned Rooms Queue
-                            </h1>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
-                                {unassignedList.length} Awaiting Room #
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
-                            Confirmed reservations from OTAs and website engines pending physical room allocation
-                        </p>
-                    </div>
-                </div>
+            {/* Standardized Thesis Page Header */}
+            <PageHeader
+                title="Unassigned Rooms Queue"
+                subtitle="Confirmed reservations from OTAs and website engines pending physical room allocation"
+                icon={<BedDouble size={22} />}
+                badge={
+                    <span className="badge-status-active">
+                        <span className="size-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                        {unassignedList.length} Awaiting Room #
+                    </span>
+                }
+                actions={
+                    <>
+                        {unassignedList.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleAutoAssignAll}
+                                className="btn-primary"
+                                title="Auto-Assign all unassigned reservations to best available clean rooms"
+                            >
+                                <Sparkles size={14} className="stroke-[2.5]" />
+                                <span>Auto-Allocate All</span>
+                            </button>
+                        )}
 
-                {/* Primary Actions */}
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    {unassignedList.length > 0 && (
                         <button
                             type="button"
-                            onClick={handleAutoAssignAll}
-                            className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
-                            title="Auto-Assign all unassigned reservations to best available clean rooms"
+                            onClick={() => setActivePage('stay-view')}
+                            className="btn-secondary"
                         >
-                            <Sparkles size={13} className="text-blue-200" />
-                            <span>Auto-Allocate All</span>
+                            <span>Stay View</span>
+                            <ArrowRight size={13} />
                         </button>
-                    )}
 
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('stay-view')}
-                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-                    >
-                        <span>Stay View</span>
-                        <ArrowRight size={13} />
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('front-desk')}
-                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-                    >
-                        <span>Front Desk</span>
-                        <ArrowRight size={13} />
-                    </button>
-                </div>
-            </div>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('front-desk')}
+                            className="btn-secondary"
+                        >
+                            <span>Front Desk</span>
+                            <ArrowRight size={13} />
+                        </button>
+                    </>
+                }
+            />
 
             {/* Operational Metric KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Unassigned</span>
-                    <div className="text-xl font-black text-slate-900 font-mono mt-0.5">{unassignedList.length} Bookings</div>
-                    <p className="text-[10px] text-slate-500 mt-1">Pending physical room keys</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Unassigned</span>
+                    <div className="text-2xl font-black text-slate-900 font-mono mt-1">{unassignedList.length} Bookings</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Pending physical room keys</p>
                 </div>
 
-                <div className="bg-rose-50/70 p-3 rounded-xl border border-rose-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Due In Today (Urgent)</span>
-                    <div className="text-xl font-black text-rose-900 font-mono mt-0.5">{dueTodayCount} Guests</div>
-                    <p className="text-[10px] text-rose-700 mt-1">Arriving on 01 Jul 2026</p>
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Due In Today (Urgent)</span>
+                    <div className="text-2xl font-black text-rose-700 font-mono mt-1">{dueTodayCount} Guests</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Arriving on 01 Jul 2026</p>
                 </div>
 
-                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Clean Rooms in Stock</span>
-                    <div className="text-xl font-black text-emerald-900 font-mono mt-0.5">18 Ready</div>
-                    <p className="text-[10px] text-emerald-700 mt-1">100% capacity available to allocate</p>
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Clean Rooms in Stock</span>
+                    <div className="text-2xl font-black text-emerald-700 font-mono mt-1">18 Ready</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">100% capacity available to allocate</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-slate-900 to-[#1e3a8a] text-white p-3 rounded-xl shadow-xs">
-                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">Revenue In Queue</span>
-                    <div className="text-xl font-black font-mono mt-0.5">BDT {totalRevenueAtRisk.toLocaleString()}</div>
-                    <p className="text-[10px] text-blue-200/80 mt-1">Guaranteed prepaid &amp; corporate tariffs</p>
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Revenue In Queue</span>
+                    <div className="text-2xl font-black text-slate-900 font-mono mt-1">BDT {totalRevenueAtRisk.toLocaleString()}</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Guaranteed prepaid & corporate tariffs</p>
                 </div>
             </div>
 
@@ -556,7 +547,7 @@ export const ReservationUnassigned: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => setAssignTarget(u)}
-                                                    className="h-7 px-3 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs inline-flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                                                    className="btn-primary py-1.5 px-3 text-xs"
                                                 >
                                                     <span>Assign Room</span>
                                                     <ArrowRight size={11} className="stroke-[2.5]" />
@@ -588,7 +579,7 @@ export const ReservationUnassigned: React.FC = () => {
                         {/* Modal Header */}
                         <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center font-bold">
+                                <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-bold">
                                     <BedDouble size={16} />
                                 </div>
                                 <div>
@@ -674,7 +665,7 @@ export const ReservationUnassigned: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={handleConfirmAssign}
-                                className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                className="btn-primary"
                             >
                                 <Check size={14} className="stroke-[3]" />
                                 <span>Confirm Room {targetRoom}</span>

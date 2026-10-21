@@ -152,21 +152,21 @@ export const NightAuditAutomation: React.FC = () => {
             )}
 
             {/* Header */}
-            <header className="bg-slate-900 text-white px-3.5 py-2.5 flex items-center justify-between shadow-2xs z-20 border-b border-slate-800">
+            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex items-center justify-between shadow-2xs z-20">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-600/30 text-purple-400 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
+                    <div className="size-10 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shrink-0">
                         <Moon size={18} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-white tracking-tight">
+                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
                                 End of Day (EOD) Night Audit Automation
                             </h1>
-                            <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            <span className="badge-status-active">
                                 EOD Pipeline
                             </span>
                         </div>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-xs text-slate-500 mt-0.5">
                             Automatic room rent & tax posting, cashier shift reconciliation, no-show forfeiture, and GL rollover.
                         </p>
                     </div>
@@ -174,41 +174,37 @@ export const NightAuditAutomation: React.FC = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="text-right">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block leading-none">System Business Date</span>
-                        <span className="text-sm font-mono font-bold text-purple-300 mt-0.5 block leading-tight">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">System Business Date</span>
+                        <span className="text-sm font-mono font-bold text-purple-700 mt-1 block leading-tight">
                             {businessDate}
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-2 border-l border-slate-800 pl-3">
+                    <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
                         {auditCompleted ? (
                             <button
                                 onClick={handleResetAudit}
-                                className="h-7 px-3 bg-slate-800 hover:bg-slate-700 text-white rounded text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                className="btn-secondary"
                             >
-                                <RefreshCw size={12} />
+                                <RefreshCw size={13} />
                                 <span>Reset / Re-run</span>
                             </button>
                         ) : (
                             <button
                                 onClick={handleRunFullAudit}
                                 disabled={isRunning}
-                                className={`h-7 px-3 rounded text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer ${
-                                    isRunning
-                                        ? 'bg-purple-800 text-purple-300 cursor-not-allowed'
-                                        : 'bg-purple-600 hover:bg-purple-700 text-white'
-                                }`}
+                                className="btn-primary"
                             >
-                                {isRunning ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}
+                                {isRunning ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />}
                                 <span>{isRunning ? 'Running EOD Audit...' : 'Execute Night Audit'}</span>
                             </button>
                         )}
 
                         <button
                             onClick={() => window.print()}
-                            className="h-7 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-[11px] font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            className="btn-secondary"
                         >
-                            <Printer size={12} />
+                            <Printer size={13} />
                             <span>Print Report</span>
                         </button>
                     </div>

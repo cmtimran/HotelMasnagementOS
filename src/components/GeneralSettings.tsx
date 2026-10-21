@@ -144,35 +144,35 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
             </div>
 
             {/* Elevated Header Card */}
-            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
-                <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-sm shadow-2xs flex-shrink-0">
-                            <Settings size={22} className="text-blue-600" />
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3.5">
+                        <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0 shadow-2xs">
+                            <Settings size={22} className="text-primary" />
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight truncate">
+                                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight truncate">
                                     System & Property General Settings
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
+                                <span className="badge-status-active">
                                     Global Core
                                 </span>
-                                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                     v2.4.0 Production
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
                                 <span className="flex items-center gap-1">
-                                    <Clock size={11} className="text-gray-400" />
+                                    <Clock size={12} className="text-slate-400" />
                                     <span>Timezone: UTC+6 (Dhaka)</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <DollarSign size={11} className="text-gray-400" />
+                                    <DollarSign size={12} className="text-slate-400" />
                                     <span>Base: BDT (৳)</span>
                                 </span>
                                 <span className="hidden sm:flex items-center gap-1">
-                                    <Cloud size={11} className="text-gray-400" />
+                                    <Cloud size={12} className="text-slate-400" />
                                     <span>Backup: Automated Daily (04:00 AM)</span>
                                 </span>
                             </div>
@@ -180,22 +180,22 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                         <button
                             type="button"
                             onClick={handleReset}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            className="btn-secondary"
                         >
-                            <RotateCcw size={12} className="text-gray-400" />
+                            <RotateCcw size={13} className="text-slate-400" />
                             <span>Reset</span>
                         </button>
                         <button
                             type="button"
                             onClick={handleSave}
-                            className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            className="btn-primary"
                         >
-                            <Save size={13} />
-                            <span>Deploy Settings</span>
+                            <Save size={14} />
+                            <span>Save Changes</span>
                         </button>
                     </div>
                 </div>

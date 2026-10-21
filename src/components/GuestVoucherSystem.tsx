@@ -198,21 +198,21 @@ export const GuestVoucherSystem: React.FC = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-3.5 py-2.5 flex items-center justify-between shadow-2xs z-20">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex items-center justify-between shadow-2xs z-20">
+                <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
                         <Ticket size={18} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-gray-900 tracking-tight">
+                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
                                 Digital Guest Service Vouchers & Passes
                             </h1>
-                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="badge-status-active">
                                 In-Stay Privileges
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-500">
+                        <p className="text-xs text-slate-500 mt-0.5">
                             Issuance and real-time QR redemption of breakfast passes, dining coupons, spa sessions, and airport transfers.
                         </p>
                     </div>
@@ -221,40 +221,40 @@ export const GuestVoucherSystem: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setShowIssueModal(true)}
-                        className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        className="btn-primary"
                     >
-                        <Plus size={12} />
+                        <Plus size={14} />
                         <span>Issue Voucher Pass</span>
                     </button>
                     <button
                         onClick={() => window.print()}
-                        className="h-7 px-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-md text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer"
+                        className="btn-secondary"
                     >
-                        <Printer size={12} />
+                        <Printer size={13} />
                         <span>Print Sheet</span>
                     </button>
                 </div>
             </header>
 
             {/* Top KPI Metrics */}
-            <div className="bg-white border-b border-gray-200 px-3.5 py-2 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+            <div className="bg-white border-b border-slate-200 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Active Valid Vouchers</span>
-                        <p className="text-base font-bold text-emerald-700 mt-0.5">{activeCount} <span className="text-[10px] text-gray-400 font-normal">Passes</span></p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Valid Vouchers</span>
+                        <p className="text-lg font-black text-emerald-700 mt-0.5 font-mono">{activeCount} <span className="text-xs font-normal text-slate-400">Passes</span></p>
                     </div>
-                    <div className="w-7 h-7 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <Ticket size={14} />
+                    <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+                        <Ticket size={16} />
                     </div>
                 </div>
 
-                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Redeemed Today</span>
-                        <p className="text-base font-bold text-gray-900 mt-0.5">{redeemedCount} <span className="text-[10px] text-gray-400 font-normal">Used</span></p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Redeemed Today</span>
+                        <p className="text-lg font-black text-slate-900 mt-0.5 font-mono">{redeemedCount} <span className="text-xs font-normal text-slate-400">Used</span></p>
                     </div>
-                    <div className="w-7 h-7 rounded bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <CheckCircle2 size={14} />
+                    <div className="size-9 rounded-xl bg-blue-50 text-primary border border-blue-100 flex items-center justify-center">
+                        <CheckCircle2 size={16} />
                     </div>
                 </div>
 

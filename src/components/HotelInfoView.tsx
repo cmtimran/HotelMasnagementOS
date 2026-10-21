@@ -145,10 +145,10 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
     return (
         <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
             {/* Consistent Property Header Card */}
-            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
-                <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-sm shadow-2xs flex-shrink-0 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3.5">
+                        <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle border border-primary-border flex items-center justify-center text-primary font-bold text-sm shadow-2xs shrink-0 overflow-hidden">
                             {property.logo && !property.logo.includes('placehold.co') ? (
                                 <img
                                     src={property.logo}
@@ -161,31 +161,31 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight truncate">
+                                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight truncate">
                                     {property.name}
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 flex-shrink-0">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                                     <Star size={10} fill="currentColor" />
                                     <span>{property.grade || '5 Star'}</span>
                                 </span>
-                                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+                                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-primary border border-blue-200">
                                     HTL-DHK-01
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
                                 <span className="flex items-center gap-1">
-                                    <MapPin size={11} className="text-gray-400" />
+                                    <MapPin size={12} className="text-slate-400" />
                                     <span>{property.city}, {property.country}</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <Globe size={11} className="text-gray-400" />
-                                    <a href={`https://${property.website}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                                    <Globe size={12} className="text-slate-400" />
+                                    <a href={`https://${property.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                                         {property.website}
                                     </a>
                                 </span>
                                 {property.phone && (
                                     <span className="hidden md:flex items-center gap-1">
-                                        <Phone size={11} className="text-gray-400" />
+                                        <Phone size={12} className="text-slate-400" />
                                         <span>{property.phone}</span>
                                     </span>
                                 )}
@@ -194,36 +194,36 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
                     </div>
 
                     {/* Header Action Buttons & Live Clock */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
-                        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200/70 rounded-lg text-xs font-mono text-gray-700">
-                            <Clock size={12} className="text-blue-600 animate-spin" style={{ animationDuration: '10s' }} />
+                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                        <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-mono text-slate-700">
+                            <Clock size={13} className="text-primary animate-spin" style={{ animationDuration: '10s' }} />
                             <span className="font-bold">{localTime || '12:00:00 PM'}</span>
-                            <span className="text-[9.5px] text-gray-400 font-sans font-medium">(UTC+6)</span>
+                            <span className="text-[10px] text-slate-400 font-sans font-medium">(UTC+6)</span>
                         </div>
                         <button
                             type="button"
                             onClick={handleCopyInfo}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            className="btn-secondary"
                             title="Copy Hotel Information"
                         >
-                            {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} className="text-gray-400" />}
+                            {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} className="text-slate-400" />}
                             <span>{copied ? 'Copied' : 'Copy'}</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => setIsEmailModalOpen(true)}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            className="btn-secondary"
                             title="Send Details via Email"
                         >
-                            <Mail size={12} className="text-gray-400" />
+                            <Mail size={13} className="text-slate-400" />
                             <span>Email</span>
                         </button>
                         <button
                             type="button"
                             onClick={onManageProperty}
-                            className="h-7 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-semibold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+                            className="btn-primary"
                         >
-                            <Edit2 size={11} />
+                            <Edit2 size={13} />
                             <span>Manage Property</span>
                         </button>
                     </div>

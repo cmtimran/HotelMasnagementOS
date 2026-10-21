@@ -10,6 +10,7 @@ import {
     ShieldAlert,
     FileText
 } from 'lucide-react';
+import PageHeader from '../common/PageHeader';
 
 export interface CancelledItem {
     id: number;
@@ -256,99 +257,91 @@ export const ReservationCancel: React.FC = () => {
                 </div>
             )}
 
-            {/* Header Bar */}
-            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3.5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center flex-shrink-0">
-                        <XCircle size={18} />
-                    </div>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-gray-900 tracking-tight truncate">
-                                Cancelled Reservations & Forfeiture Ledger
-                            </h1>
-                            <span className="px-1.5 py-0.2 text-[9.5px] font-bold rounded bg-rose-50 text-rose-700 border border-rose-200">
-                                GL-4501 Audit
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500 truncate">
-                            Track cancelled bookings, reason telemetry, retention fee penalties, and refund disbursements.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const csvContent = "data:text/csv;charset=utf-8," + 
-                                ["Res#,Guest,RoomType,Nights,CancelDate,Reason,RetentionBDT,RefundStatus"].join(",") + "\n" +
-                                cancelledList.map(c => `"${c.reservationNumber}","${c.guestName}","${c.roomType}",${c.nights},"${c.cancellationDate}","${c.reason}",${c.retentionFeeBDT},"${c.refundStatus}"`).join("\n");
-                            const encodedUri = encodeURI(csvContent);
-                            const link = document.createElement("a");
-                            link.setAttribute("href", encodedUri);
-                            link.setAttribute("download", `Cancellation_Audit_Report_${new Date().toISOString().slice(0, 10)}.csv`);
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            showToast("Exported Cancellation Audit CSV.");
-                        }}
-                        className="h-8 px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                    >
-                        <FileSpreadsheet size={13} className="text-emerald-600" />
-                        <span>Export CSV</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="h-8 px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                    >
-                        <Printer size={13} className="text-gray-600" />
-                        <span>Print Log</span>
-                    </button>
-                </div>
-            </div>
+            {/* Standardized Thesis Page Header */}
+            <PageHeader
+                title="Cancelled Reservations & Forfeiture Ledger"
+                subtitle="Track cancelled bookings, cancellation reason telemetry, retention penalties, and refund disbursements"
+                icon={<XCircle size={22} className="text-rose-600" />}
+                badge={
+                    <span className="badge-status-active">
+                        <span className="size-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                        GL-4501 Audit
+                    </span>
+                }
+                actions={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const csvContent = "data:text/csv;charset=utf-8," + 
+                                    ["Res#,Guest,RoomType,Nights,CancelDate,Reason,RetentionBDT,RefundStatus"].join(",") + "\n" +
+                                    cancelledList.map(c => `"${c.reservationNumber}","${c.guestName}","${c.roomType}",${c.nights},"${c.cancellationDate}","${c.reason}",${c.retentionFeeBDT},"${c.refundStatus}"`).join("\n");
+                                const encodedUri = encodeURI(csvContent);
+                                const link = document.createElement("a");
+                                link.setAttribute("href", encodedUri);
+                                link.setAttribute("download", `Cancellation_Audit_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                showToast("Exported Cancellation Audit CSV.");
+                            }}
+                            className="btn-secondary"
+                        >
+                            <FileSpreadsheet size={13} className="text-emerald-600" />
+                            <span>Export CSV</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="btn-secondary"
+                        >
+                            <Printer size={13} className="text-slate-500" />
+                            <span>Print Log</span>
+                        </button>
+                    </>
+                }
+            />
 
             {/* KPI Metric Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-white p-2.5 rounded-lg border border-gray-200/90 shadow-2xs flex items-center justify-between">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Total Cancelled</span>
-                        <p className="text-base font-bold text-gray-900 mt-0.5">{cancelledList.length} <span className="text-[10px] font-normal text-gray-400">Bookings</span></p>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Cancelled</span>
+                        <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{cancelledList.length} <span className="text-xs font-normal text-slate-400">Bookings</span></p>
                     </div>
-                    <div className="w-7 h-7 rounded-md bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center">
-                        <XCircle size={14} />
+                    <div className="size-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center">
+                        <XCircle size={18} />
                     </div>
                 </div>
 
-                <div className="bg-white p-2.5 rounded-lg border border-gray-200/90 shadow-2xs flex items-center justify-between">
+                <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fees Retained (GL-4501)</span>
-                        <p className="text-base font-bold text-rose-700 font-mono mt-0.5">৳ {totalRetainedBDT.toLocaleString()}</p>
-                        <p className="text-[9.5px] text-gray-400 font-mono">Booked: ৳ {totalOriginalBDT.toLocaleString()}</p>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fees Retained (GL-4501)</span>
+                        <p className="text-2xl font-black text-rose-700 font-mono mt-1">৳ {totalRetainedBDT.toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">Booked: ৳ {totalOriginalBDT.toLocaleString()}</p>
                     </div>
-                    <div className="w-7 h-7 rounded-md bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
-                        <DollarSign size={14} />
+                    <div className="size-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
+                        <DollarSign size={18} />
                     </div>
                 </div>
 
-                <div className="bg-white p-2.5 rounded-lg border border-gray-200/90 shadow-2xs flex items-center justify-between">
+                <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Full Refunds Disbursed</span>
-                        <p className="text-base font-bold text-emerald-700 mt-0.5">{fullRefundsCount} <span className="text-[10px] font-normal text-gray-400">Waivers</span></p>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Full Refunds Disbursed</span>
+                        <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">{fullRefundsCount} <span className="text-xs font-normal text-slate-400">Waivers</span></p>
                     </div>
-                    <div className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
-                        <CheckCircle2 size={14} />
+                    <div className="size-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+                        <CheckCircle2 size={18} />
                     </div>
                 </div>
 
-                <div className="bg-white p-2.5 rounded-lg border border-gray-200/90 shadow-2xs flex items-center justify-between">
+                <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Penalties / Forfeitures</span>
-                        <p className="text-base font-bold text-gray-900 mt-0.5">{penaltyAppliedCount} <span className="text-[10px] font-normal text-gray-400">Accounts</span></p>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Penalties / Forfeitures</span>
+                        <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{penaltyAppliedCount} <span className="text-xs font-normal text-slate-400">Accounts</span></p>
                     </div>
-                    <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
-                        <ShieldAlert size={14} />
+                    <div className="size-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center">
+                        <ShieldAlert size={18} />
                     </div>
                 </div>
             </div>

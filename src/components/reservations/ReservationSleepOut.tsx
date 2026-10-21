@@ -4,6 +4,7 @@ import {
     Printer, RefreshCw, ArrowRight, Check
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
+import PageHeader from '../common/PageHeader';
 
 export interface SleepOutItem {
     id: number;
@@ -167,77 +168,68 @@ export const ReservationSleepOut: React.FC = () => {
                 </div>
             )}
 
-            {/* Top Operational Header */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-700 to-indigo-900 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
-                        <Moon size={20} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
-                                Sleep Out Register &amp; Security Ledger
-                            </h1>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                {activeOutCount} Active Out
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
-                            Tracks checked-in guests sleeping away from property while retaining room billing &amp; key security
-                        </p>
-                    </div>
-                </div>
+            {/* Standardized Thesis Page Header */}
+            <PageHeader
+                title="Sleep Out Register & Security Ledger"
+                subtitle="Tracks checked-in guests sleeping away from property while retaining room billing & key security"
+                icon={<Moon size={22} />}
+                badge={
+                    <span className="badge-status-active">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        {activeOutCount} Active Out
+                    </span>
+                }
+                actions={
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(true)}
+                            className="btn-primary"
+                        >
+                            <Plus size={14} className="stroke-[2.5]" />
+                            <span>Log Sleep Out</span>
+                        </button>
 
-                {/* Primary Actions */}
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    <button
-                        type="button"
-                        onClick={() => setIsModalOpen(true)}
-                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
-                    >
-                        <Plus size={14} className="stroke-[2.5]" />
-                        <span>Log Sleep Out</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('front-desk')}
-                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-                    >
-                        <span>Front Desk</span>
-                        <ArrowRight size={13} />
-                    </button>
-                </div>
-            </div>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('front-desk')}
+                            className="btn-secondary"
+                        >
+                            <span>Front Desk</span>
+                            <ArrowRight size={13} />
+                        </button>
+                    </>
+                }
+            />
 
             {/* Metric KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Sleep-Outs</span>
-                    <div className="text-xl font-black text-indigo-900 font-mono mt-0.5">{activeOutCount} Rooms</div>
-                    <p className="text-[10px] text-slate-500 mt-1">Currently away from hotel</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Active Sleep-Outs</span>
+                    <div className="text-2xl font-black text-slate-900 font-mono mt-1">{activeOutCount} Rooms</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Currently away from hotel</p>
                 </div>
 
-                <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider block">Key Cards Secured</span>
-                    <div className="text-xl font-black text-indigo-950 font-mono mt-0.5">
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Key Cards Secured</span>
+                    <div className="text-2xl font-black text-primary font-mono mt-1">
                         {sleepOuts.filter(s => s.status === 'Sleeping Out' && s.keyCardLocation === 'Held at Front Desk').length} Keys
                     </div>
-                    <p className="text-[10px] text-indigo-700 mt-1">Held at Front Desk safe</p>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Held at Front Desk safe</p>
                 </div>
 
-                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Returned &amp; Closed</span>
-                    <div className="text-xl font-black text-emerald-950 font-mono mt-0.5">
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Returned &amp; Closed</span>
+                    <div className="text-2xl font-black text-emerald-700 font-mono mt-1">
                         {sleepOuts.filter(s => s.status === 'Returned').length} Records
                     </div>
-                    <p className="text-[10px] text-emerald-700 mt-1">Safely re-occupied</p>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Safely re-occupied</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-slate-900 to-[#1e3a8a] text-white p-3 rounded-xl shadow-xs">
-                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">Night Audit Policy</span>
-                    <div className="text-xl font-black font-mono mt-0.5">Active Billing</div>
-                    <p className="text-[10px] text-blue-200/80 mt-1">Tariff posting continues as in-house</p>
+                <div className="card-container p-4">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Night Audit Policy</span>
+                    <div className="text-2xl font-black text-slate-900 font-mono mt-1">Active Billing</div>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">Tariff posting continues as in-house</p>
                 </div>
             </div>
 
@@ -542,7 +534,7 @@ export const ReservationSleepOut: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer shadow-xs"
+                                    className="btn-primary"
                                 >
                                     <Check size={13} className="stroke-[3]" />
                                     <span>Register Sleep-Out</span>
@@ -606,7 +598,7 @@ export const ReservationSleepOut: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => window.print()}
-                                className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                className="btn-primary"
                             >
                                 <Printer size={13} />
                                 <span>Print Pass</span>

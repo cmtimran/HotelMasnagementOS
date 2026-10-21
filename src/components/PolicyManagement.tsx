@@ -950,74 +950,67 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
             )}
 
             {/* Elevated Header Card */}
-            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
-                <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-sm shadow-2xs flex-shrink-0">
-                            <ShieldCheck size={22} className="text-blue-600" />
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3.5">
+                        <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0 shadow-2xs">
+                            <ShieldCheck size={24} />
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight">
+                                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
                                     Dynamic Hotel Policy & Rules Engine
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
+                                <span className="badge-status-active">
                                     Computational Engine
                                 </span>
-                                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-primary border border-blue-200">
                                     GL Ledger Mapped
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
                                 <span className="flex items-center gap-1">
-                                    <ShieldCheck size={11} className="text-gray-400" />
+                                    <ShieldCheck size={12} className="text-slate-400" />
                                     <span>{policies.filter(p => p.isActive).length} Active Enforced Policies</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <Clock size={11} className="text-gray-400" />
+                                    <Clock size={12} className="text-slate-400" />
                                     <span>Check-in: 14:00 • Check-out: 12:00</span>
                                 </span>
                                 <span className="hidden sm:flex items-center gap-1">
-                                    <Calendar size={11} className="text-gray-400" />
+                                    <Calendar size={12} className="text-slate-400" />
                                     <span>Cancellation Cutoff: {policies.find(p => p.code === 'POL-CANC-FLEX48')?.params.hoursThreshold ?? 48}h Window</span>
-                                </span>
-                                <span className="hidden lg:flex items-center gap-1">
-                                    <CreditCard size={11} className="text-gray-400" />
-                                    <span>Incidental Hold: ৳ {(policies.find(p => p.code === 'POL-FIN-INCIDENTAL')?.params.flatAmountBDT ?? 5000).toLocaleString()} / Night</span>
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     {/* Header Action Buttons */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
                         <button
                             type="button"
                             onClick={() => setIsSimulatorOpen(!isSimulatorOpen)}
-                            className={`h-7 px-2.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer ${isSimulatorOpen
-                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                                : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
-                                }`}
+                            className={isSimulatorOpen ? 'btn-primary' : 'btn-secondary'}
                             title="Interactive Policy Rule Evaluation Simulator"
                         >
-                            <Play size={11} className="text-indigo-600" />
+                            <Play size={13} className={isSimulatorOpen ? 'text-white' : 'text-primary'} />
                             <span>Rule Simulator</span>
                         </button>
                         <button
                             type="button"
                             onClick={handleExportHandbook}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            className="btn-secondary"
                             title="Export Master Policy Handbook JSON"
                         >
-                            <Download size={12} className="text-gray-400" />
+                            <Download size={13} className="text-slate-400" />
                             <span>Export Rules</span>
                         </button>
                         <button
                             type="button"
                             onClick={handleOpenCreateRule}
-                            className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            className="btn-primary"
                         >
-                            <Plus size={13} />
+                            <Plus size={14} />
                             <span>Create Policy</span>
                         </button>
                     </div>
