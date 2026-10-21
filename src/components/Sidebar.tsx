@@ -91,6 +91,17 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
         setOpenMenus(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
+    useEffect(() => {
+        const inventoryPages = [
+            'rate-plans', 'package-builder', 'meal-plans', 'rate-calendar',
+            'manage-room-type', 'manage-room', 'joint-room',
+            'building-management', 'floor-management', 'building-floor', 'buildings', 'floors', 'buildings-floors'
+        ];
+        if (inventoryPages.includes(activePage)) {
+            setOpenMenus(prev => ({ ...prev, inventoryMod: true }));
+        }
+    }, [activePage]);
+
     // ========================================================================
     // MODULE-WISE EXPERT HOSPITALITY ERP SIDEBAR ARCHITECTURE
     // ========================================================================
@@ -143,9 +154,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             label: 'Maintenance',
             icon: <Wrench size={14} />,
             items: [
-                { id: 'maintenance', label: 'Work Orders Kanban', icon: <Wrench size={12} />, badge: 'Tickets', badgeColor: 'bg-amber-100 text-amber-700' },
-                { id: 'building-floor', label: 'Plant & Floor Facilities', icon: <Building2 size={12} /> },
-            ]
+                { id: 'maintenance', label: 'Work Orders Kanban', icon: <Wrench size={12} />, badge: 'Tickets', badgeColor: 'bg-amber-100 text-amber-700' }]
         },
 
         // MODULE: F&B POS & KDS
@@ -236,13 +245,15 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             icon: <Layers size={14} />,
             sectionHeader: 'Commercial & Distribution',
             items: [
-                { id: 'rate-plans', label: 'Rate Plans (BAR & Corp)', icon: <Tags size={12} /> },
-                { id: 'package-builder', label: 'Package Builder (L2)', icon: <Package size={12} /> },
-                { id: 'meal-plans', label: 'Meal Plans (EP, CP, MAP)', icon: <Utensils size={12} /> },
-                { id: 'rate-calendar', label: 'Rate & Availability Board', icon: <Calendar size={12} /> },
-                { id: 'manage-room-type', label: 'Room Types & Categories', icon: <Tags size={12} /> },
-                { id: 'manage-room', label: 'Physical Rooms Master', icon: <BedDouble size={12} /> },
-                { id: 'joint-room', label: 'Connecting & Adjoining Rooms', icon: <Layers size={12} /> },
+                { id: 'building-management', label: 'Building Management', icon: <Building2 size={12} />},
+                { id: 'floor-management', label: 'Floor Management', icon: <Layers size={12} /> },
+                { id: 'manage-room-type', label: 'Room Types', icon: <Tags size={12} /> },
+                { id: 'manage-room', label: 'Rooms Master', icon: <BedDouble size={12} /> },
+                { id: 'joint-room', label: 'Connecting Rooms', icon: <Layers size={12} /> },
+                { id: 'rate-plans', label: 'Rate Plans', icon: <Tags size={12} /> },
+                { id: 'package-builder', label: 'Package Builder', icon: <Package size={12} /> },
+                { id: 'meal-plans', label: 'Meal Plans', icon: <Utensils size={12} /> },
+                { id: 'rate-calendar', label: 'Rate & Availability', icon: <Calendar size={12} /> },
             ]
         },
 
@@ -350,7 +361,14 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
     const renderMenuItem = (item: MenuItem, depth: number = 0) => {
         const isOpen = item.key ? (openMenus[item.key] || searchTerm.trim().length > 0) : false;
         const hasChildren = item.items && item.items.length > 0;
-        const isActive = item.id ? activePage === item.id : false;
+        const isItemActive = (id?: string) => {
+            if (!id) return false;
+            if (activePage === id) return true;
+            if (id === 'building-management' && (activePage === 'buildings' || activePage === 'building-floor' || activePage === 'buildings-floors' || activePage === 'building-management')) return true;
+            if (id === 'floor-management' && (activePage === 'floors' || activePage === 'floor-management')) return true;
+            return false;
+        };
+        const isActive = isItemActive(item.id);
 
         if (hasChildren) {
             return (

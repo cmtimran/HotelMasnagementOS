@@ -499,7 +499,22 @@ function App() {
           />
         );
       case 'building-floor':
-        return <BuildingManagement />;
+      case 'building-management':
+      case 'floor-management':
+      case 'buildings':
+      case 'floors':
+      case 'buildings-floors':
+      case 'building':
+      case 'floor-setup':
+        return (
+          <BuildingManagement
+            initialTab={
+              activePage === 'floor-management' || activePage === 'floors' || activePage === 'floor-setup'
+                ? 'floors'
+                : 'buildings'
+            }
+          />
+        );
       case 'manage-room-type':
       case 'room-types':
       case 'room-type':

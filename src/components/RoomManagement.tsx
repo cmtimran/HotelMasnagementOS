@@ -47,6 +47,32 @@ const mockFloors = [
     { id: '5', name: 'Floor 5 (VIP Penthouse)', buildingId: '2' }
 ];
 
+const getStoredBuildings = () => {
+    try {
+        const saved = localStorage.getItem('hotel_buildings_v2');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed.map((b: any) => ({ id: String(b.id), name: b.title || b.name }));
+            }
+        }
+    } catch {}
+    return mockBuildings;
+};
+
+const getStoredFloors = () => {
+    try {
+        const saved = localStorage.getItem('hotel_floors_v2');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed.map((f: any) => ({ id: String(f.id), name: f.name, buildingId: String(f.buildingId) }));
+            }
+        }
+    } catch {}
+    return mockFloors;
+};
+
 const mockRoomTypes = [
     { id: '1', name: 'Deluxe Double', code: 'DLX' },
     { id: '2', name: 'Superior King', code: 'SUPK' },
@@ -118,6 +144,9 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
     const [selectedFloor, setSelectedFloor] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     const [activeTab, setActiveTab] = useState('location');
+
+    const availableBuildings = useMemo(() => getStoredBuildings(), []);
+    const availableFloors = useMemo(() => getStoredFloors(), []);
 
     const [formData, setFormData] = useState<Room>({
         id: 0,
@@ -295,13 +324,13 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 >
                                     All ({rooms.length})
                                 </button>
-                                {[1, 2, 3, 4, 5].map(floor => (
+                                {availableFloors.map(floor => (
                                     <button
-                                        key={floor}
-                                        onClick={() => setSelectedFloor(String(floor))}
-                                        className={`px-2.5 py-1 rounded-md font-bold transition-all ${selectedFloor === String(floor) ? 'bg-blue-600 text-white shadow-2xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
+                                        key={floor.id}
+                                        onClick={() => setSelectedFloor(String(floor.id))}
+                                        className={`px-2.5 py-1 rounded-md font-bold transition-all ${selectedFloor === String(floor.id) ? 'bg-blue-600 text-white shadow-2xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'}`}
                                     >
-                                        Floor {floor}
+                                        {floor.name.includes('Floor') ? floor.name.split('(')[0].trim() : floor.name}
                                     </button>
                                 ))}
 
@@ -333,7 +362,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                 {filteredRooms.map(room => {
                                 const roomType = mockRoomTypes.find(t => t.id === room.roomTypeId);
-                                const floor = mockFloors.find(f => f.id === room.floorId);
+                                const floor = availableFloors.find(f => f.id === room.floorId) || mockFloors.find(f => f.id === room.floorId);
 
                                 return (
                                     <div key={room.id} className="group border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all bg-white relative flex flex-col justify-between">
@@ -451,7 +480,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                                 onChange={e => updateField('buildingId', e.target.value)}
                                                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none"
                                             >
-                                                {mockBuildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                                {availableBuildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                             </select>
                                         </div>
                                         <div className="space-y-1">
@@ -461,7 +490,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                                 onChange={e => updateField('floorId', e.target.value)}
                                                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white outline-none"
                                             >
-                                                {mockFloors.map(f => (
+                                                {availableFloors.map(f => (
                                                     <option key={f.id} value={f.id}>{f.name}</option>
                                                 ))}
                                             </select>
