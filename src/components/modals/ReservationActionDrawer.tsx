@@ -24,7 +24,8 @@ import {
     RefreshCw,
     Crown,
     Info,
-    Plus
+    Plus,
+    Lock
 } from 'lucide-react';
 import type { AmendBookingData } from './AmendStayModal';
 
@@ -377,33 +378,55 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button
                             type="button"
+                            disabled={Boolean(booking?.isPast)}
                             onClick={() => {
+                                if (booking?.isPast) return;
                                 if (onEdit) onEdit(booking);
                                 else setMode('amend');
                             }}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            className={`h-7 px-2.5 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors ${
+                                booking?.isPast
+                                    ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60'
+                                    : 'bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 cursor-pointer'
+                            }`}
+                            title={booking?.isPast ? 'Historical reservations cannot be edited' : 'Edit reservation'}
                         >
-                            <Edit3 size={11} className="text-[#0e3592]" />
+                            <Edit3 size={11} className={booking?.isPast ? 'text-gray-400' : 'text-[#0e3592]'} />
                             <span>Edit</span>
                         </button>
 
                         <div className="relative">
                             <button
                                 type="button"
-                                onClick={() => setIsOptionsOpen(!isOptionsOpen)}
-                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                disabled={Boolean(booking?.isPast)}
+                                onClick={() => {
+                                    if (booking?.isPast) return;
+                                    setIsOptionsOpen(!isOptionsOpen);
+                                }}
+                                className={`h-7 px-2.5 rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors ${
+                                    booking?.isPast
+                                        ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60'
+                                        : 'bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 cursor-pointer'
+                                }`}
+                                title={booking?.isPast ? 'Historical reservations cannot be modified' : 'Options & Actions'}
                             >
-                                {mode === 'overview' ? (
+                                {booking?.isPast ? (
+                                    <>
+                                        <Lock size={11} className="text-gray-400" />
+                                        <span>Read Only</span>
+                                    </>
+                                ) : mode === 'overview' ? (
                                     <>
                                         <Settings size={11} className="text-[#0e3592]" />
                                         <span>Options</span>
+                                        <ChevronDown size={11} className={`transition-transform duration-200 ${isOptionsOpen ? 'rotate-180' : ''}`} />
                                     </>
                                 ) : (
                                     <>
                                         <span className="text-blue-700 font-extrabold">{modeMeta.title}</span>
+                                        <ChevronDown size={11} className={`transition-transform duration-200 ${isOptionsOpen ? 'rotate-180' : ''}`} />
                                     </>
                                 )}
-                                <ChevronDown size={11} className={`transition-transform duration-200 ${isOptionsOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {/* Dropdown Menu (all 12 PMS Actions matching screenshots) */}
@@ -446,6 +469,23 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         </div>
                     </div>
                 </div>
+
+                {/* Audit Lock Historical Warning Banner */}
+                {booking.isPast && (
+                    <div className="bg-amber-50 border-b border-amber-200 px-3.5 py-2 flex items-center gap-2.5 text-amber-950 text-xs flex-shrink-0 animate-in fade-in duration-150">
+                        <div className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center flex-shrink-0">
+                            <Lock size={12} />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="font-extrabold text-[11px] uppercase tracking-wide text-amber-900 mr-1.5">
+                                Audit Locked (Read Only):
+                            </span>
+                            <span className="text-[10.5px] text-amber-800">
+                                This reservation is in past dates. Historical records cannot be modified or moved for audit & financial compliance.
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 {/* 2. Drawer Body */}
                 {isSingleColumn ? (
@@ -620,6 +660,25 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                             <span className="font-mono font-black text-emerald-400 text-base">
                                 {totalAmount.toFixed(2)}
                             </span>
+                        </div>
+
+                        {/* Single-Column Overview Bottom Footer */}
+                        <div className="pt-2 flex items-center justify-end gap-2 border-t border-blue-800/40">
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="h-8 px-3.5 bg-white/10 hover:bg-white/20 text-white rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                                <Printer size={12} />
+                                <span>Print Folio</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="h-8 px-5 bg-white hover:bg-gray-100 text-[#0e3592] rounded text-xs font-bold transition-all cursor-pointer shadow-xs"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 ) : (
@@ -1463,16 +1522,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     onClick={onClose}
                                     className="h-9 px-5 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-md text-xs cursor-pointer shadow-xs transition-all active:scale-[0.98]"
                                 >
-                                    Cancel
+                                    {booking?.isPast ? 'Close' : 'Cancel'}
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={handlePrimaryAction}
-                                    className={`h-9 px-5 text-white font-bold rounded-md text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.98] ${modeMeta.buttonClass}`}
-                                >
-                                    {modeMeta.buttonIcon}
-                                    <span>{modeMeta.buttonText}</span>
-                                </button>
+                                {!booking?.isPast && (
+                                    <button
+                                        type="button"
+                                        onClick={handlePrimaryAction}
+                                        className={`h-9 px-5 text-white font-bold rounded-md text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.98] ${modeMeta.buttonClass}`}
+                                    >
+                                        {modeMeta.buttonIcon}
+                                        <span>{modeMeta.buttonText}</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

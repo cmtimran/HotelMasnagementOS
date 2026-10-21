@@ -243,281 +243,306 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 select-none animate-in fade-in duration-200">
-            <div className="bg-white w-[96%] max-w-[1100px] h-[86vh] max-h-[850px] rounded-lg shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 border border-gray-200">
-                {/* Header */}
-                <div className="bg-[#3b42b5] text-white px-4 py-3 flex items-center justify-between shadow-xs">
-                    <h2 className="text-base font-semibold tracking-tight m-0">Quick Reservation</h2>
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 select-none animate-in fade-in duration-150">
+            <div className="bg-white w-[96%] max-w-[840px] max-h-[88vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 border border-slate-200">
+                {/* Modern Light Header */}
+                <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-2xs">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
+                            <CalendarIcon size={14} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-sm font-bold text-slate-800 tracking-tight m-0">Quick Reservation</h2>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                    Express Mode
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 m-0 font-medium">Fast Front Desk Walk-In &amp; Express Booking</p>
+                        </div>
+                    </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="text-white/80 hover:text-white p-1 rounded hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Close"
+                        className="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors cursor-pointer"
+                        title="Close Modal"
                     >
-                        <X size={20} />
+                        <X size={18} />
                     </button>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex gap-4 px-4 pt-3 pb-0 bg-white border-b-2 border-[#e2e8f0]">
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab('reservation')}
-                        className={`pb-2.5 text-xs font-semibold cursor-pointer relative transition-colors ${
-                            activeTab === 'reservation'
-                                ? 'text-[#3b82f6] border-b-2 border-[#3b82f6] -mb-[2px]'
-                                : 'text-[#64748b] hover:text-gray-800'
-                        }`}
-                    >
-                        Reservation Details
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab('payment')}
-                        className={`pb-2.5 text-xs font-semibold cursor-pointer relative transition-colors ${
-                            activeTab === 'payment'
-                                ? 'text-[#3b82f6] border-b-2 border-[#3b82f6] -mb-[2px]'
-                                : 'text-[#64748b] hover:text-gray-800'
-                        }`}
-                    >
-                        Payment Details
-                    </button>
+                {/* Compact Segmented Tabs */}
+                <div className="px-4 py-2 bg-white border-b border-slate-200 flex items-center justify-between">
+                    <div className="flex p-0.5 bg-slate-100/90 rounded-lg border border-slate-200/80">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('reservation')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                                activeTab === 'reservation'
+                                    ? 'bg-white text-blue-900 shadow-2xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            1. Reservation Details
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('payment')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                                activeTab === 'payment'
+                                    ? 'bg-white text-blue-900 shadow-2xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            2. Payment &amp; Billing
+                        </button>
+                    </div>
+
+                    <div className="text-[11px] font-medium text-slate-500 hidden sm:block">
+                        Total: <strong className="text-slate-900 font-bold">BDT {netTotal.toLocaleString()}</strong>
+                    </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-5 bg-white space-y-4">
+                <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 bg-white space-y-3.5">
                     {activeTab === 'reservation' && (
-                        <div className="space-y-4 animate-in fade-in duration-100">
-                            {/* Options Row */}
-                            <div className="flex items-center gap-6">
-                                <label className="flex items-center gap-2 text-xs font-medium text-[#334155] cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={dayUse}
-                                        onChange={e => setDayUse(e.target.checked)}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                    />
-                                    <span>Day Use</span>
-                                </label>
-                                <label className="flex items-center gap-2 text-xs font-medium text-[#334155] cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={taxApplicable}
-                                        onChange={e => setTaxApplicable(e.target.checked)}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                    />
-                                    <span>Tax Applicable</span>
-                                </label>
-                            </div>
-
-                            {/* Top 5 Grid Fields */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] font-semibold text-[#334155]">
-                                        Check-in Date <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative flex items-center">
+                        <div className="space-y-3 animate-in fade-in duration-100">
+                            {/* Parameters Card Container (matching Add Reservation) */}
+                            <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2.5">
+                                {/* Top 5 Grid Fields */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <CalendarIcon size={11} className="text-blue-600" />
+                                            <span>Check-in</span>
+                                            <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="date"
                                             value={checkInDate}
                                             onChange={e => handleCheckInChange(e.target.value)}
-                                            className="w-full h-8 pl-8 pr-2.5 border border-[#e2e8f0] rounded-md text-xs bg-white text-[#1e293b] outline-none focus:border-blue-500"
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 font-medium transition-all"
                                         />
-                                        <CalendarIcon size={14} className="absolute left-2.5 text-[#94a3b8] pointer-events-none" />
                                     </div>
-                                </div>
 
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] font-semibold text-[#334155]">Nights</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        value={nights}
-                                        onChange={e => handleNightsChange(parseInt(e.target.value) || 1)}
-                                        className="w-full h-8 px-2.5 border border-[#e2e8f0] rounded-md text-xs bg-white text-[#1e293b] text-center font-bold outline-none focus:border-blue-500"
-                                    />
-                                </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <span>Nights</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={nights}
+                                            onChange={e => handleNightsChange(parseInt(e.target.value) || 1)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 text-center font-bold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                                        />
+                                    </div>
 
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] font-semibold text-[#334155]">
-                                        Check-out Date <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative flex items-center">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <CalendarIcon size={11} className="text-blue-600" />
+                                            <span>Check-out</span>
+                                            <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="date"
                                             value={checkOutDate}
                                             onChange={e => setCheckOutDate(e.target.value)}
-                                            className="w-full h-8 pl-8 pr-2.5 border border-[#e2e8f0] rounded-md text-xs bg-white text-[#1e293b] outline-none focus:border-blue-500"
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 font-medium transition-all"
                                         />
-                                        <CalendarIcon size={14} className="absolute left-2.5 text-[#94a3b8] pointer-events-none" />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <span>Source</span>
+                                            <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={businessSource}
+                                            onChange={e => setBusinessSource(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
+                                        >
+                                            <option value="Direct">Direct</option>
+                                            <option value="Booking.com">Booking.com</option>
+                                            <option value="Agoda">Agoda</option>
+                                            <option value="Expedia">Expedia</option>
+                                            <option value="Corporate">Corporate</option>
+                                            <option value="Walk-In">Walk-In</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <span>Agent</span>
+                                            <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={businessAgent}
+                                            onChange={e => setBusinessAgent(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
+                                        >
+                                            <option value="Direct">Direct</option>
+                                            <option value="Front Desk">Front Desk</option>
+                                            <option value="Agent A">Agent A</option>
+                                            <option value="Corporate Rep">Corporate Rep</option>
+                                        </select>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] font-semibold text-[#334155]">
-                                        Business Source <span className="text-red-500">*</span>
+                                {/* Options Row */}
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/80">
+                                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
+                                        <input
+                                            type="checkbox"
+                                            checked={dayUse}
+                                            onChange={e => setDayUse(e.target.checked)}
+                                            className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                        <span>Day Use</span>
                                     </label>
-                                    <select
-                                        value={businessSource}
-                                        onChange={e => setBusinessSource(e.target.value)}
-                                        className="w-full h-8 px-2 border border-[#e2e8f0] rounded-md text-xs bg-white text-[#1e293b] outline-none focus:border-blue-500"
-                                    >
-                                        <option value="Direct">Direct</option>
-                                        <option value="Booking.com">Booking.com</option>
-                                        <option value="Agoda">Agoda</option>
-                                        <option value="Expedia">Expedia</option>
-                                        <option value="Corporate">Corporate</option>
-                                        <option value="Walk-In">Walk-In</option>
-                                    </select>
-                                </div>
 
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] font-semibold text-[#334155]">
-                                        Business Agent <span className="text-red-500">*</span>
+                                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
+                                        <input
+                                            type="checkbox"
+                                            checked={taxApplicable}
+                                            onChange={e => setTaxApplicable(e.target.checked)}
+                                            className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                        <span>Tax Applicable</span>
                                     </label>
-                                    <select
-                                        value={businessAgent}
-                                        onChange={e => setBusinessAgent(e.target.value)}
-                                        className="w-full h-8 px-2 border border-[#e2e8f0] rounded-md text-xs bg-white text-[#1e293b] outline-none focus:border-blue-500"
-                                    >
-                                        <option value="Direct">Direct</option>
-                                        <option value="Agent A">Agent A</option>
-                                        <option value="Agent B">Agent B</option>
-                                        <option value="In-House Sales">In-House Sales</option>
-                                    </select>
                                 </div>
                             </div>
 
                             {/* Rooms Table */}
-                            <div className="bg-white border border-[#f1f5f9] rounded-lg overflow-x-auto shadow-2xs">
-                                <table className="w-full text-left border-collapse text-xs">
-                                    <thead>
-                                        <tr className="bg-[#f8fafc] text-[#475569] font-semibold border-b border-[#e2e8f0]">
-                                            <th className="py-2.5 px-3">Room Type</th>
-                                            <th className="py-2.5 px-2 text-center">No. of Rooms</th>
-                                            <th className="py-2.5 px-3">
-                                                Rate Type/Package <span className="text-red-500">*</span>
-                                            </th>
-                                            <th className="py-2.5 px-3">Room Number</th>
-                                            <th className="py-2.5 px-2 text-center">Adult</th>
-                                            <th className="py-2.5 px-2 text-center">Child</th>
-                                            <th className="py-2.5 px-3">Rate</th>
-                                            <th className="py-2.5 px-3">Total</th>
-                                            <th className="py-2.5 px-2 text-center">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[#f1f5f9]">
-                                        {roomsList.map(item => {
-                                            const lineTotal = item.rate * item.noOfRooms * nights;
-                                            return (
-                                                <tr key={item.id} className="hover:bg-gray-50/50">
-                                                    <td className="py-2 px-3">
-                                                        <select
-                                                            value={item.roomType}
-                                                            onChange={e => handleRoomFieldChange(item.id, 'roomType', e.target.value)}
-                                                            className="w-full h-7 px-2 border border-[#cbd5e1] rounded text-xs bg-white outline-none"
-                                                        >
-                                                            <option value="Winter Rate Plan">Winter Rate Plan</option>
-                                                            <option value="Deluxe Double">Deluxe Double</option>
-                                                            <option value="Executive Suite">Executive Suite</option>
-                                                            <option value="Standard Single">Standard Single</option>
-                                                        </select>
-                                                    </td>
-                                                    <td className="py-2 px-2 text-center">
-                                                        <input
-                                                            type="number"
-                                                            min={1}
-                                                            value={item.noOfRooms}
-                                                            onChange={e => handleRoomFieldChange(item.id, 'noOfRooms', parseInt(e.target.value) || 1)}
-                                                            className="w-12 h-7 px-1 border border-[#cbd5e1] rounded text-xs text-center outline-none"
-                                                        />
-                                                    </td>
-                                                    <td className="py-2 px-3">
-                                                        <select
-                                                            value={item.ratePlan}
-                                                            onChange={e => handleRoomFieldChange(item.id, 'ratePlan', e.target.value)}
-                                                            className="w-full h-7 px-2 border border-[#cbd5e1] rounded text-xs bg-white outline-none"
-                                                        >
-                                                            <option value="Summer Vacation">Summer Vacation</option>
-                                                            <option value="Standard EP">Standard EP (Room Only)</option>
-                                                            <option value="Corporate CP">Corporate CP (Bed & Breakfast)</option>
-                                                        </select>
-                                                    </td>
-                                                    <td className="py-2 px-3">
-                                                        <input
-                                                            type="text"
-                                                            value={item.roomNumber}
-                                                            onChange={e => handleRoomFieldChange(item.id, 'roomNumber', e.target.value)}
-                                                            className="w-24 h-7 px-2 border border-[#cbd5e1] rounded text-xs font-mono font-bold text-blue-700 outline-none"
-                                                        />
-                                                    </td>
-                                                    <td className="py-2 px-2 text-center">
-                                                        <input
-                                                            type="number"
-                                                            min={1}
-                                                            value={item.adults}
-                                                            onChange={e => handleRoomFieldChange(item.id, 'adults', parseInt(e.target.value) || 1)}
-                                                            className="w-12 h-7 px-1 border border-[#cbd5e1] rounded text-xs text-center outline-none"
-                                                        />
-                                                    </td>
-                                                    <td className="py-2 px-2 text-center">
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            value={item.children}
-                                                            onChange={e => handleRoomFieldChange(item.id, 'children', parseInt(e.target.value) || 0)}
-                                                            className="w-12 h-7 px-1 border border-[#cbd5e1] rounded text-xs text-center outline-none"
-                                                        />
-                                                    </td>
-                                                    <td className="py-2 px-3">
-                                                        <input
-                                                            type="number"
-                                                            value={item.rate}
-                                                            onChange={e => handleRoomFieldChange(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                                                            className="w-20 h-7 px-2 border border-[#cbd5e1] rounded text-xs font-semibold outline-none"
-                                                        />
-                                                    </td>
-                                                    <td className="py-2 px-3 font-bold text-[#0f172a]">
-                                                        {lineTotal.toFixed(2)}
-                                                    </td>
-                                                    <td className="py-2 px-2 text-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveRoom(item.id)}
-                                                            disabled={roomsList.length <= 1}
-                                                            className="text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-1"
-                                                            title="Delete Room Row"
-                                                        >
-                                                            <Trash2 size={15} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-[11px]">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                                                <th className="py-2 px-3">Room Type</th>
+                                                <th className="py-2 px-2 text-center">Qty</th>
+                                                <th className="py-2 px-2.5">Rate Plan</th>
+                                                <th className="py-2 px-2.5">Room No.</th>
+                                                <th className="py-2 px-2 text-center">Adult</th>
+                                                <th className="py-2 px-2 text-center">Child</th>
+                                                <th className="py-2 px-2.5 text-right">Rate</th>
+                                                <th className="py-2 px-2.5 text-right">Total</th>
+                                                <th className="py-2 px-2 text-center">Del</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {roomsList.map(item => {
+                                                const lineTotal = item.rate * item.noOfRooms * nights;
+                                                return (
+                                                    <tr key={item.id} className="hover:bg-blue-50/20 transition-colors">
+                                                        <td className="py-1.5 px-3">
+                                                            <select
+                                                                value={item.roomType}
+                                                                onChange={e => handleRoomFieldChange(item.id, 'roomType', e.target.value)}
+                                                                className="w-32 h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                            >
+                                                                <option value="Winter Rate Plan">Winter Rate Plan</option>
+                                                                <option value="Deluxe Double">Deluxe Double</option>
+                                                                <option value="Executive Suite">Executive Suite</option>
+                                                                <option value="Standard Single">Standard Single</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="py-1.5 px-2 text-center">
+                                                            <input
+                                                                type="number"
+                                                                min={1}
+                                                                value={item.noOfRooms}
+                                                                onChange={e => handleRoomFieldChange(item.id, 'noOfRooms', parseInt(e.target.value) || 1)}
+                                                                className="w-10 h-7 px-1 border border-slate-200 rounded text-[11px] text-center font-bold outline-none"
+                                                            />
+                                                        </td>
+                                                        <td className="py-1.5 px-2.5">
+                                                            <select
+                                                                value={item.ratePlan}
+                                                                onChange={e => handleRoomFieldChange(item.id, 'ratePlan', e.target.value)}
+                                                                className="w-32 h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                            >
+                                                                <option value="Summer Vacation">Summer Vacation</option>
+                                                                <option value="Standard EP">Standard EP (Room Only)</option>
+                                                                <option value="Corporate CP">Corporate CP (Bed & Breakfast)</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="py-1.5 px-2.5">
+                                                            <input
+                                                                type="text"
+                                                                value={item.roomNumber}
+                                                                onChange={e => handleRoomFieldChange(item.id, 'roomNumber', e.target.value)}
+                                                                className="w-20 h-7 px-1.5 border border-slate-200 rounded text-[11px] font-mono font-bold text-blue-700 outline-none text-center"
+                                                            />
+                                                        </td>
+                                                        <td className="py-1.5 px-2 text-center">
+                                                            <input
+                                                                type="number"
+                                                                min={1}
+                                                                value={item.adults}
+                                                                onChange={e => handleRoomFieldChange(item.id, 'adults', parseInt(e.target.value) || 1)}
+                                                                className="w-10 h-7 px-1 border border-slate-200 rounded text-[11px] text-center outline-none"
+                                                            />
+                                                        </td>
+                                                        <td className="py-1.5 px-2 text-center">
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                value={item.children}
+                                                                onChange={e => handleRoomFieldChange(item.id, 'children', parseInt(e.target.value) || 0)}
+                                                                className="w-10 h-7 px-1 border border-slate-200 rounded text-[11px] text-center outline-none"
+                                                            />
+                                                        </td>
+                                                        <td className="py-1.5 px-2.5 text-right">
+                                                            <input
+                                                                type="number"
+                                                                value={item.rate}
+                                                                onChange={e => handleRoomFieldChange(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                                                                className="w-20 h-7 px-1.5 border border-slate-200 rounded text-[11px] font-semibold text-right outline-none"
+                                                            />
+                                                        </td>
+                                                        <td className="py-1.5 px-2.5 text-right font-bold text-slate-800">
+                                                            ৳{lineTotal.toLocaleString()}
+                                                        </td>
+                                                        <td className="py-1.5 px-2 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveRoom(item.id)}
+                                                                disabled={roomsList.length <= 1}
+                                                                className="text-red-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-1 transition-colors"
+                                                                title="Delete Room Row"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
                             <button
                                 type="button"
                                 onClick={handleAddRoom}
-                                className="border border-[#e2e8f0] hover:bg-[#f8fafc] text-[#0f172a] text-xs font-semibold px-3 py-1.5 rounded-md shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                className="border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-md shadow-2xs cursor-pointer inline-flex items-center gap-1 transition-colors"
                             >
                                 + Add Room
                             </button>
 
                             {/* Guest Quick Info */}
-                            <div className="pt-2">
-                                <h3 className="text-xs font-bold text-[#1e293b] mb-2 uppercase tracking-wider">
-                                    Guest Quick Info
+                            <div className="bg-slate-50/50 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2">
+                                <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider m-0">
+                                    Guest Profile
                                 </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-semibold text-[#334155]">Title</label>
+                                        <label className="text-[10px] font-semibold text-slate-600">Title</label>
                                         <select
                                             value={title}
                                             onChange={e => setTitle(e.target.value)}
-                                            className="w-full h-8 px-2 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none focus:border-blue-500"
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
                                         >
                                             <option value="Mr.">Mr.</option>
                                             <option value="Mrs.">Mrs.</option>
@@ -528,39 +553,39 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     </div>
 
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-semibold text-[#334155]">
+                                        <label className="text-[10px] font-semibold text-slate-600">
                                             Name <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="text"
-                                            placeholder="Type guest name or select from list..."
+                                            placeholder="Guest full name..."
                                             value={name}
                                             onChange={e => setName(e.target.value)}
-                                            className="w-full h-8 px-2.5 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none focus:border-blue-500 font-medium"
+                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-medium"
                                         />
                                     </div>
 
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-semibold text-[#334155]">
+                                        <label className="text-[10px] font-semibold text-slate-600">
                                             Mobile No. <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="text"
-                                            placeholder="e.g. +880 1712-345678"
+                                            placeholder="e.g. 01712-345678"
                                             value={mobile}
                                             onChange={e => setMobile(e.target.value)}
-                                            className="w-full h-8 px-2.5 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none focus:border-blue-500 font-bold text-gray-800"
+                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
                                         />
                                     </div>
 
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-semibold text-[#334155]">Email</label>
+                                        <label className="text-[10px] font-semibold text-slate-600">Email</label>
                                         <input
                                             type="email"
                                             placeholder="guest@example.com"
                                             value={email}
                                             onChange={e => setEmail(e.target.value)}
-                                            className="w-full h-8 px-2.5 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none focus:border-blue-500"
+                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
                                         />
                                     </div>
                                 </div>
@@ -570,20 +595,20 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
                     {activeTab === 'payment' && (
                         <div className="animate-in fade-in duration-100">
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
                                 {/* Left: Discount & Payment Methods (7 cols) */}
-                                <div className="lg:col-span-7 space-y-5">
+                                <div className="lg:col-span-7 space-y-3.5">
                                     {/* Discount Section */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-[#1e293b] mb-2">Discount</h3>
-                                        <div className="flex items-center gap-2.5">
+                                    <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs">
+                                        <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Discount</h3>
+                                        <div className="flex items-center gap-2">
                                             <select
                                                 value={discountType}
                                                 onChange={e => setDiscountType(e.target.value as any)}
-                                                className="w-36 h-8 px-2 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none"
+                                                className="w-32 h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none cursor-pointer"
                                             >
-                                                <option value="Fixed">Fixed</option>
-                                                <option value="Percentage">Percentage</option>
+                                                <option value="Fixed">Fixed (BDT)</option>
+                                                <option value="Percentage">Percentage (%)</option>
                                             </select>
                                             <input
                                                 type="number"
@@ -591,35 +616,46 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                 value={discountValue || ''}
                                                 onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)}
                                                 placeholder="0"
-                                                className="w-48 h-8 px-2.5 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none font-bold"
+                                                className="flex-1 h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none font-bold"
                                             />
-                                            <button
-                                                type="button"
-                                                onClick={() => setDiscountValue(0)}
-                                                className="p-1.5 text-gray-400 hover:text-gray-700 cursor-pointer"
-                                                title="Clear Discount"
-                                            >
-                                                <X size={16} />
-                                            </button>
+                                            {discountValue > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDiscountValue(0)}
+                                                    className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                                    title="Clear Discount"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
                                         </div>
-                                        <p className="text-xs text-[#64748b] mt-1.5">Remarks: Added discount</p>
                                     </div>
 
                                     {/* Payment Method Section */}
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-[#1e293b] mb-2">Payment Method</h3>
-                                        <div className="space-y-2.5">
+                                    <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Payment Method</h3>
+                                            <button
+                                                type="button"
+                                                onClick={handleAddPaymentRow}
+                                                className="text-[#1e3a8a] hover:text-blue-900 text-[11px] font-semibold cursor-pointer"
+                                            >
+                                                + Add Method
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-2">
                                             {paymentRows.map(row => (
                                                 <div
                                                     key={row.id}
-                                                    className="flex items-center gap-3 bg-[#fafafa] p-3 border border-[#f1f5f9] rounded-lg"
+                                                    className="flex items-center gap-2 bg-white p-2 border border-slate-200/80 rounded-md"
                                                 >
-                                                    <div className="flex-1 flex flex-col gap-1">
-                                                        <label className="text-[11px] font-semibold text-gray-700">Method</label>
+                                                    <div className="w-1/2 flex flex-col gap-0.5">
+                                                        <label className="text-[9.5px] font-semibold text-slate-500">Method</label>
                                                         <select
                                                             value={row.method}
                                                             onChange={e => handlePaymentRowChange(row.id, 'method', e.target.value as any)}
-                                                            className="w-full h-8 px-2 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none"
+                                                            className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
                                                         >
                                                             <option value="Cash">Cash</option>
                                                             <option value="Card">Card</option>
@@ -628,14 +664,14 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                         </select>
                                                     </div>
 
-                                                    <div className="flex-1 flex flex-col gap-1">
-                                                        <label className="text-[11px] font-semibold text-gray-700">Amount</label>
+                                                    <div className="w-1/2 flex flex-col gap-0.5">
+                                                        <label className="text-[9.5px] font-semibold text-slate-500">Amount (BDT)</label>
                                                         <input
                                                             type="number"
                                                             value={row.amount || ''}
                                                             onChange={e => handlePaymentRowChange(row.id, 'amount', parseFloat(e.target.value) || 0)}
                                                             placeholder="0.00"
-                                                            className="w-full h-8 px-2.5 border border-[#cbd5e1] rounded-md text-xs bg-white outline-none font-bold"
+                                                            className="w-full h-7 px-2 border border-slate-200 rounded text-[11px] bg-white outline-none font-bold"
                                                         />
                                                     </div>
 
@@ -643,55 +679,41 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                         type="button"
                                                         onClick={() => handleRemovePaymentRow(row.id)}
                                                         disabled={paymentRows.length <= 1}
-                                                        className="text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer self-end mb-1 p-1"
-                                                        title="Delete Payment Method"
+                                                        className="text-red-400 hover:text-red-600 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer self-end mb-0.5 p-1"
+                                                        title="Delete Payment Row"
                                                     >
-                                                        <Trash2 size={16} />
+                                                        <Trash2 size={13} />
                                                     </button>
                                                 </div>
                                             ))}
-                                        </div>
-
-                                        <div className="flex justify-end mt-3">
-                                            <button
-                                                type="button"
-                                                onClick={handleAddPaymentRow}
-                                                className="bg-[#2643a6] hover:bg-[#1e3687] text-white px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer shadow-xs transition-colors"
-                                            >
-                                                Add New Payment Method
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Right: Summary Box (5 cols) */}
                                 <div className="lg:col-span-5">
-                                    <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-lg p-4 shadow-2xs">
-                                        <div className="divide-y divide-[#f1f5f9] text-xs">
-                                            <div className="flex justify-between py-2 text-[#64748b]">
-                                                <span>Total Amount</span>
-                                                <span className="font-bold text-gray-900">{totalAmount.toFixed(2)}</span>
+                                    <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 shadow-2xs">
+                                        <div className="divide-y divide-slate-200/80 text-[11px]">
+                                            <div className="flex justify-between py-1.5 text-slate-600">
+                                                <span>Subtotal ({nights}N)</span>
+                                                <span className="font-semibold text-slate-900">৳{totalAmount.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between py-2 text-[#64748b]">
-                                                <span>Discounted Amount</span>
-                                                <span className="font-bold text-gray-900">{discountedAmount.toFixed(2)}</span>
+                                            <div className="flex justify-between py-1.5 text-slate-600">
+                                                <span>Discount</span>
+                                                <span className="font-semibold text-emerald-700">-৳{discountedAmount.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between py-2 text-[#64748b]">
+                                            <div className="flex justify-between py-1.5 text-slate-600">
+                                                <span>Net Payable</span>
+                                                <span className="font-bold text-slate-900">৳{netTotal.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between py-1.5 text-slate-600">
                                                 <span>Total Paid</span>
-                                                <span className="font-bold text-emerald-700">{totalPaid.toFixed(2)}</span>
+                                                <span className="font-bold text-emerald-700">৳{totalPaid.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between py-2.5 text-sm font-bold text-gray-900">
-                                                <span>Total Due</span>
-                                                <span className="text-red-600">{totalDue.toFixed(2)}</span>
-                                            </div>
-                                            <div className="bg-[#f1f5f9] -mx-4 px-4 py-2.5 flex justify-between font-bold text-xs text-gray-800">
-                                                <span>Amount</span>
-                                                <span>{totalPaid.toFixed(2)}</span>
-                                            </div>
-                                            <div className="bg-white -mx-4 -mb-4 px-4 py-3 flex justify-between font-extrabold text-sm text-[#0f172a] border-t border-[#e2e8f0] rounded-b-lg">
-                                                <span>Remaining Amount</span>
-                                                <span className={totalDue > 0 ? 'text-amber-600' : 'text-emerald-600'}>
-                                                    {totalDue.toFixed(2)}
+                                            <div className="bg-white -mx-3 -mb-3 px-3 py-2.5 flex justify-between font-bold text-xs border-t border-slate-200 rounded-b-lg">
+                                                <span className="text-slate-800">Remaining Balance:</span>
+                                                <span className={totalDue > 0 ? 'text-amber-700' : 'text-emerald-700'}>
+                                                    ৳{totalDue.toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
@@ -702,39 +724,39 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="border-t border-[#e2e8f0] px-4 py-2.5 bg-white flex items-center justify-between shadow-xs">
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Building2 size={15} className="text-blue-600" />
-                        <span>Room: <strong className="text-gray-900 font-mono">{roomsList[0]?.roomNumber || '101'}</strong> ({nights} Night{nights > 1 ? 's' : ''})</span>
+                {/* Modern Compact Footer */}
+                <div className="border-t border-slate-200 px-4 py-2.5 bg-slate-50/70 flex items-center justify-between shadow-2xs">
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <Building2 size={14} className="text-blue-700" />
+                        <span>Room: <strong className="text-slate-900 font-mono">{roomsList[0]?.roomNumber || '101'}</strong> ({nights} Night{nights > 1 ? 's' : ''})</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                        >
+                            Cancel
+                        </button>
                         <button
                             type="button"
                             onClick={() => handleCompleteReservation('hold')}
-                            className="bg-white border border-[#cbd5e1] hover:bg-[#f8fafc] text-[#3b82f6] px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors"
+                            className="bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                         >
-                            Hold Till
+                            Hold
                         </button>
                         <button
                             type="button"
                             onClick={() => handleCompleteReservation('confirmed')}
-                            className="bg-white border border-[#3b82f6] hover:bg-[#eff6ff] text-[#3b82f6] px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors"
-                        >
-                            Temporary Reserve
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => handleCompleteReservation('confirmed')}
-                            className="bg-[#2643a6] hover:bg-[#1e3687] text-white px-4 py-1.5 rounded-md text-xs font-semibold shadow-2xs cursor-pointer transition-colors"
+                            className="bg-[#1e3a8a] hover:bg-blue-900 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-2xs cursor-pointer transition-colors"
                         >
                             Reserve
                         </button>
                         <button
                             type="button"
                             onClick={() => handleCompleteReservation('arrived')}
-                            className="bg-[#2643a6] hover:bg-[#1e3687] text-white px-4 py-1.5 rounded-md text-xs font-semibold shadow-2xs cursor-pointer transition-colors"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-2xs cursor-pointer transition-colors"
                         >
                             Check In
                         </button>

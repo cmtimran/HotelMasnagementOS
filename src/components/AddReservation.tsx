@@ -8,6 +8,7 @@ import {
     MapPin,
     Briefcase,
     CheckCircle2,
+    Check,
     Calendar,
     List,
     Plus
@@ -352,57 +353,76 @@ export const AddReservation: React.FC = () => {
 
             {/* Main Form Card Container */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden flex flex-col flex-1">
-                {/* Stepper Navigation */}
-                <div className="bg-gray-50/70 border-b border-gray-200/80 px-4 py-1.5 flex items-center justify-center select-none flex-shrink-0">
-                    <div className="flex items-center w-full max-w-[620px]">
+                {/* Stepper Navigation: Responsive Segmented Track */}
+                <div className="bg-slate-50/80 border-b border-gray-200/80 px-3 py-2 flex items-center justify-center select-none flex-shrink-0">
+                    <div className="w-full max-w-[680px] grid grid-cols-3 gap-2">
                         {/* Step 1 */}
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setStep(1)}
-                            className={`flex items-center gap-1.5 cursor-pointer ${step >= 1 ? 'opacity-100 font-semibold' : 'opacity-60'}`}
+                            className={`flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg border text-xs transition-all cursor-pointer ${
+                                step === 1
+                                    ? 'bg-white border-blue-500 text-blue-900 font-bold shadow-xs ring-1 ring-blue-500/20'
+                                    : step > 1
+                                        ? 'bg-blue-50/60 border-blue-200 text-blue-800 font-medium hover:bg-blue-100/50'
+                                        : 'bg-white/60 border-gray-200 text-gray-500 hover:text-gray-700'
+                            }`}
                         >
-                            <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center font-bold text-[10px] transition-colors ${
-                                step >= 1 ? 'bg-[#1e3a8a] text-white shadow-xs' : 'bg-gray-200 text-gray-600'
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] flex-shrink-0 transition-colors ${
+                                step === 1
+                                    ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                    : step > 1
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-600'
                             }`}>
-                                1
+                                {step > 1 ? <Check size={11} className="stroke-[3]" /> : '1'}
                             </div>
-                            <span className={`text-[11px] ${step === 1 ? 'text-[#1e3a8a] font-bold' : 'text-gray-600 font-medium'}`}>
-                                Check Availability
-                            </span>
-                        </div>
-
-                        <div className={`flex-1 h-0.5 mx-2.5 transition-colors ${step >= 2 ? 'bg-[#1e3a8a]' : 'bg-gray-200'}`}></div>
+                            <span className="truncate tracking-tight">1. Check Availability</span>
+                        </button>
 
                         {/* Step 2 */}
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setStep(2)}
-                            className={`flex items-center gap-1.5 cursor-pointer ${step >= 2 ? 'opacity-100 font-semibold' : 'opacity-60'}`}
+                            className={`flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg border text-xs transition-all cursor-pointer ${
+                                step === 2
+                                    ? 'bg-white border-blue-500 text-blue-900 font-bold shadow-xs ring-1 ring-blue-500/20'
+                                    : step > 2
+                                        ? 'bg-blue-50/60 border-blue-200 text-blue-800 font-medium hover:bg-blue-100/50'
+                                        : 'bg-white/60 border-gray-200 text-gray-500 hover:text-gray-700'
+                            }`}
                         >
-                            <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center font-bold text-[10px] transition-colors ${
-                                step >= 2 ? 'bg-[#1e3a8a] text-white shadow-xs' : 'bg-gray-200 text-gray-600'
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] flex-shrink-0 transition-colors ${
+                                step === 2
+                                    ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                    : step > 2
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-600'
                             }`}>
-                                2
+                                {step > 2 ? <Check size={11} className="stroke-[3]" /> : '2'}
                             </div>
-                            <span className={`text-[11px] ${step === 2 ? 'text-[#1e3a8a] font-bold' : 'text-gray-600 font-medium'}`}>
-                                Guest Information
-                            </span>
-                        </div>
-
-                        <div className={`flex-1 h-0.5 mx-2.5 transition-colors ${step >= 3 ? 'bg-[#1e3a8a]' : 'bg-gray-200'}`}></div>
+                            <span className="truncate tracking-tight">2. Guest Profile</span>
+                        </button>
 
                         {/* Step 3 */}
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setStep(3)}
-                            className={`flex items-center gap-1.5 cursor-pointer ${step >= 3 ? 'opacity-100 font-semibold' : 'opacity-60'}`}
+                            className={`flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg border text-xs transition-all cursor-pointer ${
+                                step === 3
+                                    ? 'bg-white border-blue-500 text-blue-900 font-bold shadow-xs ring-1 ring-blue-500/20'
+                                    : 'bg-white/60 border-gray-200 text-gray-500 hover:text-gray-700'
+                            }`}
                         >
-                            <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center font-bold text-[10px] transition-colors ${
-                                step >= 3 ? 'bg-[#1e3a8a] text-white shadow-xs' : 'bg-gray-200 text-gray-600'
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] flex-shrink-0 transition-colors ${
+                                step === 3
+                                    ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                    : 'bg-gray-200 text-gray-600'
                             }`}>
                                 3
                             </div>
-                            <span className={`text-[11px] ${step === 3 ? 'text-[#1e3a8a] font-bold' : 'text-gray-600 font-medium'}`}>
-                                Payments
-                            </span>
-                        </div>
+                            <span className="truncate tracking-tight">3. Billing &amp; Pay</span>
+                        </button>
                     </div>
                 </div>
 
@@ -413,116 +433,131 @@ export const AddReservation: React.FC = () => {
                         ======================================================== */}
                     {step === 1 && (
                         <div className="space-y-3 animate-in fade-in duration-150">
-                            {/* Top 6-Field Grid */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                                <div className="flex flex-col gap-0.5">
-                                    <label className="text-[10px] font-semibold text-gray-700">
-                                        Check in <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={checkIn}
-                                        onChange={e => handleCheckInChange(e.target.value)}
-                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <label className="text-[10px] font-semibold text-gray-700">Nights</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        value={nights}
-                                        onChange={e => handleNightsChange(Number(e.target.value))}
-                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white text-gray-800 outline-none text-center font-bold"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <label className="text-[10px] font-semibold text-gray-700">
-                                        Check out <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={checkOut}
-                                        onChange={e => handleCheckOutChange(e.target.value)}
-                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <label className="text-[10px] font-semibold text-gray-700">Room(s)</label>
-                                    <input
-                                        type="text"
-                                        value={roomsList.length}
-                                        disabled
-                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-gray-100 text-gray-500 cursor-not-allowed text-center font-bold"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <label className="text-[10px] font-semibold text-gray-700">Business Source</label>
-                                    <select
-                                        value={businessSource}
-                                        onChange={e => setBusinessSource(e.target.value)}
-                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 cursor-pointer"
-                                    >
-                                        <option value="Direct">Direct</option>
-                                        <option value="Booking.com">Booking.com</option>
-                                        <option value="Agoda">Agoda</option>
-                                        <option value="Corporate">Corporate</option>
-                                        <option value="Walk-In">Walk-In</option>
-                                    </select>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <label className="text-[10px] font-semibold text-gray-700">Business Agent</label>
-                                    <select
-                                        value={businessAgent}
-                                        onChange={e => setBusinessAgent(e.target.value)}
-                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 cursor-pointer"
-                                    >
-                                        <option value="Direct">Direct</option>
-                                        <option value="Front Desk">Front Desk</option>
-                                        <option value="Expedia Partner">Expedia Partner</option>
-                                        <option value="Corporate Manager">Corporate Manager</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Options Row */}
-                            <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                                <label className="flex items-center gap-1.5 text-[11px] text-gray-700 cursor-pointer select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={dayUse}
-                                        onChange={e => setDayUse(e.target.checked)}
-                                        className="w-3.5 h-3.5 rounded text-blue-600 cursor-pointer"
-                                    />
-                                    <span>Day Use</span>
-                                </label>
-
-                                <div className="flex items-center gap-3">
-                                    <label className="flex items-center gap-1 text-[11px] text-gray-700 cursor-pointer select-none">
+                            {/* Parameters Card Container */}
+                            <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2.5">
+                                {/* Top 6-Field Grid */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <Calendar size={11} className="text-blue-600" />
+                                            <span>Check in</span>
+                                            <span className="text-red-500">*</span>
+                                        </label>
                                         <input
-                                            type="radio"
-                                            name="ratePerNight"
-                                            checked={ratePerNight === 'Rate Per Night'}
-                                            onChange={() => setRatePerNight('Rate Per Night')}
-                                            className="text-blue-600 cursor-pointer"
+                                            type="date"
+                                            value={checkIn}
+                                            onChange={e => handleCheckInChange(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
                                         />
-                                        <span>Rate Per Night</span>
-                                    </label>
+                                    </div>
 
-                                    <label className="flex items-center gap-1.5 text-[11px] text-gray-700 cursor-pointer select-none">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <span>Nights</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={nights}
+                                            onChange={e => handleNightsChange(Number(e.target.value))}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none text-center font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <Calendar size={11} className="text-blue-600" />
+                                            <span>Check out</span>
+                                            <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={checkOut}
+                                            onChange={e => handleCheckOutChange(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <span>Room(s)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={roomsList.length}
+                                            disabled
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-slate-100 text-slate-600 cursor-not-allowed text-center font-bold"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <span>Business Source</span>
+                                        </label>
+                                        <select
+                                            value={businessSource}
+                                            onChange={e => setBusinessSource(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
+                                        >
+                                            <option value="Direct">Direct</option>
+                                            <option value="Booking.com">Booking.com</option>
+                                            <option value="Agoda">Agoda</option>
+                                            <option value="Corporate">Corporate</option>
+                                            <option value="Walk-In">Walk-In</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <span>Business Agent</span>
+                                        </label>
+                                        <select
+                                            value={businessAgent}
+                                            onChange={e => setBusinessAgent(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer font-medium transition-all"
+                                        >
+                                            <option value="Direct">Direct</option>
+                                            <option value="Front Desk">Front Desk</option>
+                                            <option value="Expedia Partner">Expedia Partner</option>
+                                            <option value="Corporate Manager">Corporate Manager</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Options Row */}
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/80">
+                                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
                                         <input
                                             type="checkbox"
-                                            checked={taxApplicable}
-                                            onChange={e => setTaxApplicable(e.target.checked)}
-                                            className="w-3.5 h-3.5 rounded text-blue-600 cursor-pointer"
+                                            checked={dayUse}
+                                            onChange={e => setDayUse(e.target.checked)}
+                                            className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                         />
-                                        <span>Tax Applicable</span>
+                                        <span>Day Use</span>
                                     </label>
+
+                                    <div className="flex items-center gap-4">
+                                        <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
+                                            <input
+                                                type="radio"
+                                                name="ratePerNight"
+                                                checked={ratePerNight === 'Rate Per Night'}
+                                                onChange={() => setRatePerNight('Rate Per Night')}
+                                                className="text-blue-600 cursor-pointer"
+                                            />
+                                            <span>Rate Per Night</span>
+                                        </label>
+
+                                        <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
+                                            <input
+                                                type="checkbox"
+                                                checked={taxApplicable}
+                                                onChange={e => setTaxApplicable(e.target.checked)}
+                                                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                            <span>Tax Applicable</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
 

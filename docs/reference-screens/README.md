@@ -32,3 +32,6 @@ This directory contains the reference UI screenshots provided by the client, ren
 - `25-drag-extend-stayview.png`: Dragging timeline reservation handle to extend/shorten nights.
 - `26-assign-rooms-header-gap.png`: Assign Rooms drawer header spacing.
 - `27-assign-rooms-drawer-reference.png`: Full Assign Rooms drawer reference.
+- `28-stayview-15-days-overflow-and-icon-cutoff.png`: 15 days window width overflow & icon clipping reference.
+- `29-stayview-backdates-today-holidays-marking.png`: Distinct markings for Today (blue), Backdates/Past dates (grey background, audit locked read-only), and Weekends/Holidays (red/pink headers and cell washes).
+- `30-add-reservation-stepper-and-check-availability-box.png`: Add Reservation 3-step wizard bar and check availability parameters box optimization reference.

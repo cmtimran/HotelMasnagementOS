@@ -35,6 +35,7 @@ export interface AmendBookingData {
     nights: number;
     avgDailyRate?: number;
     status: string;
+    isPast?: boolean;
 }
 
 interface AmendStayModalProps {
