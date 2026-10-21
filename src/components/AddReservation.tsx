@@ -37,12 +37,12 @@ interface PaymentRow {
 }
 
 const AVAILABLE_ROOMS_MAP: Record<string, string[]> = {
-    'Deluxe Double': ['101', '102', '201', '301', '302'],
-    'Superior King': ['103', '202', '507'],
-    'Executive Suite': ['104', '203', '502'],
+    'Deluxe Double': ['101', '102', '107', '108', '202', '205', '207', '301', '302'],
+    'Superior King': ['103', '203', '305', '306', '307', '507'],
+    'Executive Suite': ['104', '201', '206', '401', '402', '404', '502'],
     'Presidential Suite': ['501', '503'],
-    'Winter Rate Plan': ['101', '102', '505'],
-    'Standard Single': ['105', '205']
+    'Winter Rate Plan': ['101', '102', '202', '505'],
+    'Standard Single': ['105', '205', '208', '303']
 };
 
 const getAvailableRooms = (roomType: string): string[] => {
@@ -217,16 +217,33 @@ export const AddReservation: React.FC = () => {
     };
 
     const updateRoomRow = (id: number, field: keyof RoomRow, value: any) => {
-        setRoomsList(roomsList.map(r => {
-            if (r.id !== id) return r;
-            if (field === 'roomType') {
-                const used = new Set(roomsList.filter(other => other.id !== id).map(other => other.roomNumber));
-                const pool = getAvailableRooms(value);
-                const nextRoom = pool.find(rn => !used.has(rn)) || pool[0] || '101';
-                return { ...r, roomType: value, roomNumber: nextRoom };
-            }
-            return { ...r, [field]: value };
-        }));
+        setRoomsList(prev => {
+            // 1. Update target row
+            const updated = prev.map(r => {
+                if (r.id !== id) return r;
+                if (field === 'roomType') {
+                    const otherUsed = new Set(prev.filter(other => other.id !== id).map(other => other.roomNumber));
+                    const pool = getAvailableRooms(value);
+                    const nextRoom = pool.find(rn => !otherUsed.has(rn)) || pool[0] || '101';
+                    return { ...r, roomType: value, roomNumber: nextRoom };
+                }
+                return { ...r, [field]: value };
+            });
+
+            // 2. Ensure complete uniqueness of room numbers across all rows
+            const allocatedSet = new Set<string>();
+            return updated.map((r, idx) => {
+                const pool = getAvailableRooms(r.roomType);
+                if (allocatedSet.has(r.roomNumber)) {
+                    // Collision detected! Automatically assign next available room in the pool
+                    const freeRoom = pool.find(rn => !allocatedSet.has(rn)) || String(100 + (idx + 1) * 2);
+                    allocatedSet.add(freeRoom);
+                    return { ...r, roomNumber: freeRoom };
+                }
+                allocatedSet.add(r.roomNumber);
+                return r;
+            });
+        });
     };
 
     // Payment Handlers
@@ -269,11 +286,24 @@ export const AddReservation: React.FC = () => {
         const reservationNumber = `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
         
         // Auto assign available rooms upon saving for rows with isAssign === true
+        const usedRoomsAcrossBooking = new Set<string>();
+
+        // 1. Lock in manual selections first
+        roomsList.forEach(r => {
+            if (!r.isAssign && r.roomNumber) {
+                usedRoomsAcrossBooking.add(r.roomNumber);
+            }
+        });
+
+        // 2. Allocate auto rows from remaining pool
         const allocatedRoomNumbers = roomsList.map((r, idx) => {
             if (r.isAssign) {
                 const pool = getAvailableRooms(r.roomType);
-                return pool[idx % pool.length] || r.roomNumber;
+                const freeRoom = pool.find(rn => !usedRoomsAcrossBooking.has(rn)) || String(100 + idx);
+                usedRoomsAcrossBooking.add(freeRoom);
+                return freeRoom;
             }
+            usedRoomsAcrossBooking.add(r.roomNumber);
             return r.roomNumber;
         });
 
@@ -663,11 +693,25 @@ export const AddReservation: React.FC = () => {
                                                                 className="w-20 h-7 px-1 border border-blue-400 bg-white text-blue-900 rounded text-[11px] font-bold text-center outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs mx-auto"
                                                                 title="Manual Room Selection: Select room"
                                                             >
-                                                                {getAvailableRooms(row.roomType).map(rm => (
-                                                                    <option key={rm} value={rm}>
-                                                                        Room {rm}
-                                                                    </option>
-                                                                ))}
+                                                                {(() => {
+                                                                    const otherRowsRooms = new Set(
+                                                                        roomsList.filter(other => other.id !== row.id).map(other => other.roomNumber)
+                                                                    );
+                                                                    const pool = getAvailableRooms(row.roomType);
+                                                                    return pool.map(rm => {
+                                                                        const isTaken = otherRowsRooms.has(rm);
+                                                                        return (
+                                                                            <option
+                                                                                key={rm}
+                                                                                value={rm}
+                                                                                disabled={isTaken}
+                                                                                className={isTaken ? 'text-gray-400 bg-gray-100 italic' : 'text-blue-950 font-bold'}
+                                                                            >
+                                                                                Room {rm}{isTaken ? ' (In Use)' : ''}
+                                                                            </option>
+                                                                        );
+                                                                    });
+                                                                })()}
                                                             </select>
                                                         )}
                                                     </td>

@@ -144,6 +144,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     // Room handlers
     const handleAddRoom = () => {
         const nextId = roomsList.length > 0 ? Math.max(...roomsList.map(r => r.id)) + 1 : 1;
+        const usedRooms = new Set(roomsList.map(r => r.roomNumber));
+        const pool = ['101', '102', '107', '108', '201', '202', '205', '301', '302'];
+        const nextRoom = pool.find(rn => !usedRooms.has(rn)) || String(100 + nextId);
         setRoomsList([
             ...roomsList,
             {
@@ -151,7 +154,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 roomType: 'Deluxe Double',
                 noOfRooms: 1,
                 ratePlan: 'Standard Rate',
-                roomNumber: '102',
+                roomNumber: nextRoom,
                 adults: 2,
                 children: 0,
                 rate: 3000

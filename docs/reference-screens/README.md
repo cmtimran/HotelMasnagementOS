@@ -46,3 +46,5 @@ This directory contains the reference UI screenshots provided by the client, ren
 - `39-calendar-popover-cutoff-at-screen-bottom-in-quick-reservation-modal.png`: Calendar popover in Quick Reservation modal jumping down to the bottom edge of the screen and getting cut off due to `position: fixed` relative to transformed modal container.
 - `40-calendar-popover-cutoff-at-bottom-in-add-reservation.png`: Calendar popover in Add Reservation page jumping down to bottom-left corner and getting cut off below the viewport.
 - `41-horizontal-scrollbar-in-rooms-table-of-quick-reservation-modal.png`: Horizontal scrollbar appearing across the Rooms table in Quick Reservation modal on Windows viewports.
+- `42-front-office-sidebar-pages-need-expert-redesign.png`: Front Office navigation items highlighted by user requiring complete enterprise-grade redesign.
+- `43-duplicate-room-selection-in-add-reservation.png`: Room dropdown allows selecting the same room (Room 102) across multiple rows simultaneously in Add Reservation.
