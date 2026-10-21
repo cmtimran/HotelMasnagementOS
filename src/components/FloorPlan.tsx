@@ -152,29 +152,33 @@ export const FloorPlan: React.FC = () => {
                 </div>
 
                 {/* Floor Switcher Buttons */}
-                <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200 gap-1 shadow-2xs">
                     {[
                         { floor: 1, label: 'Floor 1 (Deluxe)' },
                         { floor: 2, label: 'Floor 2 (Executive)' },
                         { floor: 3, label: 'Floor 3 (Superior)' },
                         { floor: 4, label: 'Floor 4 (Suites)' },
                         { floor: 5, label: 'Floor 5 (Penthouse)' }
-                    ].map(f => (
-                        <button
-                            key={f.floor}
-                            onClick={() => {
-                                setSelectedFloor(f.floor);
-                                setSelectedRoom(null);
-                            }}
-                            className={`h-7 px-2.5 rounded font-bold text-[11px] cursor-pointer transition-colors ${
-                                selectedFloor === f.floor
-                                    ? 'bg-white text-gray-900 shadow-2xs'
-                                    : 'text-gray-500 hover:text-gray-900'
-                            }`}
-                        >
-                            {f.label}
-                        </button>
-                    ))}
+                    ].map(f => {
+                        const isActive = selectedFloor === f.floor;
+                        return (
+                            <button
+                                key={f.floor}
+                                type="button"
+                                onClick={() => {
+                                    setSelectedFloor(f.floor);
+                                    setSelectedRoom(null);
+                                }}
+                                className={`h-7 px-3 rounded-md font-bold text-[11px] cursor-pointer transition-all ${
+                                    isActive
+                                        ? 'bg-[#1e3a8a] text-white shadow-xs'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/70'
+                                }`}
+                            >
+                                {f.label}
+                            </button>
+                        );
+                    })}
                 </div>
             </header>
 

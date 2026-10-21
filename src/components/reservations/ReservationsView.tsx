@@ -279,7 +279,6 @@ export const ReservationsView: React.FC = () => {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [guestFilter, setGuestFilter] = useState<'all' | 'single' | 'group'>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
     
     // Dates Range State
     const [startDate, setStartDate] = useState('');
@@ -481,60 +480,63 @@ export const ReservationsView: React.FC = () => {
 
     return (
         <div className="p-3 sm:p-5 bg-[#f0f4f8] min-h-full flex flex-col gap-3 font-sans text-xs text-gray-800 animate-in fade-in duration-150">
-            {/* Top Control Bar (Exact 2-Row Design matching hotel-management) */}
-            <div className="bg-white rounded-lg p-3 sm:px-5 sm:py-2.5 flex flex-col gap-2.5 shadow-2xs border border-gray-200/80 select-none">
-                {/* Row 1: Primary Tabs & Primary Action Controls */}
-                <div className="flex items-center justify-between flex-wrap gap-2.5">
-                    {/* Primary Tabs */}
-                    <div className="flex items-center gap-5 border-b border-gray-200 flex-1 min-w-[260px]">
-                        <button
-                            type="button"
-                            onClick={() => handleTabChange('reservations')}
-                            className={`py-2 text-[13px] font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-                                activeTab === 'reservations' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
-                            }`}
-                        >
-                            <span>Reservations</span>
-                            <span className="text-xs font-semibold">{countReservations}</span>
-                            {activeTab === 'reservations' && (
-                                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#312e81]"></span>
-                            )}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => handleTabChange('arrivals')}
-                            className={`py-2 text-[13px] font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-                                activeTab === 'arrivals' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
-                            }`}
-                        >
-                            <span>Arrivals</span>
-                            <span className="text-xs font-semibold">{countArrivals}</span>
-                            {activeTab === 'arrivals' && (
-                                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#312e81]"></span>
-                            )}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => handleTabChange('departures')}
-                            className={`py-2 text-[13px] font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-                                activeTab === 'departures' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
-                            }`}
-                        >
-                            <span>Departures</span>
-                            <span className="text-xs font-semibold">{countDepartures}</span>
-                            {activeTab === 'departures' && (
-                                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#312e81]"></span>
-                            )}
-                        </button>
+            {/* Top Control Bar */}
+            <div className="bg-white rounded-lg p-3 sm:px-5 sm:py-3 flex flex-col gap-3 shadow-2xs border border-gray-200/80 select-none">
+                {/* Row 1: Unified All 5 Status Tabs + Primary CTA */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-1 border-b border-gray-100">
+                    {/* Status Tabs */}
+                    <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+                        {[
+                            { id: 'reservations', label: 'Reservations', count: countReservations },
+                            { id: 'arrivals', label: 'Arrivals', count: countArrivals },
+                            { id: 'in-house', label: 'In House', count: countInHouse },
+                            { id: 'departures', label: 'Departures', count: countDepartures },
+                            { id: 'checked-out', label: 'Checked Out', count: countCheckOut }
+                        ].map(t => {
+                            const isActive = activeTab === t.id;
+                            return (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => handleTabChange(t.id as any)}
+                                    className={`py-2 text-[13px] transition-colors relative cursor-pointer flex items-center gap-1.5 font-medium ${
+                                        isActive ? 'text-[#1e3a8a] font-bold' : 'text-gray-500 hover:text-gray-900'
+                                    }`}
+                                >
+                                    <span>{t.label}</span>
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-bold ${
+                                        isActive ? 'bg-blue-100 text-[#1e3a8a]' : 'bg-gray-100 text-gray-600'
+                                    }`}>
+                                        {t.count}
+                                    </span>
+                                    {isActive && (
+                                        <span className="absolute bottom-[-5px] left-0 right-0 h-[2.5px] bg-[#1e3a8a] rounded-full"></span>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
 
-                    {/* Primary Right Actions */}
+                    {/* Primary Right Action */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('add-reservation')}
+                            className="flex items-center gap-1.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors h-8 cursor-pointer shadow-xs"
+                        >
+                            <Plus size={14} className="stroke-[2.5]" />
+                            <span>Add Reservation</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Row 2: Secondary Toolbar (Date Presets, Single/Group, Search, View Mode, Grouping, Export) */}
+                <div className="flex items-center justify-between flex-wrap gap-2.5">
+                    {/* Left: Filter Controls */}
                     <div className="flex items-center gap-2 flex-wrap">
                         {/* Interactive Date Range Picker */}
                         <div className="relative">
-                            <div className="flex items-center border border-gray-200 rounded-md px-2 py-0.5 gap-1.5 bg-white text-xs text-gray-700 h-8 shadow-2xs hover:border-blue-400 transition-colors">
+                            <div className="flex items-center border border-gray-200 rounded-lg px-2.5 py-0.5 gap-1.5 bg-white text-xs text-gray-700 h-8 shadow-2xs hover:border-blue-400 transition-colors">
                                 <input
                                     type="date"
                                     value={startDate}
@@ -574,7 +576,7 @@ export const ReservationsView: React.FC = () => {
                             {isDatePopoverOpen && (
                                 <>
                                     <div className="fixed inset-0 z-30" onClick={() => setIsDatePopoverOpen(false)}></div>
-                                    <div className="absolute right-0 top-9 z-40 bg-white border border-gray-200 shadow-xl rounded-md p-2 w-44 space-y-1 animate-in fade-in zoom-in-95 duration-100 text-xs">
+                                    <div className="absolute left-0 top-9 z-40 bg-white border border-gray-200 shadow-xl rounded-lg p-2 w-44 space-y-1 animate-in fade-in zoom-in-95 duration-100 text-xs">
                                         <div className="text-[10px] font-bold text-gray-400 uppercase px-2 py-0.5">Quick Presets</div>
                                         <button
                                             type="button"
@@ -610,7 +612,7 @@ export const ReservationsView: React.FC = () => {
                         </div>
 
                         {/* Single Guest / Group Guest Mode Toggle */}
-                        <div className="flex border border-gray-200 rounded-md overflow-hidden h-8 shadow-2xs bg-white">
+                        <div className="flex border border-gray-200 rounded-lg overflow-hidden h-8 shadow-2xs bg-white">
                             <button
                                 type="button"
                                 onClick={() => setGuestFilter(prev => prev === 'single' ? 'all' : 'single')}
@@ -639,8 +641,41 @@ export const ReservationsView: React.FC = () => {
                             </button>
                         </div>
 
+                        {/* Search Input */}
+                        <div className="relative">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search guest, res #, room, group..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="h-8 pl-7 pr-2.5 text-xs border border-gray-200 rounded-lg bg-white outline-none w-52 sm:w-64 focus:border-blue-500 shadow-2xs transition-colors"
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                >
+                                    <X size={12} />
+                                </button>
+                            )}
+                        </div>
+
+                        {guestFilter !== 'all' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                                <span>Filter: {guestFilter === 'single' ? 'Single Guests' : 'Group Bookings'}</span>
+                                <button type="button" onClick={() => setGuestFilter('all')} className="hover:text-red-500 cursor-pointer">
+                                    <X size={11} />
+                                </button>
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-2">
                         {/* View Mode: Card (Grid) vs Table (List) Toggle */}
-                        <div className="flex border border-gray-200 rounded-md overflow-hidden h-8 shadow-2xs bg-white">
+                        <div className="flex border border-gray-200 rounded-lg overflow-hidden h-8 shadow-2xs bg-white">
                             <button
                                 type="button"
                                 onClick={() => setViewMode('grid')}
@@ -677,7 +712,7 @@ export const ReservationsView: React.FC = () => {
                                     setIsGroupingMode(!isGroupingMode);
                                 }
                             }}
-                            className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition-all h-8 cursor-pointer shadow-2xs ${
+                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all h-8 cursor-pointer shadow-2xs ${
                                 isGroupingMode
                                     ? 'bg-purple-700 text-white ring-2 ring-purple-300'
                                     : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
@@ -688,106 +723,15 @@ export const ReservationsView: React.FC = () => {
                             <span>{isGroupingMode ? 'Grouping Active' : 'Make Group'}</span>
                         </button>
 
-                        {/* Add New Reservation Button */}
-                        <button
-                            type="button"
-                            onClick={() => setActivePage('add-reservation')}
-                            className="flex items-center gap-1 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-md px-3 py-1 text-xs font-semibold transition-colors h-8 cursor-pointer shadow-2xs"
-                        >
-                            <Plus size={14} />
-                            <span>Add Reservation</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Row 2: Secondary Tabs & Secondary Actions (Export & Search) */}
-                <div className="flex items-center justify-between flex-wrap gap-2.5 pt-1">
-                    {/* Secondary Tabs */}
-                    <div className="flex items-center gap-5 border-b border-gray-200 flex-1 min-w-[200px]">
-                        <button
-                            type="button"
-                            onClick={() => handleTabChange('checked-out')}
-                            className={`py-1.5 text-xs font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-                                activeTab === 'checked-out' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
-                            }`}
-                        >
-                            <span>Check Out</span>
-                            <span className="text-[11px] font-semibold">{countCheckOut}</span>
-                            {activeTab === 'checked-out' && (
-                                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#312e81]"></span>
-                            )}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => handleTabChange('in-house')}
-                            className={`py-1.5 text-xs font-medium transition-colors relative cursor-pointer flex items-center gap-1.5 ${
-                                activeTab === 'in-house' ? 'text-[#312e81] font-bold' : 'text-gray-500 hover:text-gray-800'
-                            }`}
-                        >
-                            <span>In House</span>
-                            <span className="text-[11px] font-semibold">{countInHouse}</span>
-                            {activeTab === 'in-house' && (
-                                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#312e81]"></span>
-                            )}
-                        </button>
-                    </div>
-
-                    {/* Secondary Right Actions */}
-                    <div className="flex items-center gap-2">
-                        {/* Active Filter Indicators */}
-                        {guestFilter !== 'all' && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
-                                <span>Filter: {guestFilter === 'single' ? 'Single Guests' : 'Group Bookings'}</span>
-                                <button type="button" onClick={() => setGuestFilter('all')} className="hover:text-red-500 cursor-pointer">
-                                    <X size={11} />
-                                </button>
-                            </span>
-                        )}
-
                         {/* Export Button */}
                         <button
                             type="button"
                             onClick={exportCSV}
-                            className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-md px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors h-8 cursor-pointer shadow-2xs"
+                            className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors h-8 cursor-pointer shadow-2xs"
                         >
                             <Download size={13} className="text-gray-500" />
-                            <span>Export</span>
+                            <span>Export CSV</span>
                         </button>
-
-                        {/* Search Box / Toggle */}
-                        {isSearchOpen ? (
-                            <div className="flex items-center border border-blue-400 rounded-md px-2 bg-white h-8 w-60 animate-in fade-in duration-150 shadow-2xs">
-                                <Search size={13} className="text-gray-400 mr-1.5 flex-shrink-0" />
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    placeholder="Search guest, res #, group..."
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    className="w-full border-0 outline-none text-xs text-gray-800"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsSearchOpen(false);
-                                        setSearchQuery('');
-                                    }}
-                                    className="text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
-                                >
-                                    <X size={12} />
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setIsSearchOpen(true)}
-                                className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-800 bg-white hover:bg-gray-50 cursor-pointer transition-colors shadow-2xs"
-                                title="Search Reservations"
-                            >
-                                <Search size={14} />
-                            </button>
-                        )}
                     </div>
                 </div>
             </div>
@@ -882,11 +826,11 @@ export const ReservationsView: React.FC = () => {
                 ) : viewMode === 'list' ? (
                     /* Table (List) View */
                     <div className="overflow-x-auto flex-1">
-                        <table className="w-full text-left border-collapse text-xs">
+                        <table className="w-full text-left border-collapse text-xs min-w-[1120px]">
                             <thead>
                                 <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider select-none">
                                     {isGroupingMode && (
-                                        <th className="px-3 py-2.5 w-10 text-center animate-in fade-in duration-100">
+                                        <th className="px-3.5 py-2.5 w-10 text-center animate-in fade-in duration-100">
                                             <button
                                                 type="button"
                                                 onClick={() => toggleSelectAll(filteredReservations)}
@@ -901,15 +845,15 @@ export const ReservationsView: React.FC = () => {
                                             </button>
                                         </th>
                                     )}
-                                    <th className="px-3 py-2.5">Res #</th>
-                                    <th className="px-3 py-2.5">Guest &amp; Group</th>
-                                    <th className="px-3 py-2.5">Room</th>
-                                    <th className="px-3 py-2.5">Stay Dates</th>
-                                    <th className="px-3 py-2.5">Source</th>
-                                    <th className="px-3 py-2.5">Total Tariff</th>
-                                    <th className="px-3 py-2.5">Due Balance</th>
-                                    <th className="px-3 py-2.5">Status</th>
-                                    <th className="px-3 py-2.5 text-right">Actions</th>
+                                    <th className="px-3.5 py-2.5 w-28">Res #</th>
+                                    <th className="px-3.5 py-2.5 min-w-[190px]">Guest &amp; Group</th>
+                                    <th className="px-3.5 py-2.5 w-28">Room</th>
+                                    <th className="px-3.5 py-2.5 w-40">Stay Dates</th>
+                                    <th className="px-3.5 py-2.5 w-28">Source</th>
+                                    <th className="px-3.5 py-2.5 w-32">Total Tariff</th>
+                                    <th className="px-3.5 py-2.5 w-32">Due Balance</th>
+                                    <th className="px-3.5 py-2.5 w-28">Status</th>
+                                    <th className="px-3.5 py-2.5 w-36 text-right pr-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-[11.5px]">
@@ -1029,7 +973,7 @@ export const ReservationsView: React.FC = () => {
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="px-3 py-2 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                            <td className="px-3.5 py-2.5 text-right whitespace-nowrap pr-4" onClick={e => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     {(r.status === 'arriving' || r.status === 'confirmed') && (
                                                         <button

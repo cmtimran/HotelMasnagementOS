@@ -193,7 +193,7 @@ export const ReservationSleepOut: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(true)}
-                        className="h-8.5 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                     >
                         <Plus size={14} className="stroke-[2.5]" />
                         <span>Log Sleep Out</span>
@@ -202,7 +202,7 @@ export const ReservationSleepOut: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setActivePage('front-desk')}
-                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
                     >
                         <span>Front Desk</span>
                         <ArrowRight size={13} />
@@ -285,21 +285,22 @@ export const ReservationSleepOut: React.FC = () => {
             {/* Sleep Out Ledger Table */}
             <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
+                    <table className="w-full text-left border-collapse text-xs min-w-[1050px]">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
-                                <th className="py-2.5 px-3.5">Guest &amp; Room</th>
-                                <th className="py-2.5 px-3">Pass &amp; Dates</th>
-                                <th className="py-2.5 px-3">Reason / Purpose</th>
-                                <th className="py-2.5 px-2.5">Key Card Location</th>
-                                <th className="py-2.5 px-3 text-center">Status</th>
-                                <th className="py-2.5 px-3.5 text-right">Actions</th>
+                                <th className="py-2.5 px-3.5 w-64">Guest &amp; Room</th>
+                                <th className="py-2.5 px-3 w-52">Pass &amp; Dates</th>
+                                <th className="py-2.5 px-3 min-w-[200px]">Reason / Purpose</th>
+                                <th className="py-2.5 px-3 w-40">Key Card Location</th>
+                                <th className="py-2.5 px-3 w-32 text-center">Status</th>
+                                <th className="py-2.5 px-4 w-40 text-right pr-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filtered.length > 0 ? (
                                 filtered.map(s => {
                                     const isOut = s.status === 'Sleeping Out';
+                                    const cardLocation = s.keyCardLocation || 'Held at Front Desk';
 
                                     return (
                                         <tr key={s.id} className="hover:bg-indigo-50/15 transition-colors">
@@ -343,13 +344,13 @@ export const ReservationSleepOut: React.FC = () => {
                                             </td>
 
                                             {/* Key Card Location */}
-                                            <td className="py-2.5 px-2.5">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                                    s.keyCardLocation === 'Held at Front Desk'
+                                            <td className="py-2.5 px-3">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border inline-block ${
+                                                    cardLocation === 'Held at Front Desk'
                                                         ? 'bg-blue-50 text-blue-700 border-blue-200'
                                                         : 'bg-amber-50 text-amber-700 border-amber-200'
                                                 }`}>
-                                                    {s.keyCardLocation}
+                                                    {cardLocation}
                                                 </span>
                                             </td>
 
@@ -365,7 +366,7 @@ export const ReservationSleepOut: React.FC = () => {
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="py-2.5 px-3.5 text-right">
+                                            <td className="py-2.5 px-4 text-right pr-4">
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     {isOut && (
                                                         <button

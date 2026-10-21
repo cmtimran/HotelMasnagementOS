@@ -276,7 +276,7 @@ export const RoomRack: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setActivePage('front-desk')}
-                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
                     >
                         <span>Front Desk Hub</span>
                         <ArrowRight size={13} />
@@ -288,7 +288,7 @@ export const RoomRack: React.FC = () => {
                             setPrefilledRoomNumber('');
                             setIsQuickReserveOpen(true);
                         }}
-                        className="h-8.5 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                     >
                         <Plus size={14} className="stroke-[2.5]" />
                         <span>Walk-In / Booking</span>

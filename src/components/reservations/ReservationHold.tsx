@@ -248,7 +248,7 @@ export const ReservationHold: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(true)}
-                        className="h-8.5 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                     >
                         <Plus size={14} className="stroke-[2.5]" />
                         <span>New Hold Block</span>
@@ -257,7 +257,7 @@ export const ReservationHold: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setActivePage('front-desk')}
-                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
                     >
                         <span>Front Desk</span>
                         <ArrowRight size={13} />
@@ -339,16 +339,16 @@ export const ReservationHold: React.FC = () => {
             {/* Hold Register Table */}
             <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
+                    <table className="w-full text-left border-collapse text-xs min-w-[1080px]">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
-                                <th className="py-2.5 px-3.5">Guest &amp; Reference</th>
-                                <th className="py-2.5 px-3">Room Category</th>
-                                <th className="py-2.5 px-3">Intended Stay</th>
-                                <th className="py-2.5 px-3">Hold Expiry Deadline</th>
-                                <th className="py-2.5 px-3">Hold Reason</th>
-                                <th className="py-2.5 px-3 text-right">Tariff Value</th>
-                                <th className="py-2.5 px-3.5 text-right">Actions</th>
+                                <th className="py-2.5 px-3.5 w-60">Guest &amp; Reference</th>
+                                <th className="py-2.5 px-3 w-40">Room Category</th>
+                                <th className="py-2.5 px-3 w-40">Intended Stay</th>
+                                <th className="py-2.5 px-3 w-48">Hold Expiry Deadline</th>
+                                <th className="py-2.5 px-3 min-w-[180px]">Hold Reason</th>
+                                <th className="py-2.5 px-3 w-36 text-right">Tariff Value</th>
+                                <th className="py-2.5 px-3.5 w-44 text-right pr-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -424,7 +424,7 @@ export const ReservationHold: React.FC = () => {
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="py-2.5 px-3.5 text-right">
+                                            <td className="py-2.5 px-3.5 text-right pr-4">
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     {isHold ? (
                                                         <>

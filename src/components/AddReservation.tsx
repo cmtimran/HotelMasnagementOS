@@ -407,23 +407,23 @@ export const AddReservation: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                     <button
                         type="button"
                         onClick={() => setActivePage('reservations')}
-                        className="h-6.5 px-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded text-[11px] font-semibold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="h-7.5 px-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 rounded-lg text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
                         title="View All Reservations"
                     >
-                        <List size={12} className="text-gray-500" />
+                        <List size={13} className="text-gray-500" />
                         <span>Reservations List</span>
                     </button>
                     <button
                         type="button"
                         onClick={() => setActivePage('stay-view')}
-                        className="h-6.5 px-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-blue-700 rounded text-[11px] font-semibold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="h-7.5 px-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-blue-300 text-blue-700 rounded-lg text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
                         title="Open Stay View Calendar"
                     >
-                        <Calendar size={12} className="text-blue-600" />
+                        <Calendar size={13} className="text-blue-600" />
                         <span>Stay View</span>
                     </button>
                 </div>

@@ -338,7 +338,7 @@ export const ReservationUnassigned: React.FC = () => {
                         <button
                             type="button"
                             onClick={handleAutoAssignAll}
-                            className="h-8.5 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                            className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                             title="Auto-Assign all unassigned reservations to best available clean rooms"
                         >
                             <Sparkles size={13} className="text-blue-200" />
@@ -349,7 +349,7 @@ export const ReservationUnassigned: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setActivePage('stay-view')}
-                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
                     >
                         <span>Stay View</span>
                         <ArrowRight size={13} />
@@ -358,7 +358,7 @@ export const ReservationUnassigned: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setActivePage('front-desk')}
-                        className="h-8.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
                     >
                         <span>Front Desk</span>
                         <ArrowRight size={13} />
@@ -453,16 +453,16 @@ export const ReservationUnassigned: React.FC = () => {
             {/* Unassigned Bookings Data Table */}
             <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
+                    <table className="w-full text-left border-collapse text-xs min-w-[1080px]">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
-                                <th className="py-2.5 px-3.5">Res # &amp; Guest</th>
-                                <th className="py-2.5 px-3">Reserved Category</th>
-                                <th className="py-2.5 px-3">Stay Period</th>
-                                <th className="py-2.5 px-2.5 text-center">Pax</th>
-                                <th className="py-2.5 px-3">Channel / Source</th>
-                                <th className="py-2.5 px-3 text-right">Tariff / Balance</th>
-                                <th className="py-2.5 px-3.5 text-right">Allocation Action</th>
+                                <th className="py-2.5 px-3.5 w-60">Res # &amp; Guest</th>
+                                <th className="py-2.5 px-3 w-48">Reserved Category</th>
+                                <th className="py-2.5 px-3 w-40">Stay Period</th>
+                                <th className="py-2.5 px-2.5 w-24 text-center">Pax</th>
+                                <th className="py-2.5 px-3 w-36">Channel / Source</th>
+                                <th className="py-2.5 px-3 w-36 text-right">Tariff / Balance</th>
+                                <th className="py-2.5 px-3.5 w-44 text-right pr-4">Allocation Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -552,7 +552,7 @@ export const ReservationUnassigned: React.FC = () => {
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="py-2.5 px-3.5 text-right">
+                                            <td className="py-2.5 px-3.5 text-right pr-4">
                                                 <button
                                                     type="button"
                                                     onClick={() => setAssignTarget(u)}

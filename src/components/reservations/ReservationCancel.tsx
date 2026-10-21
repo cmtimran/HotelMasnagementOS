@@ -293,17 +293,17 @@ export const ReservationCancel: React.FC = () => {
                             document.body.removeChild(link);
                             showToast("Exported Cancellation Audit CSV.");
                         }}
-                        className="h-7 px-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-md text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        className="h-8 px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                     >
-                        <FileSpreadsheet size={12} className="text-emerald-600" />
+                        <FileSpreadsheet size={13} className="text-emerald-600" />
                         <span>Export CSV</span>
                     </button>
                     <button
                         type="button"
                         onClick={() => window.print()}
-                        className="h-7 px-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-md text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        className="h-8 px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                     >
-                        <Printer size={12} className="text-gray-600" />
+                        <Printer size={13} className="text-gray-600" />
                         <span>Print Log</span>
                     </button>
                 </div>
@@ -421,19 +421,19 @@ export const ReservationCancel: React.FC = () => {
 
             {/* Table */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
-                <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left min-w-[960px] border-collapse">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[1180px] border-collapse">
                         <thead>
                             <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
-                                <th className="px-3 py-2">Res #</th>
-                                <th className="px-3 py-2">Guest Identity</th>
-                                <th className="px-3 py-2">Room Details</th>
-                                <th className="px-3 py-2">Original Dates</th>
-                                <th className="px-3 py-2">Cancellation Details & Reason</th>
-                                <th className="px-3 py-2">Operator</th>
-                                <th className="px-3 py-2 text-right">Original / Retained</th>
-                                <th className="px-3 py-2">Refund Status</th>
-                                <th className="px-3 py-2 text-right">Actions</th>
+                                <th className="px-3.5 py-2.5 w-24">Res #</th>
+                                <th className="px-3.5 py-2.5 w-44">Guest Identity</th>
+                                <th className="px-3.5 py-2.5 w-36">Room Details</th>
+                                <th className="px-3.5 py-2.5 w-36">Original Dates</th>
+                                <th className="px-3.5 py-2.5 min-w-[220px]">Cancellation Details & Reason</th>
+                                <th className="px-3.5 py-2.5 w-32">Operator</th>
+                                <th className="px-3.5 py-2.5 w-36 text-right">Original / Retained</th>
+                                <th className="px-3.5 py-2.5 w-40">Refund Status</th>
+                                <th className="px-3.5 py-2.5 w-44 text-right pr-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 text-[11.5px]">
@@ -446,14 +446,14 @@ export const ReservationCancel: React.FC = () => {
                             ) : (
                                 filtered.map(c => (
                                     <tr key={c.id} className="hover:bg-rose-50/20 transition-colors">
-                                        <td className="px-3 py-2 font-mono font-bold text-rose-800">
+                                        <td className="px-3.5 py-2.5 font-mono font-bold text-rose-800">
                                             {c.reservationNumber}
                                         </td>
-                                        <td className="px-3 py-2">
+                                        <td className="px-3.5 py-2.5">
                                             <p className="font-semibold text-gray-900 leading-tight">{c.guestName}</p>
                                             <p className="text-[10px] text-gray-500 font-mono mt-0.5">{c.phone}</p>
                                         </td>
-                                        <td className="px-3 py-2">
+                                        <td className="px-3.5 py-2.5">
                                             <span className="font-medium text-gray-800">{c.roomType}</span>
                                             {c.roomNumber && (
                                                 <span className="ml-1.5 px-1 py-0.2 bg-gray-100 text-gray-700 rounded text-[9.5px] font-mono">
@@ -461,11 +461,11 @@ export const ReservationCancel: React.FC = () => {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                                        <td className="px-3.5 py-2.5 text-gray-600 whitespace-nowrap">
                                             <span className="font-mono text-[10.5px]">{c.stayDates}</span>
                                             <span className="ml-1 text-[10px] font-semibold text-gray-400">({c.nights}N)</span>
                                         </td>
-                                        <td className="px-3 py-2 max-w-xs">
+                                        <td className="px-3.5 py-2.5 max-w-xs">
                                             <div className="flex items-center gap-1.5 mb-0.5">
                                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-gray-100 text-gray-700 border border-gray-200">
                                                     {c.reasonCategory}
@@ -476,10 +476,10 @@ export const ReservationCancel: React.FC = () => {
                                                 {c.reason}
                                             </p>
                                         </td>
-                                        <td className="px-3 py-2 text-gray-600 text-[10.5px] whitespace-nowrap">
+                                        <td className="px-3.5 py-2.5 text-gray-600 text-[10.5px] whitespace-nowrap">
                                             {c.cancelledBy}
                                         </td>
-                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                        <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
                                             <div className="font-mono font-bold text-rose-700">
                                                 ৳ {(c.retentionFeeBDT || 0).toLocaleString()}
                                             </div>
@@ -487,7 +487,7 @@ export const ReservationCancel: React.FC = () => {
                                                 Orig: ৳ {(c.originalTotalBDT || 0).toLocaleString()}
                                             </div>
                                         </td>
-                                        <td className="px-3 py-2 whitespace-nowrap">
+                                        <td className="px-3.5 py-2.5 whitespace-nowrap">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                                 (c.refundStatus || '').includes('Full')
                                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -499,11 +499,11 @@ export const ReservationCancel: React.FC = () => {
                                             </span>
                                             <span className="block text-[9px] text-gray-400 mt-0.5">{c.refundMethod || 'Direct Method'}</span>
                                         </td>
-                                        <td className="px-3 py-2 text-right whitespace-nowrap space-x-1">
+                                        <td className="px-3.5 py-2.5 text-right whitespace-nowrap pr-4 space-x-1">
                                             <button
                                                 type="button"
                                                 onClick={() => setViewVoucherItem(c)}
-                                                className="h-6 px-2 text-[10.5px] font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                                className="h-6.5 px-2.5 text-[10.5px] font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded shadow-2xs cursor-pointer inline-flex items-center gap-1"
                                                 title="View Cancellation & Refund Voucher"
                                             >
                                                 <FileText size={11} className="text-gray-500" />
@@ -512,7 +512,7 @@ export const ReservationCancel: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => handleReinstate(c.id)}
-                                                className="h-6 px-2 text-[10.5px] font-bold bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                                className="h-6.5 px-2.5 text-[10.5px] font-bold bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded shadow-2xs cursor-pointer inline-flex items-center gap-1"
                                                 title="Reinstate to Active Booking"
                                             >
                                                 <RotateCcw size={11} className="text-blue-600" />
