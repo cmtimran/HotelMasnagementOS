@@ -68,7 +68,14 @@ const SAMPLE_PACKAGES_L2 = [
 
 export default function RatePlanManagement() {
     const [view, setView] = useState<'list' | 'form' | 'calendar'>('list');
-    const [ratePlans, setRatePlans] = useState<RatePlan[]>([
+    const [ratePlans, setRatePlans] = useState<RatePlan[]>(() => {
+        try {
+            const saved = localStorage.getItem('hotel_rate_plans_v1');
+            if (saved) return JSON.parse(saved);
+        } catch {
+            // fallback
+        }
+        return [
         {
             id: 1,
             name: 'Best Available Rate (BAR)',
@@ -196,7 +203,8 @@ export default function RatePlanManagement() {
                 { roomTypeId: 'Standard Room', structure: 'Flat', operatingCost: 2500, baseRate: 8500, doubleRate: 8500, tripleRate: 10500, extraAdult: 2000, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 2 }
             ]
         }
-    ]);
+        ];
+    });
     const [formData, setFormData] = useState<Partial<RatePlan>>({});
     const [activeTab, setActiveTab] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
@@ -248,14 +256,32 @@ export default function RatePlanManagement() {
         setActiveTab(1);
     };
 
+    const persistRatePlans = (updated: RatePlan[]) => {
+        setRatePlans(updated);
+        try {
+            localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(updated));
+        } catch {
+            // fallback
+        }
+    };
+
+    const handleDelete = (id: number) => {
+        if (window.confirm('Are you sure you want to delete this rate plan?')) {
+            const updated = ratePlans.filter(p => p.id !== id);
+            persistRatePlans(updated);
+        }
+    };
+
     const handleSave = () => {
         if (formData.name && formData.shortCode) {
             const finalData = { ...formData, id: editingPlan?.id || Date.now() } as RatePlan;
+            let updated: RatePlan[];
             if (editingPlan) {
-                setRatePlans(ratePlans.map((p: RatePlan) => p.id === editingPlan.id ? finalData : p));
+                updated = ratePlans.map((p: RatePlan) => p.id === editingPlan.id ? finalData : p);
             } else {
-                setRatePlans([...ratePlans, finalData]);
+                updated = [...ratePlans, finalData];
             }
+            persistRatePlans(updated);
             setView('list');
             setFormData({});
             setEditingPlan(null);
@@ -340,8 +366,8 @@ export default function RatePlanManagement() {
                                     <div className="text-[10px] text-gray-400">Exc. Tax</div>
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
-                                    <button onClick={() => openEdit(plan)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Edit2 size={16} /></button>
-                                    <button className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={16} /></button>
+                                    <button onClick={() => openEdit(plan)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Edit Plan"><Edit2 size={16} /></button>
+                                    <button onClick={() => handleDelete(plan.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Delete Plan"><Trash2 size={16} /></button>
                                 </td>
                             </tr>
                         ))}
@@ -687,34 +713,49 @@ export default function RatePlanManagement() {
     );
 
     const renderCalendar = () => (
-        <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in zoom-in duration-300">
-            <div className="flex justify-between items-center">
+        <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in zoom-in duration-300">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-xs">
                 <div>
-                    <h2 className="text-2xl font-bold flex items-center gap-3">
-                        <TrendingUp className="text-blue-600" /> Yield Operations Grid
+                    <h2 className="text-xl font-bold flex items-center gap-3 text-gray-900">
+                        <TrendingUp className="text-blue-600" /> Yield Operations Grid (July 2026)
                     </h2>
-                    <p className="text-sm text-gray-500">Monthly control for fencings and demand logic</p>
+                    <p className="text-xs text-gray-500">Live multi-tier BAR and Corporate distribution rates</p>
                 </div>
-                <button onClick={() => setView('list')} className="px-4 py-2 bg-white border rounded-lg text-sm font-bold hover:bg-gray-50 uppercase tracking-widest text-gray-600"><X size={16} className="inline mr-2"/> Close Console</button>
+                <button onClick={() => setView('list')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold uppercase tracking-wider text-gray-700 transition-colors">
+                    <X size={15} className="inline mr-1.5"/> Close Console
+                </button>
             </div>
-            <div className="grid grid-cols-7 gap-4">
+            <div className="grid grid-cols-7 gap-3">
                 {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d: string) => (
-                    <div key={d} className="text-center font-black text-gray-400 text-[10px] uppercase tracking-widest">{d}</div>
+                    <div key={d} className="text-center font-bold text-gray-400 text-[11px] uppercase tracking-wider py-1">{d}</div>
                 ))}
-                {[...Array(30)].map((_: any, i: number) => (
-                    <div key={i} className="h-32 bg-white border border-gray-100 rounded-xl p-4 hover:border-blue-500 transition-all flex flex-col justify-between shadow-sm cursor-pointer">
-                        <div className="flex justify-between items-start">
-                            <span className="font-bold text-gray-900">{i + 1}</span>
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex justify-between text-[9px] bg-blue-50 p-1 rounded font-bold text-blue-700">
-                                <span>BAR</span>
-                                <span>৳14.5k</span>
+                {/* 3 leading empty cells for July 1 2026 (Wednesday) */}
+                <div className="h-28 bg-gray-50/50 border border-transparent rounded-xl" />
+                <div className="h-28 bg-gray-50/50 border border-transparent rounded-xl" />
+                <div className="h-28 bg-gray-50/50 border border-transparent rounded-xl" />
+                {[...Array(31)].map((_: any, i: number) => {
+                    const dayNum = i + 1;
+                    const isFriOrSat = (dayNum + 2) % 7 === 5 || (dayNum + 2) % 7 === 6;
+                    const baseRate = isFriOrSat ? 3800 : 3000;
+                    return (
+                        <div key={i} className="h-28 bg-white border border-gray-200/90 rounded-xl p-2.5 hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between shadow-2xs">
+                            <div className="flex justify-between items-start">
+                                <span className="font-bold text-gray-800 text-xs">{dayNum}</span>
+                                <div className={`w-2 h-2 rounded-full ${isFriOrSat ? 'bg-purple-500' : 'bg-emerald-500'}`} title={isFriOrSat ? 'Weekend Surcharge' : 'Standard Demand'} />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-[10px] bg-blue-50/80 px-1.5 py-0.5 rounded font-bold text-blue-700">
+                                    <span>BAR</span>
+                                    <span>৳{(baseRate / 1000).toFixed(1)}k</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] bg-purple-50/80 px-1.5 py-0.5 rounded font-bold text-purple-700">
+                                    <span>CORP</span>
+                                    <span>৳4.0k</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

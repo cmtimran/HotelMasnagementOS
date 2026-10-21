@@ -402,9 +402,9 @@ const SAMPLE_PACKAGES: HotelPackage[] = [
         }
     },
     {
-        id: 4, name: 'Standard Bed & Breakfast', shortCode: 'STDBB', packageType: 'Standard',
-        status: 'Active', color: '#6366F1',
-        description: 'Simple and comfortable. Includes daily buffet breakfast for two.',
+        id: 4, name: 'Full Board Family Getaway', shortCode: 'FB-FAM', packageType: 'Family',
+        status: 'Active', color: '#10B981',
+        description: 'Complete family holiday with all meals (breakfast, lunch, dinner), arcade tokens and trampoline sessions.',
         roomConfig: {
             applicableRoomTypes: ['Family Suite', 'Interconnecting'],
             extraBedAllowed: true, extraBedRate: 2500, extraAdultRate: 2000,
@@ -812,14 +812,33 @@ const sel = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
 // MAIN COMPONENT
 // ============================================================
 
+const PKG_STORAGE_KEY = 'hotel_packages_v2';
+
 const PackageManagement = () => {
-    const [packages, setPackages] = useState<HotelPackage[]>(SAMPLE_PACKAGES);
+    const [packages, setPackages] = useState<HotelPackage[]>(() => {
+        try {
+            const saved = localStorage.getItem(PKG_STORAGE_KEY);
+            if (saved) return JSON.parse(saved);
+        } catch {
+            // fallback
+        }
+        return SAMPLE_PACKAGES;
+    });
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingPackage, setEditingPackage] = useState<HotelPackage | null>(null);
     const [formData, setFormData] = useState<Omit<HotelPackage, 'id'>>(defaultPackage());
     const [activeTab, setActiveTab] = useState<FormTab>('basic');
     const [searchQuery, setSearchQuery] = useState('');
     const [previewMode, setPreviewMode] = useState(false);
+
+    const persistPackages = (updated: HotelPackage[]) => {
+        setPackages(updated);
+        try {
+            localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(updated));
+        } catch {
+            // fallback
+        }
+    };
 
     const filtered = packages.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -842,19 +861,24 @@ const PackageManagement = () => {
 
     const handleDuplicate = (pkg: HotelPackage) => {
         const newPkg: HotelPackage = { ...pkg, id: Date.now(), name: `${pkg.name} (Copy)`, shortCode: `${pkg.shortCode}2`, status: 'Draft' };
-        setPackages([...packages, newPkg]);
+        persistPackages([...packages, newPkg]);
     };
 
     const handleDelete = (id: number) => {
-        setPackages(packages.filter(p => p.id !== id));
+        if (window.confirm('Are you sure you want to delete this package? Linked bookings will keep existing line-item snapshots.')) {
+            const updated = packages.filter(p => p.id !== id);
+            persistPackages(updated);
+        }
     };
 
     const handleSave = () => {
+        let updated: HotelPackage[];
         if (editingPackage) {
-            setPackages(packages.map(p => p.id === editingPackage.id ? { ...formData, id: editingPackage.id } : p));
+            updated = packages.map(p => p.id === editingPackage.id ? { ...formData, id: editingPackage.id } : p);
         } else {
-            setPackages([...packages, { ...formData, id: Date.now() }]);
+            updated = [...packages, { ...formData, id: Date.now() }];
         }
+        persistPackages(updated);
         setView('list');
     };
 

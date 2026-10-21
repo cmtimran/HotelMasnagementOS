@@ -501,8 +501,12 @@ function App() {
       case 'building-floor':
         return <BuildingManagement />;
       case 'manage-room-type':
+      case 'room-types':
+      case 'room-type':
         return <RoomTypeManagement />;
       case 'manage-room':
+      case 'manage-rooms':
+      case 'rooms':
         return <RoomManagement onBack={() => setActivePage('dashboard')} />;
       case 'room-rack':
         return <RoomRack />;
@@ -533,14 +537,19 @@ function App() {
       case 'floor-plan':
         return <FloorPlan />;
       case 'joint-room':
+      case 'connecting-rooms':
+      case 'connecting-room':
         return <ConnectingRoomManagement />;
       case 'rate-plans':
+      case 'rate-plan':
         return <RatePlanManagement />;
       case 'rate-calendar':
         return <RateCalendar />;
       case 'meal-plans':
+      case 'meal-plan':
         return <MealPlanManagement />;
       case 'package-builder':
+      case 'packages':
         return <PackageManagement />;
       case 'service-master':
         return <ServiceManagement />;

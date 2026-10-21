@@ -68,9 +68,18 @@ interface MealPlan {
     venue: string;
 }
 
+const MEAL_STORAGE_KEY = 'hotel_meal_plans_v1';
+
 export default function MealPlanManagement() {
     const [view, setView] = useState<'list' | 'form'>('list');
-    const [mealPlans, setMealPlans] = useState<MealPlan[]>([
+    const [mealPlans, setMealPlans] = useState<MealPlan[]>(() => {
+        try {
+            const saved = localStorage.getItem(MEAL_STORAGE_KEY);
+            if (saved) return JSON.parse(saved);
+        } catch {
+            // fallback
+        }
+        return [
         {
             id: 1,
             name: 'Continental Plan (CP)',
@@ -321,7 +330,8 @@ export default function MealPlanManagement() {
             endTime: '00:00',
             venue: 'N/A'
         }
-    ]);
+        ];
+    });
     const [formData, setFormData] = useState<Partial<MealPlan>>({});
     const [activeTab, setActiveTab] = useState('identity');
     const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
@@ -375,14 +385,25 @@ export default function MealPlanManagement() {
         setView('form');
     };
 
+    const persistMealPlans = (updated: MealPlan[]) => {
+        setMealPlans(updated);
+        try {
+            localStorage.setItem(MEAL_STORAGE_KEY, JSON.stringify(updated));
+        } catch {
+            // fallback
+        }
+    };
+
     const handleSave = () => {
         if (formData.name && formData.shortCode) {
+            let updated: MealPlan[];
             if (editingPlan) {
-                setMealPlans(mealPlans.map(p => p.id === editingPlan.id ? { ...formData, id: editingPlan.id } as MealPlan : p));
+                updated = mealPlans.map(p => p.id === editingPlan.id ? { ...formData, id: editingPlan.id } as MealPlan : p);
             } else {
                 const newPlan = { ...formData, id: Date.now() } as MealPlan;
-                setMealPlans([...mealPlans, newPlan]);
+                updated = [...mealPlans, newPlan];
             }
+            persistMealPlans(updated);
             setView('list');
             setFormData({});
             setEditingPlan(null);
@@ -391,7 +412,10 @@ export default function MealPlanManagement() {
     };
 
     const handleDelete = (id: number) => {
-        setMealPlans(mealPlans.filter(p => p.id !== id));
+        if (window.confirm('Are you sure you want to delete this meal plan configuration?')) {
+            const updated = mealPlans.filter(p => p.id !== id);
+            persistMealPlans(updated);
+        }
     };
 
     const toggleInclusion = (field: keyof MealPlan) => {
