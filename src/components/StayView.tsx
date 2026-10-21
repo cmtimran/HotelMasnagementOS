@@ -12,9 +12,8 @@ import {
 } from 'lucide-react';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
-import AmendStayModal, { type AmendBookingData } from './modals/AmendStayModal';
-import ReservationDetailsDrawer from './modals/ReservationDetailsDrawer';
-import RoomMoveModal, { type RoomMoveData } from './modals/RoomMoveModal';
+import type { AmendBookingData } from './modals/AmendStayModal';
+import ReservationActionDrawer, { type DrawerMode } from './modals/ReservationActionDrawer';
 
 interface TimelineBooking {
     id: string;
@@ -149,10 +148,14 @@ export const StayView: React.FC = () => {
     } | null>(null);
 
     // =========================================================================
-    // RESERVATION / STAY DETAILS DRAWER (NORMAL CLICK) & AMEND STAY MODAL & ROOM MOVE
+    // UNIFIED RESERVATION ACTION DRAWER (ALL 12 MODES & FIXED PINNED FOOTER)
     // =========================================================================
-    const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
-    const [detailsBookingData, setDetailsBookingData] = useState<AmendBookingData | null>(null);
+    const [isActionDrawerOpen, setIsActionDrawerOpen] = useState(false);
+    const [actionDrawerBooking, setActionDrawerBooking] = useState<AmendBookingData | null>(null);
+    const [actionDrawerMode, setActionDrawerMode] = useState<DrawerMode>('overview');
+    const [actionDrawerTargetDep, setActionDrawerTargetDep] = useState<string | undefined>();
+    const [actionDrawerTargetNights, setActionDrawerTargetNights] = useState<number | undefined>();
+    const [actionDrawerTargetRoom, setActionDrawerTargetRoom] = useState<string | undefined>();
 
     // Extend / Shorten Drag State
     const [extendDrag, setExtendDrag] = useState<{
@@ -161,17 +164,6 @@ export const StayView: React.FC = () => {
         currentEndIndex: number;
         hasMoved?: boolean;
     } | null>(null);
-
-    const [isAmendStayOpen, setIsAmendStayOpen] = useState(false);
-    const [amendBookingData, setAmendBookingData] = useState<{
-        booking: AmendBookingData;
-        targetDeparture: string;
-        targetNights: number;
-    } | null>(null);
-
-    // Room Move Drawer State (Drag-and-Drop to move reservation)
-    const [isRoomMoveOpen, setIsRoomMoveOpen] = useState(false);
-    const [roomMoveData, setRoomMoveData] = useState<RoomMoveData | null>(null);
 
     // Move Reservation Drag State
     const [moveDrag, setMoveDrag] = useState<{
@@ -497,7 +489,7 @@ export const StayView: React.FC = () => {
 
     const todayAvailableCount = Math.max(0, totalRoomsCount - todayAssignedCount);
 
-    // Open Single-Column Reservation Details Drawer on Normal Click (matching media_1792541210487_8b5ecb8d.png)
+    // Open Unified Reservation Action Drawer on Normal Click
     const handleOpenDetailsDrawer = (booking: TimelineBooking) => {
         const arrivalDateStr = days[booking.startIndex]?.date || '2026-07-04';
         const currentDepDateStr = days[booking.endIndex]?.date || '2026-07-06';
@@ -506,7 +498,7 @@ export const StayView: React.FC = () => {
         const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
         const currentNights = Math.max(1, diffDays > 0 ? diffDays : booking.endIndex - booking.startIndex);
 
-        setDetailsBookingData({
+        const bData: AmendBookingData = {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
             guestName: booking.guestName,
@@ -518,11 +510,13 @@ export const StayView: React.FC = () => {
             nights: currentNights,
             avgDailyRate: 3000,
             status: booking.status.toUpperCase()
-        });
-        setIsDetailsDrawerOpen(true);
+        };
+        setActionDrawerBooking(bData);
+        setActionDrawerMode('overview');
+        setIsActionDrawerOpen(true);
     };
 
-    // Open Amend Stay Modal on Drag-to-Extend or Resize Handle Click (matching media_1792541010797_b7d6f151.png)
+    // Open Unified Action Drawer in Amend Stay Mode on Drag-to-Extend or Resize Handle Click
     const handleOpenAmendModal = (booking: TimelineBooking, customTargetDep?: string, customTargetNights?: number) => {
         const arrivalDateStr = days[booking.startIndex]?.date || '2026-07-04';
         const currentDepDateStr = days[booking.endIndex]?.date || '2026-07-06';
@@ -541,24 +535,25 @@ export const StayView: React.FC = () => {
             targetNights = currentNights + 1;
         }
 
-        setAmendBookingData({
-            booking: {
-                id: booking.id,
-                reservationNumber: booking.reservationNumber,
-                guestName: booking.guestName,
-                roomNumber: booking.roomNumber,
-                roomType: 'Winter Rate Plan',
-                ratePlan: 'Summer Vacation',
-                arrivalDate: arrivalDateStr,
-                departureDate: currentDepDateStr,
-                nights: currentNights,
-                avgDailyRate: 3000,
-                status: booking.status.toUpperCase()
-            },
-            targetDeparture,
-            targetNights: targetNights || currentNights + 1
-        });
-        setIsAmendStayOpen(true);
+        const bData: AmendBookingData = {
+            id: booking.id,
+            reservationNumber: booking.reservationNumber,
+            guestName: booking.guestName,
+            roomNumber: booking.roomNumber,
+            roomType: 'Winter Rate Plan',
+            ratePlan: 'Summer Vacation',
+            arrivalDate: arrivalDateStr,
+            departureDate: currentDepDateStr,
+            nights: currentNights,
+            avgDailyRate: 3000,
+            status: booking.status.toUpperCase()
+        };
+
+        setActionDrawerBooking(bData);
+        setActionDrawerMode('amend');
+        setActionDrawerTargetDep(targetDeparture);
+        setActionDrawerTargetNights(targetNights || currentNights + 1);
+        setIsActionDrawerOpen(true);
     };
 
     const handleSaveAmendStay = (bookingId: string, newDeparture: string, newNights: number) => {
@@ -592,6 +587,79 @@ export const StayView: React.FC = () => {
         }));
         const targetB = bookings.find(b => b.id === bookingId);
         showToast(`Reservation ${targetB?.reservationNumber || ''} (${targetB?.guestName || ''}) moved to Room A-(${newRoomNumber}) (${newFromDate} to ${newToDate})!`);
+    };
+
+    // Core PMS Live Action Handlers for Unified Action Drawer
+    const handleSavePayment = (bookingId: string, method: string, amount: number) => {
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, isPaymentDue: false } : b));
+        const b = bookings.find(item => item.id === bookingId);
+        showToast(`Payment of ৳${amount.toLocaleString()} received via ${method} for ${b?.guestName || 'guest'}!`);
+    };
+
+    const handleSaveRoomSplit = (bookingId: string, targetRoomNumber: string) => {
+        const target = bookings.find(b => b.id === bookingId);
+        if (target) {
+            showToast(`Reservation ${target.reservationNumber} split to Room ${targetRoomNumber}!`);
+        }
+    };
+
+    const handleStopRoomMove = (bookingId: string, allow: boolean) => {
+        const target = bookings.find(b => b.id === bookingId);
+        showToast(`Room move status updated for ${target?.guestName || 'reservation'} (Allow: ${allow})`);
+    };
+
+    const handleProceedNewBooking = () => {
+        setIsActionDrawerOpen(false);
+        setIsAddReservationOpen(true);
+    };
+
+    const handleConfirmCancel = (bookingId: string, fee: number, refund: number) => {
+        const target = bookings.find(b => b.id === bookingId);
+        setBookings(prev => prev.filter(b => b.id !== bookingId));
+        showToast(`Reservation ${target?.reservationNumber || ''} cancelled (Fee: ৳${fee}, Refund: ৳${refund})`);
+    };
+
+    const handleConfirmVoid = (bookingId: string, reason: string) => {
+        const target = bookings.find(b => b.id === bookingId);
+        setBookings(prev => prev.filter(b => b.id !== bookingId));
+        showToast(`Reservation ${target?.reservationNumber || ''} voided: "${reason || 'No reason specified'}"`);
+    };
+
+    const handleConfirmHold = (bookingId: string, _startDate: string, endDate: string) => {
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'hold' } : b));
+        const target = bookings.find(b => b.id === bookingId);
+        showToast(`Reservation ${target?.reservationNumber || ''} placed on HOLD until ${endDate}!`);
+    };
+
+    const handleConfirmUnassign = (bookingId: string, roomNum: string) => {
+        const target = bookings.find(b => b.id === bookingId);
+        if (target) {
+            setBookings(prev => prev.filter(b => b.id !== bookingId));
+            const unItem: UnassignedBooking = {
+                id: `un-${Date.now()}`,
+                reservationNumber: target.reservationNumber,
+                guestName: target.guestName,
+                roomType: 'Winter Rate Plan',
+                checkIn: days[target.startIndex]?.date || '2026-07-01',
+                checkOut: days[target.endIndex]?.date || '2026-07-04',
+                nights: Math.max(1, target.endIndex - target.startIndex),
+                totalRooms: 1,
+                source: 'Front Desk',
+                totalAmount: Math.max(1, target.endIndex - target.startIndex) * 3000,
+                status: 'unassigned'
+            };
+            setUnassignedList(prev => [unItem, ...prev]);
+            showToast(`Reservation ${target.reservationNumber} unassigned from Room ${roomNum}!`);
+        }
+    };
+
+    const handleConfirmUngroup = (bookingId: string) => {
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, isGroupBooking: false, isGroupOwner: false } : b));
+        showToast(`Reservation ungrouped successfully!`);
+    };
+
+    const handleConfirmChangeOwner = (_bookingId: string, newOwner: string) => {
+        showToast(`Group owner changed to ${newOwner}!`);
     };
 
     // Global mousemove and mouseup listeners for drag-to-select, extend/shorten drag, and move drag
@@ -649,58 +717,37 @@ export const StayView: React.FC = () => {
                 const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
                 const targetNights = Math.max(1, diffDays > 0 ? diffDays : targetCol - b.startIndex);
 
-                setAmendBookingData({
-                    booking: {
-                        id: b.id,
-                        reservationNumber: b.reservationNumber,
-                        guestName: b.guestName,
-                        roomNumber: b.roomNumber,
-                        roomType: 'Winter Rate Plan',
-                        ratePlan: 'Summer Vacation',
-                        arrivalDate: arrivalDateStr,
-                        departureDate: days[b.endIndex]?.date || '2026-07-06',
-                        nights: Math.max(1, b.endIndex - b.startIndex),
-                        avgDailyRate: 3000,
-                        status: b.status.toUpperCase()
-                    },
-                    targetDeparture: targetDepDateStr,
-                    targetNights
-                });
-                setIsAmendStayOpen(true);
+                handleOpenAmendModal(b, targetDepDateStr, targetNights);
                 setExtendDrag(null);
             }
 
             // Handle Move Reservation Drag Release
             if (moveDrag) {
                 if (moveDrag.isDragging) {
-                    // User dragged and dropped to move -> Open Room Move Modal (matching media_1792541566827_b05dc667.png)!
                     const b = moveDrag.booking;
                     const targetFromDate = days[moveDrag.targetStartIndex]?.date || days[b.startIndex]?.date || '2026-07-04';
                     const targetToDate = days[moveDrag.targetEndIndex]?.date || days[b.endIndex]?.date || '2026-07-06';
 
-                    setRoomMoveData({
-                        booking: {
-                            id: b.id,
-                            reservationNumber: b.reservationNumber,
-                            guestName: b.guestName,
-                            roomNumber: b.roomNumber,
-                            roomType: 'Winter Rate Plan',
-                            ratePlan: 'Summer Vacation',
-                            arrivalDate: days[b.startIndex]?.date || '2026-07-04',
-                            departureDate: days[b.endIndex]?.date || '2026-07-06',
-                            nights: Math.max(1, b.endIndex - b.startIndex),
-                            avgDailyRate: 3000,
-                            status: b.status.toUpperCase()
-                        },
-                        targetRoomNumber: moveDrag.targetRoomNumber,
-                        targetFromDate,
-                        targetToDate,
-                        targetRoomType: 'Winter Rate Plan',
-                        targetRateType: 'Summer Vacation'
-                    });
-                    setIsRoomMoveOpen(true);
+                    const bData: AmendBookingData = {
+                        id: b.id,
+                        reservationNumber: b.reservationNumber,
+                        guestName: b.guestName,
+                        roomNumber: b.roomNumber,
+                        roomType: 'Winter Rate Plan',
+                        ratePlan: 'Summer Vacation',
+                        arrivalDate: targetFromDate,
+                        departureDate: targetToDate,
+                        nights: Math.max(1, b.endIndex - b.startIndex),
+                        avgDailyRate: 3000,
+                        status: b.status.toUpperCase()
+                    };
+
+                    setActionDrawerBooking(bData);
+                    setActionDrawerMode('move');
+                    setActionDrawerTargetRoom(moveDrag.targetRoomNumber);
+                    setActionDrawerTargetDep(targetToDate);
+                    setIsActionDrawerOpen(true);
                 } else {
-                    // Simple normal click without drag -> Open Reservation Details Drawer (matching media_1792541210487_8b5ecb8d.png)!
                     handleOpenDetailsDrawer(moveDrag.booking);
                 }
                 setMoveDrag(null);
@@ -1678,76 +1725,34 @@ export const StayView: React.FC = () => {
                 }}
             />
 
-            {/* Single-Column Reservation Details Drawer on Normal Click (matching media_1792541210487_8b5ecb8d.png) */}
-            <ReservationDetailsDrawer
-                isOpen={isDetailsDrawerOpen}
+            {/* Unified Reusable Reservation Action Drawer (matching all WingsCRM reference screens) */}
+            <ReservationActionDrawer
+                isOpen={isActionDrawerOpen}
                 onClose={() => {
-                    setIsDetailsDrawerOpen(false);
-                    setDetailsBookingData(null);
+                    setIsActionDrawerOpen(false);
+                    setActionDrawerBooking(null);
                 }}
-                booking={detailsBookingData}
-                onAmendStay={(b) => {
-                    setIsDetailsDrawerOpen(false);
-                    const targetBooking = bookings.find(item => item.id === b.id);
-                    if (targetBooking) {
-                        handleOpenAmendModal(targetBooking);
-                    }
-                }}
-                onRoomMove={(b) => {
-                    setIsDetailsDrawerOpen(false);
-                    setRoomMoveData({
-                        booking: b,
-                        targetRoomNumber: b.roomNumber,
-                        targetFromDate: b.arrivalDate,
-                        targetToDate: b.departureDate,
-                        targetRoomType: b.roomType || 'Winter Rate Plan',
-                        targetRateType: b.ratePlan || 'Summer Vacation'
-                    });
-                    setIsRoomMoveOpen(true);
-                }}
-            />
-
-            {/* Amend Stay Modal on Drag-to-Extend/Shorten matching media_1792541010797_b7d6f151.png */}
-            <AmendStayModal
-                isOpen={isAmendStayOpen}
-                onClose={() => {
-                    setIsAmendStayOpen(false);
-                    setAmendBookingData(null);
-                }}
-                booking={amendBookingData?.booking || null}
-                initialTargetDeparture={amendBookingData?.targetDeparture}
-                initialTargetNights={amendBookingData?.targetNights}
-                onSave={handleSaveAmendStay}
-                onRoomMove={(b) => {
-                    setIsAmendStayOpen(false);
-                    setRoomMoveData({
-                        booking: b,
-                        targetRoomNumber: b.roomNumber,
-                        targetFromDate: b.arrivalDate,
-                        targetToDate: b.departureDate,
-                        targetRoomType: b.roomType || 'Winter Rate Plan',
-                        targetRateType: b.ratePlan || 'Summer Vacation'
-                    });
-                    setIsRoomMoveOpen(true);
-                }}
-            />
-
-            {/* Room Move Modal on Drag-and-Drop or Menu Action (matching media_1792541566827_b05dc667.png) */}
-            <RoomMoveModal
-                isOpen={isRoomMoveOpen}
-                onClose={() => {
-                    setIsRoomMoveOpen(false);
-                    setRoomMoveData(null);
-                }}
-                data={roomMoveData}
+                booking={actionDrawerBooking}
+                initialMode={actionDrawerMode}
                 allRooms={allRooms}
+                initialTargetDeparture={actionDrawerTargetDep}
+                initialTargetNights={actionDrawerTargetNights}
+                initialTargetRoomNumber={actionDrawerTargetRoom}
+                onSaveAmendStay={handleSaveAmendStay}
                 onSaveRoomMove={handleSaveRoomMove}
-                onAmendStay={(b) => {
-                    setIsRoomMoveOpen(false);
-                    const targetBooking = bookings.find(item => item.id === b.id);
-                    if (targetBooking) {
-                        handleOpenAmendModal(targetBooking);
-                    }
+                onSavePayment={handleSavePayment}
+                onSaveRoomSplit={handleSaveRoomSplit}
+                onStopRoomMove={handleStopRoomMove}
+                onProceedNewBooking={handleProceedNewBooking}
+                onConfirmCancel={handleConfirmCancel}
+                onConfirmVoid={handleConfirmVoid}
+                onConfirmHold={handleConfirmHold}
+                onConfirmUnassign={handleConfirmUnassign}
+                onConfirmUngroup={handleConfirmUngroup}
+                onConfirmChangeOwner={handleConfirmChangeOwner}
+                onEdit={() => {
+                    setIsActionDrawerOpen(false);
+                    setIsAddReservationOpen(true);
                 }}
             />
 

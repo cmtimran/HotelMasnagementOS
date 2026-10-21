@@ -14,11 +14,13 @@ import {
     Home,
     Printer,
     Settings,
-    MoveHorizontal,
-    CheckSquare,
-    Receipt,
-    Printer as PrintIcon,
-    AlertCircle
+    CalendarPlus,
+    CalendarX,
+    CircleSlash,
+    Hand,
+    GitFork,
+    DoorOpen,
+    DoorClosed
 } from 'lucide-react';
 
 export interface AmendBookingData {
@@ -42,7 +44,15 @@ interface AmendStayModalProps {
     initialTargetDeparture?: string;
     initialTargetNights?: number;
     onSave: (bookingId: string, newDeparture: string, newNights: number) => void;
+    onAddPayment?: (booking: AmendBookingData) => void;
+    onAmendStay?: (booking: AmendBookingData) => void;
     onRoomMove?: (booking: AmendBookingData) => void;
+    onRoomSplit?: (booking: AmendBookingData) => void;
+    onStopRoomMove?: (booking: AmendBookingData) => void;
+    onAddNewBooking?: (booking: AmendBookingData) => void;
+    onCancelReservation?: (booking: AmendBookingData) => void;
+    onReservationHold?: (booking: AmendBookingData) => void;
+    onUnassign?: (booking: AmendBookingData) => void;
     onEdit?: (booking: AmendBookingData) => void;
 }
 
@@ -53,7 +63,15 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
     initialTargetDeparture,
     initialTargetNights,
     onSave,
+    onAddPayment,
+    onAmendStay,
     onRoomMove,
+    onRoomSplit,
+    onStopRoomMove,
+    onAddNewBooking,
+    onCancelReservation,
+    onReservationHold,
+    onUnassign,
     onEdit
 }) => {
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
@@ -163,50 +181,122 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                             </button>
 
                             {isOptionsOpen && (
-                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-2xl border border-gray-200 py-1.5 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-md shadow-2xl border border-gray-200 py-1 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                    {/* 1. Add Payment */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onAddPayment) onAddPayment(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <CreditCard size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Add Payment</span>
+                                    </button>
+
+                                    {/* 2. Amend Stay */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onAmendStay) onAmendStay(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors font-bold text-blue-700 bg-blue-50/50"
+                                    >
+                                        <Calendar size={14} className="text-blue-600 flex-shrink-0" />
+                                        <span>Amend Stay</span>
+                                    </button>
+
+                                    {/* 3. Room Move */}
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setIsOptionsOpen(false);
                                             if (onRoomMove) onRoomMove(booking);
                                         }}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-bold hover:bg-blue-50 text-[#0e3592] flex items-center gap-2 cursor-pointer transition-colors"
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <MoveHorizontal size={13} className="text-blue-600" />
+                                        <DoorOpen size={14} className="text-gray-700 flex-shrink-0" />
                                         <span>Room Move</span>
                                     </button>
+
+                                    {/* 4. Room Split */}
                                     <button
                                         type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onRoomSplit) onRoomSplit(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <CheckSquare size={13} className="text-emerald-600" />
-                                        <span>Check In / Out</span>
+                                        <GitFork size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Room Split</span>
                                     </button>
+
+                                    {/* 5. Stop Room Move */}
                                     <button
                                         type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onStopRoomMove) onStopRoomMove(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <Receipt size={13} className="text-purple-600" />
-                                        <span>Folio & Billing</span>
+                                        <Hand size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Stop Room Move</span>
                                     </button>
+
+                                    {/* 6. Add New Booking */}
                                     <button
                                         type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onAddNewBooking) onAddNewBooking(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <PrintIcon size={13} className="text-gray-600" />
-                                        <span>Registration Card</span>
+                                        <CalendarPlus size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Add New Booking</span>
                                     </button>
-                                    <div className="h-px bg-gray-100 my-1" />
+
+                                    {/* 7. Cancel Reservation */}
                                     <button
                                         type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-rose-50 text-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onCancelReservation) onCancelReservation(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <AlertCircle size={13} className="text-rose-600" />
+                                        <CalendarX size={14} className="text-gray-700 flex-shrink-0" />
                                         <span>Cancel Reservation</span>
+                                    </button>
+
+                                    {/* 8. Reservation Hold */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onReservationHold) onReservationHold(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <CircleSlash size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Reservation Hold</span>
+                                    </button>
+
+                                    {/* 9. Unassign */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onUnassign) onUnassign(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <DoorClosed size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Unassign</span>
                                     </button>
                                 </div>
                             )}
@@ -214,10 +304,10 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                     </div>
                 </div>
 
-                {/* 2. Drawer Body: 2 Columns Side-by-Side */}
-                <div className="flex-1 overflow-y-auto p-3.5 grid grid-cols-12 gap-3.5 bg-[#0e3592]">
-                    {/* LEFT COLUMN (~57% width): Overview Cards & Financial Card */}
-                    <div className="col-span-7 flex flex-col gap-2">
+                {/* 2. Drawer Body: 2 Columns Side-by-Side with Independent Scroll & Fixed Bottom Footer */}
+                <div className="flex-1 min-h-0 grid grid-cols-12 bg-[#0e3592] overflow-hidden">
+                    {/* LEFT COLUMN (~57% width): Overview Cards & Financial Card - Independent Scroll */}
+                    <div className="col-span-7 h-full overflow-y-auto p-3.5 space-y-2 border-r border-blue-800/40">
                         {/* Row 1: Reservation # & Status */}
                         <div className="grid grid-cols-2 gap-2">
                             <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
@@ -390,22 +480,23 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN (~43% width): Amend Stay Form, Date Controls & Buttons */}
-                    <div className="col-span-5 flex flex-col justify-between space-y-3">
-                        <div className="space-y-2.5">
-                            {/* Header Row */}
-                            <div className="flex items-center justify-between border-b border-blue-400/20 pb-2">
-                                <h2 className="text-sm font-bold text-white">Amend Stay</h2>
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="p-1 text-blue-200 hover:text-white rounded transition-colors cursor-pointer"
-                                    title="Close"
-                                >
-                                    <X size={15} />
-                                </button>
-                            </div>
+                    {/* RIGHT COLUMN (~43% width): Amend Stay Form - Independent Scroll + Fixed Bottom Footer */}
+                    <div className="col-span-5 h-full flex flex-col min-h-0 bg-[#0e3592]">
+                        {/* Header Row */}
+                        <div className="px-4 py-2.5 flex items-center justify-between border-b border-blue-400/20 flex-shrink-0">
+                            <h2 className="text-sm font-bold text-white tracking-wide">Amend Stay</h2>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="p-1 text-blue-200 hover:text-white rounded transition-colors cursor-pointer"
+                                title="Close"
+                            >
+                                <X size={15} />
+                            </button>
+                        </div>
 
+                        {/* Scrollable Form Body */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
                             {/* Rooms Selection */}
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between text-[11px] font-semibold text-white">
@@ -419,7 +510,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     </button>
                                 </div>
 
-                                <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-lg p-2 flex items-center gap-2">
+                                <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-lg p-2.5 flex items-center gap-2">
                                     <input
                                         type="checkbox"
                                         checked={roomSelected}
@@ -440,7 +531,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                         type="date"
                                         value={booking.arrivalDate}
                                         disabled
-                                        className="w-full h-7 px-2 border border-blue-400/30 rounded text-[11px] bg-[#122e75] text-gray-300 cursor-not-allowed outline-none font-medium"
+                                        className="w-full h-8 px-2 border border-blue-400/30 rounded text-[11px] bg-[#122e75] text-gray-300 cursor-not-allowed outline-none font-medium"
                                     />
                                 </div>
 
@@ -450,7 +541,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                         type="date"
                                         value={departureDate}
                                         onChange={e => handleDepartureChange(e.target.value)}
-                                        className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
                                     />
                                 </div>
                             </div>
@@ -463,26 +554,26 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     min={1}
                                     value={nights}
                                     onChange={e => handleNightsChange(Number(e.target.value))}
-                                    className="w-full h-7 px-2 border border-blue-300 rounded text-xs bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="w-full h-8 px-2 border border-blue-300 rounded text-xs bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400"
                                 />
                             </div>
                         </div>
 
-                        {/* Bottom Action Buttons (Pinned Right) */}
-                        <div className="flex items-center justify-end gap-2 pt-3 border-t border-blue-400/20">
+                        {/* Bottom Action Buttons (Fixed & Pinned Right Footer matching screenshot) */}
+                        <div className="flex-shrink-0 px-4 py-3 bg-[#0c2e7a]/80 border-t border-blue-400/20 flex items-center justify-end gap-2.5">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="h-7.5 px-3.5 bg-white hover:bg-gray-100 text-[#0e3592] font-bold rounded text-xs cursor-pointer transition-colors shadow-2xs"
+                                className="h-9 px-5 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-md text-xs cursor-pointer shadow-xs transition-all active:scale-[0.98]"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={handleSave}
-                                className="h-7.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-md"
+                                className="h-9 px-5 bg-[#1a73e8] hover:bg-blue-600 text-white font-bold rounded-md text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.98]"
                             >
-                                <Edit3 size={12} />
+                                <Edit3 size={13} />
                                 <span>Save Changes</span>
                             </button>
                         </div>

@@ -14,30 +14,48 @@ import {
     Calculator,
     CreditCard,
     Wallet,
-    CalendarDays,
-    CheckSquare,
-    Receipt,
-    Printer as PrintIcon,
-    AlertCircle,
-    MoveHorizontal
+    CalendarPlus,
+    CalendarX,
+    CircleSlash,
+    Hand,
+    GitFork,
+    DoorOpen,
+    DoorClosed
 } from 'lucide-react';
 import type { AmendBookingData } from './AmendStayModal';
 
-interface ReservationDetailsDrawerProps {
+export interface ReservationDrawerActions {
+    onAddPayment?: (booking: AmendBookingData) => void;
+    onAmendStay?: (booking: AmendBookingData) => void;
+    onRoomMove?: (booking: AmendBookingData) => void;
+    onRoomSplit?: (booking: AmendBookingData) => void;
+    onStopRoomMove?: (booking: AmendBookingData) => void;
+    onAddNewBooking?: (booking: AmendBookingData) => void;
+    onCancelReservation?: (booking: AmendBookingData) => void;
+    onReservationHold?: (booking: AmendBookingData) => void;
+    onUnassign?: (booking: AmendBookingData) => void;
+    onEdit?: (booking: AmendBookingData) => void;
+}
+
+interface ReservationDetailsDrawerProps extends ReservationDrawerActions {
     isOpen: boolean;
     onClose: () => void;
     booking: AmendBookingData | null;
-    onAmendStay?: (booking: AmendBookingData) => void;
-    onRoomMove?: (booking: AmendBookingData) => void;
-    onEdit?: (booking: AmendBookingData) => void;
 }
 
 export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> = ({
     isOpen,
     onClose,
     booking,
+    onAddPayment,
     onAmendStay,
     onRoomMove,
+    onRoomSplit,
+    onStopRoomMove,
+    onAddNewBooking,
+    onCancelReservation,
+    onReservationHold,
+    onUnassign,
     onEdit
 }) => {
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
@@ -104,74 +122,124 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <ChevronDown size={11} className={`transition-transform duration-200 ${isOptionsOpen ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {/* Options Dropdown Menu (Comprehensive Actions) */}
+                            {/* Options Dropdown Menu (Exact 9 options matching media_1792542819332_c56d27e8.png) */}
                             {isOptionsOpen && (
-                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-2xl border border-gray-200 py-1.5 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-md shadow-2xl border border-gray-200 py-1 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                    {/* 1. Add Payment */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onAddPayment) onAddPayment(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <CreditCard size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Add Payment</span>
+                                    </button>
+
+                                    {/* 2. Amend Stay */}
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setIsOptionsOpen(false);
                                             if (onAmendStay) onAmendStay(booking);
                                         }}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-bold hover:bg-blue-50 text-[#0e3592] flex items-center gap-2 cursor-pointer transition-colors"
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <CalendarDays size={13} className="text-blue-600" />
-                                        <span>Amend Stay / Extend</span>
+                                        <Calendar size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Amend Stay</span>
                                     </button>
+
+                                    {/* 3. Room Move */}
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setIsOptionsOpen(false);
                                             if (onRoomMove) onRoomMove(booking);
                                         }}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-bold hover:bg-blue-50 text-[#0e3592] flex items-center gap-2 cursor-pointer transition-colors"
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <MoveHorizontal size={13} className="text-blue-600" />
+                                        <DoorOpen size={14} className="text-gray-700 flex-shrink-0" />
                                         <span>Room Move</span>
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
-                                    >
-                                        <CheckSquare size={13} className="text-emerald-600" />
-                                        <span>Check In / Out</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
-                                    >
-                                        <Receipt size={13} className="text-purple-600" />
-                                        <span>Folio & Billing</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
-                                    >
-                                        <PrintIcon size={13} className="text-gray-600" />
-                                        <span>Registration Card</span>
-                                    </button>
+
+                                    {/* 4. Room Split */}
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setIsOptionsOpen(false);
-                                            if (onRoomMove) onRoomMove(booking);
+                                            if (onRoomSplit) onRoomSplit(booking);
                                         }}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 text-gray-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <Layers size={13} className="text-amber-600" />
-                                        <span>Upgrade Room / Move</span>
+                                        <GitFork size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Room Split</span>
                                     </button>
-                                    <div className="h-px bg-gray-100 my-1" />
+
+                                    {/* 5. Stop Room Move */}
                                     <button
                                         type="button"
-                                        onClick={() => setIsOptionsOpen(false)}
-                                        className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-rose-50 text-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onStopRoomMove) onStopRoomMove(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
-                                        <AlertCircle size={13} className="text-rose-600" />
+                                        <Hand size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Stop Room Move</span>
+                                    </button>
+
+                                    {/* 6. Add New Booking */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onAddNewBooking) onAddNewBooking(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <CalendarPlus size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Add New Booking</span>
+                                    </button>
+
+                                    {/* 7. Cancel Reservation */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onCancelReservation) onCancelReservation(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <CalendarX size={14} className="text-gray-700 flex-shrink-0" />
                                         <span>Cancel Reservation</span>
+                                    </button>
+
+                                    {/* 8. Reservation Hold */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onReservationHold) onReservationHold(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <CircleSlash size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Reservation Hold</span>
+                                    </button>
+
+                                    {/* 9. Unassign */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsOptionsOpen(false);
+                                            if (onUnassign) onUnassign(booking);
+                                        }}
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                    >
+                                        <DoorClosed size={14} className="text-gray-700 flex-shrink-0" />
+                                        <span>Unassign</span>
                                     </button>
                                 </div>
                             )}
