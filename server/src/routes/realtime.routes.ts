@@ -1,0 +1,161 @@
+import { Router, type Request, type Response } from 'express';
+
+const router = Router();
+
+interface ConnectedClient {
+    id: string;
+    terminalName: string;
+    propertyId: string;
+    res: Response;
+    connectedAt: number;
+}
+
+const clients = new Map<string, ConnectedClient>();
+
+// Keep-alive heartbeat ping every 15 seconds to prevent network timeouts
+setInterval(() => {
+    const pingData = `data: ${JSON.stringify({ type: 'HEARTBEAT_PING', timestamp: Date.now() })}\n\n`;
+    for (const [id, client] of clients.entries()) {
+        try {
+            client.res.write(pingData);
+        } catch {
+            clients.delete(id);
+        }
+    }
+}, 15000);
+
+/**
+ * SSE Endpoint: PC-1, PC-2, PC-3 connect here to receive sub-second updates
+ */
+router.get('/stream', (req: Request, res: Response) => {
+    const terminalName = (req.query.terminal as string) || `Terminal-${Math.random().toString(36).substring(2, 6)}`;
+    const propertyId = (req.query.propertyId as string) || 'prop_grand_palace';
+    const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+    });
+
+    // Send initial handshake
+    res.write(`data: ${JSON.stringify({
+        type: 'SYNC_HANDSHAKE',
+        clientId,
+        terminalName,
+        propertyId,
+        connectedClientsCount: clients.size + 1,
+        timestamp: Date.now()
+    })}\n\n`);
+
+    clients.set(clientId, {
+        id: clientId,
+        terminalName,
+        propertyId,
+        res,
+        connectedAt: Date.now()
+    });
+
+    // Notify other terminals that a new PC connected
+    const joinEvent = JSON.stringify({
+        type: 'TERMINAL_CONNECTED',
+        clientId,
+        terminalName,
+        connectedCount: clients.size,
+        timestamp: Date.now()
+    });
+    for (const [id, client] of clients.entries()) {
+        if (id !== clientId) {
+            try {
+                client.res.write(`data: ${joinEvent}\n\n`);
+            } catch {
+                clients.delete(id);
+            }
+        }
+    }
+
+    req.on('close', () => {
+        clients.delete(clientId);
+        const leaveEvent = JSON.stringify({
+            type: 'TERMINAL_DISCONNECTED',
+            clientId,
+            terminalName,
+            connectedCount: clients.size,
+            timestamp: Date.now()
+        });
+        for (const [id, client] of clients.entries()) {
+            try {
+                client.res.write(`data: ${leaveEvent}\n\n`);
+            } catch {
+                clients.delete(id);
+            }
+        }
+    });
+});
+
+/**
+ * Programmatic Server-Side Event Broadcaster
+ * Can be called by controllers, services, or internal audit daemons to emit real-time events to all connected terminals.
+ */
+export function broadcastServerEvent(event: any, senderClientId?: string): number {
+    const payload = JSON.stringify({
+        ...event,
+        serverTimestamp: Date.now(),
+        senderClientId: senderClientId || 'SERVER_DAEMON'
+    });
+
+    let deliveredCount = 0;
+    for (const [id, client] of clients.entries()) {
+        if (!senderClientId || id !== senderClientId) {
+            try {
+                client.res.write(`data: ${payload}\n\n`);
+                deliveredCount++;
+            } catch {
+                clients.delete(id);
+            }
+        }
+    }
+    return deliveredCount;
+}
+
+/**
+ * Broadcast Endpoint: Called when any PC creates, drags, resizes, or updates a reservation
+ */
+router.post('/broadcast', (req: Request, res: Response) => {
+    const { senderClientId, event } = req.body;
+
+    if (!event || !event.type) {
+        res.status(400).json({ success: false, error: 'Invalid event payload' });
+        return;
+    }
+
+    const deliveredCount = broadcastServerEvent(event, senderClientId);
+
+    res.json({
+        success: true,
+        deliveredCount,
+        totalConnected: clients.size,
+        timestamp: Date.now()
+    });
+});
+
+/**
+ * Active Status & Terminals list
+ */
+router.get('/status', (_req: Request, res: Response) => {
+    const terminals = Array.from(clients.values()).map(c => ({
+        id: c.id,
+        terminalName: c.terminalName,
+        propertyId: c.propertyId,
+        connectedAt: c.connectedAt
+    }));
+
+    res.json({
+        success: true,
+        onlineCount: clients.size,
+        terminals
+    });
+});
+
+export default router;

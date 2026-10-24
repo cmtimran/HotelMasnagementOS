@@ -60,6 +60,12 @@ import TaxVatManagement from './components/TaxVatManagement';
 import PrinterSettingsManagement from './components/PrinterSettingsManagement';
 import RolesPermissionsManagement from './components/RolesPermissionsManagement';
 import UserStaffManagement from './components/UserStaffManagement';
+import RelationalDatabaseExplorer from './components/database/RelationalDatabaseExplorer';
+import AdvanceAccountingDashboard from './components/accounting/AdvanceAccountingDashboard';
+import HRMManagementDashboard from './components/hrm/HRMManagementDashboard';
+import MultiPropertyConsole from './components/chain/MultiPropertyConsole';
+import { initNetworkSync } from './utils/pmsNetworkSync';
+import { syncReservationsFromDB } from './utils/roomInventoryEngine';
 
 import { useNavigation } from './context/NavigationContext';
 
@@ -93,6 +99,12 @@ function App() {
   });
 
   const [viewingProperty, setViewingProperty] = useState<any>(null);
+
+  // Global Event-Driven Realtime Network Sync & SQLite Database Hydration on Application Boot
+  useEffect(() => {
+    initNetworkSync();
+    syncReservationsFromDB().catch(console.error);
+  }, []);
 
   // Sync session across multiple browser tabs
   useEffect(() => {
@@ -653,6 +665,14 @@ function App() {
       case 'general-settings':
       case 'system-settings':
         return <GeneralSettings onNavigate={setActivePage} />;
+      case 'advance-accounting':
+        return <AdvanceAccountingDashboard />;
+      case 'hrm-dashboard':
+        return <HRMManagementDashboard />;
+      case 'multi-property':
+        return <MultiPropertyConsole />;
+      case 'schema-explorer':
+        return <RelationalDatabaseExplorer />;
       default:
         return <Dashboard />;
     }

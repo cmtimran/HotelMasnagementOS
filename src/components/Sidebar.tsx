@@ -206,6 +206,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             icon: <Landmark size={14} />,
             sectionHeader: 'Finance & ERP',
             items: [
+                { id: 'advance-accounting', label: 'USALI General Ledger & Journals', icon: <Landmark size={12} />, badge: 'GL/JV', badgeColor: 'bg-emerald-100 text-emerald-700' },
                 { id: 'revenue-dashboard', label: 'Financial Revenue KPIs', icon: <TrendingUp size={12} />, badge: 'RevPAR', badgeColor: 'bg-blue-100 text-blue-700' },
                 { id: 'master-data', label: 'USALI Chart of Accounts', icon: <Database size={12} />, badge: 'USALI', badgeColor: 'bg-emerald-100 text-emerald-700' },
                 { id: 'revenue-heads', label: 'Revenue Heads & Groups', icon: <TrendingUp size={12} /> },
@@ -228,6 +229,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             icon: <Users size={14} />,
             sectionHeader: 'Personnel & Governance',
             items: [
+                { id: 'hrm-dashboard', label: 'Workforce & 24/7 Shifts Suite', icon: <Users size={12} />, badge: 'Payroll', badgeColor: 'bg-purple-100 text-purple-700' },
                 { id: 'user-management', label: 'Staff & Employee Directory', icon: <UserCog size={12} /> },
                 { id: 'departments', label: 'Department Management', icon: <Building2 size={12} />, badge: 'Cost Centers', badgeColor: 'bg-blue-100 text-blue-700' },
                 { id: 'shifts', label: '24/7 Work Shifts & Handover', icon: <Clock size={12} />, badge: 'Shifts', badgeColor: 'bg-purple-100 text-purple-700' },
@@ -285,6 +287,8 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
             icon: <Settings size={14} />,
             sectionHeader: 'System & Configuration',
             items: [
+                { id: 'multi-property', label: 'Multi-Hotel Chain Console', icon: <Building2 size={12} />, badge: 'Chain', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'schema-explorer', label: 'Relational DB & 1NF-4NF Schema', icon: <Database size={12} />, badge: '1-4NF', badgeColor: 'bg-indigo-100 text-indigo-700' },
                 { id: 'holiday-management', label: 'Holiday & Peak Calendar', icon: <CalendarDays size={12} />, badge: 'Gov', badgeColor: 'bg-amber-100 text-amber-700' },
                 { id: 'taxes-vat', label: 'Taxes, VAT & Service Charges', icon: <Percent size={12} />, badge: 'Tax', badgeColor: 'bg-rose-100 text-rose-700' },
                 { id: 'printer-settings', label: 'Hardware & Printer Settings', icon: <Printer size={12} />, badge: 'ESC/POS', badgeColor: 'bg-indigo-100 text-indigo-700' },

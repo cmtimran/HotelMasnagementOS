@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     User, LogIn, LogOut, Search,
     DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, Monitor,
@@ -10,6 +10,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
 import { QuickReservationModal } from './modals/QuickReservationModal';
 import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
+import { syncReservationsFromDB, updateReservationStatusInDB } from '../utils/roomInventoryEngine';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -316,11 +317,72 @@ export const FrontDesk: React.FC = () => {
         return DEFAULT_FRONT_DESK_DATA;
     });
 
-    // Save back to localStorage whenever reservations change
+    // Sync with SQLite Database on Mount and on Real-Time Events
+    useEffect(() => {
+        const fetchDB = async () => {
+            try {
+                const dbList = await syncReservationsFromDB();
+                if (dbList && dbList.length > 0) {
+                    setReservations(prev => {
+                        const merged = [...prev];
+                        dbList.forEach((item: any) => {
+                            const idx = merged.findIndex(m => m.reservationNumber === item.reservationNumber || String(m.id) === String(item.id));
+                            const formattedItem: FrontDeskGuestRecord = {
+                                id: item.id || `RES-${item.reservationNumber}`,
+                                reservationNumber: item.reservationNumber,
+                                guestName: item.guestName || 'Valued Guest',
+                                phone: item.phone || '+880 1711-000000',
+                                email: item.email || '',
+                                roomNumber: item.roomNumber || '101',
+                                roomType: item.roomType || 'Deluxe Double',
+                                roomStatus: 'clean',
+                                checkIn: item.checkIn || item.arrivalDate || '2026-07-01',
+                                checkOut: item.checkOut || item.departureDate || '2026-07-02',
+                                eta: '12:00',
+                                nights: item.nights || 1,
+                                adults: item.adults || 1,
+                                children: item.children || 0,
+                                totalAmount: Number(item.totalAmount) || 3000,
+                                paidAmount: Number(item.paidAmount) || 0,
+                                dueAmount: Number(item.dueAmount) || 0,
+                                status: (item.status === 'in-house' ? 'in-house' : item.status === 'checked-out' ? 'checked-out' : item.status === 'hold' ? 'hold' : 'arriving'),
+                                source: item.source || 'Direct',
+                                vip: item.vip || 'None',
+                                specialRequests: item.specialRequests || '',
+                                servicesBundle: item.servicesBundle
+                            };
+                            if (idx !== -1) {
+                                merged[idx] = { ...merged[idx], ...formattedItem };
+                            } else {
+                                merged.unshift(formattedItem);
+                            }
+                        });
+                        return merged;
+                    });
+                }
+            } catch (err) {
+                console.warn('FrontDesk DB sync fallback:', err);
+            }
+        };
+
+        fetchDB();
+
+        const handleSyncEvent = () => fetchDB();
+        window.addEventListener('hotel_pms_sync_event', handleSyncEvent);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSyncEvent);
+    }, []);
+
+    // Save back to localStorage and SQLite DB whenever reservations change
     const persistReservations = (updated: FrontDeskGuestRecord[]) => {
         setReservations(updated);
         try {
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(updated));
+            // Sync status to SQLite database
+            updated.forEach(item => {
+                if (item.status && item.id) {
+                    updateReservationStatusInDB(item.id, item.status);
+                }
+            });
         } catch (e) {
             console.error('Failed to sync to local storage', e);
         }

@@ -11,5 +11,6 @@ router.get('/', requirePermission('reservation.view'), bookingController.getAllB
 router.get('/:id', requirePermission('reservation.view'), bookingController.getBookingById);
 router.post('/', requirePermission('reservation.create'), bookingController.createBooking);
 router.patch('/:id/status', requirePermission('reservation.manage'), bookingController.updateStatus);
+router.delete('/:id', requirePermission('reservation.manage'), bookingController.deleteBooking);
 
 export default router;

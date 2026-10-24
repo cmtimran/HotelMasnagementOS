@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import AddReservationModal from '../modals/AddReservationModal';
 import { useNavigation } from '../../context/NavigationContext';
+import { syncReservationsFromDB, updateReservationStatusInDB } from '../../utils/roomInventoryEngine';
 
 export interface ReservationItem {
     id: number;
@@ -295,7 +296,7 @@ export const ReservationsView: React.FC = () => {
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // Hydrate state from localStorage or initial
+    // Hydrate state from localStorage or initial, then immediately sync with SQLite DB
     const [reservations, setReservations] = useState<ReservationItem[]>(() => {
         try {
             const saved = localStorage.getItem('hotel_reservations_v3');
@@ -304,6 +305,27 @@ export const ReservationsView: React.FC = () => {
             return INITIAL_RESERVATIONS;
         }
     });
+
+    const loadReservationsFromDB = async () => {
+        try {
+            const dbList = await syncReservationsFromDB();
+            if (dbList && dbList.length > 0) {
+                setReservations(dbList as any);
+            }
+        } catch (e) {
+            console.warn('Fallback to local cache:', e);
+        }
+    };
+
+    useEffect(() => {
+        loadReservationsFromDB();
+
+        const handleSync = () => {
+            loadReservationsFromDB();
+        };
+        window.addEventListener('hotel_pms_sync_event', handleSync);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
+    }, []);
 
     useEffect(() => {
         try {
@@ -321,11 +343,12 @@ export const ReservationsView: React.FC = () => {
         setIsGroupingMode(false);
     };
 
-    // Handle check in / check out actions
+    // Handle check in / check out actions with direct SQLite DB persistence
     const handleStatusChange = (id: number, nextStatus: ReservationItem['status']) => {
         setReservations(prev =>
             prev.map(r => r.id === id ? { ...r, status: nextStatus } : r)
         );
+        updateReservationStatusInDB(id, nextStatus);
     };
 
     // Toggle Selection of row in grouping mode

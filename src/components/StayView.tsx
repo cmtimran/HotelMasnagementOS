@@ -19,6 +19,22 @@ import AddReservationModal from './modals/AddReservationModal';
 import type { AmendBookingData } from './modals/AmendStayModal';
 import ReservationActionDrawer, { type DrawerMode } from './modals/ReservationActionDrawer';
 import { toast } from '../context/ToastContext';
+import {
+    subscribeToPMSEvents,
+    broadcastPMSEvent,
+    getAllStoredReservations,
+    getActiveLocks,
+    getCanonicalRooms,
+    validateAndCommitReservation,
+    syncReservationsFromDB,
+    type RoomLock,
+    type StoredReservation
+} from '../utils/roomInventoryEngine';
+import {
+    initNetworkSync,
+    subscribeToSyncStatus,
+    type SyncStatus
+} from '../utils/pmsNetworkSync';
 
 interface TimelineBooking {
     id: string;
@@ -27,6 +43,9 @@ interface TimelineBooking {
     roomNumber: string;
     startIndex: number;
     endIndex: number;
+    checkInDate?: string;        // Exact ISO check-in
+    checkOutDate?: string;       // Exact ISO check-out
+    nights?: number;             // Exact stay nights
     status: 'arrived' | 'stayover' | 'confirmed' | 'hold' | 'due-out' | 'checked-out' | 'day-use' | 'out-of-order';
     // 4 Key Indicators requested by User:
     isGroupOwner?: boolean;      // 1. Group Owner (👑)
@@ -35,6 +54,27 @@ interface TimelineBooking {
     isVipOrSingleLady?: boolean; // 4. VIP or Single Lady (⭐)
     indicator?: string;
     isPast?: boolean;            // Historical / Backdated flag for read-only audit lock
+}
+
+export interface RoomNode {
+    id: string;
+    roomNumber: string;
+    type: string;
+    floor: string;
+    building: string;
+    status: string;
+}
+
+export interface FloorNode {
+    id: string;
+    name: string;
+    rooms: RoomNode[];
+}
+
+export interface BuildingNode {
+    id: string;
+    name: string;
+    floors: FloorNode[];
 }
 
 export interface UnassignedBooking {
@@ -120,13 +160,15 @@ export const StayView: React.FC = () => {
     });
     const [daysWindow, setDaysWindow] = useState<number>(15);
 
-    // Tree Expansion State
+    // Tree Expansion State - All floors 1-5 across Buildings 1 & 2 expanded by default
     const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
         'b-1': true,
         'f-1': true,
         'f-2': true,
+        'f-3': true,
         'b-2': true,
-        'f-3': true
+        'f-4': true,
+        'f-5': true
     });
 
     const toggleNode = (nodeId: string) => {
@@ -139,6 +181,7 @@ export const StayView: React.FC = () => {
     // Modals & Selection
     const [isAddReservationOpen, setIsAddReservationOpen] = useState(false);
     const [isQuickReservationOpen, setIsQuickReservationOpen] = useState(false);
+    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
     const [selectedRange, setSelectedRange] = useState<{
         room: string;
         startIndex: number;
@@ -325,56 +368,68 @@ export const StayView: React.FC = () => {
         return colWidth * daysWindow;
     }, [colWidth, daysWindow]);
 
-    // Initial Rooms Structure
-    const roomTree = useMemo(() => [
-        {
-            id: 'b-1',
-            name: 'Building 1 (Main Tower)',
-            floors: [
-                {
-                    id: 'f-1',
-                    name: 'Floor 1 (Executive)',
-                    rooms: [
-                        { id: 'r-101', roomNumber: '101', type: 'Deluxe Double', floor: '1', building: 'Building 1', status: 'clean' },
-                        { id: 'r-102', roomNumber: '102', type: 'Deluxe Double', floor: '1', building: 'Building 1', status: 'clean' },
-                        { id: 'r-103', roomNumber: '103', type: 'Superior King', floor: '1', building: 'Building 1', status: 'inspected' },
-                        { id: 'r-104', roomNumber: '104', type: 'Executive Suite', floor: '1', building: 'Building 1', status: 'clean' }
-                    ]
-                },
-                {
-                    id: 'f-2',
-                    name: 'Floor 2 (Standard & Deluxe)',
-                    rooms: [
-                        { id: 'r-201', roomNumber: '201', type: 'Deluxe Double', floor: '2', building: 'Building 1', status: 'clean' },
-                        { id: 'r-202', roomNumber: '202', type: 'Superior King', floor: '2', building: 'Building 1', status: 'dirty' },
-                        { id: 'r-203', roomNumber: '203', type: 'Executive Suite', floor: '2', building: 'Building 1', status: 'clean' }
-                    ]
-                }
-            ]
-        },
-        {
-            id: 'b-2',
-            name: 'Building 2 (Annex & Suites)',
-            floors: [
-                {
-                    id: 'f-3',
-                    name: 'Floor 5 (Presidential & Deluxe)',
-                    rooms: [
-                        { id: 'r-501', roomNumber: '501', type: 'Presidential Suite', floor: '5', building: 'Building 2', status: 'clean' },
-                        { id: 'r-505', roomNumber: '505', type: 'Winter Rate Plan (Deluxe)', floor: '5', building: 'Building 2', status: 'clean' },
-                        { id: 'r-507', roomNumber: '507', type: 'Superior King', floor: '5', building: 'Building 2', status: 'clean' },
-                        { id: 'r-508', roomNumber: '508', type: 'Superior King', floor: '5', building: 'Building 2', status: 'clean' },
-                        { id: 'r-509', roomNumber: '509', type: 'Deluxe Suite', floor: '5', building: 'Building 2', status: 'clean' },
-                        { id: 'r-10023', roomNumber: '10023', type: 'RD-2 Deluxe King', floor: '5', building: 'Building 2', status: 'clean' }
-                    ]
-                }
-            ]
-        }
-    ], []);
+    // Dynamic Canonical Rooms Structure (All 34 Rooms across 5 Floors)
+    const roomTree: BuildingNode[] = useMemo(() => {
+        const canonical = getCanonicalRooms();
+        const buildingNames: Record<string, string> = {
+            '1': 'Building 1 (Main Tower)',
+            '2': 'Building 2 (Annex & Suites)'
+        };
+        const floorNames: Record<string, string> = {
+            '1': 'Floor 1 (Executive)',
+            '2': 'Floor 2 (Standard & Deluxe)',
+            '3': 'Floor 3 (Deluxe & Superior)',
+            '4': 'Floor 4 (Club & Suites)',
+            '5': 'Floor 5 (Presidential & Deluxe)'
+        };
+
+        const buildingMap = new Map<string, Map<string, RoomNode[]>>();
+
+        canonical.forEach(r => {
+            const bId = String(r.buildingId || '1');
+            const fId = String(r.floorId || '1');
+            if (!buildingMap.has(bId)) {
+                buildingMap.set(bId, new Map());
+            }
+            const floorMap = buildingMap.get(bId)!;
+            if (!floorMap.has(fId)) {
+                floorMap.set(fId, []);
+            }
+            floorMap.get(fId)!.push({
+                id: `r-${r.number}`,
+                roomNumber: String(r.number),
+                type: r.roomTypeName,
+                floor: fId,
+                building: buildingNames[bId] || `Building ${bId}`,
+                status: r.status === 'Out of Order' ? 'out-of-order' : (r.housekeepingStatus?.toLowerCase() || 'clean')
+            });
+        });
+
+        const tree: BuildingNode[] = [];
+        Array.from(buildingMap.keys()).sort().forEach(bId => {
+            const floorMap = buildingMap.get(bId)!;
+            const floors: FloorNode[] = [];
+            Array.from(floorMap.keys()).sort().forEach(fId => {
+                const rooms = floorMap.get(fId)!.sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true }));
+                floors.push({
+                    id: `f-${fId}`,
+                    name: floorNames[fId] || `Floor ${fId}`,
+                    rooms
+                });
+            });
+            tree.push({
+                id: `b-${bId}`,
+                name: buildingNames[bId] || `Building ${bId}`,
+                floors
+            });
+        });
+
+        return tree;
+    }, []);
 
     // Total rooms count across entire hotel
     const totalRoomsCount = useMemo(() => {
-        return roomTree.reduce((acc, b) => acc + b.floors.reduce((facc, f) => facc + f.rooms.length, 0), 0);
+        return roomTree.reduce((acc: number, b: BuildingNode) => acc + b.floors.reduce((facc: number, f: FloorNode) => facc + f.rooms.length, 0), 0);
     }, [roomTree]);
 
     // Flattened room list for assignment dropdowns
@@ -519,6 +574,135 @@ export const StayView: React.FC = () => {
     // HIGH-PERFORMANCE PRE-COMPUTED CACHES (EVENT-DRIVEN O(1) LOOKUPS)
     // =========================================================================
 
+    // Multi-PC Network Real-Time Sync Status
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+        isConnected: false,
+        mode: 'Local Browser Only',
+        terminalId: 'Terminal-1',
+        connectedTerminalsCount: 1,
+        lastSyncedAt: Date.now()
+    });
+
+    useEffect(() => {
+        initNetworkSync();
+        const unsub = subscribeToSyncStatus(setSyncStatus);
+        return () => unsub();
+    }, []);
+
+    // Active temporary soft locks on rooms across all executives/tabs
+    const [activeLocks, setActiveLocks] = useState<RoomLock[]>(() => getActiveLocks());
+
+    // Single source of truth: Sync stored reservations to timeline bookings
+    const syncStoredReservations = React.useCallback(() => {
+        const stored = getAllStoredReservations();
+        setBookings(prev => {
+            const historicalBookings = prev.filter(b => b.isPast);
+            const syncedList: TimelineBooking[] = [];
+
+            for (const res of stored) {
+                if (res.status === 'cancelled' || res.status === 'voided') {
+                    continue;
+                }
+
+                const isGroup = (res.roomsList && res.roomsList.length > 1) || (res.allocatedRooms && res.allocatedRooms.length > 1);
+
+                if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.length > 0) {
+                    res.roomsList.forEach((r: any, idx: number) => {
+                        const rNum = String(r.roomNumber || res.roomNumber);
+                        const rIn = r.checkInDate || res.checkIn;
+                        const rOut = r.checkOutDate || res.checkOut;
+                        const rNights = Number(r.nights || res.nights || 1);
+
+                        const sIdx = days.findIndex(d => d.date === rIn);
+                        const baseDate = new Date(days[0]?.date || '2026-06-28');
+                        const curInDate = new Date(rIn);
+                        const diffFromStart = Math.round((curInDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+                        const start = sIdx !== -1 ? sIdx : diffFromStart;
+                        const end = start + Math.max(1, rNights) - 1;
+
+                        syncedList.push({
+                            id: `res-${res.id}-${r.id || idx}-${rNum}`,
+                            reservationNumber: res.reservationNumber,
+                            guestName: isGroup ? `${res.guestName} (${rNum})` : res.guestName,
+                            roomNumber: rNum,
+                            startIndex: start,
+                            endIndex: end,
+                            checkInDate: rIn,
+                            checkOutDate: rOut,
+                            nights: rNights,
+                            status: (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
+                            isGroupOwner: isGroup && idx === 0,
+                            isGroupBooking: isGroup,
+                            isPaymentDue: (res.dueAmount || 0) > 0,
+                            isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none')
+                        });
+                    });
+                } else {
+                    const rNum = String(res.roomNumber || (res.allocatedRooms && res.allocatedRooms[0]) || '101');
+                    const rIn = res.checkIn;
+                    const rOut = res.checkOut;
+                    const rNights = Number(res.nights || 1);
+
+                    const sIdx = days.findIndex(d => d.date === rIn);
+                    const baseDate = new Date(days[0]?.date || '2026-06-28');
+                    const curInDate = new Date(rIn);
+                    const diffFromStart = Math.round((curInDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const start = sIdx !== -1 ? sIdx : diffFromStart;
+                    const end = start + Math.max(1, rNights) - 1;
+
+                    syncedList.push({
+                        id: `res-${res.id}-${rNum}`,
+                        reservationNumber: res.reservationNumber,
+                        guestName: res.guestName,
+                        roomNumber: rNum,
+                        startIndex: start,
+                        endIndex: end,
+                        checkInDate: rIn,
+                        checkOutDate: rOut,
+                        nights: rNights,
+                        status: (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
+                        isGroupOwner: isGroup,
+                        isGroupBooking: isGroup,
+                        isPaymentDue: (res.dueAmount || 0) > 0,
+                        isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none')
+                    });
+                }
+            }
+
+            // Preserve initial mock active bookings only if storage has no reservation with that number
+            const storedResNums = new Set(stored.map(r => r.reservationNumber));
+            const remainingSeedBookings = prev.filter(b => !b.isPast && !b.id.startsWith('res-') && !storedResNums.has(b.reservationNumber));
+
+            return [...historicalBookings, ...remainingSeedBookings, ...syncedList];
+        });
+    }, [days]);
+
+    // Subscribe to cross-tab PMS real-time synchronization events
+    useEffect(() => {
+        // Sync initially on mount from local cache and live SQLite DB
+        syncStoredReservations();
+        syncReservationsFromDB().then(() => {
+            syncStoredReservations();
+        });
+
+        const unsubscribe = subscribeToPMSEvents((event) => {
+            setActiveLocks(getActiveLocks());
+
+            if (event.type === 'RESERVATION_COMMITTED' || event.type === 'INVENTORY_REFRESH') {
+                syncStoredReservations();
+            }
+        });
+
+        const timer = setInterval(() => {
+            setActiveLocks(getActiveLocks());
+        }, 4000);
+
+        return () => {
+            unsubscribe();
+            clearInterval(timer);
+        };
+    }, [syncStoredReservations]);
+
     // O(1) Pre-calculated Bookings Lookup Map by Room Number
     const bookingsByRoom = useMemo(() => {
         const map = new Map<string, TimelineBooking[]>();
@@ -530,14 +714,25 @@ export const StayView: React.FC = () => {
         return map;
     }, [bookings]);
 
+    // O(1) Pre-calculated Soft Locks Lookup Map by Room Number
+    const locksByRoom = useMemo(() => {
+        const map = new Map<string, RoomLock[]>();
+        for (const lock of activeLocks) {
+            const list = map.get(lock.roomNumber);
+            if (list) list.push(lock);
+            else map.set(lock.roomNumber, [lock]);
+        }
+        return map;
+    }, [activeLocks]);
+
     // O(1) Pre-calculated Floor Daily Breakdown Matrix [Available, Assigned, Unassigned]
     const floorDailyBreakdown = useMemo(() => {
         const breakdown: Record<string, { available: number; assigned: number; unassigned: number }[]> = {};
         for (const building of roomTree) {
             for (const floor of building.floors) {
                 const floorRooms = floor.rooms;
-                const floorRoomTypes = new Set(floorRooms.map(r => r.type));
-                const roomNumbersSet = new Set(floorRooms.map(r => r.roomNumber));
+                const floorRoomTypes = new Set(floorRooms.map((r: RoomNode) => r.type));
+                const roomNumbersSet = new Set(floorRooms.map((r: RoomNode) => r.roomNumber));
 
                 breakdown[floor.id] = days.map(d => {
                     const assignedCount = bookings.filter(b => 
@@ -546,7 +741,7 @@ export const StayView: React.FC = () => {
                     const availableCount = Math.max(0, floorRooms.length - assignedCount);
 
                     const unassignedCount = unassignedList.filter(u => {
-                        const matchesType = floorRoomTypes.has(u.roomType) || u.roomType.includes(floor.name) || floorRooms.some(r => u.roomType.includes(r.type));
+                        const matchesType = floorRoomTypes.has(u.roomType) || u.roomType.includes(floor.name) || floorRooms.some((r: RoomNode) => u.roomType.includes(r.type));
                         if (!matchesType) return false;
                         const startIdx = days.findIndex(x => x.date === u.checkIn);
                         const s = startIdx >= 0 ? startIdx : 0;
@@ -587,31 +782,52 @@ export const StayView: React.FC = () => {
         });
     };
 
-    // Perform room allocation
+    // Perform room allocation with atomic commit to central reservation repository
     const handleConfirmAssign = (booking: UnassignedBooking) => {
         const available = getAvailableRoomsForBooking(booking);
         const targetRoom = selectedRoomNumber || available[0]?.roomNumber || '102';
 
-        const bStart = days.findIndex(d => d.date === booking.checkIn);
-        const bEnd = days.findIndex(d => d.date === booking.checkOut);
-        const startIdx = bStart >= 0 ? bStart : 0;
-        const endIdx = bEnd >= 0 ? bEnd : Math.min(days.length - 1, startIdx + booking.nights);
-
-        const newBooking: TimelineBooking = {
-            id: `b-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        const commitRes = validateAndCommitReservation({
+            id: Date.now(),
             reservationNumber: booking.reservationNumber,
             guestName: booking.guestName,
+            phone: '+880 1711-000000',
+            email: 'guest@hospitality.com',
             roomNumber: targetRoom,
-            startIndex: startIdx,
-            endIndex: endIdx,
+            roomType: booking.roomType,
+            allocatedRooms: [targetRoom],
+            roomsCount: 1,
+            checkIn: booking.checkIn,
+            checkOut: booking.checkOut,
+            nights: booking.nights,
             status: 'confirmed',
-            isPaymentDue: false
-        };
+            totalAmount: booking.totalAmount,
+            paidAmount: 0,
+            dueAmount: booking.totalAmount,
+            source: booking.source || 'OTA Channel',
+            roomsList: [{
+                id: 1,
+                roomNumber: targetRoom,
+                roomType: booking.roomType,
+                checkInDate: booking.checkIn,
+                checkOutDate: booking.checkOut,
+                nights: booking.nights,
+                roomsCount: 1,
+                assignedRooms: [targetRoom],
+                rate: Math.round(booking.totalAmount / Math.max(1, booking.nights))
+            }]
+        });
 
-        setBookings(prev => [...prev, newBooking]);
+        if (!commitRes.success) {
+            showToast(`Cannot assign Room ${targetRoom}: ${commitRes.errorMessage || 'Room conflict detected!'}`);
+            return;
+        }
+
         setUnassignedList(prev => prev.filter(u => u.id !== booking.id));
         setActiveAssigningId(null);
+        setSelectedRoomNumber('');
         showToast(`Room ${targetRoom} successfully assigned to ${booking.guestName} (${booking.reservationNumber})!`);
+        syncStoredReservations();
     };
 
     // Date carousel days for the drawer
@@ -660,24 +876,33 @@ export const StayView: React.FC = () => {
 
     // Open Unified Reservation Action Drawer on Normal Click
     const handleOpenDetailsDrawer = (booking: TimelineBooking) => {
-        const arrivalDateStr = days[booking.startIndex]?.date || '2026-07-04';
-        const currentDepDateStr = days[booking.endIndex]?.date || '2026-07-06';
-        const start = new Date(arrivalDateStr);
-        const end = new Date(currentDepDateStr);
-        const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        const currentNights = Math.max(1, diffDays > 0 ? diffDays : booking.endIndex - booking.startIndex);
+        let arrivalDateStr = booking.checkInDate || days[booking.startIndex]?.date || '2026-07-01';
+        let currentDepDateStr = booking.checkOutDate;
+        let currentNights = booking.nights;
+
+        if (!currentDepDateStr || !currentNights) {
+            const startD = new Date(arrivalDateStr);
+            const spanNights = Math.max(1, booking.endIndex - booking.startIndex + 1);
+            currentNights = spanNights;
+            const endD = new Date(startD);
+            endD.setDate(endD.getDate() + spanNights);
+            currentDepDateStr = endD.toISOString().split('T')[0];
+        }
+
+        const stored = getAllStoredReservations();
+        const originalRes = stored.find(r => r.reservationNumber === booking.reservationNumber);
 
         const bData: AmendBookingData = {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
             guestName: booking.guestName,
             roomNumber: booking.roomNumber,
-            roomType: 'Winter Rate Plan',
-            ratePlan: 'Summer Vacation',
+            roomType: originalRes?.roomType || 'Deluxe Double',
+            ratePlan: originalRes?.ratePlan || 'Standard Rate',
             arrivalDate: arrivalDateStr,
             departureDate: currentDepDateStr,
             nights: currentNights,
-            avgDailyRate: 3000,
+            avgDailyRate: originalRes ? Math.round((originalRes.totalAmount || 3000) / Math.max(1, currentNights)) : 3000,
             status: booking.status.toUpperCase(),
             isPast: booking.isPast
         };
@@ -688,12 +913,18 @@ export const StayView: React.FC = () => {
 
     // Open Unified Action Drawer in Amend Stay Mode on Drag-to-Extend or Resize Handle Click
     const handleOpenAmendModal = (booking: TimelineBooking, customTargetDep?: string, customTargetNights?: number) => {
-        const arrivalDateStr = days[booking.startIndex]?.date || '2026-07-04';
-        const currentDepDateStr = days[booking.endIndex]?.date || '2026-07-06';
-        const start = new Date(arrivalDateStr);
-        const end = new Date(currentDepDateStr);
-        const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        const currentNights = Math.max(1, diffDays > 0 ? diffDays : booking.endIndex - booking.startIndex);
+        let arrivalDateStr = booking.checkInDate || days[booking.startIndex]?.date || '2026-07-01';
+        let currentDepDateStr = booking.checkOutDate;
+        let currentNights = booking.nights;
+
+        if (!currentDepDateStr || !currentNights) {
+            const startD = new Date(arrivalDateStr);
+            const spanNights = Math.max(1, booking.endIndex - booking.startIndex + 1);
+            currentNights = spanNights;
+            const endD = new Date(startD);
+            endD.setDate(endD.getDate() + spanNights);
+            currentDepDateStr = endD.toISOString().split('T')[0];
+        }
 
         let targetDeparture = customTargetDep;
         let targetNights = customTargetNights;
@@ -705,17 +936,20 @@ export const StayView: React.FC = () => {
             targetNights = currentNights + 1;
         }
 
+        const stored = getAllStoredReservations();
+        const originalRes = stored.find(r => r.reservationNumber === booking.reservationNumber);
+
         const bData: AmendBookingData = {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
             guestName: booking.guestName,
             roomNumber: booking.roomNumber,
-            roomType: 'Winter Rate Plan',
-            ratePlan: 'Summer Vacation',
+            roomType: originalRes?.roomType || 'Deluxe Double',
+            ratePlan: originalRes?.ratePlan || 'Standard Rate',
             arrivalDate: arrivalDateStr,
             departureDate: currentDepDateStr,
             nights: currentNights,
-            avgDailyRate: 3000,
+            avgDailyRate: originalRes ? Math.round((originalRes.totalAmount || 3000) / Math.max(1, currentNights)) : 3000,
             status: booking.status.toUpperCase()
         };
 
@@ -726,51 +960,193 @@ export const StayView: React.FC = () => {
         setIsActionDrawerOpen(true);
     };
 
+    // Save Extended / Shortened Stay to Central PMS Storage
     const handleSaveAmendStay = (bookingId: string, newDeparture: string, newNights: number) => {
+        const targetB = bookings.find(b => b.id === bookingId);
+        if (!targetB) return;
+
+        // Persist to central reservation storage (hotel_reservations_v2)
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === targetB.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = { ...res };
+            updated.checkOut = newDeparture;
+            updated.nights = newNights;
+
+            if (updated.roomsList && Array.isArray(updated.roomsList)) {
+                updated.roomsList = updated.roomsList.map((r: any) => {
+                    if (String(r.roomNumber) === String(targetB.roomNumber)) {
+                        return {
+                            ...r,
+                            checkOutDate: newDeparture,
+                            nights: newNights
+                        };
+                    }
+                    return r;
+                });
+            }
+
+            const dailyRate = Math.round((res.totalAmount || 3000) / Math.max(1, res.nights || 1));
+            updated.totalAmount = dailyRate * newNights;
+            updated.dueAmount = Math.max(0, updated.totalAmount - (updated.paidAmount || 0));
+
+            stored[resIdx] = updated;
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
         setBookings(prev => prev.map(b => {
             if (b.id !== bookingId) return b;
             const depIndex = days.findIndex(d => d.date === newDeparture);
-            const calculatedEnd = depIndex >= 0 ? depIndex : b.startIndex + newNights - 1;
+            const calculatedEnd = depIndex >= 0 ? depIndex - 1 : b.startIndex + newNights - 1;
             return {
                 ...b,
-                endIndex: calculatedEnd
+                endIndex: calculatedEnd,
+                checkOutDate: newDeparture,
+                nights: newNights
             };
         }));
-        const targetB = bookings.find(b => b.id === bookingId);
-        showToast(`Reservation ${targetB?.reservationNumber || ''} (${targetB?.guestName || ''}) updated to ${newDeparture} (${newNights} Nights)!`);
+
+        showToast(`Reservation ${targetB.reservationNumber} (${targetB.guestName}) updated to ${newDeparture} (${newNights} Nights)!`);
     };
 
-    // Save Room Move
+    // Save Room Move to Central PMS Storage
     const handleSaveRoomMove = (bookingId: string, newRoomNumber: string, newFromDate: string, newToDate: string) => {
+        const targetB = bookings.find(b => b.id === bookingId);
+        if (!targetB) return;
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === targetB.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = { ...res };
+
+            if (updated.roomsList && Array.isArray(updated.roomsList)) {
+                updated.roomsList = updated.roomsList.map((r: any) => {
+                    if (String(r.roomNumber) === String(targetB.roomNumber)) {
+                        return {
+                            ...r,
+                            roomNumber: newRoomNumber,
+                            assignedRooms: [newRoomNumber],
+                            checkInDate: newFromDate,
+                            checkOutDate: newToDate
+                        };
+                    }
+                    return r;
+                });
+            }
+
+            if (String(updated.roomNumber) === String(targetB.roomNumber)) {
+                updated.roomNumber = newRoomNumber;
+            }
+            if (updated.allocatedRooms && Array.isArray(updated.allocatedRooms)) {
+                updated.allocatedRooms = updated.allocatedRooms.map((rm: string) => rm === targetB.roomNumber ? newRoomNumber : rm);
+            }
+
+            stored[resIdx] = updated;
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
         const startIdx = days.findIndex(d => d.date === newFromDate);
         const endIdx = days.findIndex(d => d.date === newToDate);
         setBookings(prev => prev.map(b => {
             if (b.id !== bookingId) return b;
             const s = startIdx >= 0 ? startIdx : b.startIndex;
-            const e = endIdx >= 0 ? endIdx : s + (b.endIndex - b.startIndex);
+            const e = endIdx >= 0 ? endIdx - 1 : s + (b.endIndex - b.startIndex);
             return {
                 ...b,
                 roomNumber: newRoomNumber,
                 startIndex: s,
-                endIndex: e
+                endIndex: e,
+                checkInDate: newFromDate,
+                checkOutDate: newToDate
             };
         }));
-        const targetB = bookings.find(b => b.id === bookingId);
-        showToast(`Reservation ${targetB?.reservationNumber || ''} (${targetB?.guestName || ''}) moved to Room A-(${newRoomNumber}) (${newFromDate} to ${newToDate})!`);
+
+        showToast(`Reservation ${targetB.reservationNumber} (${targetB.guestName}) moved to Room ${newRoomNumber} (${newFromDate} to ${newToDate})!`);
     };
 
     // Core PMS Live Action Handlers for Unified Action Drawer
     const handleSavePayment = (bookingId: string, method: string, amount: number) => {
+        const targetB = bookings.find(item => item.id === bookingId);
+        if (!targetB) return;
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === targetB.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = { ...res };
+            updated.paidAmount = (updated.paidAmount || 0) + amount;
+            updated.dueAmount = Math.max(0, (updated.totalAmount || 0) - updated.paidAmount);
+            stored[resIdx] = updated;
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
         setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, isPaymentDue: false } : b));
-        const b = bookings.find(item => item.id === bookingId);
-        showToast(`Payment of ৳${amount.toLocaleString()} received via ${method} for ${b?.guestName || 'guest'}!`);
+        showToast(`Payment of ৳${amount.toLocaleString()} received via ${method} for ${targetB.guestName}!`);
     };
 
-    const handleSaveRoomSplit = (bookingId: string, targetRoomNumber: string) => {
+    const handleSaveRoomSplit = (bookingId: string, targetRoomNumber: string, splitFromDate?: string, splitToDate?: string) => {
         const target = bookings.find(b => b.id === bookingId);
-        if (target) {
-            showToast(`Reservation ${target.reservationNumber} split to Room ${targetRoomNumber}!`);
+        if (!target) return;
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        if (resIdx === -1) return;
+
+        const res = stored[resIdx];
+        const checkIn = target.checkInDate || res.checkIn;
+        const checkOut = splitToDate || target.checkOutDate || res.checkOut;
+        const totalNights = target.nights || res.nights || 2;
+
+        let effectiveSplitDate = splitFromDate;
+        if (!effectiveSplitDate) {
+            const inD = new Date(checkIn);
+            const midNights = Math.max(1, Math.floor(totalNights / 2));
+            inD.setDate(inD.getDate() + midNights);
+            effectiveSplitDate = inD.toISOString().split('T')[0];
         }
+
+        const nights1 = Math.max(1, Math.round((new Date(effectiveSplitDate).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24)));
+        const nights2 = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(effectiveSplitDate).getTime()) / (1000 * 60 * 60 * 24)));
+
+        const splitRoomsList = [
+            {
+                id: 1,
+                roomNumber: target.roomNumber,
+                roomType: res.roomType,
+                checkInDate: checkIn,
+                checkOutDate: effectiveSplitDate,
+                nights: nights1,
+                roomsCount: 1,
+                assignedRooms: [target.roomNumber]
+            },
+            {
+                id: 2,
+                roomNumber: targetRoomNumber,
+                roomType: res.roomType,
+                checkInDate: effectiveSplitDate,
+                checkOutDate: checkOut,
+                nights: nights2,
+                roomsCount: 1,
+                assignedRooms: [targetRoomNumber]
+            }
+        ];
+
+        const updated = {
+            ...res,
+            allocatedRooms: [target.roomNumber, targetRoomNumber],
+            roomsList: splitRoomsList
+        };
+
+        stored[resIdx] = updated;
+        localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+        broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        syncStoredReservations();
+        showToast(`Reservation ${target.reservationNumber} split between Room ${target.roomNumber} (until ${effectiveSplitDate}) & Room ${targetRoomNumber}!`);
     };
 
     const handleStopRoomMove = (bookingId: string, allow: boolean) => {
@@ -780,47 +1156,138 @@ export const StayView: React.FC = () => {
 
     const handleProceedNewBooking = () => {
         setIsActionDrawerOpen(false);
+        setEditingReservation(null);
         setIsAddReservationOpen(true);
     };
 
     const handleConfirmCancel = (bookingId: string, fee: number, refund: number) => {
         const target = bookings.find(b => b.id === bookingId);
-        setBookings(prev => prev.filter(b => b.id !== bookingId));
-        showToast(`Reservation ${target?.reservationNumber || ''} cancelled (Fee: ৳${fee}, Refund: ৳${refund})`);
+        if (!target) return;
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = {
+                ...res,
+                status: 'cancelled',
+                cancellationFee: fee,
+                refundAmount: refund,
+                cancelledAt: new Date().toISOString()
+            };
+            stored[resIdx] = updated;
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
+        setBookings(prev => prev.filter(b => b.reservationNumber !== target.reservationNumber));
+        showToast(`Reservation ${target.reservationNumber} cancelled (Fee: ৳${fee}, Refund: ৳${refund})`);
     };
 
     const handleConfirmVoid = (bookingId: string, reason: string) => {
         const target = bookings.find(b => b.id === bookingId);
-        setBookings(prev => prev.filter(b => b.id !== bookingId));
-        showToast(`Reservation ${target?.reservationNumber || ''} voided: "${reason || 'No reason specified'}"`);
+        if (!target) return;
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = {
+                ...res,
+                status: 'voided',
+                voidReason: reason || 'Voided by front desk executive',
+                voidedAt: new Date().toISOString()
+            };
+            stored[resIdx] = updated;
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
+        setBookings(prev => prev.filter(b => b.reservationNumber !== target.reservationNumber));
+        showToast(`Reservation ${target.reservationNumber} voided: "${reason || 'No reason specified'}"`);
     };
 
     const handleConfirmHold = (bookingId: string, _startDate: string, endDate: string) => {
-        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'hold' } : b));
         const target = bookings.find(b => b.id === bookingId);
-        showToast(`Reservation ${target?.reservationNumber || ''} placed on HOLD until ${endDate}!`);
+        if (!target) return;
+
+        const stored = getAllStoredReservations();
+        const resIdx = stored.findIndex(r => r.reservationNumber === target.reservationNumber);
+        if (resIdx !== -1) {
+            const res = stored[resIdx];
+            const updated = {
+                ...res,
+                status: 'hold',
+                holdUntil: endDate
+            };
+            stored[resIdx] = updated;
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+
+            try {
+                const existingHolds = JSON.parse(localStorage.getItem('hotel_holds_v2') || '[]');
+                existingHolds.unshift({
+                    id: Date.now(),
+                    reservationNumber: target.reservationNumber,
+                    guestName: target.guestName,
+                    status: 'Hold',
+                    holdStartDate: res.checkIn,
+                    holdEndDate: endDate,
+                    reason: 'Tentative booking held from StayView',
+                    reservationDate: new Date().toISOString().split('T')[0],
+                    checkInDate: res.checkIn,
+                    checkOutDate: endDate,
+                    roomType: res.roomType,
+                    estimatedAmount: res.totalAmount
+                });
+                localStorage.setItem('hotel_holds_v2', JSON.stringify(existingHolds));
+            } catch {}
+
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        }
+
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'hold' } : b));
+        showToast(`Reservation ${target.reservationNumber} placed on HOLD until ${endDate}!`);
     };
 
     const handleConfirmUnassign = (bookingId: string, roomNum: string) => {
         const target = bookings.find(b => b.id === bookingId);
-        if (target) {
-            setBookings(prev => prev.filter(b => b.id !== bookingId));
-            const unItem: UnassignedBooking = {
-                id: `un-${Date.now()}`,
-                reservationNumber: target.reservationNumber,
-                guestName: target.guestName,
-                roomType: 'Winter Rate Plan',
-                checkIn: days[target.startIndex]?.date || '2026-07-01',
-                checkOut: days[target.endIndex]?.date || '2026-07-04',
-                nights: Math.max(1, target.endIndex - target.startIndex),
-                totalRooms: 1,
-                source: 'Front Desk',
-                totalAmount: Math.max(1, target.endIndex - target.startIndex) * 3000,
-                status: 'unassigned'
-            };
-            setUnassignedList(prev => [unItem, ...prev]);
-            showToast(`Reservation ${target.reservationNumber} unassigned from Room ${roomNum}!`);
+        if (!target) return;
+
+        const stored = getAllStoredReservations();
+        const res = stored.find(r => r.reservationNumber === target.reservationNumber);
+
+        const checkIn = target.checkInDate || days[target.startIndex]?.date || '2026-07-01';
+        const nights = target.nights || Math.max(1, target.endIndex - target.startIndex + 1);
+        const checkOut = target.checkOutDate || (() => {
+            const d = new Date(checkIn);
+            d.setDate(d.getDate() + nights);
+            return d.toISOString().split('T')[0];
+        })();
+
+        const unItem: UnassignedBooking = {
+            id: `un-${Date.now()}`,
+            reservationNumber: target.reservationNumber,
+            guestName: res?.guestName || target.guestName,
+            roomType: res?.roomType || 'Deluxe Double',
+            checkIn,
+            checkOut,
+            nights,
+            totalRooms: 1,
+            source: res?.source || 'Front Desk',
+            totalAmount: res?.totalAmount || (nights * 3000),
+            status: 'unassigned'
+        };
+
+        setUnassignedList(prev => [unItem, ...prev]);
+
+        if (res) {
+            const updated = stored.filter(r => r.reservationNumber !== target.reservationNumber);
+            localStorage.setItem('hotel_reservations_v2', JSON.stringify(updated));
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         }
+
+        setBookings(prev => prev.filter(b => b.id !== bookingId));
+        showToast(`Reservation ${target.reservationNumber} unassigned from Room ${roomNum}!`);
     };
 
     const handleConfirmUngroup = (bookingId: string) => {
@@ -996,6 +1463,19 @@ export const StayView: React.FC = () => {
                         <h1 className="text-xs font-bold text-gray-900 tracking-tight whitespace-nowrap">
                             Stay View
                         </h1>
+                        {/* Real-Time Cross-PC Sync Indicator */}
+                        <div 
+                            className={`hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all ${
+                                syncStatus.isConnected 
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                            }`}
+                            title={`Real-Time Synchronization: ${syncStatus.mode}. Current Terminal ID: ${syncStatus.terminalId}. Connected Terminals: ${syncStatus.connectedTerminalsCount}.`}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full ${syncStatus.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                            <span className="tracking-tight">{syncStatus.isConnected ? 'Real-Time Sync: Live' : 'Local Sync: Ready'}</span>
+                            <span className="font-mono text-[9px] opacity-75">[{syncStatus.terminalId.split('-')[1] || '1'}]</span>
+                        </div>
                     </div>
                 </div>
 
@@ -1284,7 +1764,7 @@ export const StayView: React.FC = () => {
                                     </div>
 
                                     {/* Floors and Rooms */}
-                                    {expandedNodes[building.id] && building.floors.map(floor => (
+                                    {expandedNodes[building.id] && building.floors.map((floor: FloorNode) => (
                                         <React.Fragment key={floor.id}>
                                             {/* Floor Header Row with Daily Breakdown Counters [Available][Assigned][Unassigned] */}
                                             <div className="flex bg-gray-50/80 border-b border-gray-100 text-gray-700 font-semibold">
@@ -1347,7 +1827,7 @@ export const StayView: React.FC = () => {
                                             </div>
 
                                             {/* Rooms */}
-                                            {expandedNodes[floor.id] && floor.rooms.map(room => (
+                                            {expandedNodes[floor.id] && floor.rooms.map((room: RoomNode) => (
                                                 <div key={room.id} className="flex border-b border-gray-100/90 hover:bg-blue-50/20 transition-colors group relative overflow-visible min-h-[36px]">
                                                     {/* Room Info Cell */}
                                                     <div
@@ -1580,6 +2060,39 @@ export const StayView: React.FC = () => {
                                                                     </div>
                                                                 );
                                                             })}
+
+                                                        {/* Render Active Soft Hold / Locks on Room */}
+                                                        {(locksByRoom.get(room.roomNumber) || []).map(lock => {
+                                                            const sIdx = days.findIndex(d => d.date === lock.checkIn);
+                                                            const eIdx = days.findIndex(d => d.date === lock.checkOut);
+                                                            const start = sIdx !== -1 ? sIdx : 0;
+                                                            const end = eIdx !== -1 ? Math.max(start, eIdx - 1) : Math.min(daysWindow - 1, start + 1);
+                                                            if (start > daysWindow - 1 || end < 0) return null;
+
+                                                            const left = start * colWidth + 2;
+                                                            const width = Math.max(24, (end - start + 1) * colWidth - 4);
+                                                            const remainingSec = Math.max(0, Math.round((lock.expiresAt - Date.now()) / 1000));
+                                                            const remainingMin = Math.floor(remainingSec / 60);
+
+                                                            return (
+                                                                <div
+                                                                    key={lock.lockId}
+                                                                    style={{ left: `${left}px`, width: `${width}px` }}
+                                                                    className="absolute top-[7px] bottom-[5px] z-15 rounded border-2 border-dashed border-amber-400 bg-amber-100/90 text-amber-900 px-2 flex items-center justify-between shadow-xs select-none cursor-not-allowed group transition-all"
+                                                                    title={`🔒 Held by ${lock.heldBy} (${remainingMin}m ${remainingSec % 60}s remaining)`}
+                                                                >
+                                                                    <div className="flex items-center gap-1.5 truncate">
+                                                                        <Lock size={10} className="text-amber-700 flex-shrink-0 animate-pulse" />
+                                                                        <span className="text-[9.5px] font-bold tracking-tight truncate">
+                                                                            Held by {lock.heldBy}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-[8.5px] font-mono font-bold px-1 rounded bg-amber-300 text-amber-950 ml-1 flex-shrink-0">
+                                                                        {remainingMin}m
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
 
                                                         {/* Drag Selection Visual Overlay */}
                                                         {dragState && dragState.room === room.roomNumber && (
@@ -1885,8 +2398,11 @@ export const StayView: React.FC = () => {
                 }}
                 roomInfo={(() => {
                     const startIso = selectedRange ? days[selectedRange.startIndex]?.date : startDate;
-                    const endIso = selectedRange ? days[selectedRange.endIndex]?.date : startDate;
-                    const stayNights = selectedRange ? selectedRange.endIndex - selectedRange.startIndex + 1 : 1;
+                    const stayNights = selectedRange ? Math.max(1, selectedRange.endIndex - selectedRange.startIndex + 1) : 1;
+                    const baseStart = new Date(startIso || '2026-07-01');
+                    const baseEnd = new Date(baseStart);
+                    baseEnd.setDate(baseEnd.getDate() + stayNights);
+                    const endIso = baseEnd.toISOString().split('T')[0];
                     return {
                         room: selectedRange?.room || '101',
                         startDate: startIso,
@@ -1896,21 +2412,10 @@ export const StayView: React.FC = () => {
                         endIndex: selectedRange?.endIndex
                     };
                 })()}
-                onReserve={(newBooking) => {
-                    setBookings(prev => [
-                        ...prev,
-                        {
-                            id: `b-${Date.now()}`,
-                            reservationNumber: `RES-${Date.now().toString().slice(-6)}`,
-                            guestName: newBooking.guestName,
-                            roomNumber: newBooking.room,
-                            startIndex: newBooking.startIndex,
-                            endIndex: newBooking.endIndex,
-                            status: newBooking.status as any
-                        }
-                    ]);
+                onReserve={(_newBooking) => {
                     setIsQuickReservationOpen(false);
                     setSelectedRange(null);
+                    syncStoredReservations();
                 }}
             />
 
@@ -1920,28 +2425,24 @@ export const StayView: React.FC = () => {
                 onClose={() => {
                     setIsAddReservationOpen(false);
                     setSelectedRange(null);
+                    setEditingReservation(null);
                 }}
                 initialRoom={selectedRange?.room || '101'}
                 initialStartDate={selectedRange ? days[selectedRange.startIndex]?.date : startDate}
-                initialEndDate={selectedRange ? days[selectedRange.endIndex]?.date : undefined}
-                onReservationCreated={(res) => {
-                    const startIdx = selectedRange?.startIndex || 0;
-                    const endIdx = selectedRange?.endIndex || Math.min(days.length - 1, startIdx + (res.nights || 2) - 1);
-                    setBookings(prev => [
-                        ...prev,
-                        {
-                            id: `b-${Date.now()}`,
-                            reservationNumber: res.reservationNumber,
-                            guestName: res.guestName,
-                            roomNumber: res.roomNumber,
-                            startIndex: startIdx,
-                            endIndex: endIdx,
-                            status: res.status === 'in-house' ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
-                            vip: res.vip && res.vip !== 'None'
-                        }
-                    ]);
+                initialEndDate={(() => {
+                    const startIso = selectedRange ? days[selectedRange.startIndex]?.date : startDate;
+                    const stayNights = selectedRange ? Math.max(1, selectedRange.endIndex - selectedRange.startIndex + 1) : 1;
+                    const baseStart = new Date(startIso || '2026-07-01');
+                    const baseEnd = new Date(baseStart);
+                    baseEnd.setDate(baseEnd.getDate() + stayNights);
+                    return baseEnd.toISOString().split('T')[0];
+                })()}
+                editingReservation={editingReservation}
+                onReservationCreated={(_res) => {
                     setIsAddReservationOpen(false);
                     setSelectedRange(null);
+                    setEditingReservation(null);
+                    syncStoredReservations();
                 }}
             />
 
@@ -1970,7 +2471,32 @@ export const StayView: React.FC = () => {
                 onConfirmUnassign={handleConfirmUnassign}
                 onConfirmUngroup={handleConfirmUngroup}
                 onConfirmChangeOwner={handleConfirmChangeOwner}
-                onEdit={() => {
+                onEdit={(b) => {
+                    const bookingToEdit = b || actionDrawerBooking;
+                    if (bookingToEdit) {
+                        const stored = getAllStoredReservations();
+                        const found = stored.find(r => r.reservationNumber === bookingToEdit.reservationNumber);
+                        if (found) {
+                            setEditingReservation(found);
+                        } else {
+                            setEditingReservation({
+                                id: bookingToEdit.id,
+                                reservationNumber: bookingToEdit.reservationNumber,
+                                guestName: bookingToEdit.guestName,
+                                roomNumber: bookingToEdit.roomNumber,
+                                roomType: bookingToEdit.roomType || 'Deluxe Double',
+                                allocatedRooms: [bookingToEdit.roomNumber],
+                                checkIn: bookingToEdit.arrivalDate,
+                                checkOut: bookingToEdit.departureDate,
+                                nights: bookingToEdit.nights,
+                                status: bookingToEdit.status?.toLowerCase() || 'confirmed',
+                                totalAmount: (bookingToEdit.avgDailyRate || 3000) * (bookingToEdit.nights || 1),
+                                paidAmount: 0,
+                                dueAmount: (bookingToEdit.avgDailyRate || 3000) * (bookingToEdit.nights || 1),
+                                source: 'Direct'
+                            } as any);
+                        }
+                    }
                     setIsActionDrawerOpen(false);
                     setIsAddReservationOpen(true);
                 }}

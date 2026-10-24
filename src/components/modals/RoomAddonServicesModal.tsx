@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     X,
     Car,
@@ -54,6 +54,8 @@ export interface RoomAddonServicesModalProps {
     roomType: string;
     baseRate: number;
     nights: number;
+    roomsCount?: number;
+    assignedRooms?: string[];
     initialTab?: ServiceTabType;
     currentServices?: RoomServicesBundle;
     currentExtraBed?: ExtraBedConfig;
@@ -68,6 +70,8 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
     roomType,
     baseRate,
     nights,
+    roomsCount,
+    assignedRooms,
     initialTab = 'pickup',
     currentServices,
     currentExtraBed,
@@ -75,6 +79,21 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
     onSave
 }) => {
     const [activeTab, setActiveTab] = useState<ServiceTabType>(initialTab);
+
+    // Derived assigned rooms list for multi-room bookings
+    const assignedRoomsList = useMemo(() => {
+        if (assignedRooms && assignedRooms.length > 0) return assignedRooms;
+        if (roomNumber && roomNumber.includes(',')) {
+            return roomNumber.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        return roomNumber ? [roomNumber] : ['101'];
+    }, [assignedRooms, roomNumber]);
+
+    const isMultiRoomRow = (roomsCount && roomsCount > 1) || assignedRoomsList.length > 1;
+
+    const [targetRoomScope, setTargetRoomScope] = useState<string>(() => {
+        return currentServices?.targetRoomNumber || 'all';
+    });
 
     // Individual states
     const [pickup, setPickup] = useState<PickupConfig>(() => ({
@@ -122,6 +141,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
             setSpaWellness({ ...DEFAULT_SPA_WELLNESS, ...(currentServices?.spaWellness || {}) });
             setTimingFlex({ ...DEFAULT_TIMING_FLEX, ...(currentServices?.timingFlex || {}) });
             setCustomAddons(currentServices?.customAddons ? [...currentServices.customAddons] : []);
+            setTargetRoomScope(currentServices?.targetRoomNumber || 'all');
         }
     }, [isOpen, initialTab, currentServices, currentExtraBed, currentPickup]);
 
@@ -135,7 +155,9 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
         celebration,
         spaWellness,
         timingFlex,
-        customAddons
+        customAddons,
+        allocationScope: targetRoomScope === 'all' ? 'all' : 'specific',
+        targetRoomNumber: targetRoomScope === 'all' ? 'All Rooms' : targetRoomScope
     };
 
     const extraBedSubtotal = getExtraBedTotal(extraBed, nights);
@@ -151,7 +173,11 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
     const grandRowTotal = roomStayTotal + totalAddonsCharge;
 
     const handleSave = () => {
-        onSave(currentBundle);
+        onSave({
+            ...currentBundle,
+            allocationScope: targetRoomScope === 'all' ? 'all' : 'specific',
+            targetRoomNumber: targetRoomScope === 'all' ? 'All Rooms' : targetRoomScope
+        });
         onClose();
     };
 
@@ -236,6 +262,31 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                         <X size={18} />
                     </button>
                 </div>
+
+                {/* Multi-Room Target Scope Banner (Enterprise Hotel Standard) */}
+                {isMultiRoomRow && (
+                    <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/80 to-blue-50/90 border-b border-blue-200/70 px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse flex-shrink-0"></span>
+                            <span className="text-slate-800">
+                                <strong>Multi-Room Booking ({roomsCount || assignedRoomsList.length} Rooms: {assignedRoomsList.join(', ') || roomNumber})</strong>: Specify how add-ons apply:
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-slate-700">Target Room:</span>
+                            <select
+                                value={targetRoomScope}
+                                onChange={e => setTargetRoomScope(e.target.value)}
+                                className="h-7 px-2 border border-blue-300 rounded-md bg-white text-xs font-semibold text-blue-900 outline-none cursor-pointer shadow-2xs focus:ring-1 focus:ring-blue-500"
+                            >
+                                <option value="all">🌐 All Rooms in Group ({assignedRoomsList.join(', ')})</option>
+                                {assignedRoomsList.map((rm: string) => (
+                                    <option key={rm} value={rm}>🚪 Room {rm} Only (Master/Target)</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                )}
 
                 {/* Nav Tabs Bar */}
                 <div className="px-4 py-2 bg-slate-100/70 border-b border-slate-200 overflow-x-auto scrollbar-none flex items-center gap-1.5">

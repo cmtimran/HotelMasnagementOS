@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Plus, FileText, CreditCard, 
     ArrowRightLeft, Printer, Send, 
     ShieldCheck, CheckCircle2,
     Search
 } from 'lucide-react';
+import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
+import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
+
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
 
 interface Transaction {
     id: number;
@@ -361,6 +365,85 @@ export const FolioOperations: React.FC = () => {
         remarks: ''
     });
 
+    const fetchFoliosFromAPI = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/accounting/folios`);
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                const mapped: FolioAccount[] = json.data.map((f: any) => {
+                    const charges = f.charges || [];
+                    const payments = f.payments || [];
+                    const txns: Transaction[] = [];
+
+                    charges.forEach((c: any) => {
+                        txns.push({
+                            id: Number(c.id),
+                            date: c.charge_date ? `${c.charge_date} 12:00` : '2026-06-25 12:00',
+                            refNo: `CHG-${c.charge_code || 'SRV'}-${c.id}`,
+                            particulars: c.description || 'Department Charge',
+                            description: `Posted charge (Tax: ৳${Number(c.tax_amount || 0).toFixed(2)})`,
+                            user: 'system_pms',
+                            amount: -Number(c.total_amount || c.amount || 0),
+                            windowId: 1,
+                            category: c.charge_code?.includes('FB') ? 'F&B' : c.charge_code?.includes('TRN') ? 'Transport' : 'Room'
+                        });
+                    });
+
+                    payments.forEach((p: any) => {
+                        txns.push({
+                            id: 10000 + Number(p.id),
+                            date: p.transaction_date ? String(p.transaction_date).slice(0, 16).replace('T', ' ') : '2026-06-25 14:00',
+                            refNo: p.payment_number || `PAY-${p.id}`,
+                            particulars: `Payment Received (${p.payment_method})`,
+                            description: `Receipt Ref: ${p.reference_code || 'Front Desk'}`,
+                            user: 'fo_cashier',
+                            amount: Number(p.amount || 0),
+                            windowId: 1,
+                            category: 'Payment'
+                        });
+                    });
+
+                    return {
+                        id: Number(f.id),
+                        roomNumber: String(f.room_number || '101'),
+                        guestName: f.guest_name || 'Valued Guest',
+                        folioNumber: f.folio_number || `FOL-${f.id}`,
+                        roomType: f.room_type || 'Deluxe Room',
+                        checkIn: f.check_in || '2026-06-25',
+                        checkOut: f.check_out || '2026-06-28',
+                        company: 'Individual Guest',
+                        package: 'Best Available Rate',
+                        allowances: [
+                            { service: 'Complimentary Buffet Breakfast', total: 2, used: 1, unit: 'Meals' },
+                            { service: 'High-Speed Wi-Fi', total: 1, used: 1, unit: 'Access' }
+                        ],
+                        transactions: txns
+                    };
+                });
+
+                setFolios(prev => {
+                    const mappedIds = new Set(mapped.map(m => m.id));
+                    const remaining = prev.filter(p => !mappedIds.has(p.id));
+                    return [...mapped, ...remaining];
+                });
+            }
+        } catch (e) {
+            console.warn('API fetch folios fallback to local:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchFoliosFromAPI();
+        const handleSync = (e: any) => {
+            const d = e.detail;
+            if (d?.type === 'FOLIO_UPDATED' || d?.type === 'RESERVATION_COMMITTED' || d?.type === 'INVENTORY_REFRESH') {
+                fetchFoliosFromAPI();
+            }
+        };
+        window.addEventListener('hotel_pms_sync_event', handleSync);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
+    }, [fetchFoliosFromAPI]);
+
     useEffect(() => {
         localStorage.setItem('hotel_folios_v2', JSON.stringify(folios));
     }, [folios]);
@@ -424,6 +507,24 @@ export const FolioOperations: React.FC = () => {
             return { ...f, transactions: [newTxn, ...f.transactions] };
         }));
 
+        // Asynchronous persistence to SQLite DB & Network Broadcast
+        if (activeFolio && activeFolio.id) {
+            fetch(`${API_BASE}/api/accounting/folios/${activeFolio.id}/charges`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chargeCode: postChargeForm.category === 'F&B' ? 'FB_REST' : postChargeForm.category === 'Transport' ? 'TRN_PICK' : 'ROOM_TARIFF',
+                    description: postChargeForm.particulars,
+                    amount: amt,
+                    chargeDate: new Date().toISOString().split('T')[0]
+                })
+            }).then(() => {
+                const broadcastMsg = { type: 'INVENTORY_REFRESH' as const };
+                broadcastPMSEvent(broadcastMsg);
+                dispatchPMSNetworkEvent(broadcastMsg);
+            }).catch(console.warn);
+        }
+
         setShowPostChargeModal(false);
         setPostChargeForm({ particulars: '', description: '', amount: '', category: 'F&B', windowId: 1 });
         showToast(`Posted charge of ৳ ${amt.toLocaleString()} to Window ${newTxn.windowId}`);
@@ -455,6 +556,23 @@ export const FolioOperations: React.FC = () => {
             if (f.id !== activeFolio.id) return f;
             return { ...f, transactions: [settlementTxn, ...f.transactions] };
         }));
+
+        // Asynchronous persistence to SQLite DB & Network Broadcast
+        if (activeFolio && activeFolio.id) {
+            fetch(`${API_BASE}/api/accounting/folios/${activeFolio.id}/payments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    paymentMethod: settleForm.method.includes('bKash') ? 'BKASH' : settleForm.method === 'Cash BDT' ? 'CASH' : 'CREDIT_CARD',
+                    amount: amountToPay,
+                    referenceCode: settleForm.remarks || 'FRONT_DESK_SETTLE'
+                })
+            }).then(() => {
+                const broadcastMsg = { type: 'INVENTORY_REFRESH' as const };
+                broadcastPMSEvent(broadcastMsg);
+                dispatchPMSNetworkEvent(broadcastMsg);
+            }).catch(console.warn);
+        }
 
         setShowSettleModal(false);
         showToast(`Window ${activeWindow} settled in full. Balance cleared.`);

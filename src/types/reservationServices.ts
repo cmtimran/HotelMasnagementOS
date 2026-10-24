@@ -85,6 +85,8 @@ export interface CustomAddonItem {
 }
 
 export interface RoomServicesBundle {
+    allocationScope?: 'all' | 'specific';
+    targetRoomNumber?: string;
     extraBed?: ExtraBedConfig;
     pickup?: PickupConfig;
     mealPlan?: MealPlanConfig;

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     X,
     ChevronDown,
@@ -16,9 +17,13 @@ import {
     Utensils,
     Gift,
     Clock,
-    Sparkles
+    Sparkles,
+    CheckCircle2,
+    AlertTriangle,
+    Split
 } from 'lucide-react';
 import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
+import { MultiRoomSelectorModal } from './MultiRoomSelectorModal';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -33,6 +38,11 @@ import {
     getCustomAddonsTotal,
     getRoomBundleTotal
 } from '../../types/reservationServices';
+import {
+    getAvailableRoomsForStay,
+    validateAndCommitReservation
+} from '../../utils/roomInventoryEngine';
+import { toast } from '../../context/ToastContext';
 
 export interface AddReservationModalProps {
     isOpen: boolean;
@@ -41,6 +51,7 @@ export interface AddReservationModalProps {
     initialRoom?: string;
     initialStartDate?: string;
     initialEndDate?: string;
+    editingReservation?: any;
 }
 
 interface RoomRow {
@@ -49,6 +60,7 @@ interface RoomRow {
     roomsCount: number;
     ratePlan: string;
     roomNumber: string;
+    assignedRooms?: string[];
     adults: number;
     children: number;
     rate: number;
@@ -56,6 +68,10 @@ interface RoomRow {
     servicesBundle?: RoomServicesBundle;
     extraBed?: ExtraBedConfig;
     pickup?: PickupConfig;
+    checkInDate?: string;
+    checkOutDate?: string;
+    nights?: number;
+    roomDatesMap?: Record<string, { checkIn: string; checkOut: string; nights: number }>;
 }
 
 interface PaymentRow {
@@ -70,7 +86,8 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     onReservationCreated,
     initialRoom = '101',
     initialStartDate = '2026-07-01',
-    initialEndDate = '2026-07-02'
+    initialEndDate = '2026-07-02',
+    editingReservation = null
 }) => {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
@@ -87,19 +104,217 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const [ratePerNight, setRatePerNight] = useState('Rate Per Night');
     const [taxApplicable, setTaxApplicable] = useState(true);
 
-    const [roomsList, setRoomsList] = useState<RoomRow[]>([
-        {
-            id: 1,
-            roomType: 'Deluxe Double',
-            roomsCount: 1,
-            ratePlan: 'Summer Vacation',
-            roomNumber: initialRoom || '101',
-            adults: 2,
-            children: 1,
-            rate: 3000,
-            isAssign: true
+    const [roomsList, setRoomsList] = useState<RoomRow[]>(() => {
+        const report = getAvailableRoomsForStay(initialStartDate, initialEndDate, 'Deluxe Double');
+        const isInitialAvailable = initialRoom && report.availableRooms.some(r => r.number === initialRoom);
+        const freeRoom = isInitialAvailable
+            ? initialRoom
+            : (report.availableRooms[0]?.number || '102');
+
+        return [
+            {
+                id: 1,
+                roomType: 'Deluxe Double',
+                roomsCount: 1,
+                ratePlan: 'Summer Vacation',
+                roomNumber: freeRoom,
+                assignedRooms: [freeRoom],
+                adults: 2,
+                children: 1,
+                rate: 3000,
+                isAssign: true
+            }
+        ];
+    });
+
+    // Hydrate form when editing an existing reservation
+    useEffect(() => {
+        if (!isOpen) return;
+        if (editingReservation) {
+            if (editingReservation.checkIn) setCheckIn(editingReservation.checkIn);
+            if (editingReservation.checkOut) setCheckOut(editingReservation.checkOut);
+            if (editingReservation.nights) setNights(Number(editingReservation.nights) || 1);
+            if (editingReservation.guestName) {
+                const cleanName = editingReservation.guestName.replace(/^(Mr|Mrs|Ms|Dr|Prof)\.?\s+/i, '');
+                setGuestName(cleanName);
+            }
+            if (editingReservation.phone) setPhone(editingReservation.phone);
+            if (editingReservation.mobile) setMobile(editingReservation.mobile);
+            if (editingReservation.email) setEmail(editingReservation.email);
+            if (editingReservation.vip) setVipStatus(editingReservation.vip);
+            if (editingReservation.source) setBusinessSource(editingReservation.source);
+            if (editingReservation.agent) setBusinessAgent(editingReservation.agent);
+            if (editingReservation.purpose) setPurposeOfVisit(editingReservation.purpose);
+            if (editingReservation.idType) setIdType(editingReservation.idType);
+            if (editingReservation.specialRequests) {
+                setRemarksMap(prev => ({ ...prev, Guest: editingReservation.specialRequests }));
+            }
+
+            if (editingReservation.roomsList && Array.isArray(editingReservation.roomsList) && editingReservation.roomsList.length > 0) {
+                setRoomsList(editingReservation.roomsList.map((r: any, idx: number) => ({
+                    id: r.id || idx + 1,
+                    roomType: r.roomType || 'Deluxe Double',
+                    roomsCount: r.roomsCount || 1,
+                    ratePlan: r.ratePlan || 'Summer Vacation',
+                    roomNumber: r.roomNumber || '101',
+                    assignedRooms: r.assignedRooms || [r.roomNumber || '101'],
+                    adults: r.adults || 2,
+                    children: r.children || 0,
+                    rate: r.rate || 3000,
+                    isAssign: true,
+                    checkInDate: r.checkInDate || editingReservation.checkIn,
+                    checkOutDate: r.checkOutDate || editingReservation.checkOut,
+                    nights: r.nights || editingReservation.nights || 1,
+                    servicesBundle: r.servicesBundle,
+                    extraBed: r.extraBed,
+                    pickup: r.pickup
+                })));
+            } else if (editingReservation.allocatedRooms && editingReservation.allocatedRooms.length > 0) {
+                setRoomsList(editingReservation.allocatedRooms.map((rm: string, idx: number) => ({
+                    id: idx + 1,
+                    roomType: editingReservation.roomType || 'Deluxe Double',
+                    roomsCount: 1,
+                    ratePlan: 'Summer Vacation',
+                    roomNumber: rm,
+                    assignedRooms: [rm],
+                    adults: 2,
+                    children: 0,
+                    rate: 3000,
+                    isAssign: true,
+                    checkInDate: editingReservation.checkIn,
+                    checkOutDate: editingReservation.checkOut,
+                    nights: editingReservation.nights || 1
+                })));
+            }
+            if (editingReservation.paidAmount !== undefined) {
+                setPaymentRows([{ id: 1, method: 'Cash', amount: editingReservation.paidAmount }]);
+            }
         }
-    ]);
+    }, [isOpen, editingReservation]);
+
+    // Live Availability Report for selected stay dates
+    const liveAvailabilityReport = useMemo(() => {
+        return getAvailableRoomsForStay(checkIn, checkOut);
+    }, [checkIn, checkOut]);
+
+    // Self-healing room validation: Ensure no row is assigned to an Occupied room!
+    useEffect(() => {
+        if (editingReservation) return; // When editing an existing reservation, preserve its rooms
+        setRoomsList(prev => {
+            let changed = false;
+            const updated = prev.map(row => {
+                const isCurrentAvailable = liveAvailabilityReport.availableRooms.some(ar => ar.number === row.roomNumber);
+                if (!isCurrentAvailable && liveAvailabilityReport.availableRooms.length > 0) {
+                    const freeMatch = liveAvailabilityReport.availableRooms.find(ar => 
+                        ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) ||
+                        row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())
+                    ) || liveAvailabilityReport.availableRooms[0];
+
+                    if (freeMatch && freeMatch.number !== row.roomNumber) {
+                        changed = true;
+                        const count = Number(row.roomsCount) || 1;
+                        const autoAssigned = liveAvailabilityReport.availableRooms
+                            .filter(ar => ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) || row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase()))
+                            .slice(0, count)
+                            .map(ar => ar.number);
+                        return {
+                            ...row,
+                            roomNumber: freeMatch.number,
+                            assignedRooms: autoAssigned.length > 0 ? autoAssigned : [freeMatch.number]
+                        };
+                    }
+                }
+                return row;
+            });
+            return changed ? updated : prev;
+        });
+    }, [checkIn, checkOut, liveAvailabilityReport]);
+
+    // Total actual room count across all rows in this form
+    const totalRoomsAllocatedInForm = useMemo(() => {
+        return roomsList.reduce((acc, r) => acc + (Number(r.roomsCount) || 1), 0);
+    }, [roomsList]);
+
+    // Live remaining rooms after deducting this form's selected rooms
+    const remainingOverallFreeRooms = Math.max(0, liveAvailabilityReport.availableCount - totalRoomsAllocatedInForm);
+
+    // Total inventory free for this type in the hotel (before any form selection)
+    const getTotalInventoryForType = (typeName: string): number => {
+        return liveAvailabilityReport.allRoomsStatus.filter(st => {
+            const matches = st.room.roomTypeName.toLowerCase().includes(typeName.toLowerCase()) ||
+                            typeName.toLowerCase().includes(st.room.roomTypeName.toLowerCase());
+            return matches && st.isAvailable;
+        }).length;
+    };
+
+    // Rooms of this type already allocated across ALL rows in this form
+    const getAllocatedCountForType = (typeName: string): number => {
+        return roomsList
+            .filter(r => (
+                r.roomType.toLowerCase().includes(typeName.toLowerCase()) ||
+                typeName.toLowerCase().includes(r.roomType.toLowerCase())
+            ))
+            .reduce((sum, r) => sum + (Number(r.roomsCount) || 1), 0);
+    };
+
+    // Rooms of this type allocated in OTHER rows (excluding currentRowId)
+    const getAllocatedCountInOtherRows = (typeName: string, currentRowId?: number): number => {
+        return roomsList
+            .filter(r => r.id !== currentRowId && (
+                r.roomType.toLowerCase().includes(typeName.toLowerCase()) ||
+                typeName.toLowerCase().includes(r.roomType.toLowerCase())
+            ))
+            .reduce((sum, r) => sum + (Number(r.roomsCount) || 1), 0);
+    };
+
+    // Remaining free rooms of this type in the hotel AFTER what is allocated across all rows in this form
+    const getRemainingFreeCountForType = (typeName: string): number => {
+        const totalFree = getTotalInventoryForType(typeName);
+        const totalAllocated = getAllocatedCountForType(typeName);
+        return Math.max(0, totalFree - totalAllocated);
+    };
+
+    // Maximum rooms the CURRENT row can take without exceeding hotel inventory:
+    const getMaxRoomsAllowedForRow = (typeName: string, currentRowId: number): number => {
+        const totalFree = getTotalInventoryForType(typeName);
+        const takenInOthers = getAllocatedCountInOtherRows(typeName, currentRowId);
+        return Math.max(1, totalFree - takenInOthers);
+    };
+
+    // Overbooking validation check across the entire modal form
+    const hasOverbookingError = useMemo(() => {
+        if (totalRoomsAllocatedInForm > liveAvailabilityReport.availableCount) return true;
+        for (const r of roomsList) {
+            const maxForThis = getMaxRoomsAllowedForRow(r.roomType, r.id);
+            if ((Number(r.roomsCount) || 1) > maxForThis) return true;
+        }
+        return false;
+    }, [totalRoomsAllocatedInForm, liveAvailabilityReport.availableCount, roomsList]);
+
+    // Helper to get auto-allocated physical room numbers for a given row based on its roomsCount
+    const getAutoAssignedRoomsForRow = (row: RoomRow): string[] => {
+        const takenBefore = new Set<string>();
+        for (const r of roomsList) {
+            if (r.id === row.id) break;
+            const rCount = Number(r.roomsCount) || 1;
+            const freeForPrev = liveAvailabilityReport.availableRooms
+                .filter(ar => (ar.roomTypeName.toLowerCase().includes(r.roomType.toLowerCase()) || r.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())) && !takenBefore.has(ar.number))
+                .slice(0, rCount)
+                .map(ar => ar.number);
+            freeForPrev.forEach(rn => takenBefore.add(rn));
+        }
+
+        const countNeeded = Number(row.roomsCount) || 1;
+        const matchingAvailable = liveAvailabilityReport.availableRooms
+            .filter(ar => (ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) || row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())) && !takenBefore.has(ar.number))
+            .slice(0, countNeeded)
+            .map(ar => ar.number);
+
+        if (matchingAvailable.length > 0) {
+            return matchingAvailable;
+        }
+        return [row.roomNumber || '101'];
+    };
 
     // ==========================================
     // STEP 2 STATE
@@ -169,7 +384,55 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         rowId: null,
         initialTab: 'pickup'
     });
-    const [activeMenuRowId, setActiveMenuRowId] = useState<number | null>(null);
+
+    // Multi-Room Assignment Modal State
+    const [multiRoomModal, setMultiRoomModal] = useState<{
+        isOpen: boolean;
+        rowId: number | null;
+        roomType: string;
+        requiredCount: number;
+        isAutoMode: boolean;
+    }>({
+        isOpen: false,
+        rowId: null,
+        roomType: '',
+        requiredCount: 1,
+        isAutoMode: false
+    });
+    
+    // Anchored portal state for 3-dots dropdown menu (prevents table overflow clipping & scrollbars)
+    const [menuAnchor, setMenuAnchor] = useState<{
+        rowId: number;
+        top: number;
+        right: number;
+    } | null>(null);
+
+    const handleToggleRowMenu = (e: React.MouseEvent<HTMLButtonElement>, rowId: number) => {
+        e.stopPropagation();
+        if (menuAnchor && menuAnchor.rowId === rowId) {
+            setMenuAnchor(null);
+        } else {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setMenuAnchor({
+                rowId,
+                top: rect.bottom + 4,
+                right: Math.max(16, window.innerWidth - rect.right)
+            });
+        }
+    };
+
+    // Close menu when clicking outside or scrolling
+    useEffect(() => {
+        const handleScrollOrResize = () => {
+            if (menuAnchor) setMenuAnchor(null);
+        };
+        window.addEventListener('scroll', handleScrollOrResize, true);
+        window.addEventListener('resize', handleScrollOrResize);
+        return () => {
+            window.removeEventListener('scroll', handleScrollOrResize, true);
+            window.removeEventListener('resize', handleScrollOrResize);
+        };
+    }, [menuAnchor]);
 
     const handleSaveRoomServices = (rowId: number, bundle: RoomServicesBundle) => {
         setRoomsList(prev => prev.map(r => r.id === rowId ? {
@@ -243,8 +506,93 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         setRoomsList(roomsList.filter(r => r.id !== id));
     };
 
+    // Front Desk Split Action: Split multi-room group row into individual 1-room rows
+    const handleSplitRowIntoRooms = (rowId: number) => {
+        const targetRow = roomsList.find(r => r.id === rowId);
+        if (!targetRow || targetRow.roomsCount <= 1) return;
+
+        const count = targetRow.roomsCount;
+        const assigned = targetRow.assignedRooms && targetRow.assignedRooms.length === count
+            ? targetRow.assignedRooms
+            : getAutoAssignedRoomsForRow(targetRow);
+
+        const targetIndex = roomsList.findIndex(r => r.id === rowId);
+        let maxId = Math.max(...roomsList.map(r => r.id));
+
+        const newRows: RoomRow[] = assigned.map((roomNum, idx) => {
+            const dateConf = targetRow.roomDatesMap?.[roomNum];
+            return {
+                ...targetRow,
+                id: idx === 0 ? targetRow.id : ++maxId,
+                roomsCount: 1,
+                roomNumber: roomNum,
+                assignedRooms: [roomNum],
+                isAssign: false,
+                adults: Math.max(1, Math.round(targetRow.adults / count)) || 1,
+                children: 0,
+                checkInDate: dateConf?.checkIn || targetRow.checkInDate || checkIn,
+                checkOutDate: dateConf?.checkOut || targetRow.checkOutDate || checkOut,
+                nights: dateConf?.nights || targetRow.nights || nights,
+                roomDatesMap: undefined
+            };
+        });
+
+        const updatedList = [...roomsList];
+        updatedList.splice(targetIndex, 1, ...newRows);
+        setRoomsList(updatedList);
+        toast.success(`Split into ${count} individual room rows (${assigned.join(', ')})!`);
+    };
+
     const updateRoomRow = (id: number, field: keyof RoomRow, value: any) => {
-        setRoomsList(roomsList.map(r => r.id === id ? { ...r, [field]: value } : r));
+        setRoomsList(prev => prev.map(r => {
+            if (r.id !== id) return r;
+            if (field === 'roomType') {
+                const maxForNewType = getMaxRoomsAllowedForRow(value, id);
+                const safeCount = Math.min(r.roomsCount, maxForNewType);
+                const autoAssigned = getAutoAssignedRoomsForRow({ ...r, roomType: value, roomsCount: safeCount });
+                return { 
+                    ...r, 
+                    roomType: value, 
+                    roomsCount: Math.max(1, safeCount),
+                    assignedRooms: autoAssigned,
+                    roomNumber: autoAssigned[0] || r.roomNumber
+                };
+            }
+            if (field === 'roomsCount') {
+                const rawVal = Number(value);
+                const maxAllowed = getMaxRoomsAllowedForRow(r.roomType, id);
+                const safeCount = Math.max(1, isNaN(rawVal) ? 1 : Math.min(rawVal, maxAllowed));
+                if (!isNaN(rawVal) && rawVal > maxAllowed) {
+                    toast.warning(`Overbooking Prevented: Only ${maxAllowed} room(s) available for ${r.roomType}!`);
+                }
+                const autoAssigned = getAutoAssignedRoomsForRow({ ...r, roomsCount: safeCount });
+                return { 
+                    ...r, 
+                    roomsCount: safeCount, 
+                    assignedRooms: autoAssigned,
+                    roomNumber: autoAssigned[0] || r.roomNumber
+                };
+            }
+            if (field === 'assignedRooms') {
+                const list = Array.isArray(value) ? value : [];
+                return {
+                    ...r,
+                    assignedRooms: list,
+                    roomNumber: list[0] || r.roomNumber
+                };
+            }
+            if (field === 'isAssign') {
+                const isAuto = Boolean(value);
+                const autoAssigned = getAutoAssignedRoomsForRow(r);
+                return {
+                    ...r,
+                    isAssign: isAuto,
+                    assignedRooms: r.assignedRooms && r.assignedRooms.length === r.roomsCount ? r.assignedRooms : autoAssigned,
+                    roomNumber: (r.assignedRooms && r.assignedRooms[0]) || autoAssigned[0] || r.roomNumber
+                };
+            }
+            return { ...r, [field]: value };
+        }));
     };
 
     // Payment Handlers
@@ -284,17 +632,55 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     // Save Reservation to LocalStorage
     const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
-        const reservationNumber = `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
+        const reservationNumber = editingReservation?.reservationNumber || `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
+        const reservationId = editingReservation?.id || Date.now();
+
+        // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
+        const usedRoomsAcrossBooking = new Set<string>();
+        const allocatedRoomNumbers: string[] = [];
+
+        roomsList.forEach(r => {
+            const countNeeded = Number(r.roomsCount) || 1;
+            let roomsForThisRow: string[] = [];
+
+            if (!r.isAssign && r.assignedRooms && r.assignedRooms.length === countNeeded) {
+                roomsForThisRow = [...r.assignedRooms];
+            } else if (!r.isAssign && countNeeded === 1 && r.roomNumber) {
+                roomsForThisRow = [r.roomNumber];
+            } else {
+                const report = getAvailableRoomsForStay(checkIn, checkOut, r.roomType);
+                const freeRooms = report.availableRooms.filter(ar => !usedRoomsAcrossBooking.has(ar.number));
+                roomsForThisRow = freeRooms.slice(0, countNeeded).map(ar => ar.number);
+
+                if (roomsForThisRow.length < countNeeded) {
+                    const fallback = getAutoAssignedRoomsForRow(r);
+                    fallback.forEach(f => {
+                        if (roomsForThisRow.length < countNeeded && !roomsForThisRow.includes(f)) {
+                            roomsForThisRow.push(f);
+                        }
+                    });
+                }
+            }
+
+            roomsForThisRow.forEach(rm => {
+                allocatedRoomNumbers.push(rm);
+                usedRoomsAcrossBooking.add(rm);
+            });
+        });
+
         const mainRoom = roomsList[0] || { roomNumber: '101', roomType: 'Deluxe Double' };
+        const primaryRoomNumber = allocatedRoomNumbers[0] || mainRoom.roomNumber;
 
         const newReservation = {
-            id: Date.now(),
+            id: reservationId,
             reservationNumber,
             guestName: `${salutation} ${guestName || 'Valued Guest'}`,
             phone: mobile || phone || '+880 1711-000000',
             email: email || 'guest@hospitality.com',
-            roomNumber: mainRoom.roomNumber,
+            roomNumber: primaryRoomNumber,
             roomType: mainRoom.roomType,
+            allocatedRooms: allocatedRoomNumbers,
+            roomsCount: totalRoomsAllocatedInForm,
             checkIn,
             checkOut,
             nights,
@@ -317,6 +703,24 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             spaWellness: mainRoom.servicesBundle?.spaWellness || null,
             timingFlex: mainRoom.servicesBundle?.timingFlex || null,
             customAddons: mainRoom.servicesBundle?.customAddons || [],
+            roomsList: roomsList.flatMap((r) => {
+                const countNeeded = Number(r.roomsCount) || 1;
+                const assigned = (r.assignedRooms && r.assignedRooms.length === countNeeded)
+                    ? r.assignedRooms
+                    : [r.roomNumber];
+                return assigned.map(rm => {
+                    const dateConf = r.roomDatesMap?.[rm];
+                    return {
+                        ...r,
+                        roomsCount: 1,
+                        roomNumber: rm,
+                        assignedRooms: [rm],
+                        checkInDate: dateConf?.checkIn || checkIn,
+                        checkOutDate: dateConf?.checkOut || checkOut,
+                        nights: dateConf?.nights || nights
+                    };
+                });
+            }),
             addonCharges: {
                 extraBed: totalExtraBedCharge,
                 pickup: totalPickupArrivalCharge,
@@ -332,12 +736,20 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             createdAt: new Date().toISOString()
         };
 
-        try {
-            const existing = localStorage.getItem('hotel_reservations_v2');
-            const list = existing ? JSON.parse(existing) : [];
-            list.unshift(newReservation);
-            localStorage.setItem('hotel_reservations_v2', JSON.stringify(list));
+        // Two-phase atomic pre-commit validation guard
+        const commitResult = validateAndCommitReservation(newReservation);
+        if (!commitResult.success) {
+            toast.error(commitResult.errorMessage || 'Cannot complete booking: Room is already booked or locked!');
+            if (commitResult.suggestedAlternates && commitResult.suggestedAlternates.length > 0) {
+                const alt = commitResult.suggestedAlternates[0];
+                if (alt.alternatives.length > 0) {
+                    toast.warning(`Suggestion: Room ${alt.alternatives.map(a => a.number).join(', ')} is available in ${alt.roomType}.`);
+                }
+            }
+            return;
+        }
 
+        try {
             // If hold, also push to holds list
             if (actionType === 'hold') {
                 const holdsExisting = localStorage.getItem('hotel_holds_v2');
@@ -359,8 +771,10 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(holdsList));
             }
         } catch (e) {
-            console.error('Failed to save reservation', e);
+            console.error('Failed to save reservation hold', e);
         }
+
+        toast.success(editingReservation ? `Reservation ${reservationNumber} updated successfully!` : `Reservation ${reservationNumber} confirmed!`);
 
         if (onReservationCreated) {
             onReservationCreated(newReservation);
@@ -551,6 +965,33 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
                             {/* Exact Rooms Table */}
                             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-2xs">
+                                <div className="px-3.5 py-2.5 bg-slate-50/90 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                                            Room Allocation &amp; Inventory Check
+                                        </span>
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border font-bold text-[10px] shadow-2xs transition-all ${
+                                            remainingOverallFreeRooms > 0 
+                                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                                : 'bg-amber-50 text-amber-800 border-amber-300'
+                                        }`}>
+                                            <CheckCircle2 size={12} className={remainingOverallFreeRooms > 0 ? "text-emerald-600" : "text-amber-600"} />
+                                            <span>{remainingOverallFreeRooms} of {liveAvailabilityReport.totalCount} Rooms Available</span>
+                                            <span className="text-[9.5px] font-normal text-slate-500 font-mono">({totalRoomsAllocatedInForm} Selected)</span>
+                                        </span>
+                                    </div>
+                                    <span className="text-[10.5px] text-slate-500 font-medium">
+                                        Dates: <strong className="text-blue-900">{checkIn}</strong> to <strong className="text-blue-900">{checkOut}</strong> ({nights}N)
+                                    </span>
+                                </div>
+
+                                {hasOverbookingError && (
+                                    <div className="mx-3.5 my-2 p-2 rounded-md bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2">
+                                        <AlertTriangle size={14} className="text-red-600 flex-shrink-0 animate-pulse" />
+                                        <span>⚠️ Overbooking Warning: Room quantity exceeds total available rooms in this category! Please adjust room counts before proceeding.</span>
+                                    </div>
+                                )}
+
                                 <div className="overflow-x-auto no-scrollbar">
                                     <table className="w-full text-left border-collapse min-w-[850px]">
                                         <thead>
@@ -558,7 +999,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                 <th className="p-3">Room Type</th>
                                                 <th className="p-3">No. of Rooms</th>
                                                 <th className="p-3">Rate Type/Plan</th>
-                                                <th className="p-3">Room #</th>
+                                                <th className="p-3 text-center">Room #</th>
                                                 <th className="p-3">Adult</th>
                                                 <th className="p-3">Child</th>
                                                 <th className="p-3">Rate</th>
@@ -575,110 +1016,100 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                 onChange={e => updateRoomRow(row.id, 'roomType', e.target.value)}
                                                                 className="w-full h-8 px-2 border border-gray-300 rounded text-xs bg-white outline-none font-medium"
                                                             >
-                                                                <option value="Deluxe Double">Deluxe Double</option>
-                                                                <option value="Executive Suite">Executive Suite</option>
-                                                                <option value="Superior King">Superior King</option>
-                                                                <option value="Family Interconnecting">Family Interconnecting</option>
-                                                                <option value="Winter Rate Plan">Winter Rate Plan</option>
+                                                                <option value="Deluxe Double">Deluxe Double [{getRemainingFreeCountForType('Deluxe Double')}]</option>
+                                                                <option value="Executive Suite">Executive Suite [{getRemainingFreeCountForType('Executive Suite')}]</option>
+                                                                <option value="Superior King">Superior King [{getRemainingFreeCountForType('Superior King')}]</option>
+                                                                <option value="Standard Single">Standard Single [{getRemainingFreeCountForType('Standard Single')}]</option>
+                                                                <option value="Presidential Suite">Presidential Suite [{getRemainingFreeCountForType('Presidential Suite')}]</option>
                                                             </select>
-                                                            {/* Active Room Add-on Badges */}
+                                                            {/* Ultra-Compact & Elegant Active Addons Pill */}
                                                             {(() => {
                                                                 const b = row.servicesBundle || { extraBed: row.extraBed, pickup: row.pickup };
-                                                                const hasServices = b.pickup?.enabled || b.extraBed?.enabled || b.mealPlan?.enabled || b.celebration?.enabled || b.spaWellness?.enabled || b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut || (b.customAddons && b.customAddons.length > 0);
-                                                                if (!hasServices) return null;
+                                                                const activeNames: string[] = [];
+                                                                if (b.pickup?.enabled) activeNames.push('Pickup');
+                                                                if (b.pickup?.dropEnabled) activeNames.push('Drop');
+                                                                if (b.extraBed?.enabled) activeNames.push(`${b.extraBed.quantity || 1}x Bed`);
+                                                                if (b.mealPlan?.enabled) activeNames.push(b.mealPlan.planType.split(' ')[0]);
+                                                                if (b.celebration?.enabled) activeNames.push('Decor');
+                                                                if (b.spaWellness?.enabled) activeNames.push('Spa');
+                                                                if (b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut) activeNames.push('Flex');
+                                                                if (b.customAddons && b.customAddons.length > 0) activeNames.push(`+${b.customAddons.length} Extra`);
+
+                                                                if (activeNames.length === 0) return null;
+
+                                                                const addonsCost = getRoomBundleTotal(b, nights);
+                                                                const scopeLabel = b.targetRoomNumber && b.targetRoomNumber !== 'All Rooms' ? ` (${b.targetRoomNumber})` : '';
 
                                                                 return (
-                                                                    <div className="flex flex-wrap items-center gap-1 mt-1 max-w-[210px]">
-                                                                        {b.pickup?.enabled && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 cursor-pointer shadow-2xs"
-                                                                                title="Airport Transfer Configured"
-                                                                            >
-                                                                                <Car size={10} />
-                                                                                <span>{b.pickup.flightNumber ? b.pickup.flightNumber : 'Transfer'}</span>
-                                                                                <span className="font-bold">{b.pickup.isComplimentary ? 'Free' : `৳${b.pickup.chargeAmount}`}</span>
-                                                                            </button>
-                                                                        )}
-                                                                        {b.extraBed?.enabled && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'extrabed' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 cursor-pointer shadow-2xs"
-                                                                                title="Extra Bed Configured"
-                                                                            >
-                                                                                <BedDouble size={10} />
-                                                                                <span>{b.extraBed.quantity}x Bed</span>
-                                                                                <span className="font-bold">{b.extraBed.isComplimentary ? 'Free' : `৳${getExtraBedTotal(b.extraBed, nights)}`}</span>
-                                                                            </button>
-                                                                        )}
-                                                                        {b.mealPlan?.enabled && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'mealplan' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 cursor-pointer shadow-2xs"
-                                                                                title="Meal Plan Configured"
-                                                                            >
-                                                                                <Utensils size={10} />
-                                                                                <span>{b.mealPlan.planType.split(' ')[0]}</span>
-                                                                            </button>
-                                                                        )}
-                                                                        {b.celebration?.enabled && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'celebration' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 cursor-pointer shadow-2xs"
-                                                                                title="Celebration Setup Configured"
-                                                                            >
-                                                                                <Gift size={10} />
-                                                                                <span>Decor</span>
-                                                                            </button>
-                                                                        )}
-                                                                        {b.spaWellness?.enabled && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'spa' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 cursor-pointer shadow-2xs"
-                                                                                title="Spa Treatment Configured"
-                                                                            >
-                                                                                <Sparkles size={10} />
-                                                                                <span>Spa</span>
-                                                                            </button>
-                                                                        )}
-                                                                        {(b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut) && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'timing' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 cursor-pointer shadow-2xs"
-                                                                                title="Early/Late Check-in/out Flex"
-                                                                            >
-                                                                                <Clock size={10} />
-                                                                                <span>Flex</span>
-                                                                            </button>
-                                                                        )}
-                                                                        {b.customAddons && b.customAddons.length > 0 && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'custom' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 cursor-pointer shadow-2xs"
-                                                                                title="Custom Addons"
-                                                                            >
-                                                                                <span>+{b.customAddons.length} Custom</span>
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' })}
+                                                                        className="mt-1 w-full max-w-[210px] h-5.5 px-2 rounded-md bg-blue-50/90 hover:bg-blue-100 border border-blue-200/80 text-blue-900 text-[10px] font-semibold flex items-center justify-between shadow-2xs cursor-pointer transition-all select-none group"
+                                                                        title={`Configured Services${scopeLabel}: ${activeNames.join(', ')} (Click to edit)`}
+                                                                    >
+                                                                        <div className="flex items-center gap-1.5 truncate">
+                                                                            <Sparkles size={11} className="text-blue-600 flex-shrink-0" />
+                                                                            <span className="truncate">{activeNames.slice(0, 2).join(', ')}{activeNames.length > 2 ? ` +${activeNames.length - 2}` : ''}{scopeLabel}</span>
+                                                                        </div>
+                                                                        <span className="text-[9px] font-bold text-blue-700 bg-white/90 px-1 rounded border border-blue-200/60 flex-shrink-0 ml-1">
+                                                                            +৳{addonsCost.toLocaleString()}
+                                                                        </span>
+                                                                    </button>
                                                                 );
                                                             })()}
                                                         </td>
-                                                        <td className="p-3">
-                                                            <input
-                                                                type="number"
-                                                                min={1}
-                                                                value={row.roomsCount}
-                                                                onChange={e => updateRoomRow(row.id, 'roomsCount', Number(e.target.value))}
-                                                                className="w-16 h-8 px-2 border border-gray-300 rounded text-xs text-center font-bold"
-                                                            />
+                                                        <td className="p-3 text-center">
+                                                            {(() => {
+                                                                const isDedicatedSingle = !row.isAssign && (Number(row.roomsCount) || 1) === 1;
+                                                                const maxAllowed = getMaxRoomsAllowedForRow(row.roomType, row.id);
+                                                                const freeLeft = getRemainingFreeCountForType(row.roomType);
+                                                                const isExceeded = (Number(row.roomsCount) || 1) > maxAllowed;
+
+                                                                if (isDedicatedSingle) {
+                                                                    return (
+                                                                        <div className="flex flex-col items-center justify-center">
+                                                                            <span className="w-12 h-8 flex items-center justify-center bg-slate-50 border border-slate-300 rounded text-xs font-bold text-slate-800 shadow-2xs">
+                                                                                1
+                                                                            </span>
+                                                                            <span className="text-[9px] font-semibold text-blue-700 bg-blue-50/90 px-1 py-0.5 rounded border border-blue-200/80 mt-0.5 whitespace-nowrap shadow-2xs">
+                                                                                Single (Rm {row.roomNumber})
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <div className="flex flex-col items-center">
+                                                                        <input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            max={maxAllowed}
+                                                                            value={row.roomsCount}
+                                                                            onChange={e => {
+                                                                                const raw = parseInt(e.target.value);
+                                                                                if (isNaN(raw) || raw < 1) {
+                                                                                    updateRoomRow(row.id, 'roomsCount', 1);
+                                                                                    return;
+                                                                                }
+                                                                                if (raw > maxAllowed) {
+                                                                                    toast.warning(`Overbooking Prevented: Only ${maxAllowed} room(s) available for ${row.roomType}!`);
+                                                                                    updateRoomRow(row.id, 'roomsCount', maxAllowed);
+                                                                                } else {
+                                                                                    updateRoomRow(row.id, 'roomsCount', raw);
+                                                                                }
+                                                                            }}
+                                                                            className={`w-16 h-8 px-2 border rounded text-xs text-center font-bold outline-none transition-all ${
+                                                                                isExceeded 
+                                                                                    ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-400' 
+                                                                                    : 'border-gray-300 focus:border-blue-500'
+                                                                            }`}
+                                                                        />
+                                                                        <span className={`text-[9.5px] font-semibold mt-0.5 whitespace-nowrap ${isExceeded ? 'text-red-600 font-bold' : 'text-gray-500'}`} title="Maximum available inventory">
+                                                                            Max: {maxAllowed} ({freeLeft} free)
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="p-3">
                                                             <select
@@ -692,21 +1123,134 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                 <option value="Complimentary">Complimentary</option>
                                                             </select>
                                                         </td>
-                                                        <td className="p-3">
-                                                            <select
-                                                                value={row.roomNumber}
-                                                                onChange={e => updateRoomRow(row.id, 'roomNumber', e.target.value)}
-                                                                className="w-24 h-8 px-2 border border-gray-300 rounded text-xs bg-white outline-none font-bold text-blue-700"
-                                                            >
-                                                                <option value="101">101</option>
-                                                                <option value="102">102</option>
-                                                                <option value="103">103</option>
-                                                                <option value="104">104</option>
-                                                                <option value="201">201</option>
-                                                                <option value="202">202</option>
-                                                                <option value="203">203</option>
-                                                                <option value="506 (A)">506 (A)</option>
-                                                            </select>
+                                                        <td className="p-3 text-center">
+                                                            {(() => {
+                                                                const assignedList = (row.assignedRooms && row.assignedRooms.length > 0)
+                                                                    ? row.assignedRooms
+                                                                    : getAutoAssignedRoomsForRow(row);
+
+                                                                if (row.roomsCount > 1) {
+                                                                    if (row.isAssign) {
+                                                                        return (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setMultiRoomModal({
+                                                                                    isOpen: true,
+                                                                                    rowId: row.id,
+                                                                                    roomType: row.roomType,
+                                                                                    requiredCount: row.roomsCount,
+                                                                                    isAutoMode: true
+                                                                                })}
+                                                                                className="w-32 h-8 px-2 border border-blue-300 bg-blue-50/90 hover:bg-blue-100 text-blue-900 rounded-md text-xs font-bold flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all group"
+                                                                                title="Auto-Allocated. Click to view or customize assigned rooms"
+                                                                            >
+                                                                                <div className="flex items-center gap-1 truncate">
+                                                                                    <Sparkles size={12} className="text-blue-600 flex-shrink-0" />
+                                                                                    <span className="text-blue-700 font-extrabold">Auto ({assignedList.length})</span>
+                                                                                </div>
+                                                                                <span className="text-[10px] font-mono font-semibold text-slate-700 bg-white/90 px-1 py-0.5 rounded border border-blue-200/60 truncate max-w-[50px]">
+                                                                                    {assignedList.map(rm => {
+                                                                                        const conf = row.roomDatesMap?.[rm];
+                                                                                        return conf && conf.nights !== nights ? `${rm}(${conf.nights}N)` : rm;
+                                                                                    }).slice(0, 2).join(',')}{assignedList.length > 2 ? '..' : ''}
+                                                                                </span>
+                                                                            </button>
+                                                                        );
+                                                                    }
+
+                                                                    const isFullyPicked = assignedList.length === row.roomsCount;
+                                                                    return (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setMultiRoomModal({
+                                                                                isOpen: true,
+                                                                                rowId: row.id,
+                                                                                roomType: row.roomType,
+                                                                                requiredCount: row.roomsCount,
+                                                                                isAutoMode: false
+                                                                            })}
+                                                                            className={`w-32 h-8 px-2 border rounded-md text-xs font-bold flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all ${
+                                                                                isFullyPicked 
+                                                                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' 
+                                                                                    : 'border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 ring-2 ring-amber-300/60'
+                                                                            }`}
+                                                                            title="Manual Assignment. Click to select rooms & customize stay dates"
+                                                                        >
+                                                                            <div className="flex items-center gap-1 truncate">
+                                                                                {isFullyPicked ? (
+                                                                                    <CheckCircle2 size={12} className="text-emerald-600 flex-shrink-0" />
+                                                                                ) : (
+                                                                                    <AlertTriangle size={12} className="text-amber-600 flex-shrink-0 animate-bounce" />
+                                                                                )}
+                                                                                <span>{assignedList.length}/{row.roomsCount} Rms</span>
+                                                                            </div>
+                                                                            <span className="text-[9px] font-mono font-bold bg-white/90 px-1 py-0.5 rounded border border-slate-200 truncate max-w-[45px]">
+                                                                                {isFullyPicked 
+                                                                                    ? `${assignedList.map(rm => {
+                                                                                        const conf = row.roomDatesMap?.[rm];
+                                                                                        return conf && conf.nights !== nights ? `${rm}(${conf.nights}N)` : rm;
+                                                                                    }).slice(0, 2).join(',')}${assignedList.length > 2 ? '..' : ''}`
+                                                                                    : 'Pick'}
+                                                                            </span>
+                                                                        </button>
+                                                                    );
+                                                                }
+
+                                                                // Single room mode
+                                                                if (row.isAssign) {
+                                                                    const singleAuto = assignedList[0] || row.roomNumber;
+                                                                    return (
+                                                                        <div
+                                                                            className="w-28 h-8 px-1.5 border border-blue-200 bg-blue-50/70 text-blue-800 rounded text-xs font-bold flex items-center justify-center cursor-default select-none shadow-2xs mx-auto"
+                                                                            title={`Auto-Allocated: ${singleAuto}`}
+                                                                        >
+                                                                            <Sparkles size={12} className="text-blue-600 mr-1" />
+                                                                            <span className="text-blue-700 font-extrabold">Auto</span>
+                                                                            <span className="text-slate-600 ml-1 font-mono text-[10.5px]">
+                                                                                ({singleAuto})
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <select
+                                                                        value={row.roomNumber}
+                                                                        onChange={e => updateRoomRow(row.id, 'roomNumber', e.target.value)}
+                                                                        className="w-28 h-8 px-1 border border-blue-400 bg-white text-blue-900 rounded text-xs font-bold text-center outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs mx-auto"
+                                                                        title="Manual Room Selection"
+                                                                    >
+                                                                        {(() => {
+                                                                            const otherRowsRooms = new Set(
+                                                                                roomsList.filter(other => other.id !== row.id).map(other => other.roomNumber)
+                                                                            );
+                                                                            const report = liveAvailabilityReport;
+                                                                            const matchingStatus = report.allRoomsStatus.filter(st => {
+                                                                                const matchesType = st.room.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) ||
+                                                                                                    row.roomType.toLowerCase().includes(st.room.roomTypeName.toLowerCase());
+                                                                                return matchesType;
+                                                                            });
+
+                                                                            const listToDisplay = matchingStatus.length > 0 ? matchingStatus : report.allRoomsStatus;
+
+                                                                            return listToDisplay.map(st => {
+                                                                                const isTakenInOther = otherRowsRooms.has(st.room.number);
+                                                                                const isOccupied = !st.isAvailable || isTakenInOther;
+                                                                                return (
+                                                                                    <option
+                                                                                        key={st.room.id}
+                                                                                        value={st.room.number}
+                                                                                        disabled={isOccupied && st.room.number !== row.roomNumber}
+                                                                                        className={isOccupied ? 'text-red-500 bg-red-50' : 'text-emerald-700 font-semibold'}
+                                                                                    >
+                                                                                        {st.room.number} {isOccupied ? '(Occ)' : '(Free)'}
+                                                                                    </option>
+                                                                                );
+                                                                            });
+                                                                        })()}
+                                                                    </select>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="p-3">
                                                             <input
@@ -762,6 +1306,18 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                     <span>Is Assign</span>
                                                                 </label>
 
+                                                                {row.roomsCount > 1 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleSplitRowIntoRooms(row.id)}
+                                                                        title={`Split group row into ${row.roomsCount} separate individual room rows`}
+                                                                        className="px-1.5 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-900 rounded border border-blue-200 cursor-pointer transition-colors flex items-center gap-1 text-[10px] font-bold shadow-2xs"
+                                                                    >
+                                                                        <Split size={12} className="text-blue-600" />
+                                                                        <span>Split ({row.roomsCount})</span>
+                                                                    </button>
+                                                                )}
+
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleCopyRoomRow(row)}
@@ -771,186 +1327,19 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                     <Copy size={14} />
                                                                 </button>
 
-                                                                {/* 3-dots Menu Button right after Copy */}
-                                                                <div className="relative">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setActiveMenuRowId(activeMenuRowId === row.id ? null : row.id)}
-                                                                        title="Room Add-On Services (Transfer, Bed, Dining, Spa, Romance, Flex)"
-                                                                        className={`p-1 rounded cursor-pointer transition-all ${
-                                                                            (row.servicesBundle || row.extraBed?.enabled || row.pickup?.enabled)
-                                                                                ? 'text-blue-700 bg-blue-100/70 hover:bg-blue-200/70 ring-1 ring-blue-300'
-                                                                                : 'text-gray-400 hover:text-blue-600 hover:bg-gray-100'
-                                                                        }`}
-                                                                    >
-                                                                        <MoreVertical size={14} />
-                                                                    </button>
-
-                                                                    {activeMenuRowId === row.id && (
-                                                                        <>
-                                                                            <div 
-                                                                                className="fixed inset-0 z-20"
-                                                                                onClick={() => setActiveMenuRowId(null)}
-                                                                            />
-                                                                            <div 
-                                                                                className="absolute right-0 top-full mt-1 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 text-left animate-in fade-in zoom-in-95 duration-100"
-                                                                                onClick={e => e.stopPropagation()}
-                                                                            >
-                                                                                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
-                                                                                    <span>Room #{row.roomNumber || row.id} Services</span>
-                                                                                    <span className="text-[9px] text-blue-600 font-semibold">Expert Addons</span>
-                                                                                </div>
-                                                                                
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
-                                                                                >
-                                                                                    <span className="flex items-center gap-2">
-                                                                                        <Car size={13} className="text-blue-600" />
-                                                                                        <span>Airport Pickup (Arrival)</span>
-                                                                                    </span>
-                                                                                    {row.servicesBundle?.pickup?.enabled || row.pickup?.enabled ? (
-                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
-                                                                                    )}
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
-                                                                                >
-                                                                                    <span className="flex items-center gap-2">
-                                                                                        <Plane size={13} className="text-sky-600" />
-                                                                                        <span>Airport Drop (Departure)</span>
-                                                                                    </span>
-                                                                                    {row.servicesBundle?.pickup?.dropEnabled || row.pickup?.dropEnabled ? (
-                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
-                                                                                    )}
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'extrabed' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
-                                                                                >
-                                                                                    <span className="flex items-center gap-2">
-                                                                                        <BedDouble size={13} className="text-indigo-600" />
-                                                                                        <span>Extra Bed &amp; Baby Cot</span>
-                                                                                    </span>
-                                                                                    {row.servicesBundle?.extraBed?.enabled || row.extraBed?.enabled ? (
-                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
-                                                                                    )}
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'mealplan' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
-                                                                                >
-                                                                                    <span className="flex items-center gap-2">
-                                                                                        <Utensils size={13} className="text-amber-600" />
-                                                                                        <span>Meal Plans &amp; Dining</span>
-                                                                                    </span>
-                                                                                    {row.servicesBundle?.mealPlan?.enabled ? (
-                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
-                                                                                    )}
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'celebration' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
-                                                                                >
-                                                                                    <span className="flex items-center gap-2">
-                                                                                        <Gift size={13} className="text-rose-600" />
-                                                                                        <span>Honeymoon &amp; Decor</span>
-                                                                                    </span>
-                                                                                    {row.servicesBundle?.celebration?.enabled ? (
-                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
-                                                                                    )}
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'spa' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
-                                                                                >
-                                                                                    <span className="flex items-center gap-2">
-                                                                                        <Sparkles size={13} className="text-teal-600" />
-                                                                                        <span>Spa &amp; Wellness Pass</span>
-                                                                                    </span>
-                                                                                    {row.servicesBundle?.spaWellness?.enabled ? (
-                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
-                                                                                    )}
-                                                                                </button>
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'timing' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
-                                                                                >
-                                                                                    <span className="flex items-center gap-2">
-                                                                                        <Clock size={13} className="text-sky-600" />
-                                                                                        <span>Early / Late Check-Out</span>
-                                                                                    </span>
-                                                                                    {row.servicesBundle?.timingFlex?.earlyCheckIn || row.servicesBundle?.timingFlex?.lateCheckOut ? (
-                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
-                                                                                    )}
-                                                                                </button>
-
-                                                                                <div className="my-1 border-t border-slate-100" />
-
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' });
-                                                                                        setActiveMenuRowId(null);
-                                                                                    }}
-                                                                                    className="w-full px-3 py-1.5 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
-                                                                                >
-                                                                                    <Sparkles size={13} />
-                                                                                    <span>Manage All Services...</span>
-                                                                                </button>
-                                                                            </div>
-                                                                        </>
-                                                                    )}
-                                                                </div>
+                                                                {/* 3-dots Menu Button anchored cleanly with Portal */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => handleToggleRowMenu(e, row.id)}
+                                                                    title="Room Add-On Services (Transfer, Bed, Dining, Spa, Romance, Flex)"
+                                                                    className={`p-1 rounded cursor-pointer transition-all ${
+                                                                        (row.servicesBundle || row.extraBed?.enabled || row.pickup?.enabled)
+                                                                            ? 'text-blue-700 bg-blue-100/70 hover:bg-blue-200/70 ring-1 ring-blue-300'
+                                                                            : 'text-gray-400 hover:text-blue-600 hover:bg-gray-100'
+                                                                    }`}
+                                                                >
+                                                                    <MoreVertical size={14} />
+                                                                </button>
 
                                                                 {roomsList.length > 1 && (
                                                                     <button
@@ -969,6 +1358,179 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                         </tbody>
                                     </table>
                                 </div>
+
+                                {/* Floating 3-dots Menu rendered outside overflow containers via createPortal */}
+                                {menuAnchor && (() => {
+                                    const row = roomsList.find(r => r.id === menuAnchor.rowId);
+                                    if (!row) return null;
+
+                                    return createPortal(
+                                        <>
+                                            <div 
+                                                className="fixed inset-0 z-[99998]"
+                                                onClick={() => setMenuAnchor(null)}
+                                            />
+                                            <div 
+                                                style={{ top: `${menuAnchor.top}px`, right: `${menuAnchor.right}px` }}
+                                                className="fixed z-[99999] w-64 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100 select-none max-h-[82vh] overflow-y-auto"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                                                    <span>Room #{row.roomNumber || row.id} Services</span>
+                                                    <span className="text-[9px] text-blue-600 font-semibold">Expert Addons</span>
+                                                </div>
+                                                
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Car size={13} className="text-blue-600" />
+                                                        <span>Airport Pickup (Arrival)</span>
+                                                    </span>
+                                                    {row.servicesBundle?.pickup?.enabled || row.pickup?.enabled ? (
+                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Plane size={13} className="text-sky-600" />
+                                                        <span>Airport Drop (Departure)</span>
+                                                    </span>
+                                                    {row.servicesBundle?.pickup?.dropEnabled || row.pickup?.dropEnabled ? (
+                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'extrabed' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <BedDouble size={13} className="text-indigo-600" />
+                                                        <span>Extra Bed &amp; Baby Cot</span>
+                                                    </span>
+                                                    {row.servicesBundle?.extraBed?.enabled || row.extraBed?.enabled ? (
+                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'mealplan' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Utensils size={13} className="text-amber-600" />
+                                                        <span>Meal Plans &amp; Dining</span>
+                                                    </span>
+                                                    {row.servicesBundle?.mealPlan?.enabled ? (
+                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'celebration' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Gift size={13} className="text-rose-600" />
+                                                        <span>Honeymoon &amp; Decor</span>
+                                                    </span>
+                                                    {row.servicesBundle?.celebration?.enabled ? (
+                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'spa' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Sparkles size={13} className="text-teal-600" />
+                                                        <span>Spa &amp; Wellness Pass</span>
+                                                    </span>
+                                                    {row.servicesBundle?.spaWellness?.enabled ? (
+                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'timing' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Clock size={13} className="text-sky-600" />
+                                                        <span>Early / Late Check-Out</span>
+                                                    </span>
+                                                    {row.servicesBundle?.timingFlex?.earlyCheckIn || row.servicesBundle?.timingFlex?.lateCheckOut ? (
+                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                    )}
+                                                </button>
+
+                                                <div className="my-1 border-t border-slate-100" />
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' });
+                                                        setMenuAnchor(null);
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
+                                                >
+                                                    <Sparkles size={13} />
+                                                    <span>Manage All Services...</span>
+                                                </button>
+                                            </div>
+                                        </>
+                                        , document.body
+                                    );
+                                })()}
 
                                 <div className="p-3 border-t border-gray-100">
                                     <button
@@ -1686,7 +2248,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
                 {/* 3. Footer (Exact hotel-management buttons) */}
                 <div className="px-6 py-3.5 border-t border-gray-200 bg-white flex items-center justify-between flex-shrink-0">
-                    <div></div>
+                    <div className="text-xs text-gray-500 font-medium">
+                        {step === 1 && <span>Allocated: <strong className="text-slate-800">{totalRoomsAllocatedInForm} Room(s)</strong> | Check-in: <strong className="text-blue-900">{checkIn}</strong></span>}
+                    </div>
 
                     <div className="flex items-center gap-3">
                         {step > 1 && (
@@ -1702,8 +2266,20 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                         {step < 3 ? (
                             <button
                                 type="button"
-                                onClick={() => setStep((step + 1) as any)}
-                                className="h-9 px-6 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-md text-sm font-semibold cursor-pointer shadow-2xs transition-colors"
+                                disabled={step === 1 && hasOverbookingError}
+                                onClick={() => {
+                                    if (step === 1 && hasOverbookingError) {
+                                        toast.error('Cannot proceed: Selected rooms exceed available inventory!');
+                                        return;
+                                    }
+                                    setStep((step + 1) as any);
+                                }}
+                                className={`h-9 px-6 rounded-md text-sm font-semibold shadow-2xs transition-colors ${
+                                    step === 1 && hasOverbookingError
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-[#1e3a8a] hover:bg-blue-900 text-white cursor-pointer'
+                                }`}
+                                title={step === 1 && hasOverbookingError ? 'Overbooking error: Reduce room counts' : 'Next Step'}
                             >
                                 Next
                             </button>
@@ -1741,7 +2317,13 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 <RoomAddonServicesModal
                     isOpen={serviceModalConfig.isOpen}
                     onClose={() => setServiceModalConfig(prev => ({ ...prev, isOpen: false, rowId: null }))}
-                    roomNumber={activeRowForService.roomNumber}
+                    roomNumber={
+                        activeRowForService.isAssign 
+                            ? getAutoAssignedRoomsForRow(activeRowForService).join(', ') 
+                            : activeRowForService.roomNumber
+                    }
+                    roomsCount={Number(activeRowForService.roomsCount) || 1}
+                    assignedRooms={getAutoAssignedRoomsForRow(activeRowForService)}
                     roomType={activeRowForService.roomType}
                     baseRate={activeRowForService.rate}
                     nights={nights}
@@ -1750,6 +2332,52 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                     currentExtraBed={activeRowForService.extraBed}
                     currentPickup={activeRowForService.pickup}
                     onSave={(bundle) => handleSaveRoomServices(activeRowForService.id, bundle)}
+                />
+            )}
+
+            {/* Multi-Room Assignment Modal */}
+            {multiRoomModal.isOpen && (
+                <MultiRoomSelectorModal
+                    isOpen={multiRoomModal.isOpen}
+                    onClose={() => setMultiRoomModal(prev => ({ ...prev, isOpen: false, rowId: null }))}
+                    roomType={multiRoomModal.roomType}
+                    requiredCount={multiRoomModal.requiredCount}
+                    checkIn={checkIn}
+                    checkOut={checkOut}
+                    currentSelected={(() => {
+                        const row = roomsList.find(r => r.id === multiRoomModal.rowId);
+                        return row?.assignedRooms || (row ? getAutoAssignedRoomsForRow(row) : []);
+                    })()}
+                    initialRoomDatesMap={(() => {
+                        const row = roomsList.find(r => r.id === multiRoomModal.rowId);
+                        return row?.roomDatesMap;
+                    })()}
+                    onConfirm={(selected, datesMap) => {
+                        if (multiRoomModal.rowId !== null) {
+                            setRoomsList(prev => prev.map(r => {
+                                if (r.id !== multiRoomModal.rowId) return r;
+                                return {
+                                    ...r,
+                                    assignedRooms: selected,
+                                    roomNumber: selected[0] || r.roomNumber,
+                                    roomDatesMap: datesMap
+                                };
+                            }));
+                        }
+                    }}
+                    otherRowsTakenRooms={(() => {
+                        const otherRows = roomsList.filter(r => r.id !== multiRoomModal.rowId);
+                        const taken: string[] = [];
+                        otherRows.forEach(r => {
+                            if (r.assignedRooms && r.assignedRooms.length > 0) {
+                                taken.push(...r.assignedRooms);
+                            } else if (r.roomNumber) {
+                                taken.push(r.roomNumber);
+                            }
+                        });
+                        return taken;
+                    })()}
+                    isAutoMode={multiRoomModal.isAutoMode}
                 />
             )}
         </div>

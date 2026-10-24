@@ -102,18 +102,19 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                     <button
                         type="button"
                         onClick={() => setIsOpen(!isOpen)}
-                        className={`h-7 px-2 rounded-md bg-blue-50/90 hover:bg-blue-100 border border-blue-200 text-blue-900 font-bold text-[11px] flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all ${
+                        className={`h-7 px-2 rounded-md bg-blue-50/90 hover:bg-blue-100 border border-blue-200 text-blue-900 font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all whitespace-nowrap flex-nowrap ${
                             compact ? 'h-6 px-1.5 text-[10.5px]' : ''
                         } ${isOpen ? 'ring-2 ring-blue-500/30 border-blue-500' : ''}`}
                         title="Click to adjust child ages"
                     >
                         <Baby size={12} className="text-blue-600 flex-shrink-0" />
                         <span>{childrenCount}</span>
-                        <span className="text-[9.5px] font-normal text-blue-700 bg-blue-100/70 px-1 py-0.2 rounded border border-blue-200">
-                            {childrenAges.slice(0, 2).map(a => `${a}y`).join(', ')}
-                            {childrenAges.length > 2 ? '...' : ''}
+                        <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded border border-blue-200/80 whitespace-nowrap inline-block">
+                            {childrenAges.length > 2
+                                ? `${childrenAges.slice(0, 2).map(a => `${a}y`).join(', ')} +${childrenAges.length - 2}`
+                                : childrenAges.map(a => `${a}y`).join(', ')}
                         </span>
-                        <ChevronDown size={11} className="text-blue-500 opacity-70" />
+                        <ChevronDown size={11} className="text-blue-500 opacity-70 flex-shrink-0" />
                     </button>
                 </div>
             )}

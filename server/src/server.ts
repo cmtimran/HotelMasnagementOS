@@ -3,8 +3,16 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRouter from './routes/index.js';
 import { authMiddleware } from './middleware/authMiddleware.js';
+import { initDatabase } from './database/db.js';
 
 dotenv.config();
+
+// Initialize Relational Database & Seed Data
+try {
+  initDatabase();
+} catch (err) {
+  console.error('⚠️ Database initialization error:', err);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;

@@ -11,6 +11,7 @@ import {
     FileText
 } from 'lucide-react';
 import PageHeader from '../common/PageHeader';
+import { updateReservationStatusInDB, broadcastPMSEvent } from '../../utils/roomInventoryEngine';
 
 export interface CancelledItem {
     id: number;
@@ -210,6 +211,11 @@ export const ReservationCancel: React.FC = () => {
                 
                 resList.push(restoredReservation);
                 localStorage.setItem('hotel_reservations_v2', JSON.stringify(resList));
+                localStorage.setItem('hotel_reservations_v3', JSON.stringify(resList));
+                
+                // Relational SQLite DB synchronization & SSE broadcast
+                updateReservationStatusInDB(item.reservationNumber, 'CONFIRMED').catch(console.warn);
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             } catch (e) {
                 console.error('Failed to sync to hotel_reservations_v2', e);
             }
