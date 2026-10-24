@@ -4238,10 +4238,10 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
     };
 
     return (
-        <div className="flex h-screen bg-slate-100 font-sans text-xs text-slate-700 antialiased overflow-hidden">
+        <div className="flex h-full min-h-[calc(100vh-3.5rem)] bg-slate-100 font-sans text-xs text-slate-700 antialiased overflow-hidden">
             {/* Expert Collapsible Sidebar */}
             <aside
-                className={`${isSidebarCollapsed ? 'w-14' : 'w-60'} bg-white border-r border-gray-200/90 h-screen sticky top-0 flex flex-col transition-all duration-200 ease-in-out flex-shrink-0 z-40 select-none shadow-[1px_0_4px_rgba(0,0,0,0.02)]`}
+                className={`${isSidebarCollapsed ? 'w-14' : 'w-60'} bg-white border-r border-gray-200/90 h-full flex flex-col transition-all duration-200 ease-in-out flex-shrink-0 z-20 select-none shadow-[1px_0_4px_rgba(0,0,0,0.02)]`}
             >
                 {/* Header / Brand Area */}
                 <div className={`h-11 px-2.5 flex items-center border-b border-gray-100 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>

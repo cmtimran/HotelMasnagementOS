@@ -628,6 +628,8 @@ function App() {
       case 'user-management':
       case 'users':
       case 'staff':
+      case 'pos-users':
+      case 'admin-users':
         return <UserStaffManagement />;
       case 'roles-permissions':
       case 'roles':
@@ -700,18 +702,14 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#fafafc] font-sans text-slate-900">
-      {activePage !== 'reports' && (
-        <Sidebar
-          activePage={activePage}
-          setActivePage={setActivePage}
-          isCollapsed={isSidebarCollapsed}
-          toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        />
-      )}
+      <Sidebar
+        activePage={activePage}
+        setActivePage={setActivePage}
+        isCollapsed={isSidebarCollapsed}
+        toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+      />
       <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden transition-all duration-300">
-        {activePage !== 'reports' && (
-          <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
-        )}
+        <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0">
           {renderContent()}
         </div>

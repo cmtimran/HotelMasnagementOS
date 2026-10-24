@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const { activeProperty } = useProperty();
     const { currentUser } = usePortal();
 
-    // Accordion state - persisted in localStorage like OrderlyRMS
+    // Accordion state - persisted in localStorage
     const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => {
         try {
             const saved = localStorage.getItem('hotel_sidebar_dropdowns');
@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         });
     };
 
-    // Auto-expand accordion when an activePage is inside a dropdown
+    // Auto-expand accordion when activePage is a child item
     useEffect(() => {
         if (['categories', 'products', 'addons', 'units'].includes(activePage)) {
             setOpenDropdowns(prev => ({ ...prev, 'Menu Management': true }));
@@ -127,42 +127,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
     }, [activePage]);
 
-    // OrderlyRMS Unified Nav Sections (All Enterprise Modules cleanly organized)
+    // Standard International Hotel PMS Navigation Sections (Clean, Intuitive Industry Terms)
     const sections: MenuSection[] = useMemo(() => [
         {
             items: [
-                { id: 'front-desk', label: 'Front Desk Console', icon: <Briefcase size={14} /> },
-                { id: 'dashboard', label: 'Executive Dashboard', icon: <BarChart3 size={14} /> },
+                { id: 'front-desk', label: 'Front Desk', icon: <Briefcase size={14} /> },
+                { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={14} /> },
             ]
         },
         {
             title: 'HOTEL OPERATIONS',
             items: [
-                { id: 'stay-view', label: 'Stay View Tape Chart', icon: <CalendarDays size={14} />, badge: 'Grid', badgeColor: 'bg-blue-100 text-blue-700' },
-                { id: 'add-reservation', label: 'Add Reservation', icon: <Plus size={14} />, badge: '+ Add', badgeColor: 'bg-emerald-100 text-emerald-700' },
-                { id: 'reservations', label: 'Reservations Directory', icon: <ClipboardList size={14} /> },
+                { id: 'stay-view', label: 'Stay View', icon: <CalendarDays size={14} />, badge: 'Live', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'add-reservation', label: 'New Reservation', icon: <Plus size={14} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                { id: 'reservations', label: 'Reservations', icon: <ClipboardList size={14} /> },
                 { id: 'room-rack', label: 'Room Rack', icon: <LayoutGrid size={14} /> },
-                { id: 'folio-operations', label: 'Guest Folios & Billing', icon: <Wallet size={14} />, badge: 'Billing', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'folio-operations', label: 'Billing & Folios', icon: <Wallet size={14} />, badge: 'Billing', badgeColor: 'bg-blue-100 text-blue-700' },
                 { id: 'floor-plan', label: 'Floor Plan', icon: <Layers size={14} /> },
-                { id: 'occupancy-heatmap', label: 'Occupancy Heatmap', icon: <Grid3X3 size={14} /> },
-                { id: 'night-audit', label: 'Night Audit Automation', icon: <Moon size={14} /> },
+                { id: 'occupancy-heatmap', label: 'Occupancy Matrix', icon: <Grid3X3 size={14} /> },
+                { id: 'night-audit', label: 'Night Audit', icon: <Moon size={14} /> },
             ]
         },
         {
-            title: 'RESTAURANT & F&B (ORDERLY RMS)',
+            title: 'RESTAURANT & F&B',
             items: [
-                { id: 'pos', label: 'Restaurant POS Terminal', icon: <Utensils size={14} />, badge: 'RMS', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'pos', label: 'Restaurant POS', icon: <Utensils size={14} />, badge: 'POS', badgeColor: 'bg-blue-100 text-blue-700' },
                 { id: 'kds', label: 'Kitchen Display (KDS)', icon: <ChefHat size={14} />, badge: 'Live', badgeColor: 'bg-amber-100 text-amber-700' },
-                { id: 'table-layout', label: 'Table Management (2D)', icon: <Grid3X3 size={14} />, badge: '2D', badgeColor: 'bg-emerald-100 text-emerald-700' },
-                { id: 'waiters', label: 'Waiters & Captains', icon: <Users size={14} /> },
+                { id: 'table-layout', label: 'Table Layout', icon: <Grid3X3 size={14} /> },
+                { id: 'waiters', label: 'Waiters & Staff', icon: <Users size={14} /> },
                 {
                     label: 'Menu Management',
                     icon: <UtensilsCrossed size={14} />,
                     children: [
-                        { id: 'categories', label: 'Food Categories', icon: <Layers size={12} /> },
-                        { id: 'products', label: 'Menu Items & Recipes', icon: <Coffee size={12} /> },
-                        { id: 'addons', label: 'Modifiers & Addons', icon: <Plus size={12} /> },
-                        { id: 'units', label: 'Product Units', icon: <Scale size={12} /> },
+                        { id: 'categories', label: 'Categories', icon: <Layers size={12} /> },
+                        { id: 'products', label: 'Menu Items', icon: <Coffee size={12} /> },
+                        { id: 'addons', label: 'Addons & Modifiers', icon: <Plus size={12} /> },
+                        { id: 'units', label: 'Measurement Units', icon: <Scale size={12} /> },
                     ]
                 },
                 {
@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     children: [
                         { id: 'kitchens', label: 'Kitchen Stations', icon: <ChefHat size={12} /> },
                         { id: 'counters', label: 'Billing Counters', icon: <Printer size={12} /> },
-                        { id: 'floor', label: 'Dining Areas & Floors', icon: <DoorClosed size={12} /> },
+                        { id: 'floor', label: 'Dining Areas', icon: <DoorClosed size={12} /> },
                     ]
                 }
             ]
@@ -180,77 +180,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title: 'ROOMS & RATES',
             items: [
                 { id: 'manage-room-type', label: 'Room Types', icon: <BedDouble size={14} /> },
-                { id: 'manage-room', label: 'Rooms Master', icon: <Building2 size={14} /> },
+                { id: 'manage-room', label: 'All Rooms', icon: <Building2 size={14} /> },
                 { id: 'joint-room', label: 'Connecting Rooms', icon: <FolderKanban size={14} /> },
                 { id: 'rate-plans', label: 'Rate Plans', icon: <Percent size={14} /> },
-                { id: 'package-builder', label: 'Package Builder', icon: <Ticket size={14} /> },
+                { id: 'package-builder', label: 'Packages & Offers', icon: <Ticket size={14} /> },
                 { id: 'meal-plans', label: 'Meal Plans', icon: <Coffee size={14} /> },
                 { id: 'rate-calendar', label: 'Rate Calendar', icon: <Calendar size={14} /> },
-                { id: 'building-management', label: 'Wings & Floors', icon: <Building2 size={14} /> },
+                { id: 'building-management', label: 'Floors & Wings', icon: <Building2 size={14} /> },
             ]
         },
         {
-            title: 'HOUSEKEEPING & FACILITIES',
+            title: 'HOUSEKEEPING',
             items: [
-                { id: 'housekeeping', label: 'Cleanliness Grid', icon: <Sparkles size={14} /> },
-                { id: 'maintenance', label: 'Maintenance Kanban', icon: <Wrench size={14} /> },
-                { id: 'service-master', label: 'Linen & Valet Services', icon: <FileText size={14} /> },
+                { id: 'housekeeping', label: 'Housekeeping', icon: <Sparkles size={14} /> },
+                { id: 'maintenance', label: 'Maintenance', icon: <Wrench size={14} /> },
+                { id: 'service-master', label: 'Laundry & Services', icon: <FileText size={14} /> },
             ]
         },
         {
             title: 'GUESTS',
             items: [
-                { id: 'guest-profile', label: 'Guest Profiles 360', icon: <Users size={14} /> },
-                { id: 'service-vouchers', label: 'Digital Vouchers', icon: <Ticket size={14} /> },
-                { id: 'allowance-checker', label: 'Credit & Allowance', icon: <Wallet size={14} /> },
+                { id: 'guest-profile', label: 'Guest Directory', icon: <Users size={14} /> },
+                { id: 'service-vouchers', label: 'Gift Vouchers', icon: <Ticket size={14} /> },
+                { id: 'allowance-checker', label: 'Guest Credits', icon: <Wallet size={14} /> },
             ]
         },
         {
-            title: 'FINANCE & USALI ERP',
+            title: 'FINANCE & ACCOUNTING',
             items: [
-                { id: 'advance-accounting', label: 'USALI General Ledger', icon: <Landmark size={14} />, badge: 'USALI', badgeColor: 'bg-indigo-100 text-indigo-700' },
+                { id: 'advance-accounting', label: 'General Ledger', icon: <Landmark size={14} />, badge: 'USALI', badgeColor: 'bg-indigo-100 text-indigo-700' },
                 { id: 'master-data', label: 'Chart of Accounts', icon: <Database size={14} /> },
-                { id: 'revenue-dashboard', label: 'Revenue KPIs', icon: <TrendingUp size={14} /> },
-                { id: 'revenue-heads', label: 'Revenue Heads', icon: <Percent size={14} /> },
-                { id: 'banking', label: 'Bank Accounts & MFS', icon: <Landmark size={14} /> },
-                { id: 'corporate-profiles', label: 'City Ledger & Corporate', icon: <Building2 size={14} /> },
-                { id: 'finance-overview', label: 'Financial Overview', icon: <BarChart3 size={14} /> },
+                { id: 'revenue-dashboard', label: 'Revenue Analytics', icon: <TrendingUp size={14} /> },
+                { id: 'revenue-heads', label: 'Revenue Accounts', icon: <Percent size={14} /> },
+                { id: 'banking', label: 'Bank Accounts', icon: <Landmark size={14} /> },
+                { id: 'corporate-profiles', label: 'Corporate Accounts', icon: <Building2 size={14} /> },
+                { id: 'finance-overview', label: 'Financial Reports', icon: <BarChart3 size={14} /> },
             ]
         },
         {
-            title: 'HRM & WORKFORCE',
+            title: 'STAFF & HRM',
             items: [
-                { id: 'hrm-dashboard', label: 'Workforce Dashboard', icon: <Users size={14} /> },
-                { id: 'user-management', label: 'Staff Directory', icon: <Users size={14} /> },
-                { id: 'departments', label: 'Cost Centers & Depts', icon: <FolderKanban size={14} /> },
-                { id: 'shifts', label: '24/7 Work Shifts', icon: <Clock size={14} /> },
-                { id: 'roles-permissions', label: 'Roles & RBAC Matrix', icon: <Shield size={14} /> },
+                { id: 'hrm-dashboard', label: 'Staff Overview', icon: <Users size={14} /> },
+                { id: 'user-management', label: 'Employees', icon: <Users size={14} /> },
+                { id: 'departments', label: 'Departments', icon: <FolderKanban size={14} /> },
+                { id: 'shifts', label: 'Work Shifts', icon: <Clock size={14} /> },
+                { id: 'roles-permissions', label: 'Roles & Permissions', icon: <Shield size={14} /> },
             ]
         },
         {
-            title: 'REPORTS HUB',
+            title: 'REPORTS',
             items: [
-                { id: 'business-origins', label: 'Business Origins', icon: <MapPin size={14} /> },
-                { id: 'reports', label: 'Audit Packs & Reports', icon: <FileText size={14} />, badge: '50+', badgeColor: 'bg-blue-100 text-blue-700' },
-                { id: 'advanced-reports', label: 'Advanced Analytics', icon: <BarChart3 size={14} /> },
+                { id: 'business-origins', label: 'Booking Sources', icon: <MapPin size={14} /> },
+                { id: 'reports', label: 'Reports Center', icon: <FileText size={14} />, badge: '50+', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'advanced-reports', label: 'Analytics', icon: <BarChart3 size={14} /> },
             ]
         },
         {
-            title: 'SYSTEM & SETTINGS',
+            title: 'SETTINGS',
             items: [
                 {
                     label: 'Settings',
                     icon: <Settings size={14} />,
                     children: [
-                        { id: 'taxes-vat', label: 'Taxes & VAT (Rule Simulator)', icon: <Percent size={12} />, badge: 'Rule Sim', badgeColor: 'bg-emerald-100 text-emerald-700' },
-                        { id: 'multi-property', label: 'Multi-Hotel Chain Console', icon: <Building2 size={12} />, badge: 'HQ', badgeColor: 'bg-indigo-100 text-indigo-700' },
-                        { id: 'properties', label: 'All Hotel Properties', icon: <Building2 size={12} /> },
-                        { id: 'property-create', label: 'Register New Property', icon: <Plus size={12} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
-                        { id: 'printer-settings', label: 'Hardware & Printers', icon: <Printer size={12} /> },
-                        { id: 'policy-management', label: 'Hotel Policy Governance', icon: <FileText size={12} /> },
-                        { id: 'holiday-management', label: 'Holiday & Peak Calendar', icon: <Calendar size={12} /> },
-                        { id: 'schema-explorer', label: 'Relational DB (1NF-4NF)', icon: <Database size={12} />, badge: 'SQL', badgeColor: 'bg-blue-100 text-blue-700' },
-                        { id: 'general-settings', label: 'System Configuration', icon: <Settings size={12} /> },
+                        { id: 'taxes-vat', label: 'Taxes & VAT', icon: <Percent size={12} /> },
+                        { id: 'multi-property', label: 'Chain Console', icon: <Building2 size={12} />, badge: 'HQ', badgeColor: 'bg-indigo-100 text-indigo-700' },
+                        { id: 'properties', label: 'Properties', icon: <Building2 size={12} /> },
+                        { id: 'property-create', label: 'Add Property', icon: <Plus size={12} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
+                        { id: 'printer-settings', label: 'Printers & Hardware', icon: <Printer size={12} /> },
+                        { id: 'policy-management', label: 'Policies & Rules', icon: <FileText size={12} /> },
+                        { id: 'holiday-management', label: 'Holiday Calendar', icon: <Calendar size={12} /> },
+                        { id: 'schema-explorer', label: 'Database Schema', icon: <Database size={12} /> },
+                        { id: 'general-settings', label: 'General Settings', icon: <Settings size={12} /> },
                     ]
                 }
             ]
@@ -332,7 +332,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     // ========================================================================
-    // RENDER: EXPANDED FULL ORDERLY RMS SIDEBAR
+    // RENDER: EXPANDED FULL STANDARD SIDEBAR
     // ========================================================================
     return (
         <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r border-slate-200/90 bg-white text-slate-800 md:flex select-none z-30 shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
@@ -374,14 +374,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Quick search (e.g. POS, Folio, VAT)..."
+                        placeholder="Search menu (e.g. POS, Folios, Rates)..."
                         className="w-full bg-slate-50 border border-slate-200/90 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
                     />
                     {searchQuery && (
                         <button
                             type="button"
                             onClick={() => setSearchQuery('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                         >
                             <X size={12} />
                         </button>
@@ -389,7 +389,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             </div>
 
-            {/* Navigation List with OrderlyRMS Style */}
+            {/* Navigation List */}
             <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-3 scrollbar-thin">
                 {filteredSections.map((sec, sIdx) => (
                     <div key={sIdx} className="space-y-0.5">
@@ -518,7 +518,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         type="button"
                         onClick={() => setActivePage('multi-property')}
                         className="size-7 rounded-lg hover:bg-white text-slate-400 hover:text-blue-600 transition flex items-center justify-center shrink-0 border border-transparent hover:border-slate-200 cursor-pointer"
-                        title="Multi-Hotel Chain Console"
+                        title="Chain Portfolio Console"
                     >
                         <Building2 size={13} />
                     </button>

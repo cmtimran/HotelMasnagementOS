@@ -809,6 +809,83 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     minSubscriptionTier: 'starter',
     propertyScoped: true,
   },
+  {
+    id: 'kds',
+    slug: '/kds',
+    title: 'Kitchen Display (KDS)',
+    panel: 'main',
+    category: 'F&B POS & KDS',
+    permission: 'pos.kds.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'cashier', 'f_and_b'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'table-layout',
+    slug: '/table-layout',
+    title: 'Table Layout',
+    panel: 'main',
+    category: 'F&B POS & KDS',
+    permission: 'pos.tables.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'cashier'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'advance-accounting',
+    slug: '/advance-accounting',
+    title: 'General Ledger',
+    panel: 'main',
+    category: 'Finance & Accounts',
+    permission: 'accounting.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager', 'accountant'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'hrm-dashboard',
+    slug: '/hrm-dashboard',
+    title: 'Staff Overview',
+    panel: 'main',
+    category: 'Staff & HRM',
+    permission: 'hrm.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'starter',
+    propertyScoped: true,
+  },
+  {
+    id: 'multi-property',
+    slug: '/multi-property',
+    title: 'Hotel Chain Portfolio',
+    panel: 'main',
+    category: 'Portfolio',
+    permission: 'property.manage',
+    allowedRoles: ['super_admin', 'hotel_admin', 'general_manager'],
+    minSubscriptionTier: 'enterprise',
+    propertyScoped: false,
+  },
+  {
+    id: 'property-create',
+    slug: '/property-create',
+    title: 'Add Property',
+    panel: 'main',
+    category: 'Portfolio',
+    permission: 'property.manage',
+    allowedRoles: ['super_admin', 'hotel_admin'],
+    minSubscriptionTier: 'enterprise',
+    propertyScoped: false,
+  },
+  {
+    id: 'schema-explorer',
+    slug: '/schema-explorer',
+    title: 'Database Schema',
+    panel: 'main',
+    category: 'Security & Settings',
+    permission: 'settings.general.manage',
+    allowedRoles: ['super_admin'],
+    minSubscriptionTier: 'enterprise',
+    propertyScoped: false,
+  },
 ];
 
 // ============================================================================
@@ -1045,6 +1122,93 @@ if (addResRoute) {
   SLUG_TO_ROUTE_MAP.set('/dashboard/reservations/add', addResRoute);
   SLUG_TO_ROUTE_MAP.set('/reservations/add', addResRoute);
   SLUG_TO_ROUTE_MAP.set('/add-new-reservation', addResRoute);
+}
+
+// F&B Aliases
+const posRoute = SLUG_TO_ROUTE_MAP.get('/pos');
+if (posRoute) {
+  SLUG_TO_ROUTE_MAP.set('/restaurant-pos', posRoute);
+}
+
+const catRoute = SLUG_TO_ROUTE_MAP.get('/pos/categories');
+if (catRoute) {
+  SLUG_TO_ROUTE_MAP.set('/categories', catRoute);
+}
+
+const prodRoute = SLUG_TO_ROUTE_MAP.get('/pos/products');
+if (prodRoute) {
+  SLUG_TO_ROUTE_MAP.set('/products', prodRoute);
+  SLUG_TO_ROUTE_MAP.set('/menu-items', prodRoute);
+}
+
+const addonRoute = SLUG_TO_ROUTE_MAP.get('/pos/addons');
+if (addonRoute) {
+  SLUG_TO_ROUTE_MAP.set('/addons', addonRoute);
+}
+
+const unitRoute = SLUG_TO_ROUTE_MAP.get('/pos/units');
+if (unitRoute) {
+  SLUG_TO_ROUTE_MAP.set('/units', unitRoute);
+}
+
+const tableRoute = SLUG_TO_ROUTE_MAP.get('/pos/tables');
+if (tableRoute) {
+  SLUG_TO_ROUTE_MAP.set('/tables', tableRoute);
+}
+
+const floorRoute = SLUG_TO_ROUTE_MAP.get('/pos/floor');
+if (floorRoute) {
+  SLUG_TO_ROUTE_MAP.set('/floor', floorRoute);
+}
+
+const counterRoute = SLUG_TO_ROUTE_MAP.get('/pos/counters');
+if (counterRoute) {
+  SLUG_TO_ROUTE_MAP.set('/counters', counterRoute);
+}
+
+const kitchenRoute = SLUG_TO_ROUTE_MAP.get('/pos/kitchens');
+if (kitchenRoute) {
+  SLUG_TO_ROUTE_MAP.set('/kitchens', kitchenRoute);
+}
+
+const waiterRoute = SLUG_TO_ROUTE_MAP.get('/pos/waiters');
+if (waiterRoute) {
+  SLUG_TO_ROUTE_MAP.set('/waiters', waiterRoute);
+}
+
+// Room & Building Aliases
+const roomTypeRoute = SLUG_TO_ROUTE_MAP.get('/room-types');
+if (roomTypeRoute) {
+  SLUG_TO_ROUTE_MAP.set('/manage-room-type', roomTypeRoute);
+}
+
+const roomsRoute = SLUG_TO_ROUTE_MAP.get('/manage-rooms');
+if (roomsRoute) {
+  SLUG_TO_ROUTE_MAP.set('/manage-room', roomsRoute);
+  SLUG_TO_ROUTE_MAP.set('/rooms', roomsRoute);
+}
+
+const jointRoute = SLUG_TO_ROUTE_MAP.get('/joint-rooms');
+if (jointRoute) {
+  SLUG_TO_ROUTE_MAP.set('/joint-room', jointRoute);
+}
+
+const buildingRoute = SLUG_TO_ROUTE_MAP.get('/buildings-floors');
+if (buildingRoute) {
+  SLUG_TO_ROUTE_MAP.set('/building-management', buildingRoute);
+  SLUG_TO_ROUTE_MAP.set('/floor-management', buildingRoute);
+  SLUG_TO_ROUTE_MAP.set('/amenities-safety', buildingRoute);
+}
+
+const corpRoute = SLUG_TO_ROUTE_MAP.get('/corporate-profiles');
+if (corpRoute) {
+  SLUG_TO_ROUTE_MAP.set('/corporate', corpRoute);
+}
+
+const originRoute = SLUG_TO_ROUTE_MAP.get('/business-origins');
+if (originRoute) {
+  SLUG_TO_ROUTE_MAP.set('/origins', originRoute);
+  SLUG_TO_ROUTE_MAP.set('/booking-sources', originRoute);
 }
 
 for (const report of REPORT_PANEL_ROUTES) {
