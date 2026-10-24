@@ -77,7 +77,7 @@ interface SidebarProps {
 export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar }: SidebarProps) => {
     const [searchTerm, setSearchTerm] = useState('');
     const { activeProperty } = useProperty();
-    const { portalMode, switchToSuperAdmin, switchToPropertyPMS } = usePortal();
+    const { portalMode, switchToSuperAdmin, switchToPropertyPMS, isSuperAdmin } = usePortal();
 
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
         // Super Admin defaults
@@ -659,19 +659,19 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
                 )}
             </nav>
 
-            {/* Quick Jumper Button between Super Admin and Property PMS */}
-            {!isCollapsed && (
+            {/* Quick Jumper Button between Super Admin and Property PMS - ONLY VISIBLE TO SUPER ADMINS */}
+            {!isCollapsed && isSuperAdmin && (
                 <div className="p-2 border-t border-gray-100 bg-gray-50/70">
                     {portalMode === 'super_admin' ? (
                         <button
                             type="button"
                             onClick={() => switchToPropertyPMS(activeProperty?.id, 'front-desk')}
                             className="w-full py-1.5 px-2 rounded-lg bg-white border border-emerald-200/80 text-emerald-800 hover:bg-emerald-50 text-[11px] font-bold flex items-center justify-between shadow-2xs transition-colors cursor-pointer group"
-                            title={`Open Property Staff PMS for ${activeProperty?.name}`}
+                            title={`Inspect Property Staff PMS for ${activeProperty?.name}`}
                         >
                             <div className="flex items-center gap-1.5 min-w-0">
                                 <Building2 size={12} className="text-emerald-600 flex-shrink-0" />
-                                <span className="truncate">Hotel PMS ({activeProperty?.code})</span>
+                                <span className="truncate">Open Hotel PMS ({activeProperty?.code})</span>
                             </div>
                             <span className="text-[10px] text-emerald-600 group-hover:translate-x-0.5 transition-transform">→</span>
                         </button>
@@ -684,7 +684,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
                         >
                             <div className="flex items-center gap-1.5 min-w-0">
                                 <Shield size={12} className="text-indigo-600 flex-shrink-0" />
-                                <span className="truncate">Master HQ Console</span>
+                                <span className="truncate">Return to Master HQ</span>
                             </div>
                             <span className="text-[10px] text-indigo-600 group-hover:translate-x-0.5 transition-transform">→</span>
                         </button>

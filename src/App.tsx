@@ -68,17 +68,11 @@ import { initNetworkSync } from './utils/pmsNetworkSync';
 import { syncReservationsFromDB } from './utils/roomInventoryEngine';
 
 import { useNavigation } from './context/NavigationContext';
-
-interface UserData {
-  name: string;
-  role: string;
-  property: string;
-  image?: string;
-  email?: string;
-}
+import { usePortal, type UserData } from './context/PortalContext';
 
 function App() {
   const { activePage, setActivePage } = useNavigation();
+  const { updateUserSession } = usePortal();
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   // Session Management: Synchronous initialization eliminates login screen flash/flicker on reload
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -686,6 +680,12 @@ function App() {
     setCurrentUser(user);
     localStorage.setItem('auth_token', 'valid_token_placeholder');
     localStorage.setItem('user_data', JSON.stringify(user));
+    updateUserSession(user);
+    if (user.role === 'super_admin') {
+      setActivePage('multi-property');
+    } else {
+      setActivePage('front-desk');
+    }
   };
 
   const handleLogout = () => {
@@ -693,6 +693,8 @@ function App() {
     setCurrentUser(null);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
+    localStorage.removeItem('hotel_portal_mode');
+    updateUserSession(null);
     setActivePage('dashboard');
   };
 

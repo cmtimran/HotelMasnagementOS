@@ -19,6 +19,7 @@ interface User {
     name: string;
     role: string;
     property: string;
+    property_id?: number;
     email: string;
     image: string;
 }
@@ -38,7 +39,6 @@ const Login = ({ onLogin }: LoginProps) => {
     const [propertyId, setPropertyId] = useState('HQ-CORP');
     const [email, setEmail] = useState('superadmin@hotelmanagement.os');
     const [password, setPassword] = useState('admin123');
-    const [selectedPortal, setSelectedPortal] = useState<'super_admin' | 'property_pms'>('super_admin');
     const [isLoading, setIsLoading] = useState(false);
     const [loginStatus, setLoginStatus] = useState<'success' | 'error' | null>(null);
 
@@ -51,25 +51,23 @@ const Login = ({ onLogin }: LoginProps) => {
         return () => clearInterval(interval);
     }, []);
 
-    const handleSelectSuperAdmin = () => {
+    // Quick helpers to pre-fill demo credentials
+    const fillSuperAdmin = () => {
         setPropertyId('HQ-CORP');
         setEmail('superadmin@hotelmanagement.os');
         setPassword('admin123');
-        setSelectedPortal('super_admin');
     };
 
-    const handleSelectGrandPalacePMS = () => {
+    const fillDhakaFrontDesk = () => {
         setPropertyId('GPD-001');
         setEmail('frontdesk.dhaka@grandhospitality.com');
         setPassword('staff123');
-        setSelectedPortal('property_pms');
     };
 
-    const handleSelectGrandOceanPMS = () => {
+    const fillCoxsBazarGM = () => {
         setPropertyId('GOR-002');
         setEmail('operations.cox@grandhospitality.com');
         setPassword('staff123');
-        setSelectedPortal('property_pms');
     };
 
     const handleLogin = (e: React.FormEvent) => {
@@ -81,36 +79,39 @@ const Login = ({ onLogin }: LoginProps) => {
             if (propertyId && email && password) {
                 setLoginStatus('success');
                 setTimeout(() => {
-                    const isSuper = selectedPortal === 'super_admin' || propertyId === 'HQ-CORP' || email.includes('superadmin');
-                    
-                    if (isSuper) {
-                        localStorage.setItem('hotel_portal_mode', 'super_admin');
-                    } else {
-                        localStorage.setItem('hotel_portal_mode', 'property_pms');
-                        if (propertyId === 'GOR-002') {
-                            localStorage.setItem('hotel_active_property_id', '2');
-                        } else {
-                            localStorage.setItem('hotel_active_property_id', '1');
-                        }
-                    }
+                    const isSuper = propertyId === 'HQ-CORP' || email.includes('superadmin');
+                    const isCox = propertyId === 'GOR-002' || email.includes('cox');
+
+                    const role = isSuper ? 'super_admin' : isCox ? 'general_manager' : 'front_desk';
+                    const propertyIdNum = isSuper ? 0 : isCox ? 2 : 1;
+                    const propertyName = isSuper 
+                        ? 'HotelOS Corporate HQ' 
+                        : isCox 
+                            ? "Grand Ocean Resort (Cox's Bazar)" 
+                            : 'Grand Palace Dhaka';
 
                     const mockUser: User = {
                         name: isSuper 
                             ? 'Alexander Vance (Group MD)' 
-                            : propertyId === 'GOR-002' 
+                            : isCox 
                                 ? 'Rahim Chowdhury (Resort GM)' 
                                 : 'Sarah Jenkins (Front Desk Officer)',
-                        role: isSuper ? 'super_admin' : 'front_desk',
-                        property: isSuper 
-                            ? 'HotelOS Corporate HQ' 
-                            : propertyId === 'GOR-002' 
-                                ? "Grand Ocean Resort (Cox's Bazar)" 
-                                : 'Grand Palace Dhaka',
+                        role: role,
+                        property: propertyName,
+                        property_id: propertyIdNum,
                         email: email,
                         image: isSuper 
                             ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80'
                             : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&h=256&q=80'
                     };
+
+                    if (isSuper) {
+                        localStorage.setItem('hotel_portal_mode', 'super_admin');
+                    } else {
+                        localStorage.setItem('hotel_portal_mode', 'property_pms');
+                        localStorage.setItem('hotel_active_property_id', String(propertyIdNum));
+                    }
+
                     onLogin(mockUser);
                 }, 800);
             } else {
@@ -173,7 +174,7 @@ const Login = ({ onLogin }: LoginProps) => {
                     <div className="space-y-6">
                         <div className="flex items-center gap-2 mb-[-1rem]">
                             <Star size={12} fill={accentColor} color={accentColor} />
-                            <span className="text-[10px] font-bold tracking-[0.4em] uppercase text-white/60">Dual-Panel Architecture</span>
+                            <span className="text-[10px] font-bold tracking-[0.4em] uppercase text-white/60">Enterprise Architecture</span>
                         </div>
 
                         <div className="h-48 relative">
@@ -195,7 +196,7 @@ const Login = ({ onLogin }: LoginProps) => {
                 <div className="absolute bottom-10 left-12 right-12 flex items-center justify-between text-white/30 border-t border-white/5 pt-8 scale-90 origin-left">
                     <div className="flex gap-8">
                         <div className="flex flex-col">
-                            <span className="text-white text-base font-bold">2 Hotels Online</span>
+                            <span className="text-white text-base font-bold">Multi-Property Core</span>
                             <span className="text-[9px] font-bold uppercase tracking-widest">Dhaka & Cox's Bazar</span>
                         </div>
                         <div className="flex flex-col">
@@ -210,78 +211,21 @@ const Login = ({ onLogin }: LoginProps) => {
                 </div>
             </div>
 
-            {/* --- RIGHT SIDE: LOGIN FORM & ROLE SELECTION --- */}
+            {/* --- RIGHT SIDE: AUTHENTICATION FORM --- */}
             <div className="w-full lg:w-5/12 flex items-center justify-center p-6 lg:p-8 bg-white relative overflow-y-auto">
                 <div className="w-full max-w-[420px] transition-all duration-500 py-4">
-                    <div className="mb-6 text-center lg:text-left space-y-1">
+                    <div className="mb-8 text-center lg:text-left space-y-1">
                         <h2 className="text-[26px] font-black text-[#1e4cd3] leading-tight">
                             Welcome Back
                         </h2>
                         <p className="text-[#94a3b8] text-[13px] tracking-tight">
-                            Select an access panel or enter credentials.
+                            Enter your workspace credentials to access your terminal.
                         </p>
                     </div>
 
-                    {/* DUAL-PANEL QUICK DEMO SWITCHER */}
-                    <div className="mb-5 space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                            Direct Portal Access:
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                type="button"
-                                onClick={handleSelectSuperAdmin}
-                                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                                    selectedPortal === 'super_admin' && propertyId === 'HQ-CORP'
-                                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 ring-2 ring-indigo-500/20'
-                                        : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white'
-                                }`}
-                            >
-                                <div className="flex items-center gap-1.5 text-xs font-bold">
-                                    <Shield size={13} className="text-indigo-600" />
-                                    <span>Super Admin</span>
-                                </div>
-                                <p className="text-[9.5px] text-slate-500 font-medium mt-0.5">Master HQ & Multi-Hotel</p>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleSelectGrandPalacePMS}
-                                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                                    selectedPortal === 'property_pms' && propertyId === 'GPD-001'
-                                        ? 'border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-500/20'
-                                        : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white'
-                                }`}
-                            >
-                                <div className="flex items-center gap-1.5 text-xs font-bold">
-                                    <Building2 size={13} className="text-emerald-600" />
-                                    <span>Property PMS</span>
-                                </div>
-                                <p className="text-[9.5px] text-slate-500 font-medium mt-0.5">Grand Palace Dhaka</p>
-                            </button>
-                        </div>
-
-                        {/* Alternate Resort selection */}
-                        <button
-                            type="button"
-                            onClick={handleSelectGrandOceanPMS}
-                            className={`w-full py-1.5 px-3 rounded-lg border text-left text-[11px] font-medium transition-colors flex items-center justify-between cursor-pointer ${
-                                propertyId === 'GOR-002' 
-                                    ? 'border-blue-500 bg-blue-50 text-blue-900 font-bold' 
-                                    : 'border-slate-200/80 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                <Building2 size={12} className="text-blue-600" />
-                                <span>Grand Ocean Resort (Cox's Bazar PMS)</span>
-                            </span>
-                            <span className="font-mono text-[9px] text-slate-400">GOR-002</span>
-                        </button>
-                    </div>
-
                     <form onSubmit={handleLogin} className="space-y-3.5">
-                        <div className="space-y-2.5">
-                            {/* Property ID */}
+                        <div className="space-y-3">
+                            {/* Property / Workspace ID */}
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors group-focus-within:text-[#2451d1]">
                                     <Hash size={15} strokeWidth={2.5} />
@@ -295,7 +239,7 @@ const Login = ({ onLogin }: LoginProps) => {
                                     required
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 border border-slate-100 bg-slate-50 px-1.5 py-0.5 rounded uppercase tracking-wider pointer-events-none">
-                                    {selectedPortal === 'super_admin' ? 'HQ Mode' : 'Hotel Mode'}
+                                    Required
                                 </span>
                             </div>
 
@@ -337,16 +281,16 @@ const Login = ({ onLogin }: LoginProps) => {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center justify-between px-1 pt-1">
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <div className="relative">
                                     <input type="checkbox" defaultChecked className="peer hidden" id="keep-signed" />
                                     <div className="w-3.5 h-3.5 border border-slate-300 rounded peer-checked:bg-[#2451d1] peer-checked:border-[#2451d1] transition-all"></div>
                                     <ShieldCheck size={10} className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
                                 </div>
-                                <span className="text-[11px] font-medium text-slate-500 group-hover:text-slate-900 transition-colors">Keep signed in</span>
+                                <span className="text-[11px] font-medium text-slate-500 group-hover:text-slate-900 transition-colors">Remember device</span>
                             </label>
-                            <span className="text-[11px] font-bold text-[#2050d5] hover:underline cursor-pointer">Security Policy</span>
+                            <span className="text-[11px] font-bold text-[#2050d5] hover:underline cursor-pointer">Security Protocol</span>
                         </div>
 
                         {loginStatus === 'error' && (
@@ -359,19 +303,19 @@ const Login = ({ onLogin }: LoginProps) => {
                         <button
                             type="submit"
                             disabled={isLoading || loginStatus === 'success'}
-                            className="w-full py-3 bg-[#2050d5] hover:bg-[#1a44b8] rounded-[10px] text-white flex items-center justify-center relative overflow-hidden group shadow-md shadow-blue-400/10 active:scale-[0.99] transition-all disabled:opacity-70 cursor-pointer"
+                            className="w-full py-3 bg-[#2050d5] hover:bg-[#1a44b8] rounded-[10px] text-white flex items-center justify-center relative overflow-hidden group shadow-md shadow-blue-400/10 active:scale-[0.99] transition-all disabled:opacity-70 cursor-pointer mt-2"
                         >
                             <div className="relative z-10 flex items-center gap-2 text-sm font-bold">
                                 {isLoading ? (
                                     <>
                                         <Loader2 className="animate-spin" size={16} />
-                                        <span>AUTHENTICATING...</span>
+                                        <span>AUTHENTICATING CREDENTIALS...</span>
                                     </>
                                 ) : loginStatus === 'success' ? (
-                                    <span>ENTERING {selectedPortal === 'super_admin' ? 'MASTER HQ' : 'PMS'}...</span>
+                                    <span>SESSION INITIALIZED</span>
                                 ) : (
                                     <>
-                                        <span>Enter {selectedPortal === 'super_admin' ? 'Super Admin HQ' : 'Hotel PMS'}</span>
+                                        <span>Sign In to Terminal</span>
                                         <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" strokeWidth={2.5} />
                                     </>
                                 )}
@@ -380,9 +324,71 @@ const Login = ({ onLogin }: LoginProps) => {
                         </button>
                     </form>
 
-                    <div className="pt-8 text-center">
+                    {/* DISCRETE 1-CLICK DEMO ACCOUNT SELECTOR */}
+                    <div className="mt-8 pt-5 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Demo Fast-Fill Profiles:
+                            </span>
+                            <span className="text-[9.5px] text-slate-400">Click to load</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                onClick={fillSuperAdmin}
+                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
+                                    propertyId === 'HQ-CORP' 
+                                        ? 'border-indigo-500 bg-indigo-50/70 font-bold text-indigo-950 shadow-2xs' 
+                                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                }`}
+                                title="Load Super Admin (HQ Master Console)"
+                            >
+                                <div className="flex items-center gap-1">
+                                    <Shield size={11} className="text-indigo-600 flex-shrink-0" />
+                                    <span className="truncate font-semibold">Super Admin</span>
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-normal truncate mt-0.5">Corporate HQ</p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={fillDhakaFrontDesk}
+                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
+                                    propertyId === 'GPD-001' 
+                                        ? 'border-emerald-500 bg-emerald-50/70 font-bold text-emerald-950 shadow-2xs' 
+                                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                }`}
+                                title="Load Front Desk Staff (Grand Palace Dhaka PMS)"
+                            >
+                                <div className="flex items-center gap-1">
+                                    <Building2 size={11} className="text-emerald-600 flex-shrink-0" />
+                                    <span className="truncate font-semibold">Front Desk</span>
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-normal truncate mt-0.5">Dhaka PMS</p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={fillCoxsBazarGM}
+                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
+                                    propertyId === 'GOR-002' 
+                                        ? 'border-blue-500 bg-blue-50/70 font-bold text-blue-950 shadow-2xs' 
+                                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                }`}
+                                title="Load Resort Operations (Grand Ocean Cox's Bazar PMS)"
+                            >
+                                <div className="flex items-center gap-1">
+                                    <Building2 size={11} className="text-blue-600 flex-shrink-0" />
+                                    <span className="truncate font-semibold">Resort GM</span>
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-normal truncate mt-0.5">Cox's Bazar</p>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="pt-6 text-center">
                         <p className="text-[10px] font-semibold text-slate-400 tracking-tight uppercase">
-                            © 2026 HotelOS Enterprise • Multi-Property Platform
+                            © 2026 HotelOS Enterprise • Multi-Property Hospitality System
                         </p>
                     </div>
                 </div>

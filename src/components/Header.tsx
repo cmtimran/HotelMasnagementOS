@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const datePopoverRef = useRef<HTMLDivElement>(null);
     const propertyPopoverRef = useRef<HTMLDivElement>(null);
     const { activeProperty, properties, setActivePropertyId } = useProperty();
-    const { portalMode, switchToSuperAdmin, switchToPropertyPMS } = usePortal();
+    const { portalMode, switchToSuperAdmin, switchToPropertyPMS, isSuperAdmin } = usePortal();
 
 
     // Business System Date State (hydrated from localStorage or default '01 Jul 2026')
@@ -118,40 +118,50 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                     </span>
                 </div>
 
-                {/* Right Side - Dual-Panel Mode Switcher, Active Hotel Switcher, System Date, Action Icons, and User Profile */}
+                {/* Right Side - Dual-Panel Mode Switcher (Super Admin Only), Active Hotel Switcher, System Date, Action Icons, and User Profile */}
                 <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
-                    {/* DUAL-PANEL SEGMENTED SWITCHER (Super Admin vs Property PMS) */}
-                    <div className="flex items-center bg-gray-100/90 p-0.5 rounded-lg border border-gray-200 shadow-2xs">
-                        <button
-                            type="button"
-                            onClick={() => switchToSuperAdmin('multi-property')}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                portalMode === 'super_admin'
-                                    ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60'
-                                    : 'text-gray-500 hover:text-gray-900'
-                            }`}
-                            title="Switch to Super Admin Master Console (Group HQ & Portfolio)"
-                        >
-                            <Shield size={11} className={portalMode === 'super_admin' ? 'text-indigo-600' : 'text-gray-400'} />
-                            <span className="hidden sm:inline">Super Admin</span>
-                            <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 hidden lg:inline font-mono">HQ</span>
-                        </button>
+                    {/* DUAL-PANEL SEGMENTED SWITCHER (Rendered ONLY if user is Super Admin) */}
+                    {isSuperAdmin ? (
+                        <div className="flex items-center bg-gray-100/90 p-0.5 rounded-lg border border-gray-200 shadow-2xs">
+                            <button
+                                type="button"
+                                onClick={() => switchToSuperAdmin('multi-property')}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                    portalMode === 'super_admin'
+                                        ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60'
+                                        : 'text-gray-500 hover:text-gray-900'
+                                }`}
+                                title="Super Admin Master Console (Group HQ & Portfolio)"
+                            >
+                                <Shield size={11} className={portalMode === 'super_admin' ? 'text-indigo-600' : 'text-gray-400'} />
+                                <span className="hidden sm:inline">Super Admin</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 hidden lg:inline font-mono">HQ</span>
+                            </button>
 
-                        <button
-                            type="button"
-                            onClick={() => switchToPropertyPMS(activeProperty?.id, 'front-desk')}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                portalMode === 'property_pms'
-                                    ? 'bg-white text-emerald-700 shadow-xs border border-gray-200/60'
-                                    : 'text-gray-500 hover:text-gray-900'
-                            }`}
-                            title="Switch to Hotel Operations (Property Staff PMS)"
-                        >
-                            <Building2 size={11} className={portalMode === 'property_pms' ? 'text-emerald-600' : 'text-gray-400'} />
-                            <span className="hidden sm:inline">Property PMS</span>
-                            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 font-mono">{activeProperty?.code || 'GPD'}</span>
-                        </button>
-                    </div>
+                            <button
+                                type="button"
+                                onClick={() => switchToPropertyPMS(activeProperty?.id, 'front-desk')}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                    portalMode === 'property_pms'
+                                        ? 'bg-white text-emerald-700 shadow-xs border border-gray-200/60'
+                                        : 'text-gray-500 hover:text-gray-900'
+                                }`}
+                                title="Inspect Hotel Operations (Property Staff PMS)"
+                            >
+                                <Building2 size={11} className={portalMode === 'property_pms' ? 'text-emerald-600' : 'text-gray-400'} />
+                                <span className="hidden sm:inline">Property PMS</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 font-mono">{activeProperty?.code || 'GPD'}</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-[11px] font-semibold select-none">
+                            <Building2 size={12} className="text-emerald-600" />
+                            <span className="font-bold">{activeProperty?.name || 'Grand Palace'}</span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-mono font-bold uppercase">
+                                {user?.role ? user.role.replace('_', ' ') : 'Staff'}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Active Hotel Property Switcher Pill */}
                     <div className="relative" ref={propertyPopoverRef}>
@@ -171,13 +181,15 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                             <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 animate-in fade-in">
                                 <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between">
                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hotel Properties</span>
-                                    <button 
-                                        type="button"
-                                        onClick={() => { setIsPropertyPopoverOpen(false); setActivePage('multi-property'); }}
-                                        className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer"
-                                    >
-                                        Chain Console →
-                                    </button>
+                                    {isSuperAdmin && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => { setIsPropertyPopoverOpen(false); setActivePage('multi-property'); }}
+                                            className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer"
+                                        >
+                                            Chain Console →
+                                        </button>
+                                    )}
                                 </div>
                                 {properties.map(p => {
                                     const isSelected = p.id === activeProperty?.id;
@@ -406,39 +418,43 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                     <User size={13} className="text-gray-400" />
                                     My Profile
                                 </button>
-                                <button
-                                    className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
-                                    onClick={() => {
-                                        setIsDropdownOpen(false);
-                                        if (portalMode === 'super_admin') {
-                                            switchToPropertyPMS(activeProperty?.id, 'front-desk');
-                                        } else {
-                                            switchToSuperAdmin('multi-property');
-                                        }
-                                    }}
-                                >
-                                    {portalMode === 'super_admin' ? (
-                                        <>
-                                            <Building2 size={13} className="text-emerald-600" />
-                                            <span>Open Property PMS ({activeProperty?.code})</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Shield size={13} className="text-indigo-600" />
-                                            <span>Open Super Admin HQ</span>
-                                        </>
-                                    )}
-                                </button>
-                                <button
-                                    className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
-                                    onClick={() => {
-                                        setIsDropdownOpen(false);
-                                        setActivePage('multi-property');
-                                    }}
-                                >
-                                    <Building2 size={13} className="text-blue-600" />
-                                    Switch Hotel Property
-                                </button>
+                                {isSuperAdmin && (
+                                    <>
+                                        <button
+                                            className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
+                                            onClick={() => {
+                                                setIsDropdownOpen(false);
+                                                if (portalMode === 'super_admin') {
+                                                    switchToPropertyPMS(activeProperty?.id, 'front-desk');
+                                                } else {
+                                                    switchToSuperAdmin('multi-property');
+                                                }
+                                            }}
+                                        >
+                                            {portalMode === 'super_admin' ? (
+                                                <>
+                                                    <Building2 size={13} className="text-emerald-600" />
+                                                    <span>Open Property PMS ({activeProperty?.code})</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Shield size={13} className="text-indigo-600" />
+                                                    <span>Open Super Admin HQ</span>
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
+                                            onClick={() => {
+                                                setIsDropdownOpen(false);
+                                                setActivePage('multi-property');
+                                            }}
+                                        >
+                                            <Building2 size={13} className="text-blue-600" />
+                                            Switch Hotel Property
+                                        </button>
+                                    </>
+                                )}
 
                                 <div className="h-px bg-gray-100 my-1"></div>
                                 <div className="px-1.5 pb-0.5">
