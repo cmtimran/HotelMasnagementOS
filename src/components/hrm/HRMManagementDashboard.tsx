@@ -11,6 +11,8 @@ import {
     LogIn, 
     LogOut 
 } from 'lucide-react';
+import { getApiBaseUrl } from '../../utils/apiUrl';
+
 
 interface Employee {
     id: number;
@@ -93,7 +95,7 @@ export const HRMManagementDashboard: React.FC = () => {
         setError(null);
         try {
             // 1. Fetch Employees
-            const empRes = await fetch('http://localhost:3001/api/hrm/employees?propertyId=1');
+            const empRes = await fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=1`);
             const empData = await empRes.json();
             if (empData.success) {
                 setEmployees(empData.data);
@@ -103,28 +105,28 @@ export const HRMManagementDashboard: React.FC = () => {
             }
 
             // 2. Fetch Shifts
-            const shiftsRes = await fetch('http://localhost:3001/api/hrm/shifts?propertyId=1');
+            const shiftsRes = await fetch(`${getApiBaseUrl()}/api/hrm/shifts?propertyId=1`);
             const shiftsData = await shiftsRes.json();
             if (shiftsData.success) {
                 setShifts(shiftsData.data);
             }
 
             // 3. Fetch Today's Attendance
-            const attRes = await fetch('http://localhost:3001/api/hrm/attendance?propertyId=1&date=2026-07-01');
+            const attRes = await fetch(`${getApiBaseUrl()}/api/hrm/attendance?propertyId=1&date=2026-07-01`);
             const attData = await attRes.json();
             if (attData.success) {
                 setAttendance(attData.data);
             }
 
             // 4. Fetch Payroll Runs
-            const payRes = await fetch('http://localhost:3001/api/hrm/payroll?propertyId=1');
+            const payRes = await fetch(`${getApiBaseUrl()}/api/hrm/payroll?propertyId=1`);
             const payData = await payRes.json();
             if (payData.success) {
                 setPayrollRuns(payData.data);
             }
 
             // 5. Fetch Departments
-            const deptRes = await fetch('http://localhost:3001/api/hrm/departments?propertyId=1');
+            const deptRes = await fetch(`${getApiBaseUrl()}/api/hrm/departments?propertyId=1`);
             const deptData = await deptRes.json();
             if (deptData.success) {
                 setDepartments(deptData.data);
@@ -145,7 +147,7 @@ export const HRMManagementDashboard: React.FC = () => {
         if (!selectedEmployeeForClock) return;
         setClockActionLoading(true);
         try {
-            const res = await fetch('http://localhost:3001/api/hrm/attendance/clock', {
+            const res = await fetch(`${getApiBaseUrl()}/api/hrm/attendance/clock`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -175,7 +177,7 @@ export const HRMManagementDashboard: React.FC = () => {
         e.preventDefault();
         setProcessingPayroll(true);
         try {
-            const res = await fetch('http://localhost:3001/api/hrm/payroll/process', {
+            const res = await fetch(`${getApiBaseUrl()}/api/hrm/payroll/process`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

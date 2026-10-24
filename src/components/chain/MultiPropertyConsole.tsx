@@ -9,6 +9,8 @@ import {
     CheckCircle2, 
     ArrowRight
 } from 'lucide-react';
+import { getApiBaseUrl } from '../../utils/apiUrl';
+
 
 interface Property {
     id: number;
@@ -37,7 +39,7 @@ export const MultiPropertyConsole: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch('http://localhost:3001/api/properties');
+            const res = await fetch(`${getApiBaseUrl()}/api/properties`);
             const data = await res.json();
             if (data.success) {
                 setProperties(data.data);

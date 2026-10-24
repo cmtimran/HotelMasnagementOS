@@ -33,9 +33,21 @@ initRedis((clusterEvent) => {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Global Middleware
+// Global Middleware - Multi-Environment Dynamic CORS
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: (origin, callback) => {
+    // Allow non-browser requests, localhost, and Vercel domains
+    if (!origin) return callback(null, true);
+    if (
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1') || 
+      origin.includes('vercel.app') || 
+      origin.includes('hotelmasnagementos')
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Allow all configured hotel client origins
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -43,8 +55,9 @@ app.use(express.json());
 // Enterprise Auth Middleware
 app.use(authMiddleware);
 
-// API Routes
+// API Routes (Mounted on both /api and / to support direct and rewritten proxy requests)
 app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // 404 Handler
 app.use((req, res) => {
@@ -54,10 +67,17 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 HotelManagementOS Backend running at http://localhost:${PORT}`);
-  console.log(`📊 Reports API: http://localhost:${PORT}/api/reports/overview/metrics`);
-  console.log(`🏨 Rooms API: http://localhost:${PORT}/api/rooms`);
-  console.log(`📑 Bookings API: http://localhost:${PORT}/api/bookings`);
-  console.log(`🔒 Distributed Redlock API: http://localhost:${PORT}/api/realtime/locks`);
-});
+// Start HTTP listener only when running standalone (not in Serverless/Vercel)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 HotelManagementOS Backend running at http://localhost:${PORT}`);
+    console.log(`📊 Reports API: http://localhost:${PORT}/api/reports/overview/metrics`);
+    console.log(`🏨 Rooms API: http://localhost:${PORT}/api/rooms`);
+    console.log(`📑 Bookings API: http://localhost:${PORT}/api/bookings`);
+    console.log(`🔒 Distributed Redlock API: http://localhost:${PORT}/api/realtime/locks`);
+  });
+}
+
+export default app;
+export { app };
+

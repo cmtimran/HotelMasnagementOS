@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Search, Sparkles, BedDouble, AlertCircle, Users, CheckCircle2, XCircle, Clock, RefreshCw } from 'lucide-react';
 import { getCanonicalRooms, broadcastPMSEvent, subscribeToPMSEvents } from '../utils/roomInventoryEngine';
 import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
+import { getApiBaseUrl } from '../utils/apiUrl';
+
 
 interface HousekeepingRoom {
     id: number | string;
@@ -15,7 +17,7 @@ interface HousekeepingRoom {
     notes?: string;
 }
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+const API_BASE = getApiBaseUrl();
 
 const HousekeepingGrid = () => {
     const [searchTerm, setSearchTerm] = useState('');

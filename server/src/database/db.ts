@@ -6,9 +6,11 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Database file path inside server directory
-const DB_PATH = path.join(__dirname, '..', '..', 'hotel_pms.db');
+// Database file path inside server directory (falls back to /tmp in serverless environments like Vercel)
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DB_PATH = isServerless ? path.join('/tmp', 'hotel_pms.db') : path.join(__dirname, '..', '..', 'hotel_pms.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
+
 
 // Singleton database instance
 export const db = new DatabaseSync(DB_PATH);

@@ -10,6 +10,8 @@ import {
     Link as LinkIcon, 
     ShieldCheck 
 } from 'lucide-react';
+import { getApiBaseUrl } from '../../utils/apiUrl';
+
 
 interface TableMeta {
     name: string;
@@ -57,7 +59,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch('http://localhost:3001/api/schema/inspect');
+            const res = await fetch(`${getApiBaseUrl()}/api/schema/inspect`);
             const data = await res.json();
             if (data.success) {
                 setTables(data.tables);
@@ -80,7 +82,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
     const fetchTableRows = async (tableName: string) => {
         setLoadingRows(true);
         try {
-            const res = await fetch(`http://localhost:3001/api/schema/table/${tableName}`);
+            const res = await fetch(`${getApiBaseUrl()}/api/schema/table/${tableName}`);
             const data = await res.json();
             if (data.success) {
                 setTableData(data.rows || []);

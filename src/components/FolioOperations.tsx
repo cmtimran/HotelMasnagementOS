@@ -7,8 +7,10 @@ import {
 } from 'lucide-react';
 import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+const API_BASE = getApiBaseUrl();
+
 
 interface Transaction {
     id: number;

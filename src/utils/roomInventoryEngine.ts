@@ -9,6 +9,8 @@
  * 5. Single Source of Truth (SSOT) room inventory synced with RoomManagement.
  */
 
+import { getApiBaseUrl } from './apiUrl';
+
 export interface CanonicalRoom {
     id: number;
     number: string;
@@ -244,7 +246,7 @@ export const broadcastPMSEvent = (message: PMSBroadcastMessage) => {
 
         // Cross-PC Real-Time Network Broadcast over LAN / Internet
         if (typeof window !== 'undefined') {
-            const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+            const API_BASE = getApiBaseUrl();
             fetch(`${API_BASE}/api/realtime/broadcast`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -669,7 +671,7 @@ export const validateAndCommitReservation = (
 
         // Direct Real-Time SQLite Database Persistence
         if (typeof window !== 'undefined') {
-            const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+            const API_BASE = getApiBaseUrl();
             fetch(`${API_BASE}/api/bookings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -709,7 +711,7 @@ export const validateAndCommitReservation = (
 export const syncReservationsFromDB = async (): Promise<StoredReservation[]> => {
     if (typeof window === 'undefined') return getAllStoredReservations();
     try {
-        const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+        const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/bookings`);
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
@@ -732,7 +734,7 @@ export const updateReservationStatusInDB = async (
     newStatus: string
 ): Promise<boolean> => {
     try {
-        const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+        const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/bookings/${reservationId}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -760,7 +762,7 @@ export const deleteReservationInDB = async (
     reservationId: string | number
 ): Promise<boolean> => {
     try {
-        const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+        const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/bookings/${reservationId}`, {
             method: 'DELETE'
         });
@@ -787,7 +789,7 @@ export const syncRoomTypesAndRoomsFromDB = async (): Promise<{ roomTypes: Dynami
         return { roomTypes: getDynamicRoomTypes(), rooms: getCanonicalRooms() };
     }
     try {
-        const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+        const API_BASE = getApiBaseUrl();
         // Fetch property details containing dynamic roomTypes and physical rooms from database
         const res = await fetch(`${API_BASE}/api/properties/1`);
         const json = await res.json();
