@@ -1,4 +1,6 @@
 import { Router, type Request, type Response } from 'express';
+import { publishRedisEvent, isRedisConnected } from '../services/redis.service.js';
+import { redlockService } from '../services/redlock.service.js';
 
 const router = Router();
 
@@ -46,6 +48,7 @@ router.get('/stream', (req: Request, res: Response) => {
         terminalName,
         propertyId,
         connectedClientsCount: clients.size + 1,
+        isRedisClustered: isRedisConnected(),
         timestamp: Date.now()
     })}\n\n`);
 
@@ -97,6 +100,7 @@ router.get('/stream', (req: Request, res: Response) => {
 /**
  * Programmatic Server-Side Event Broadcaster
  * Can be called by controllers, services, or internal audit daemons to emit real-time events to all connected terminals.
+ * Automatically fans out across the entire cluster using Redis Pub/Sub!
  */
 export function broadcastServerEvent(event: any, senderClientId?: string): number {
     const payload = JSON.stringify({
@@ -116,6 +120,12 @@ export function broadcastServerEvent(event: any, senderClientId?: string): numbe
             }
         }
     }
+
+    // Propagate to other backend nodes across the cluster via Redis Pub/Sub
+    if (senderClientId !== 'REDIS_CLUSTER') {
+        publishRedisEvent(event).catch(() => {});
+    }
+
     return deliveredCount;
 }
 
@@ -136,6 +146,7 @@ router.post('/broadcast', (req: Request, res: Response) => {
         success: true,
         deliveredCount,
         totalConnected: clients.size,
+        isRedisClustered: isRedisConnected(),
         timestamp: Date.now()
     });
 });
@@ -154,8 +165,68 @@ router.get('/status', (_req: Request, res: Response) => {
     res.json({
         success: true,
         onlineCount: clients.size,
+        isRedisClustered: isRedisConnected(),
         terminals
     });
+});
+
+// ============================================================================
+// DISTRIBUTED REDLOCK ENDPOINTS (ZERO-OVERBOOKING ENGINE)
+// ============================================================================
+
+/**
+ * POST /api/realtime/locks/acquire
+ * Acquire distributed lock for a room or date inventory
+ */
+router.post('/locks/acquire', async (req: Request, res: Response) => {
+    try {
+        const { resource, holder, ttlMs } = req.body;
+        if (!resource) {
+            return res.status(400).json({ success: false, error: 'Resource name required' });
+        }
+        const result = await redlockService.acquireLock(resource, holder, ttlMs);
+        if (!result.success) {
+            return res.status(409).json({ success: false, error: result.reason });
+        }
+        res.json({ success: true, lock: result.lock });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message });
+    }
+});
+
+/**
+ * POST /api/realtime/locks/release
+ * Release distributed lock
+ */
+router.post('/locks/release', async (req: Request, res: Response) => {
+    try {
+        const { resource, lockToken } = req.body;
+        if (!resource || !lockToken) {
+            return res.status(400).json({ success: false, error: 'Resource and lockToken required' });
+        }
+        const released = await redlockService.releaseLock(resource, lockToken);
+        res.json({ success: released });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message });
+    }
+});
+
+/**
+ * GET /api/realtime/locks
+ * List currently held distributed locks
+ */
+router.get('/locks', async (_req: Request, res: Response) => {
+    try {
+        const locks = await redlockService.getActiveLocks();
+        res.json({ 
+            success: true, 
+            count: locks.length, 
+            locks, 
+            isRedisActive: isRedisConnected() 
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message });
+    }
 });
 
 export default router;
