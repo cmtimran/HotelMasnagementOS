@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isPostgresConnected } from '../database/postgres.js';
+import { isPostgresConnected, initPostgres } from '../database/postgres.js';
 import bookingRoutes from './booking.routes.js';
 import roomRoutes from './room.routes.js';
 import reportRoutes from './report.routes.js';
@@ -12,12 +12,21 @@ import schemaRoutes from './schema.routes.js';
 const apiRouter = Router();
 
 // Health check endpoint
-apiRouter.get('/health', (req, res) => {
+apiRouter.get('/health', async (req, res) => {
+  if (!isPostgresConnected() && process.env.DATABASE_URL) {
+    try {
+      await initPostgres();
+    } catch (e) {
+      console.warn('Health check postgres init notice:', e);
+    }
+  }
+
   res.json({
     status: 'online',
     service: 'HotelManagementOS Enterprise API',
     version: '1.0.0',
     cloudPostgres: isPostgresConnected() ? 'connected' : 'offline',
+    hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
     timestamp: new Date().toISOString(),
   });
 });
