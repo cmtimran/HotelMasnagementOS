@@ -22,10 +22,11 @@ export async function seedCloudPostgres(connectionUrl?: string) {
       console.log('ℹ️ Cloud PostgreSQL already contains organizations. Verifying rooms count...');
       const rCheck = await client.query('SELECT COUNT(*) as count FROM rooms;');
       console.log(`Current room count in Cloud PG: ${rCheck.rows[0].count}`);
-      if (parseInt(rCheck.rows[0].count, 10) >= 34) {
-        console.log('✅ Cloud PostgreSQL already fully seeded!');
+      if (parseInt(rCheck.rows[0].count, 10) >= 54) {
+        console.log('✅ Cloud PostgreSQL already fully seeded with multi-property assets!');
         return;
       }
+
     }
 
     console.log('🚀 Seeding Multi-Property Hotel Group, USALI Ledger, HRM, and Room Inventory into Cloud PG...');
@@ -50,7 +51,9 @@ export async function seedCloudPostgres(connectionUrl?: string) {
     await client.query(`
       INSERT INTO buildings (id, property_id, code, name, sort_order) VALUES
       (1, 1, 'B1', 'Main Tower', 1),
-      (2, 1, 'B2', 'Suites & Annex Wing', 2)
+      (2, 1, 'B2', 'Suites & Annex Wing', 2),
+      (3, 2, 'OT', 'Ocean Front Tower', 1),
+      (4, 2, 'BV', 'Bay View Chalet Villas', 2)
       ON CONFLICT (id) DO NOTHING;
     `);
 
@@ -61,7 +64,10 @@ export async function seedCloudPostgres(connectionUrl?: string) {
       (2, 1, 2, 'Floor 2 (Standard & Deluxe)', 2),
       (3, 1, 3, 'Floor 3 (Deluxe Sea View)', 3),
       (4, 2, 4, 'Floor 4 (Club & Suites)', 4),
-      (5, 2, 5, 'Floor 5 (Presidential Suites)', 5)
+      (5, 2, 5, 'Floor 5 (Presidential Suites)', 5),
+      (6, 3, 1, 'Ground (Beach Club Level)', 1),
+      (7, 3, 2, 'Floor 1 (Coral Sea View)', 2),
+      (8, 4, 1, 'Beachfront Villas Promenade', 1)
       ON CONFLICT (id) DO NOTHING;
     `);
 
@@ -72,9 +78,13 @@ export async function seedCloudPostgres(connectionUrl?: string) {
       (2, 1, 'SK', 'Superior King', 2, 2, 1, 4500.00, 1200.00, 'King bed with panoramic balcony and plush lounge'),
       (3, 1, 'ES', 'Executive Suite', 3, 3, 2, 7500.00, 1500.00, 'Separate living room, executive lounge access, bathtub'),
       (4, 1, 'PS', 'Presidential Royal Suite', 4, 4, 2, 18000.00, 2500.00, 'Top-tier luxury penthouse with private terrace and jacuzzi'),
-      (5, 1, 'SS', 'Standard Single', 1, 1, 0, 2200.00, 800.00, 'Cozy single room with premium bed and workspace')
+      (5, 1, 'SS', 'Standard Single', 1, 1, 0, 2200.00, 800.00, 'Cozy single room with premium bed and workspace'),
+      (6, 2, 'DSV', 'Deluxe Sea View', 2, 2, 1, 5500.00, 1500.00, 'Panoramic bay view balcony, king bed, beach club access'),
+      (7, 2, 'EBS', 'Executive Beach Suite', 3, 3, 2, 9500.00, 2000.00, 'Direct private beach lawn access, private plunge pool'),
+      (8, 2, 'RBV', 'Royal Beachfront Villa', 4, 4, 2, 22000.00, 3000.00, 'Exclusive private duplex villa with infinity pool and butler')
       ON CONFLICT (id) DO NOTHING;
     `);
+
 
     // 6. 34 Physical Rooms
     await client.query(`
@@ -121,7 +131,31 @@ export async function seedCloudPostgres(connectionUrl?: string) {
       (31, 1, 2, 5, 4, '501', 'Presidential Royal Suite 501', 'ACTIVE', 'CLEAN'),
       (32, 1, 2, 5, 3, '502', 'Executive Diplomatic 502', 'ACTIVE', 'CLEAN'),
       (33, 1, 2, 5, 4, '503', 'Presidential Penthouse 503', 'ACTIVE', 'CLEAN'),
-      (34, 1, 2, 5, 2, '505', 'Sky Superior 505', 'ACTIVE', 'CLEAN')
+      (34, 1, 2, 5, 2, '505', 'Sky Superior 505', 'ACTIVE', 'CLEAN'),
+
+      -- Property 2: Grand Ocean Resort (Cox's Bazar) - Ocean Front Tower
+      (35, 2, 3, 6, 6, '101', 'Deluxe Coral 101', 'ACTIVE', 'CLEAN'),
+      (36, 2, 3, 6, 6, '102', 'Deluxe Coral 102', 'ACTIVE', 'CLEAN'),
+      (37, 2, 3, 6, 6, '103', 'Deluxe Coral 103', 'ACTIVE', 'CLEAN'),
+      (38, 2, 3, 6, 6, '104', 'Deluxe Coral 104', 'ACTIVE', 'DIRTY'),
+      (39, 2, 3, 6, 7, '105', 'Beach Suite 105', 'ACTIVE', 'INSPECTED'),
+      (40, 2, 3, 6, 7, '106', 'Beach Suite 106', 'ACTIVE', 'CLEAN'),
+      (41, 2, 3, 7, 6, '201', 'Sea Horizon 201', 'ACTIVE', 'CLEAN'),
+      (42, 2, 3, 7, 6, '202', 'Sea Horizon 202', 'ACTIVE', 'CLEAN'),
+      (43, 2, 3, 7, 6, '203', 'Sea Horizon 203', 'ACTIVE', 'INSPECTED'),
+      (44, 2, 3, 7, 7, '204', 'Executive Ocean Suite 204', 'ACTIVE', 'CLEAN'),
+      (45, 2, 3, 7, 7, '205', 'Executive Ocean Suite 205', 'ACTIVE', 'DIRTY'),
+      (46, 2, 3, 7, 6, '206', 'Sea Horizon 206', 'ACTIVE', 'CLEAN'),
+      (47, 2, 3, 7, 6, '207', 'Sea Horizon 207', 'ACTIVE', 'CLEAN'),
+      (48, 2, 3, 7, 7, '208', 'Executive Ocean Suite 208', 'OUT_OF_ORDER', 'DIRTY'),
+
+      -- Property 2: Grand Ocean Resort - Bay View Chalet Villas
+      (49, 2, 4, 8, 8, 'V01', 'Royal Beach Villa 1', 'ACTIVE', 'INSPECTED'),
+      (50, 2, 4, 8, 8, 'V02', 'Royal Beach Villa 2', 'ACTIVE', 'CLEAN'),
+      (51, 2, 4, 8, 8, 'V03', 'Royal Beach Villa 3', 'ACTIVE', 'CLEAN'),
+      (52, 2, 4, 8, 8, 'V04', 'Royal Beach Villa 4', 'ACTIVE', 'DIRTY'),
+      (53, 2, 4, 8, 7, 'V05', 'Sunset Chalet 5', 'ACTIVE', 'CLEAN'),
+      (54, 2, 4, 8, 7, 'V06', 'Sunset Chalet 6', 'ACTIVE', 'CLEAN')
       ON CONFLICT (id) DO NOTHING;
     `);
 

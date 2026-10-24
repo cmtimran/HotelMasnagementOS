@@ -55,25 +55,34 @@ function seedInitialOrganizationAndProperties() {
         (1, 'GPD', 'Grand Palace Dhaka (Main Tower)', 5, 'Plot 12, Road 45, Gulshan-2, Dhaka', 'Dhaka', '+880 2 9882200', 'dhaka@grandhospitality.com', 'BDT'),
         (1, 'GOR', 'Grand Ocean Resort (Cox''s Bazar)', 5, 'Marine Drive, Kolatoli Beach, Cox''s Bazar', 'Cox''s Bazar', '+880 341 62100', 'coxsbazar@grandhospitality.com', 'BDT');
 
-        -- Buildings & Floors for Dhaka
-        INSERT INTO buildings (property_id, code, name, sort_order) VALUES
-        (1, 'B1', 'Main Tower', 1),
-        (1, 'B2', 'Suites & Annex Wing', 2);
+        -- Buildings & Floors for Dhaka & Cox's Bazar
+        INSERT INTO buildings (id, property_id, code, name, sort_order) VALUES
+        (1, 1, 'B1', 'Main Tower', 1),
+        (2, 1, 'B2', 'Suites & Annex Wing', 2),
+        (3, 2, 'OT', 'Ocean Front Tower', 1),
+        (4, 2, 'BV', 'Bay View Chalet Villas', 2);
 
-        INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES
-        (1, 1, 'Floor 1 (Executive & Lobby)', 1),
-        (1, 2, 'Floor 2 (Standard & Deluxe)', 2),
-        (1, 3, 'Floor 3 (Deluxe Sea View)', 3),
-        (2, 4, 'Floor 4 (Club & Suites)', 4),
-        (2, 5, 'Floor 5 (Presidential Suites)', 5);
+        INSERT INTO floors (id, building_id, floor_number, name, sort_order) VALUES
+        (1, 1, 1, 'Floor 1 (Executive & Lobby)', 1),
+        (2, 1, 2, 'Floor 2 (Standard & Deluxe)', 2),
+        (3, 1, 3, 'Floor 3 (Deluxe Sea View)', 3),
+        (4, 2, 4, 'Floor 4 (Club & Suites)', 4),
+        (5, 2, 5, 'Floor 5 (Presidential Suites)', 5),
+        (6, 3, 1, 'Ground (Beach Club Level)', 1),
+        (7, 3, 2, 'Floor 1 (Coral Sea View)', 2),
+        (8, 4, 1, 'Beachfront Villas Promenade', 1);
 
         -- Room Types
-        INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate, description) VALUES
-        (1, 'DD', 'Deluxe Double', 2, 2, 1, 3000.00, 1000.00, 'King bed, city view, high-speed WiFi, work desk'),
-        (1, 'SK', 'Superior King', 2, 2, 1, 4500.00, 1200.00, 'King bed with panoramic balcony and plush lounge'),
-        (1, 'ES', 'Executive Suite', 3, 3, 2, 7500.00, 1500.00, 'Separate living room, executive lounge access, bathtub'),
-        (1, 'PS', 'Presidential Royal Suite', 4, 4, 2, 18000.00, 2500.00, 'Top-tier luxury penthouse with private terrace and jacuzzi'),
-        (1, 'SS', 'Standard Single', 1, 1, 0, 2200.00, 800.00, 'Cozy single room with premium bed and workspace');
+        INSERT INTO room_types (id, property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate, description) VALUES
+        (1, 1, 'DD', 'Deluxe Double', 2, 2, 1, 3000.00, 1000.00, 'King bed, city view, high-speed WiFi, work desk'),
+        (2, 1, 'SK', 'Superior King', 2, 2, 1, 4500.00, 1200.00, 'King bed with panoramic balcony and plush lounge'),
+        (3, 1, 'ES', 'Executive Suite', 3, 3, 2, 7500.00, 1500.00, 'Separate living room, executive lounge access, bathtub'),
+        (4, 1, 'PS', 'Presidential Royal Suite', 4, 4, 2, 18000.00, 2500.00, 'Top-tier luxury penthouse with private terrace and jacuzzi'),
+        (5, 1, 'SS', 'Standard Single', 1, 1, 0, 2200.00, 800.00, 'Cozy single room with premium bed and workspace'),
+        (6, 2, 'DSV', 'Deluxe Sea View', 2, 2, 1, 5500.00, 1500.00, 'Panoramic bay view balcony, king bed, beach club access'),
+        (7, 2, 'EBS', 'Executive Beach Suite', 3, 3, 2, 9500.00, 2000.00, 'Direct private beach lawn access, private plunge pool'),
+        (8, 2, 'RBV', 'Royal Beachfront Villa', 4, 4, 2, 22000.00, 3000.00, 'Exclusive private duplex villa with infinity pool and butler');
+
 
         -- Addon Services
         INSERT INTO addon_services (property_id, code, name, category, unit_price, tax_rate) VALUES
@@ -208,7 +217,29 @@ function syncAllCanonicalRoomsAndReservations() {
         (1, 2, 5, 4, '501', 'Presidential Royal Suite 501', 'ACTIVE', 'CLEAN'),
         (1, 2, 5, 3, '502', 'Executive Diplomatic 502', 'ACTIVE', 'CLEAN'),
         (1, 2, 5, 4, '503', 'Presidential Penthouse 503', 'ACTIVE', 'CLEAN'),
-        (1, 2, 5, 2, '505', 'Sky Superior 505', 'ACTIVE', 'CLEAN');
+        (1, 2, 5, 2, '505', 'Sky Superior 505', 'ACTIVE', 'CLEAN'),
+
+        -- Property 2: Grand Ocean Resort (Cox's Bazar)
+        (2, 3, 6, 6, '101', 'Deluxe Coral 101', 'ACTIVE', 'CLEAN'),
+        (2, 3, 6, 6, '102', 'Deluxe Coral 102', 'ACTIVE', 'CLEAN'),
+        (2, 3, 6, 6, '103', 'Deluxe Coral 103', 'ACTIVE', 'CLEAN'),
+        (2, 3, 6, 6, '104', 'Deluxe Coral 104', 'ACTIVE', 'DIRTY'),
+        (2, 3, 6, 7, '105', 'Beach Suite 105', 'ACTIVE', 'INSPECTED'),
+        (2, 3, 6, 7, '106', 'Beach Suite 106', 'ACTIVE', 'CLEAN'),
+        (2, 3, 7, 6, '201', 'Sea Horizon 201', 'ACTIVE', 'CLEAN'),
+        (2, 3, 7, 6, '202', 'Sea Horizon 202', 'ACTIVE', 'CLEAN'),
+        (2, 3, 7, 6, '203', 'Sea Horizon 203', 'ACTIVE', 'INSPECTED'),
+        (2, 3, 7, 7, '204', 'Executive Ocean Suite 204', 'ACTIVE', 'CLEAN'),
+        (2, 3, 7, 7, '205', 'Executive Ocean Suite 205', 'ACTIVE', 'DIRTY'),
+        (2, 3, 7, 6, '206', 'Sea Horizon 206', 'ACTIVE', 'CLEAN'),
+        (2, 3, 7, 6, '207', 'Sea Horizon 207', 'ACTIVE', 'CLEAN'),
+        (2, 3, 7, 7, '208', 'Executive Ocean Suite 208', 'OUT_OF_ORDER', 'DIRTY'),
+        (2, 4, 8, 8, 'V01', 'Royal Beach Villa 1', 'ACTIVE', 'INSPECTED'),
+        (2, 4, 8, 8, 'V02', 'Royal Beach Villa 2', 'ACTIVE', 'CLEAN'),
+        (2, 4, 8, 8, 'V03', 'Royal Beach Villa 3', 'ACTIVE', 'CLEAN'),
+        (2, 4, 8, 8, 'V04', 'Royal Beach Villa 4', 'ACTIVE', 'DIRTY'),
+        (2, 4, 8, 7, 'V05', 'Sunset Chalet 5', 'ACTIVE', 'CLEAN'),
+        (2, 4, 8, 7, 'V06', 'Sunset Chalet 6', 'ACTIVE', 'CLEAN');
     `);
 
     // 3. Ensure realistic guests and reservations exist in SQLite

@@ -11,6 +11,8 @@ import {
     LayoutGrid
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
+import { useProperty } from '../context/PropertyContext';
+
 
 interface HeaderProps {
     activePage: string;
@@ -23,8 +25,12 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isAddReservationOpen, setIsAddReservationOpen] = useState(false);
     const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+    const [isPropertyPopoverOpen, setIsPropertyPopoverOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const datePopoverRef = useRef<HTMLDivElement>(null);
+    const propertyPopoverRef = useRef<HTMLDivElement>(null);
+    const { activeProperty, properties, setActivePropertyId } = useProperty();
+
 
     // Business System Date State (hydrated from localStorage or default '01 Jul 2026')
     const [systemDate, setSystemDate] = useState<string>(() => {
@@ -40,6 +46,10 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
             if (datePopoverRef.current && !datePopoverRef.current.contains(event.target as Node)) {
                 setIsDatePopoverOpen(false);
             }
+            if (propertyPopoverRef.current && !propertyPopoverRef.current.contains(event.target as Node)) {
+                setIsPropertyPopoverOpen(false);
+            }
+
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -87,8 +97,65 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                     </span>
                 </div>
 
-                {/* Right Side - System Date, Compact Action Icons, and User Profile */}
+                {/* Right Side - Active Hotel Switcher, System Date, Action Icons, and User Profile */}
                 <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
+                    {/* Active Hotel Property Switcher Pill */}
+                    <div className="relative" ref={propertyPopoverRef}>
+                        <button
+                            type="button"
+                            onClick={() => setIsPropertyPopoverOpen(!isPropertyPopoverOpen)}
+                            className="h-7 px-2.5 rounded-md border border-gray-200/80 bg-white hover:bg-gray-50 text-gray-700 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer select-none text-[11px] font-semibold"
+                            title="Active Hotel Property (Click to switch)"
+                        >
+                            <Building2 size={12} className="text-blue-600 flex-shrink-0" />
+                            <span className="max-w-[120px] truncate hidden md:inline">{activeProperty?.name || 'Grand Palace'}</span>
+                            <span className="md:hidden font-mono text-[10px] font-bold text-blue-600">{activeProperty?.code || 'GPD'}</span>
+                            <ChevronDown size={11} className="text-gray-400" />
+                        </button>
+
+                        {isPropertyPopoverOpen && (
+                            <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 animate-in fade-in">
+                                <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hotel Properties</span>
+                                    <button 
+                                        type="button"
+                                        onClick={() => { setIsPropertyPopoverOpen(false); setActivePage('multi-property'); }}
+                                        className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer"
+                                    >
+                                        Chain Console →
+                                    </button>
+                                </div>
+                                {properties.map(p => {
+                                    const isSelected = p.id === activeProperty?.id;
+                                    return (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setActivePropertyId(p.id);
+                                                setIsPropertyPopoverOpen(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                                                isSelected ? 'bg-blue-50/80 text-blue-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                                                    {p.code}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs truncate">{p.name}</p>
+                                                    <p className="text-[9.5px] text-gray-400 font-normal">{p.city} • {p.total_rooms || 0} rooms</p>
+                                                </div>
+                                            </div>
+                                            {isSelected && <Check size={13} className="text-blue-600 flex-shrink-0" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
                     {/* 1. System Date (Compact Pill Button) */}
                     <div className="relative" ref={datePopoverRef}>
                         <button
@@ -243,7 +310,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                     {user?.name || 'John Smith'}
                                 </span>
                                 <span className="text-[9.5px] text-gray-500 font-medium truncate max-w-[110px]">
-                                    {user?.role || 'Admin'} • {user?.property || 'Nice Hotel'}
+                                    {user?.role || 'Admin'} • {activeProperty?.code || 'GPD'}
                                 </span>
                             </div>
 
@@ -272,7 +339,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                     <p className="text-[9px] text-gray-400 truncate">{user?.email || 'admin@hotelmanagement.os'}</p>
                                     <div className="flex items-center gap-1 mt-1 text-[9px] text-emerald-700 font-semibold">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <span>Active Session ({user?.property || 'Nice Hotel'})</span>
+                                        <span>Active: {activeProperty?.name ? (activeProperty.code + ' - ' + activeProperty.city) : 'Grand Palace'}</span>
                                     </div>
                                 </div>
                                 <button
@@ -289,12 +356,13 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                     className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
                                     onClick={() => {
                                         setIsDropdownOpen(false);
-                                        setActivePage('properties');
+                                        setActivePage('multi-property');
                                     }}
                                 >
-                                    <Building2 size={13} className="text-gray-400" />
-                                    Switch Property
+                                    <Building2 size={13} className="text-blue-600" />
+                                    Switch Hotel Property
                                 </button>
+
                                 <div className="h-px bg-gray-100 my-1"></div>
                                 <div className="px-1.5 pb-0.5">
                                     <button

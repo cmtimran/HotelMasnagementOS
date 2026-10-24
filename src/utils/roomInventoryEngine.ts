@@ -784,14 +784,17 @@ export const deleteReservationInDB = async (
 /**
  * Synchronize Dynamic Room Types and Canonical Rooms directly from the PostgreSQL / SQLite database
  */
-export const syncRoomTypesAndRoomsFromDB = async (): Promise<{ roomTypes: DynamicRoomType[]; rooms: CanonicalRoom[] }> => {
+export const syncRoomTypesAndRoomsFromDB = async (
+    targetPropertyId?: number
+): Promise<{ roomTypes: DynamicRoomType[]; rooms: CanonicalRoom[] }> => {
     if (typeof window === 'undefined') {
         return { roomTypes: getDynamicRoomTypes(), rooms: getCanonicalRooms() };
     }
+    const propId = targetPropertyId || Number(localStorage.getItem('hotel_active_property_id')) || 1;
     try {
         const API_BASE = getApiBaseUrl();
         // Fetch property details containing dynamic roomTypes and physical rooms from database
-        const res = await fetch(`${API_BASE}/api/properties/1`);
+        const res = await fetch(`${API_BASE}/api/properties/${propId}`);
         const json = await res.json();
         if (json.success && json.data) {
             const { roomTypes, rooms } = json.data;
