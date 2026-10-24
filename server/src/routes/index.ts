@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { isPostgresConnected } from '../database/postgres.js';
 import bookingRoutes from './booking.routes.js';
 import roomRoutes from './room.routes.js';
 import reportRoutes from './report.routes.js';
@@ -16,6 +17,7 @@ apiRouter.get('/health', (req, res) => {
     status: 'online',
     service: 'HotelManagementOS Enterprise API',
     version: '1.0.0',
+    cloudPostgres: isPostgresConnected() ? 'connected' : 'offline',
     timestamp: new Date().toISOString(),
   });
 });
