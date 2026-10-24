@@ -98,6 +98,7 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
         inventoryMod: false,
         localHrm: false,
         reportsMod: false,
+        propertySettings: false,
     });
 
     const toggleMenu = (key: string) => {
@@ -329,6 +330,20 @@ export const Sidebar = ({ activePage, setActivePage, isCollapsed, toggleSidebar 
                 { id: 'corporate-profiles', label: 'Corporate Accounts (B2B)', icon: <Building2 size={12} /> },
                 { id: 'business-origins', label: 'Business Origins & Sources', icon: <Target size={12} /> },
                 { id: 'reports', label: 'Report Center & Audit Packs', icon: <ListOrdered size={12} />, newTab: true, badge: 'Packs', badgeColor: 'bg-gray-100 text-gray-700' },
+            ]
+        },
+
+        // MODULE: PROPERTY SETTINGS & CONFIGURATION
+        {
+            key: 'propertySettings',
+            label: 'Property Settings',
+            icon: <Settings size={14} />,
+            sectionHeader: 'Local Setup',
+            items: [
+                { id: 'hotel-info', label: 'Hotel Profile & Contacts', icon: <Info size={12} /> },
+                { id: 'policy-management', label: 'Hotel Policies & Rules', icon: <ShieldCheck size={12} /> },
+                { id: 'printer-settings', label: 'Receipt & ESC/POS Printers', icon: <Printer size={12} />, badge: 'Hardware', badgeColor: 'bg-indigo-100 text-indigo-700' },
+                { id: 'general-settings', label: 'System Configuration', icon: <Settings size={12} /> },
             ]
         }
     ];
