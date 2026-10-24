@@ -43,6 +43,12 @@ import {
     validateAndCommitReservation
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
+import {
+    calculateReservationTaxes,
+    getActiveTaxConfiguration,
+    getTaxConfigurations,
+    type TaxCalculationResult
+} from '../../utils/taxCalculationEngine';
 
 export interface AddReservationModalProps {
     isOpen: boolean;
@@ -103,6 +109,10 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const [dayUse, setDayUse] = useState(false);
     const [ratePerNight, setRatePerNight] = useState('Rate Per Night');
     const [taxApplicable, setTaxApplicable] = useState(true);
+    const [selectedTaxConfigId, setSelectedTaxConfigId] = useState<string>(() => {
+        return getActiveTaxConfiguration().id;
+    });
+    const availableTaxConfigs = useMemo(() => getTaxConfigurations().filter(c => c.status === 'Active'), []);
 
     const [roomsList, setRoomsList] = useState<RoomRow[]>(() => {
         const report = getAvailableRoomsForStay(initialStartDate, initialEndDate, 'Deluxe Double');
@@ -473,9 +483,16 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const discountedAmount = discountType === 'Percentage'
         ? (grossTotal * discountValue) / 100
         : discountValue;
-    const netTotal = Math.max(0, grossTotal - discountedAmount);
+    const netBaseAmount = Math.max(0, grossTotal - discountedAmount);
+
+    // Multi-tier dynamic Tax & VAT calculation based on /taxes-vat policy
+    const taxCalculation: TaxCalculationResult = useMemo(() => {
+        return calculateReservationTaxes(netBaseAmount, taxApplicable, selectedTaxConfigId);
+    }, [netBaseAmount, taxApplicable, selectedTaxConfigId]);
+
+    const finalPayable = taxCalculation.grandTotal;
     const totalPaid = paymentRows.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    const totalDue = Math.max(0, netTotal - totalPaid);
+    const totalDue = Math.max(0, finalPayable - totalPaid);
 
     // Handlers
     const handleAddRoomRow = () => {
@@ -622,7 +639,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             const trimmed = currentStr.slice(0, -1);
             updatePaymentRow(currentTarget.id, 'amount', Number(trimmed) || 0);
         } else if (val === 'FULL') {
-            updatePaymentRow(currentTarget.id, 'amount', netTotal);
+            updatePaymentRow(currentTarget.id, 'amount', finalPayable);
         } else {
             if (currentStr === '0') currentStr = '';
             const newStr = currentStr + val;
@@ -687,9 +704,19 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             adults: mainRoom.adults,
             children: mainRoom.children,
             status: actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : 'arriving',
-            totalAmount: netTotal,
+            totalAmount: finalPayable,
             paidAmount: actionType === 'hold' ? 0 : totalPaid,
-            dueAmount: actionType === 'hold' ? netTotal : totalDue,
+            dueAmount: actionType === 'hold' ? finalPayable : totalDue,
+            taxApplicable,
+            taxConfigId: selectedTaxConfigId,
+            taxConfigName: taxCalculation.configName,
+            taxConfigCode: taxCalculation.configCode,
+            serviceChargeAmount: taxCalculation.serviceChargeAmount,
+            vatAmount: taxCalculation.vatAmount,
+            otherTaxesAmount: taxCalculation.otherTaxesAmount,
+            totalTaxAmount: taxCalculation.totalTaxAmount,
+            taxDetails: taxCalculation,
+            baseAmount: netBaseAmount,
             source: businessSource,
             agent: businessAgent,
             vip: vipStatus || 'None',
@@ -766,7 +793,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                     checkInDate: checkIn,
                     checkOutDate: checkOut,
                     roomType: mainRoom.roomType,
-                    estimatedAmount: netTotal
+                    estimatedAmount: finalPayable
                 });
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(holdsList));
             }
@@ -951,15 +978,32 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                         <option value="Package Rate">Package Rate</option>
                                     </select>
 
-                                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none">
-                                        <input
-                                            type="checkbox"
-                                            checked={taxApplicable}
-                                            onChange={e => setTaxApplicable(e.target.checked)}
-                                            className="w-4 h-4 rounded text-blue-600"
-                                        />
-                                        <span>Tax Applicable</span>
-                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer select-none font-medium">
+                                            <input
+                                                type="checkbox"
+                                                checked={taxApplicable}
+                                                onChange={e => setTaxApplicable(e.target.checked)}
+                                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                            <span>Tax &amp; VAT</span>
+                                        </label>
+
+                                        {taxApplicable && (
+                                            <select
+                                                value={selectedTaxConfigId}
+                                                onChange={e => setSelectedTaxConfigId(e.target.value)}
+                                                className="h-8 px-2 border border-blue-300 rounded text-xs bg-blue-50/70 text-blue-900 font-medium outline-none focus:border-blue-500 cursor-pointer"
+                                                title="Select tax policy configured at /taxes-vat"
+                                            >
+                                                {availableTaxConfigs.map(cfg => (
+                                                    <option key={cfg.id} value={cfg.id}>
+                                                        {cfg.code} - {cfg.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -2118,9 +2162,39 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                         <span className="font-bold text-emerald-600 font-mono">-৳ {discountedAmount.toFixed(2)}</span>
                                     </div>
 
-                                    <div className="flex justify-between py-1 text-gray-800 font-bold">
-                                        <span>Net Payable</span>
-                                        <span className="font-mono text-blue-900 font-bold">৳ {netTotal.toFixed(2)}</span>
+                                    <div className="flex justify-between py-1 text-gray-700 text-xs">
+                                        <span>Net Base (Taxable)</span>
+                                        <span className="font-mono text-gray-900 font-semibold">৳ {netBaseAmount.toFixed(2)}</span>
+                                    </div>
+
+                                    {/* Statutory Taxes & VAT itemized breakdown from /taxes-vat */}
+                                    {taxCalculation.isTaxApplicable && taxCalculation.breakdown.length > 0 ? (
+                                        <div className="my-1 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
+                                            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider pb-0.5 border-b border-slate-200">
+                                                <span>{taxCalculation.configCode} Tax Rules</span>
+                                                <span className="text-blue-700 font-mono">+৳ {taxCalculation.totalTaxAmount.toFixed(2)}</span>
+                                            </div>
+                                            {taxCalculation.breakdown.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between text-[11px] text-slate-600">
+                                                    <span title={item.formula}>
+                                                        {item.name} ({item.rate}%):
+                                                    </span>
+                                                    <span className="font-mono text-slate-800 font-semibold">
+                                                        +৳ {item.amount.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="my-1 py-1 px-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800 font-medium flex justify-between">
+                                            <span>Tax Exemption</span>
+                                            <span className="font-mono">৳ 0.00 (Exempt)</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between py-1.5 bg-blue-50/80 -mx-1 px-2 rounded border border-blue-100 text-gray-900 font-bold">
+                                        <span className="text-blue-900 font-bold">Grand Total (Payable)</span>
+                                        <span className="font-mono text-blue-900 font-extrabold text-sm">৳ {finalPayable.toFixed(2)}</span>
                                     </div>
 
                                     <div className="flex justify-between py-1 border-b border-dashed border-gray-200 text-gray-600">

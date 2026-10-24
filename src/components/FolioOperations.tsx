@@ -19,7 +19,7 @@ interface Transaction {
     user: string;
     amount: number; // positive = credit/payment, negative = debit/charge
     windowId: 1 | 2;
-    category: 'Room' | 'F&B' | 'Transport' | 'Laundry' | 'Spa' | 'Minibar' | 'Payment';
+    category: 'Room' | 'F&B' | 'Transport' | 'Laundry' | 'Spa' | 'Minibar' | 'Payment' | 'Tax';
 }
 
 interface FolioAccount {
@@ -224,19 +224,52 @@ export const FolioOperations: React.FC = () => {
                         const existing = baseList.find(f => f.roomNumber === r.roomNumber || f.folioNumber === `FOL-${r.reservationNumber}`);
                         if (!existing && r.guestName) {
                             const newFolioId = 100 + idx + 1;
+                            const totalTax = Number(r.totalTaxAmount || 0);
+                            const addonsTotal = Number(r.addonCharges?.total || 0);
+                            const baseRate = Number(r.baseAmount) || Math.max(0, (r.totalAmount || 3000) - totalTax - addonsTotal);
+
                             const txns: Transaction[] = [
                                 {
                                     id: newFolioId * 10 + 1,
                                     date: `${r.checkIn || '2026-07-01'} 14:00`,
                                     refNo: `SYS-TAR-${r.reservationNumber || newFolioId}`,
                                     particulars: `Room Tariff (${r.nights || 1} Night${(r.nights || 1) > 1 ? 's' : ''})`,
-                                    description: `${r.roomType || 'Deluxe'} base accommodation rate`,
+                                    description: `${r.roomType || 'Deluxe'} base room rate (excl. Tax & VAT)`,
                                     user: 'system_pms',
-                                    amount: -((r.totalAmount || 3000) - (r.addonCharges?.total || 0)),
+                                    amount: -baseRate,
                                     windowId: 1,
                                     category: 'Room'
                                 }
                             ];
+
+                            // Itemize Taxes & VAT configured at /taxes-vat
+                            if (r.taxDetails?.breakdown && Array.isArray(r.taxDetails.breakdown) && r.taxDetails.breakdown.length > 0) {
+                                r.taxDetails.breakdown.forEach((t: any, tIdx: number) => {
+                                    txns.push({
+                                        id: newFolioId * 100 + 20 + tIdx,
+                                        date: `${r.checkIn || '2026-07-01'} 14:05`,
+                                        refNo: `TAX-${r.reservationNumber || newFolioId}-${tIdx + 1}`,
+                                        particulars: `${t.name} (${t.rate}%)`,
+                                        description: `${t.formula || 'Statutory Tax'} [/taxes-vat]`,
+                                        user: 'tax_engine',
+                                        amount: -Number(t.amount || 0),
+                                        windowId: 1,
+                                        category: 'Tax'
+                                    });
+                                });
+                            } else if (totalTax > 0) {
+                                txns.push({
+                                    id: newFolioId * 100 + 20,
+                                    date: `${r.checkIn || '2026-07-01'} 14:05`,
+                                    refNo: `TAX-${r.reservationNumber || newFolioId}`,
+                                    particulars: `Statutory Tax & VAT (${r.taxConfigCode || 'HOSP-STD'})`,
+                                    description: `Government hospitality taxes & VAT [/taxes-vat]`,
+                                    user: 'tax_engine',
+                                    amount: -totalTax,
+                                    windowId: 1,
+                                    category: 'Tax'
+                                });
+                            }
                             if (r.paidAmount > 0) {
                                 txns.push({
                                     id: newFolioId * 10 + 2,
@@ -868,6 +901,8 @@ export const FolioOperations: React.FC = () => {
                                                 <td className="px-3 py-2 whitespace-nowrap">
                                                     <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded uppercase ${
                                                         txn.category === 'Room' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                                        txn.category === 'Tax' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                                                        txn.category === 'Transport' ? 'bg-sky-50 text-sky-700 border border-sky-200' :
                                                         txn.category === 'F&B' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
                                                         txn.category === 'Laundry' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                                                         txn.category === 'Minibar' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
@@ -1055,7 +1090,14 @@ export const FolioOperations: React.FC = () => {
                                     {activeFolio.transactions.map(t => (
                                         <tr key={t.id}>
                                             <td className="p-2 font-mono text-gray-600">{t.date.split(' ')[0]}</td>
-                                            <td className="p-2 font-medium text-gray-900">{t.particulars}</td>
+                                            <td className="p-2 font-medium text-gray-900">
+                                                <span>{t.particulars}</span>
+                                                {t.category === 'Tax' && (
+                                                    <span className="ml-1.5 px-1 py-0.2 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded border border-indigo-200">
+                                                        TAX/VAT
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="p-2 font-mono text-gray-500 text-[10px]">{t.refNo}</td>
                                             <td className="p-2 text-right font-mono text-gray-900">
                                                 {t.amount < 0 ? `৳ ${Math.abs(t.amount).toLocaleString()}` : '-'}
@@ -1067,6 +1109,29 @@ export const FolioOperations: React.FC = () => {
                                     ))}
                                 </tbody>
                             </table>
+
+                            {/* Tax & VAT Statutory Schedule (Mushak-6.3) */}
+                            {(() => {
+                                const taxTxns = activeFolio.transactions.filter(t => t.category === 'Tax' || t.particulars.toLowerCase().includes('vat') || t.particulars.toLowerCase().includes('tax') || t.particulars.toLowerCase().includes('service charge'));
+                                const totalTaxVal = taxTxns.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                                if (totalTaxVal <= 0) return null;
+                                return (
+                                    <div className="bg-slate-50/80 border border-slate-200 rounded p-2.5 text-[10.5px] space-y-1">
+                                        <div className="font-bold text-slate-700 flex justify-between border-b border-slate-200 pb-1">
+                                            <span>Mushak-6.3 Statutory Tax &amp; Service Charge Schedule</span>
+                                            <span className="font-mono text-blue-900 font-bold">Total Taxes: ৳ {totalTaxVal.toLocaleString()}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-slate-600">
+                                            {taxTxns.map((tx, idx) => (
+                                                <div key={idx} className="flex justify-between">
+                                                    <span>{tx.particulars}:</span>
+                                                    <span className="font-mono font-medium text-slate-900">৳ {Math.abs(tx.amount).toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Summary & Net */}
                             <div className="flex justify-between items-center border-t border-gray-200 pt-3">

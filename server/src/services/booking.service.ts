@@ -282,6 +282,8 @@ export const bookingService = {
     const totalAmount = Number(payload.totalAmount || payload.rateAmount || 0);
     const paidAmount = Number(payload.paidAmount || 0);
     const dueAmount = totalAmount - paidAmount;
+    const totalTaxAmount = Number(payload.totalTaxAmount || payload.vatAmount || 0);
+    const baseAmount = Number(payload.baseAmount) || Math.max(0, totalAmount - totalTaxAmount);
     const isGroup = Boolean(payload.isGroup || (payload.allocatedRooms && payload.allocatedRooms.length > 1));
 
     const resInsert = db.prepare(`
@@ -367,6 +369,25 @@ export const bookingService = {
     );
 
     const folioId = Number(folioInsert.lastInsertRowid);
+
+    // 4b. Record initial Room Tariff and Tax charges into `folio_charges` (USALI Accounting)
+    try {
+      const taxPolicyDesc = payload.taxConfigCode ? ` [${payload.taxConfigCode}]` : '';
+      db.prepare(`
+        INSERT INTO folio_charges (
+          folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date
+        ) VALUES (?, 'ROOM_TARIFF', ?, ?, ?, ?, ?)
+      `).run(
+        folioId,
+        `Room Accommodation Tariff (${nights} night${nights > 1 ? 's' : ''})${taxPolicyDesc}`,
+        baseAmount,
+        totalTaxAmount,
+        totalAmount,
+        checkIn
+      );
+    } catch (chargeErr) {
+      console.warn('Failed to insert initial folio charges', chargeErr);
+    }
 
     // 5. If initial payment provided, record in `payments`
     if (paidAmount > 0) {

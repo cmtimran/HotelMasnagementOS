@@ -41,6 +41,12 @@ import {
     validateAndCommitReservation,
     getAvailableRoomsForStay
 } from '../../utils/roomInventoryEngine';
+import {
+    calculateReservationTaxes,
+    getActiveTaxConfiguration,
+    getTaxConfigurations,
+    type TaxCalculationResult
+} from '../../utils/taxCalculationEngine';
 import { toast } from '../../context/ToastContext';
 
 export interface QuickReservationModalProps {
@@ -100,6 +106,10 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     // Options
     const [dayUse, setDayUse] = useState<boolean>(false);
     const [taxApplicable, setTaxApplicable] = useState<boolean>(true);
+    const [selectedTaxConfigId, setSelectedTaxConfigId] = useState<string>(() => {
+        return getActiveTaxConfiguration().id;
+    });
+    const availableTaxConfigs = useMemo(() => getTaxConfigurations().filter(c => c.status === 'Active'), []);
 
     // Reservation Details
     const [checkInDate, setCheckInDate] = useState<string>(() => getSystemDateISO());
@@ -412,16 +422,23 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const discountedAmount = discountType === 'Percentage'
         ? (totalAmount * (discountValue || 0)) / 100
         : (discountValue || 0);
-    const netTotal = Math.max(0, totalAmount - discountedAmount);
+    const netBaseAmount = Math.max(0, totalAmount - discountedAmount);
+
+    // Multi-tier dynamic Tax & VAT calculation based on /taxes-vat policy
+    const taxCalculation: TaxCalculationResult = useMemo(() => {
+        return calculateReservationTaxes(netBaseAmount, taxApplicable, selectedTaxConfigId);
+    }, [netBaseAmount, taxApplicable, selectedTaxConfigId]);
+
+    const finalPayable = taxCalculation.grandTotal;
     const totalPaid = paymentRows.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const totalDue = Math.max(0, netTotal - totalPaid);
+    const totalDue = Math.max(0, finalPayable - totalPaid);
 
     // Keep payment row default in sync if only 1 cash row
     useEffect(() => {
         if (paymentRows.length === 1 && paymentRows[0].method === 'Cash') {
-            setPaymentRows([{ id: 1, method: 'Cash', amount: netTotal }]);
+            setPaymentRows([{ id: 1, method: 'Cash', amount: finalPayable }]);
         }
-    }, [netTotal]);
+    }, [finalPayable]);
 
     // Room handlers
     const handleAddRoom = () => {
@@ -599,9 +616,29 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             adults: roomsList.reduce((acc, r) => acc + r.adults, 0),
             children: roomsList.reduce((acc, r) => acc + r.children, 0),
             status,
-            totalAmount: netTotal,
+            totalAmount: finalPayable,
             paidAmount: status === 'hold' ? 0 : totalPaid,
-            dueAmount: status === 'hold' ? netTotal : totalDue,
+            dueAmount: status === 'hold' ? finalPayable : totalDue,
+            taxApplicable,
+            taxConfigId: selectedTaxConfigId,
+            taxConfigCode: taxCalculation.configCode,
+            baseAmount: netBaseAmount,
+            serviceChargeAmount: taxCalculation.serviceChargeAmount,
+            vatAmount: taxCalculation.vatAmount,
+            otherTaxesAmount: taxCalculation.otherTaxesAmount,
+            totalTaxAmount: taxCalculation.totalTaxAmount,
+            taxDetails: {
+                isTaxApplicable: taxApplicable,
+                configId: taxCalculation.configId,
+                configName: taxCalculation.configName,
+                configCode: taxCalculation.configCode,
+                baseAmount: netBaseAmount,
+                serviceChargeAmount: taxCalculation.serviceChargeAmount,
+                vatAmount: taxCalculation.vatAmount,
+                otherTaxesAmount: taxCalculation.otherTaxesAmount,
+                totalTaxAmount: taxCalculation.totalTaxAmount,
+                breakdown: taxCalculation.breakdown
+            },
             source: businessSource,
             roomsList: roomsList.flatMap((r) => {
                 const countNeeded = Number(r.noOfRooms) || 1;
@@ -735,7 +772,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     </div>
 
                     <div className="text-[11px] font-medium text-slate-500 hidden sm:block">
-                        Total: <strong className="text-slate-900 font-bold">BDT {netTotal.toLocaleString()}</strong>
+                        Total: <strong className="text-slate-900 font-bold">BDT {finalPayable.toLocaleString()}</strong>
                     </div>
                 </div>
 
@@ -818,15 +855,30 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         <span>Day Use</span>
                                     </label>
 
-                                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
-                                        <input
-                                            type="checkbox"
-                                            checked={taxApplicable}
-                                            onChange={e => setTaxApplicable(e.target.checked)}
-                                            className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                        />
-                                        <span>Tax Applicable</span>
-                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
+                                            <input
+                                                type="checkbox"
+                                                checked={taxApplicable}
+                                                onChange={e => setTaxApplicable(e.target.checked)}
+                                                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                            <span>Tax &amp; VAT Applicable</span>
+                                        </label>
+
+                                        {taxApplicable && (
+                                            <select
+                                                value={selectedTaxConfigId}
+                                                onChange={e => setSelectedTaxConfigId(e.target.value)}
+                                                className="text-[10px] font-medium text-slate-700 bg-white border border-slate-200 rounded px-1.5 py-0.5 max-w-[210px] truncate shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
+                                                title="Select Active Tax Policy from /taxes-vat"
+                                            >
+                                                {availableTaxConfigs.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -1321,27 +1373,49 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             )}
 
                                             <div className="flex justify-between py-1 border-t border-slate-200 text-slate-700 font-semibold">
-                                                <span>Total Gross</span>
+                                                <span>Total Gross (Tariff + Addons)</span>
                                                 <span className="font-bold text-slate-900">৳{totalAmount.toLocaleString()}</span>
                                             </div>
 
-                                            <div className="flex justify-between py-1 text-slate-600">
-                                                <span>Discount</span>
-                                                <span className="font-semibold text-emerald-700">-৳{discountedAmount.toLocaleString()}</span>
-                                            </div>
+                                            {discountedAmount > 0 && (
+                                                <div className="flex justify-between py-1 text-slate-600">
+                                                    <span>Discount ({discountType === 'Percentage' ? `${discountValue}%` : 'Flat'})</span>
+                                                    <span className="font-semibold text-emerald-700">-৳{discountedAmount.toLocaleString()}</span>
+                                                </div>
+                                            )}
 
                                             <div className="flex justify-between py-1 text-slate-800 font-bold border-t border-dashed border-slate-200">
-                                                <span>Net Payable</span>
-                                                <span className="font-bold text-blue-900">৳{netTotal.toLocaleString()}</span>
+                                                <span>Subtotal (Net Base)</span>
+                                                <span className="font-bold text-slate-900">৳{netBaseAmount.toLocaleString()}</span>
+                                            </div>
+
+                                            {taxApplicable && taxCalculation.breakdown.length > 0 && (
+                                                <div className="py-1.5 space-y-1 bg-amber-50/70 p-2 rounded-lg border border-amber-200/80 my-1">
+                                                    <div className="flex justify-between items-center text-[10px] font-bold text-amber-900 uppercase tracking-wider">
+                                                        <span>Taxes, VAT &amp; Surcharge</span>
+                                                        <span className="font-mono text-amber-900">+৳{taxCalculation.totalTaxAmount.toLocaleString()}</span>
+                                                    </div>
+                                                    {taxCalculation.breakdown.map((item, idx) => (
+                                                        <div key={idx} className="flex justify-between text-[11px] text-slate-600 pl-1">
+                                                            <span>{item.name} ({item.rate}%):</span>
+                                                            <span className="font-mono font-medium">+৳{item.amount.toLocaleString()}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="flex justify-between py-1 text-slate-900 font-extrabold border-t border-slate-300 text-sm">
+                                                <span>Grand Total (Payable)</span>
+                                                <span className="font-bold text-blue-900">৳{finalPayable.toLocaleString()}</span>
                                             </div>
 
                                             <div className="flex justify-between py-1 text-slate-600">
-                                                <span>Total Paid</span>
+                                                <span>Total Advance Paid</span>
                                                 <span className="font-bold text-emerald-700">৳{totalPaid.toLocaleString()}</span>
                                             </div>
 
                                             <div className="bg-white -mx-3 -mb-3 px-3 py-2.5 flex justify-between font-bold text-xs border-t border-slate-200 rounded-b-lg">
-                                                <span className="text-slate-800">Remaining Balance:</span>
+                                                <span className="text-slate-800">Remaining Balance Due:</span>
                                                 <span className={totalDue > 0 ? 'text-amber-700' : 'text-emerald-700'}>
                                                     ৳{totalDue.toLocaleString()}
                                                 </span>

@@ -51,6 +51,12 @@ import {
     subscribeToPMSEvents
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
+import {
+    calculateReservationTaxes,
+    getActiveTaxConfiguration,
+    getTaxConfigurations,
+    type TaxCalculationResult
+} from '../utils/taxCalculationEngine';
 
 interface RoomRow {
     id: number;
@@ -93,6 +99,10 @@ export const AddReservation: React.FC = () => {
     const [dayUse, setDayUse] = useState(false);
     const [ratePerNight, setRatePerNight] = useState('Rate Per Night');
     const [taxApplicable, setTaxApplicable] = useState(true);
+    const [selectedTaxConfigId, setSelectedTaxConfigId] = useState<string>(() => {
+        return getActiveTaxConfiguration().id;
+    });
+    const availableTaxConfigs = useMemo(() => getTaxConfigurations().filter(c => c.status === 'Active'), []);
 
     // Helpers for Per-Row Stay Dates (Group Staggered Stay)
     const getRowCheckIn = (r: RoomRow) => r.checkInDate || checkIn;
@@ -377,9 +387,16 @@ export const AddReservation: React.FC = () => {
     const discountedAmount = discountType === 'Percentage'
         ? (grossTotal * discountValue) / 100
         : discountValue;
-    const netTotal = Math.max(0, grossTotal - discountedAmount);
+    const netBaseAmount = Math.max(0, grossTotal - discountedAmount);
+
+    // Multi-tier dynamic Tax & VAT calculation based on /taxes-vat policy
+    const taxCalculation: TaxCalculationResult = useMemo(() => {
+        return calculateReservationTaxes(netBaseAmount, taxApplicable, selectedTaxConfigId);
+    }, [netBaseAmount, taxApplicable, selectedTaxConfigId]);
+
+    const finalPayable = taxCalculation.grandTotal;
     const totalPaid = paymentRows.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    const totalDue = Math.max(0, netTotal - totalPaid);
+    const totalDue = Math.max(0, finalPayable - totalPaid);
 
     const [pmsSyncVersion, setPmsSyncVersion] = useState(0);
 
@@ -717,7 +734,7 @@ export const AddReservation: React.FC = () => {
             const trimmed = currentStr.slice(0, -1);
             updatePaymentRow(currentTarget.id, 'amount', Number(trimmed) || 0);
         } else if (val === 'FULL') {
-            updatePaymentRow(currentTarget.id, 'amount', netTotal);
+            updatePaymentRow(currentTarget.id, 'amount', finalPayable);
         } else {
             if (currentStr === '0') currentStr = '';
             const newStr = currentStr + val;
@@ -786,9 +803,19 @@ export const AddReservation: React.FC = () => {
             adults: mainRoom.adults,
             children: mainRoom.children,
             status: actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : 'arriving',
-            totalAmount: netTotal,
+            totalAmount: finalPayable,
             paidAmount: actionType === 'hold' ? 0 : totalPaid,
-            dueAmount: actionType === 'hold' ? netTotal : totalDue,
+            dueAmount: actionType === 'hold' ? finalPayable : totalDue,
+            taxApplicable,
+            taxConfigId: selectedTaxConfigId,
+            taxConfigName: taxCalculation.configName,
+            taxConfigCode: taxCalculation.configCode,
+            serviceChargeAmount: taxCalculation.serviceChargeAmount,
+            vatAmount: taxCalculation.vatAmount,
+            otherTaxesAmount: taxCalculation.otherTaxesAmount,
+            totalTaxAmount: taxCalculation.totalTaxAmount,
+            taxDetails: taxCalculation,
+            baseAmount: netBaseAmount,
             source: businessSource,
             agent: businessAgent,
             vip: vipStatus || 'None',
@@ -867,7 +894,7 @@ export const AddReservation: React.FC = () => {
                     checkInDate: checkIn,
                     checkOutDate: checkOut,
                     roomType: mainRoom.roomType,
-                    estimatedAmount: netTotal
+                    estimatedAmount: finalPayable
                 });
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(holdsList));
             } catch (e) {
@@ -1124,15 +1151,32 @@ export const AddReservation: React.FC = () => {
                                             <span>Rate Per Night</span>
                                         </label>
 
-                                        <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
-                                            <input
-                                                type="checkbox"
-                                                checked={taxApplicable}
-                                                onChange={e => setTaxApplicable(e.target.checked)}
-                                                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                            />
-                                            <span>Tax Applicable</span>
-                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={taxApplicable}
+                                                    onChange={e => setTaxApplicable(e.target.checked)}
+                                                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                />
+                                                <span>Tax &amp; VAT</span>
+                                            </label>
+
+                                            {taxApplicable && (
+                                                <select
+                                                    value={selectedTaxConfigId}
+                                                    onChange={e => setSelectedTaxConfigId(e.target.value)}
+                                                    className="h-6 px-1.5 border border-blue-200 rounded text-[10.5px] bg-blue-50/70 text-blue-900 font-semibold outline-none focus:border-blue-500 cursor-pointer"
+                                                    title="Select statutory tax configuration configured at /taxes-vat"
+                                                >
+                                                    {availableTaxConfigs.map(cfg => (
+                                                        <option key={cfg.id} value={cfg.id}>
+                                                            {cfg.code} - {cfg.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2392,9 +2436,39 @@ export const AddReservation: React.FC = () => {
                                             <span>Discounted Amount:</span>
                                             <span className="font-bold text-emerald-600 font-mono">-৳ {discountedAmount.toFixed(2)}</span>
                                         </div>
+                                        <div className="flex items-center justify-between py-0.5 text-gray-700 text-[10.5px]">
+                                            <span>Net Base (Taxable):</span>
+                                            <span className="font-semibold font-mono text-gray-900">৳ {netBaseAmount.toFixed(2)}</span>
+                                        </div>
+
+                                        {/* Statutory Taxes & VAT itemized breakdown from /taxes-vat */}
+                                        {taxCalculation.isTaxApplicable && taxCalculation.breakdown.length > 0 ? (
+                                            <div className="my-1 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
+                                                <div className="flex items-center justify-between text-[9.5px] font-bold text-slate-500 uppercase tracking-wider pb-0.5 border-b border-slate-200">
+                                                    <span>{taxCalculation.configCode} Tax Rules</span>
+                                                    <span className="text-blue-700 font-mono">+৳ {taxCalculation.totalTaxAmount.toFixed(2)}</span>
+                                                </div>
+                                                {taxCalculation.breakdown.map((item, idx) => (
+                                                    <div key={idx} className="flex justify-between text-[10.5px] text-slate-600">
+                                                        <span title={item.formula}>
+                                                            {item.name} ({item.rate}%):
+                                                        </span>
+                                                        <span className="font-mono text-slate-800 font-semibold">
+                                                            +৳ {item.amount.toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="my-1 py-1 px-2 bg-amber-50 border border-amber-200 rounded text-[10.5px] text-amber-800 font-medium flex justify-between">
+                                                <span>Tax Exemption</span>
+                                                <span className="font-mono">৳ 0.00 (Exempt)</span>
+                                            </div>
+                                        )}
+
                                         <div className="flex items-center justify-between py-1 px-1.5 bg-blue-50/80 border border-blue-100 rounded text-blue-900 font-bold">
-                                            <span>Net Payable:</span>
-                                            <span className="font-mono text-xs">৳ {netTotal.toFixed(2)}</span>
+                                            <span>Grand Total (Payable):</span>
+                                            <span className="font-mono text-xs font-extrabold">৳ {finalPayable.toFixed(2)}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-0.5 text-gray-600">
                                             <span>Total Paid:</span>
@@ -2462,7 +2536,7 @@ export const AddReservation: React.FC = () => {
                     <div className="text-[11px] text-gray-500">
                         {step === 1 && `Rooms: ${totalRoomsCount} | Check-in: ${checkIn}`}
                         {step === 2 && `Guest: ${guestName || 'Not entered'} | Phone: ${mobile || 'N/A'}`}
-                        {step === 3 && `Net: ${netTotal.toFixed(2)} | Paid: ${totalPaid.toFixed(2)} | Due: ${totalDue.toFixed(2)}`}
+                        {step === 3 && `Payable: ৳${finalPayable.toFixed(2)} | Paid: ৳${totalPaid.toFixed(2)} | Due: ৳${totalDue.toFixed(2)}`}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -2553,9 +2627,19 @@ export const AddReservation: React.FC = () => {
                                 <span>Stay Dates:</span>
                                 <span className="font-medium text-gray-900">{createdReservation.checkIn} to {createdReservation.checkOut} ({createdReservation.nights} nights)</span>
                             </div>
-                            <div className="flex justify-between text-gray-600">
-                                <span>Total Tariff:</span>
-                                <strong className="text-gray-900 font-mono">{createdReservation.totalAmount.toFixed(2)} BDT</strong>
+                            {createdReservation.taxApplicable && (createdReservation.totalTaxAmount > 0) && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Taxes &amp; VAT ({createdReservation.taxConfigCode}):</span>
+                                    <strong className="text-blue-700 font-mono">+৳{(createdReservation.totalTaxAmount || 0).toFixed(2)}</strong>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-gray-800 font-semibold border-t border-gray-200 pt-1">
+                                <span>Grand Total (Payable):</span>
+                                <strong className="text-gray-900 font-mono">৳{createdReservation.totalAmount.toFixed(2)} BDT</strong>
+                            </div>
+                            <div className="flex justify-between text-rose-700 font-semibold">
+                                <span>Due Balance:</span>
+                                <strong className="font-mono">৳{(createdReservation.dueAmount || 0).toFixed(2)} BDT</strong>
                             </div>
                             <div className="flex justify-between text-gray-600">
                                 <span>Status:</span>
