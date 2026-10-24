@@ -20,8 +20,11 @@ import {
     Hand,
     GitFork,
     DoorOpen,
-    DoorClosed
+    DoorClosed,
+    ShieldCheck
 } from 'lucide-react';
+import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
+import { getStandardDailyRateForRoom } from '../../utils/roomInventoryEngine';
 
 export interface AmendBookingData {
     id: string;
@@ -36,6 +39,24 @@ export interface AmendBookingData {
     avgDailyRate?: number;
     status: string;
     isPast?: boolean;
+    // Statutory Tax & VAT and Financial Details
+    totalAmount?: number;
+    paidAmount?: number;
+    dueAmount?: number;
+    baseAmount?: number;
+    taxApplicable?: boolean;
+    taxConfigId?: string;
+    taxConfigCode?: string;
+    taxConfigName?: string;
+    serviceChargeAmount?: number;
+    vatAmount?: number;
+    otherTaxesAmount?: number;
+    totalTaxAmount?: number;
+    taxDetails?: any;
+    phone?: string;
+    email?: string;
+    vip?: string;
+    source?: string;
 }
 
 interface AmendStayModalProps {
@@ -122,8 +143,15 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
         onClose();
     };
 
-    const dailyRate = booking.avgDailyRate || 3000;
-    const totalAmount = nights * dailyRate;
+    // Dynamic room rate & statutory tax engine calculation
+    const dailyBaseRate = booking.avgDailyRate || (booking.baseAmount && booking.nights ? Math.round(booking.baseAmount / booking.nights) : getStandardDailyRateForRoom(booking.roomNumber, booking.roomType));
+    const currentBaseAmount = dailyBaseRate * nights;
+    const isTaxApp = booking.taxApplicable !== false;
+    const activeTaxCalc = calculateReservationTaxes(currentBaseAmount, isTaxApp, booking.taxConfigId);
+
+    const totalAmount = activeTaxCalc.grandTotal;
+    const paidAmount = booking.paidAmount || 0;
+    const dueAmount = Math.max(0, totalAmount - paidAmount);
 
     return createPortal(
         <div className="fixed inset-0 z-[99999] overflow-hidden select-none font-sans">
@@ -425,10 +453,10 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                 </div>
                                 <div className="min-w-0">
                                     <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
-                                        Avg Daily Rate
+                                        Avg Daily Rate (Base)
                                     </div>
                                     <div className="text-xs font-bold text-white font-mono">
-                                        {dailyRate.toFixed(2)}
+                                        ৳ {dailyBaseRate.toLocaleString()}
                                     </div>
                                 </div>
                             </div>
@@ -441,19 +469,29 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <div className="w-5 h-5 rounded bg-blue-500/30 flex items-center justify-center text-blue-200">
                                         <Calculator size={11} />
                                     </div>
-                                    <span>Room Total Amount</span>
+                                    <span>Room Base Tariff ({nights}N)</span>
                                 </div>
-                                <span className="font-mono font-bold text-white">{totalAmount.toFixed(2)}</span>
+                                <span className="font-mono font-bold text-white">৳ {currentBaseAmount.toLocaleString()}</span>
                             </div>
 
                             <div className="flex items-center justify-between text-blue-100 text-[11px]">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded bg-rose-500/30 flex items-center justify-center text-rose-300">
-                                        <DollarSign size={11} />
+                                    <div className="w-5 h-5 rounded bg-cyan-500/30 flex items-center justify-center text-cyan-300">
+                                        <ShieldCheck size={11} />
                                     </div>
-                                    <span>Room Discount</span>
+                                    <span>Statutory Taxes [{activeTaxCalc.configCode}]</span>
                                 </div>
-                                <span className="font-mono font-bold text-rose-300">0.00</span>
+                                <span className="font-mono font-bold text-cyan-300">+৳ {activeTaxCalc.totalTaxAmount.toLocaleString()}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-blue-100 text-[11px] pt-1 border-t border-blue-400/20">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded bg-amber-500/30 flex items-center justify-center text-amber-200">
+                                        <Calculator size={11} />
+                                    </div>
+                                    <span className="font-bold text-white">Total Amount</span>
+                                </div>
+                                <span className="font-mono font-black text-amber-300">৳ {totalAmount.toLocaleString()}</span>
                             </div>
 
                             <div className="flex items-center justify-between text-blue-100 text-[11px]">
@@ -463,7 +501,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     </div>
                                     <span>Room Paid Amount</span>
                                 </div>
-                                <span className="font-mono font-bold text-emerald-300">0.00</span>
+                                <span className="font-mono font-bold text-emerald-300">৳ {paidAmount.toLocaleString()}</span>
                             </div>
                         </div>
 
@@ -473,10 +511,10 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                 <div className="w-5 h-5 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400">
                                     <Wallet size={12} />
                                 </div>
-                                <span className="text-xs">Room Net Balance</span>
+                                <span className="text-xs">Room Net Balance (Due)</span>
                             </div>
                             <span className="font-mono font-black text-emerald-400 text-sm">
-                                {totalAmount.toFixed(2)}
+                                ৳ {dueAmount.toLocaleString()}
                             </span>
                         </div>
                     </div>

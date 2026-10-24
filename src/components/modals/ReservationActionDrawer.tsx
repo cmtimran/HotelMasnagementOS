@@ -25,9 +25,12 @@ import {
     Crown,
     Info,
     Plus,
-    Lock
+    Lock,
+    ShieldCheck
 } from 'lucide-react';
 import type { AmendBookingData } from './AmendStayModal';
+import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
+import { getStandardDailyRateForRoom } from '../../utils/roomInventoryEngine';
 
 export type DrawerMode =
     | 'overview'
@@ -169,8 +172,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             const arr = booking.arrivalDate || '2026-07-01';
             const dep = initialTargetDeparture || booking.departureDate || '2026-07-03';
             const n = initialTargetNights || booking.nights || 2;
-            const daily = booking.avgDailyRate || 3000;
-            const total = n * daily;
+            const daily = booking.avgDailyRate || getStandardDailyRateForRoom(booking.roomNumber, booking.roomType);
+            const total = booking.totalAmount !== undefined ? booking.totalAmount : (n * daily);
+            const due = booking.dueAmount !== undefined 
+                ? booking.dueAmount 
+                : Math.max(0, total - (booking.paidAmount || 0));
 
             setDepartureDate(dep);
             setNights(n);
@@ -182,9 +188,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             setMoveRoomType(booking.roomType || 'Winter Rate Plan');
             setMoveRateType(booking.ratePlan || 'Summer Vacation');
 
-            setPaymentFolio(`${booking.guestName} - FN~012607004`);
+            setPaymentFolio(`${booking.guestName} - FOL-${booking.reservationNumber}`);
             setPaymentMethod('Cash');
-            setPaymentAmount(total);
+            setPaymentAmount(due > 0 ? due : total);
             setPaymentRemarks('');
 
             setSplitRoom(booking.roomNumber);
@@ -216,8 +222,38 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
     if (!isOpen || !booking) return null;
 
-    const dailyRate = booking.avgDailyRate || 3000;
-    const totalAmount = nights * dailyRate;
+    const isTaxApplicable = booking.taxApplicable !== false;
+    const taxConfigId = booking.taxConfigId;
+    const taxConfigCode = booking.taxConfigCode || 'HOSP-STD';
+    
+    // Original values from booking record
+    const origNights = booking.nights || 1;
+    const standardDaily = booking.avgDailyRate || getStandardDailyRateForRoom(booking.roomNumber, booking.roomType);
+    const origTotal = booking.totalAmount !== undefined ? booking.totalAmount : (origNights * standardDaily);
+    const origTax = booking.totalTaxAmount !== undefined ? booking.totalTaxAmount : 0;
+    const origBase = booking.baseAmount !== undefined ? booking.baseAmount : Math.max(0, origTotal - origTax);
+    const dailyBaseRate = Math.max(0, Math.round(origBase / Math.max(1, origNights)));
+
+    // When amending stay nights, calculate dynamic stay totals using central taxCalculationEngine
+    const isAmendingNights = mode === 'amend' && nights !== origNights;
+    const currentBaseAmount = isAmendingNights ? (dailyBaseRate * nights) : origBase;
+    
+    // Evaluate taxes with central taxCalculationEngine
+    const activeTaxCalc = isAmendingNights 
+        ? calculateReservationTaxes(currentBaseAmount, isTaxApplicable, taxConfigId)
+        : (booking.taxDetails || calculateReservationTaxes(currentBaseAmount, isTaxApplicable, taxConfigId));
+
+    const totalAmount = isAmendingNights ? activeTaxCalc.grandTotal : origTotal;
+    const paidAmount = Number(booking.paidAmount || 0);
+    const dueAmount = isAmendingNights 
+        ? Math.max(0, totalAmount - paidAmount) 
+        : (booking.dueAmount !== undefined ? booking.dueAmount : Math.max(0, totalAmount - paidAmount));
+    const serviceCharge = activeTaxCalc.serviceChargeAmount || 0;
+    const vatAmount = activeTaxCalc.vatAmount || 0;
+    const otherTax = activeTaxCalc.otherTaxesAmount || 0;
+    const totalTax = activeTaxCalc.totalTaxAmount || 0;
+    const baseAmount = currentBaseAmount;
+    const dailyRate = Math.round(baseAmount / Math.max(1, nights));
 
     // Handle departure change in amend mode
     const handleDepartureChange = (newDep: string) => {
@@ -616,26 +652,62 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                             </div>
                         </div>
 
-                        {/* Financial Overview Card */}
+                        {/* Financial & Statutory Tax Overview Card */}
                         <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-2 text-xs shadow-2xs">
                             <div className="flex items-center justify-between text-blue-100 text-xs">
                                 <div className="flex items-center gap-2">
                                     <div className="w-5 h-5 rounded bg-blue-500/30 flex items-center justify-center text-blue-200">
                                         <Calculator size={11} />
                                     </div>
-                                    <span>Room Total Amount</span>
+                                    <span>Base Room Tariff (Taxable)</span>
                                 </div>
-                                <span className="font-mono font-bold text-white text-xs">{totalAmount.toFixed(2)}</span>
+                                <span className="font-mono font-bold text-white text-xs">৳ {baseAmount.toFixed(2)}</span>
                             </div>
 
-                            <div className="flex items-center justify-between text-blue-100 text-xs">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded bg-rose-500/30 flex items-center justify-center text-rose-300">
-                                        <DollarSign size={11} />
+                            {/* Statutory Tax & VAT Itemized Breakdown */}
+                            {isTaxApplicable && totalTax > 0 ? (
+                                <div className="bg-black/20 rounded-lg p-2.5 space-y-1.5 border border-blue-400/20 text-[11px]">
+                                    <div className="flex items-center justify-between font-bold text-blue-200 pb-1 border-b border-blue-400/20">
+                                        <span className="flex items-center gap-1.5">
+                                            <ShieldCheck size={12} className="text-emerald-400" />
+                                            <span>Statutory Taxes ({taxConfigCode})</span>
+                                        </span>
+                                        <span className="font-mono text-emerald-300 font-bold">+৳ {totalTax.toFixed(2)}</span>
                                     </div>
-                                    <span>Room Discount</span>
+                                    {serviceCharge > 0 && (
+                                        <div className="flex justify-between text-blue-200/90 text-[10.5px]">
+                                            <span>Hotel Service Charge (10%):</span>
+                                            <span className="font-mono text-white">+৳ {serviceCharge.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {vatAmount > 0 && (
+                                        <div className="flex justify-between text-blue-200/90 text-[10.5px]">
+                                            <span>Standard VAT Mushak-6.3 (15%):</span>
+                                            <span className="font-mono text-white">+৳ {vatAmount.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {otherTax > 0 && (
+                                        <div className="flex justify-between text-blue-200/90 text-[10.5px]">
+                                            <span>City Tourism Levy (2%):</span>
+                                            <span className="font-mono text-white">+৳ {otherTax.toFixed(2)}</span>
+                                        </div>
+                                    )}
                                 </div>
-                                <span className="font-mono font-bold text-rose-300 text-xs">0.00</span>
+                            ) : (
+                                <div className="flex items-center justify-between text-amber-200 text-[11px] bg-amber-500/10 px-2.5 py-1 rounded border border-amber-400/20">
+                                    <span>Tax Policy:</span>
+                                    <span className="font-bold">Tax Exempt (৳ 0.00)</span>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-blue-100 text-xs pt-1.5 border-t border-blue-400/20">
+                                <div className="flex items-center gap-2 font-bold text-white">
+                                    <div className="w-5 h-5 rounded bg-indigo-500/30 flex items-center justify-center text-indigo-300">
+                                        <Calculator size={11} />
+                                    </div>
+                                    <span>Grand Total (Payable)</span>
+                                </div>
+                                <span className="font-mono font-black text-white text-xs">৳ {totalAmount.toFixed(2)}</span>
                             </div>
 
                             <div className="flex items-center justify-between text-blue-100 text-xs">
@@ -643,9 +715,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     <div className="w-5 h-5 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-300">
                                         <CreditCard size={11} />
                                     </div>
-                                    <span>Room Paid Amount</span>
+                                    <span>Advance / Total Paid</span>
                                 </div>
-                                <span className="font-mono font-bold text-emerald-300 text-xs">0.00</span>
+                                <span className="font-mono font-bold text-emerald-300 text-xs">৳ {paidAmount.toFixed(2)}</span>
                             </div>
                         </div>
 
@@ -655,10 +727,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 <div className="w-6 h-6 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
                                     <Wallet size={13} />
                                 </div>
-                                <span className="text-xs font-bold tracking-tight">Room Net Balance</span>
+                                <span className="text-xs font-bold tracking-tight">Net Balance Due</span>
                             </div>
-                            <span className="font-mono font-black text-emerald-400 text-base">
-                                {totalAmount.toFixed(2)}
+                            <span className={`font-mono font-black text-base ${dueAmount > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
+                                ৳ {dueAmount.toFixed(2)}
                             </span>
                         </div>
 
@@ -811,26 +883,51 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 </div>
                             </div>
 
-                            {/* Financial Overview Card */}
+                            {/* Financial & Statutory Tax Overview Card */}
                             <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 space-y-1.5 text-xs shadow-2xs">
                                 <div className="flex items-center justify-between text-blue-100 text-[11px]">
                                     <div className="flex items-center gap-2">
                                         <div className="w-5 h-5 rounded bg-blue-500/30 flex items-center justify-center text-blue-200">
                                             <Calculator size={11} />
                                         </div>
-                                        <span>Room Total Amount</span>
+                                        <span>Base Tariff (Taxable)</span>
                                     </div>
-                                    <span className="font-mono font-bold text-white">{totalAmount.toFixed(2)}</span>
+                                    <span className="font-mono font-bold text-white">৳ {baseAmount.toFixed(2)}</span>
                                 </div>
 
-                                <div className="flex items-center justify-between text-blue-100 text-[11px]">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-5 h-5 rounded bg-rose-500/30 flex items-center justify-center text-rose-300">
-                                            <DollarSign size={11} />
+                                {/* Statutory Tax & VAT Breakdown */}
+                                {isTaxApplicable && totalTax > 0 ? (
+                                    <div className="bg-black/20 rounded-lg p-2 space-y-1 border border-blue-400/20 text-[10.5px]">
+                                        <div className="flex items-center justify-between font-bold text-blue-200 pb-0.5 border-b border-blue-400/20 text-[10px]">
+                                            <span className="flex items-center gap-1">
+                                                <ShieldCheck size={11} className="text-emerald-400" />
+                                                <span>Taxes &amp; VAT ({taxConfigCode})</span>
+                                            </span>
+                                            <span className="font-mono text-emerald-300 font-bold">+৳ {totalTax.toFixed(2)}</span>
                                         </div>
-                                        <span>Room Discount</span>
+                                        {serviceCharge > 0 && (
+                                            <div className="flex justify-between text-blue-200/90 text-[10px]">
+                                                <span>Service Charge (10%):</span>
+                                                <span className="font-mono text-white">+৳ {serviceCharge.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        {vatAmount > 0 && (
+                                            <div className="flex justify-between text-blue-200/90 text-[10px]">
+                                                <span>VAT Mushak-6.3 (15%):</span>
+                                                <span className="font-mono text-white">+৳ {vatAmount.toFixed(2)}</span>
+                                            </div>
+                                        )}
                                     </div>
-                                    <span className="font-mono font-bold text-rose-300">0.00</span>
+                                ) : (
+                                    <div className="flex items-center justify-between text-amber-200 text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-400/20">
+                                        <span>Tax Policy:</span>
+                                        <span className="font-bold">Tax Exempt</span>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between text-blue-100 text-[11px] pt-1 border-t border-blue-400/20 font-bold">
+                                    <span className="text-white">Grand Total (Payable)</span>
+                                    <span className="font-mono font-black text-white">৳ {totalAmount.toFixed(2)}</span>
                                 </div>
 
                                 <div className="flex items-center justify-between text-blue-100 text-[11px]">
@@ -838,9 +935,9 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         <div className="w-5 h-5 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-300">
                                             <CreditCard size={11} />
                                         </div>
-                                        <span>Room Paid Amount</span>
+                                        <span>Advance Paid</span>
                                     </div>
-                                    <span className="font-mono font-bold text-emerald-300">0.00</span>
+                                    <span className="font-mono font-bold text-emerald-300">৳ {paidAmount.toFixed(2)}</span>
                                 </div>
                             </div>
 
@@ -850,10 +947,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     <div className="w-5 h-5 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400">
                                         <Wallet size={12} />
                                     </div>
-                                    <span className="text-xs">Room Net Balance</span>
+                                    <span className="text-xs">Net Balance Due</span>
                                 </div>
-                                <span className="font-mono font-black text-emerald-400 text-sm">
-                                    {totalAmount.toFixed(2)}
+                                <span className={`font-mono font-black text-sm ${dueAmount > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
+                                    ৳ {dueAmount.toFixed(2)}
                                 </span>
                             </div>
                         </div>
@@ -1109,27 +1206,55 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         </div>
 
                                         <div className="bg-[#1b43aa]/80 border border-blue-400/20 rounded-xl p-3 space-y-1.5 text-xs shadow-2xs">
-                                            <div className="text-xs font-bold text-white pb-1 border-b border-blue-400/20">Payment Summary</div>
-                                            <div className="flex justify-between text-blue-100 text-[11px] pt-1">
-                                                <span>Total Amount</span>
-                                                <span className="font-mono font-bold text-white">{totalAmount.toFixed(2)}</span>
+                                            <div className="flex items-center justify-between text-xs font-bold text-white pb-1 border-b border-blue-400/20">
+                                                <span>Settlement &amp; Tax Summary</span>
+                                                <span className="text-[10px] text-blue-200 font-mono">[{taxConfigCode}]</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-100 text-[11px]">
-                                                <span>Discounted Amount</span>
-                                                <span className="font-mono font-bold text-white">0.00</span>
+                                            <div className="flex justify-between text-blue-100 text-[11px] pt-0.5">
+                                                <span>Base Room Tariff</span>
+                                                <span className="font-mono font-bold text-white">৳ {baseAmount.toFixed(2)}</span>
+                                            </div>
+                                            {isTaxApplicable && totalTax > 0 && (
+                                                <div className="flex justify-between text-emerald-300 text-[11px]">
+                                                    <span>Statutory Taxes &amp; VAT</span>
+                                                    <span className="font-mono font-bold">+৳ {totalTax.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between text-blue-100 text-[11px] pt-0.5 border-t border-blue-400/20">
+                                                <span>Total Payable</span>
+                                                <span className="font-mono font-bold text-white">৳ {totalAmount.toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[11px]">
                                                 <span>Total Paid</span>
-                                                <span className="font-mono font-bold text-emerald-300">0.00</span>
+                                                <span className="font-mono font-bold text-emerald-300">৳ {paidAmount.toFixed(2)}</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-100 text-[11px]">
-                                                <span>Total Due</span>
-                                                <span className="font-mono font-bold text-white">{totalAmount.toFixed(2)}</span>
+                                            <div className="flex justify-between text-blue-100 text-[11px] font-bold">
+                                                <span className="text-white">Current Balance Due</span>
+                                                <span className="font-mono text-rose-300 font-bold">৳ {dueAmount.toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-blue-100 text-[11px] pt-1 border-t border-blue-400/20 font-bold">
-                                                <span className="text-white">Amount</span>
-                                                <span className="font-mono text-white">{paymentAmount.toFixed(2)}</span>
+                                                <span className="text-white">Payment Amount</span>
+                                                <span className="font-mono text-emerald-300 text-xs">৳ {paymentAmount.toFixed(2)}</span>
                                             </div>
+                                            {/* Quick Pay Buttons */}
+                                            {dueAmount > 0 && (
+                                                <div className="pt-1 flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaymentAmount(dueAmount)}
+                                                        className="flex-1 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 rounded text-[10px] font-bold text-emerald-200 transition-colors cursor-pointer text-center"
+                                                    >
+                                                        Pay Full Due (৳{dueAmount.toFixed(0)})
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPaymentAmount(Math.round(dueAmount / 2))}
+                                                        className="py-1 px-2.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 rounded text-[10px] font-bold text-blue-200 transition-colors cursor-pointer text-center"
+                                                    >
+                                                        50% (৳{Math.round(dueAmount / 2)})
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex flex-col gap-1">

@@ -27,6 +27,9 @@ import {
     getCanonicalRooms,
     validateAndCommitReservation,
     syncReservationsFromDB,
+    syncRoomTypesAndRoomsFromDB,
+    getStandardDailyRateForRoom,
+    resolveReservationDailyBaseRate,
     type RoomLock,
     type StoredReservation
 } from '../utils/roomInventoryEngine';
@@ -35,6 +38,9 @@ import {
     subscribeToSyncStatus,
     type SyncStatus
 } from '../utils/pmsNetworkSync';
+import {
+    calculateReservationTaxes
+} from '../utils/taxCalculationEngine';
 
 interface TimelineBooking {
     id: string;
@@ -54,6 +60,14 @@ interface TimelineBooking {
     isVipOrSingleLady?: boolean; // 4. VIP or Single Lady (⭐)
     indicator?: string;
     isPast?: boolean;            // Historical / Backdated flag for read-only audit lock
+    // Financial & Statutory Tax Awareness
+    totalAmount?: number;
+    paidAmount?: number;
+    dueAmount?: number;
+    baseAmount?: number;
+    totalTaxAmount?: number;
+    taxConfigCode?: string;
+    taxApplicable?: boolean;
 }
 
 export interface RoomNode {
@@ -605,6 +619,13 @@ export const StayView: React.FC = () => {
                 }
 
                 const isGroup = (res.roomsList && res.roomsList.length > 1) || (res.allocatedRooms && res.allocatedRooms.length > 1);
+                const totalAmt = Number(res.totalAmount) || 0;
+                const paidAmt = Number(res.paidAmount) || 0;
+                const dueAmt = Number(res.dueAmount !== undefined ? res.dueAmount : Math.max(0, totalAmt - paidAmt));
+                const totalTax = Number(res.totalTaxAmount || res.taxDetails?.totalTaxAmount || 0);
+                const baseAmt = Number(res.baseAmount || Math.max(0, totalAmt - totalTax));
+                const taxCode = res.taxConfigCode || res.taxDetails?.configCode || 'HOSP-STD';
+                const isTaxApp = res.taxApplicable !== false;
 
                 if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.length > 0) {
                     res.roomsList.forEach((r: any, idx: number) => {
@@ -633,8 +654,15 @@ export const StayView: React.FC = () => {
                             status: (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
                             isGroupOwner: isGroup && idx === 0,
                             isGroupBooking: isGroup,
-                            isPaymentDue: (res.dueAmount || 0) > 0,
-                            isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none')
+                            isPaymentDue: dueAmt > 0,
+                            isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none'),
+                            totalAmount: totalAmt,
+                            paidAmount: paidAmt,
+                            dueAmount: dueAmt,
+                            baseAmount: baseAmt,
+                            totalTaxAmount: totalTax,
+                            taxConfigCode: taxCode,
+                            taxApplicable: isTaxApp
                         });
                     });
                 } else {
@@ -663,8 +691,15 @@ export const StayView: React.FC = () => {
                         status: (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
                         isGroupOwner: isGroup,
                         isGroupBooking: isGroup,
-                        isPaymentDue: (res.dueAmount || 0) > 0,
-                        isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none')
+                        isPaymentDue: dueAmt > 0,
+                        isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none'),
+                        totalAmount: totalAmt,
+                        paidAmount: paidAmt,
+                        dueAmount: dueAmt,
+                        baseAmount: baseAmt,
+                        totalTaxAmount: totalTax,
+                        taxConfigCode: taxCode,
+                        taxApplicable: isTaxApp
                     });
                 }
             }
@@ -679,9 +714,9 @@ export const StayView: React.FC = () => {
 
     // Subscribe to cross-tab PMS real-time synchronization events
     useEffect(() => {
-        // Sync initially on mount from local cache and live SQLite DB
+        // Sync initially on mount from local cache and live DB (PostgreSQL / SQLite)
         syncStoredReservations();
-        syncReservationsFromDB().then(() => {
+        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
             syncStoredReservations();
         });
 
@@ -786,6 +821,8 @@ export const StayView: React.FC = () => {
     const handleConfirmAssign = (booking: UnassignedBooking) => {
         const available = getAvailableRoomsForBooking(booking);
         const targetRoom = selectedRoomNumber || available[0]?.roomNumber || '102';
+        const taxCalc = calculateReservationTaxes(booking.totalAmount, true);
+        const finalPayable = taxCalc.grandTotal;
 
         const commitRes = validateAndCommitReservation({
             id: Date.now(),
@@ -801,9 +838,19 @@ export const StayView: React.FC = () => {
             checkOut: booking.checkOut,
             nights: booking.nights,
             status: 'confirmed',
-            totalAmount: booking.totalAmount,
+            baseAmount: booking.totalAmount,
+            taxApplicable: true,
+            taxConfigId: taxCalc.configId,
+            taxConfigCode: taxCalc.configCode,
+            taxConfigName: taxCalc.configName,
+            serviceChargeAmount: taxCalc.serviceChargeAmount,
+            vatAmount: taxCalc.vatAmount,
+            otherTaxesAmount: taxCalc.otherTaxesAmount,
+            totalTaxAmount: taxCalc.totalTaxAmount,
+            taxDetails: taxCalc,
+            totalAmount: finalPayable,
             paidAmount: 0,
-            dueAmount: booking.totalAmount,
+            dueAmount: finalPayable,
             source: booking.source || 'OTA Channel',
             roomsList: [{
                 id: 1,
@@ -892,6 +939,20 @@ export const StayView: React.FC = () => {
         const stored = getAllStoredReservations();
         const originalRes = stored.find(r => r.reservationNumber === booking.reservationNumber);
 
+        const nightsCount = currentNights;
+        const dailyBaseRate = resolveReservationDailyBaseRate(originalRes, booking.roomNumber);
+        const isTaxApp = originalRes?.taxApplicable !== false;
+        const taxConfigId = originalRes?.taxConfigId;
+
+        // If originalRes has full tax details, use them; otherwise compute accurately
+        const taxCalc = calculateReservationTaxes(dailyBaseRate * nightsCount, isTaxApp, taxConfigId);
+        const totalAmt = originalRes && originalRes.totalAmount ? Number(originalRes.totalAmount) : taxCalc.grandTotal;
+        const paidAmt = originalRes ? Number(originalRes.paidAmount || 0) : 0;
+        const dueAmt = originalRes ? Number(originalRes.dueAmount !== undefined ? originalRes.dueAmount : Math.max(0, totalAmt - paidAmt)) : Math.max(0, totalAmt - paidAmt);
+        const totalTax = originalRes && originalRes.totalTaxAmount ? Number(originalRes.totalTaxAmount) : taxCalc.totalTaxAmount;
+        const baseAmt = originalRes && originalRes.baseAmount ? Number(originalRes.baseAmount) : taxCalc.baseAmount;
+        const taxCode = originalRes?.taxConfigCode || originalRes?.taxDetails?.configCode || 'HOSP-STD';
+
         const bData: AmendBookingData = {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
@@ -902,9 +963,26 @@ export const StayView: React.FC = () => {
             arrivalDate: arrivalDateStr,
             departureDate: currentDepDateStr,
             nights: currentNights,
-            avgDailyRate: originalRes ? Math.round((originalRes.totalAmount || 3000) / Math.max(1, currentNights)) : 3000,
+            avgDailyRate: Math.round(baseAmt / Math.max(1, currentNights)),
             status: booking.status.toUpperCase(),
-            isPast: booking.isPast
+            isPast: booking.isPast,
+            totalAmount: totalAmt,
+            paidAmount: paidAmt,
+            dueAmount: dueAmt,
+            baseAmount: baseAmt,
+            taxApplicable: isTaxApp,
+            taxConfigId: originalRes?.taxConfigId,
+            taxConfigCode: taxCode,
+            taxConfigName: originalRes?.taxConfigName || originalRes?.taxDetails?.configName || 'Standard Hospitality Rule',
+            serviceChargeAmount: originalRes?.serviceChargeAmount || originalRes?.taxDetails?.serviceChargeAmount || 0,
+            vatAmount: originalRes?.vatAmount || originalRes?.taxDetails?.vatAmount || 0,
+            otherTaxesAmount: originalRes?.otherTaxesAmount || originalRes?.taxDetails?.otherTaxesAmount || 0,
+            totalTaxAmount: totalTax,
+            taxDetails: originalRes?.taxDetails,
+            phone: originalRes?.phone,
+            email: originalRes?.email,
+            vip: originalRes?.vip,
+            source: originalRes?.source
         };
         setActionDrawerBooking(bData);
         setActionDrawerMode('overview');
@@ -939,6 +1017,20 @@ export const StayView: React.FC = () => {
         const stored = getAllStoredReservations();
         const originalRes = stored.find(r => r.reservationNumber === booking.reservationNumber);
 
+        const nightsCount = currentNights;
+        const dailyBaseRate = resolveReservationDailyBaseRate(originalRes, booking.roomNumber);
+        const isTaxApp = originalRes?.taxApplicable !== false;
+        const taxConfigId = originalRes?.taxConfigId;
+
+        // If originalRes has full tax details, use them; otherwise compute accurately
+        const taxCalc = calculateReservationTaxes(dailyBaseRate * nightsCount, isTaxApp, taxConfigId);
+        const totalAmt = originalRes && originalRes.totalAmount ? Number(originalRes.totalAmount) : taxCalc.grandTotal;
+        const paidAmt = originalRes ? Number(originalRes.paidAmount || 0) : 0;
+        const dueAmt = originalRes ? Number(originalRes.dueAmount !== undefined ? originalRes.dueAmount : Math.max(0, totalAmt - paidAmt)) : Math.max(0, totalAmt - paidAmt);
+        const totalTax = originalRes && originalRes.totalTaxAmount ? Number(originalRes.totalTaxAmount) : taxCalc.totalTaxAmount;
+        const baseAmt = originalRes && originalRes.baseAmount ? Number(originalRes.baseAmount) : taxCalc.baseAmount;
+        const taxCode = originalRes?.taxConfigCode || originalRes?.taxDetails?.configCode || 'HOSP-STD';
+
         const bData: AmendBookingData = {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
@@ -949,8 +1041,25 @@ export const StayView: React.FC = () => {
             arrivalDate: arrivalDateStr,
             departureDate: currentDepDateStr,
             nights: currentNights,
-            avgDailyRate: originalRes ? Math.round((originalRes.totalAmount || 3000) / Math.max(1, currentNights)) : 3000,
-            status: booking.status.toUpperCase()
+            avgDailyRate: Math.round(baseAmt / Math.max(1, currentNights)),
+            status: booking.status.toUpperCase(),
+            totalAmount: totalAmt,
+            paidAmount: paidAmt,
+            dueAmount: dueAmt,
+            baseAmount: baseAmt,
+            taxApplicable: isTaxApp,
+            taxConfigId: originalRes?.taxConfigId,
+            taxConfigCode: taxCode,
+            taxConfigName: originalRes?.taxConfigName || originalRes?.taxDetails?.configName || 'Standard Hospitality Rule',
+            serviceChargeAmount: originalRes?.serviceChargeAmount || originalRes?.taxDetails?.serviceChargeAmount || 0,
+            vatAmount: originalRes?.vatAmount || originalRes?.taxDetails?.vatAmount || 0,
+            otherTaxesAmount: originalRes?.otherTaxesAmount || originalRes?.taxDetails?.otherTaxesAmount || 0,
+            totalTaxAmount: totalTax,
+            taxDetails: originalRes?.taxDetails,
+            phone: originalRes?.phone,
+            email: originalRes?.email,
+            vip: originalRes?.vip,
+            source: originalRes?.source
         };
 
         setActionDrawerBooking(bData);
@@ -987,9 +1096,24 @@ export const StayView: React.FC = () => {
                 });
             }
 
-            const dailyRate = Math.round((res.totalAmount || 3000) / Math.max(1, res.nights || 1));
-            updated.totalAmount = dailyRate * newNights;
-            updated.dueAmount = Math.max(0, updated.totalAmount - (updated.paidAmount || 0));
+            // Calculate base daily rate without taxes
+            const dailyBase = resolveReservationDailyBaseRate(res, targetB.roomNumber);
+            const newBaseAmount = dailyBase * newNights;
+
+            // Recalculate multi-tier taxes & VAT with central engine (/taxes-vat)
+            const isTaxApp = res.taxApplicable !== false;
+            const newTaxCalc = calculateReservationTaxes(newBaseAmount, isTaxApp, res.taxConfigId);
+
+            updated.baseAmount = newBaseAmount;
+            updated.taxDetails = newTaxCalc;
+            updated.totalTaxAmount = newTaxCalc.totalTaxAmount;
+            updated.serviceChargeAmount = newTaxCalc.serviceChargeAmount;
+            updated.vatAmount = newTaxCalc.vatAmount;
+            updated.otherTaxesAmount = newTaxCalc.otherTaxesAmount;
+            updated.taxConfigCode = newTaxCalc.configCode;
+            updated.taxConfigName = newTaxCalc.configName;
+            updated.totalAmount = newTaxCalc.grandTotal;
+            updated.dueAmount = Math.max(0, newTaxCalc.grandTotal - (updated.paidAmount || 0));
 
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
@@ -1075,17 +1199,19 @@ export const StayView: React.FC = () => {
 
         const stored = getAllStoredReservations();
         const resIdx = stored.findIndex(r => r.reservationNumber === targetB.reservationNumber);
+        let newDue = 0;
         if (resIdx !== -1) {
             const res = stored[resIdx];
             const updated = { ...res };
             updated.paidAmount = (updated.paidAmount || 0) + amount;
             updated.dueAmount = Math.max(0, (updated.totalAmount || 0) - updated.paidAmount);
+            newDue = updated.dueAmount;
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
         }
 
-        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, isPaymentDue: false } : b));
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, paidAmount: (b.paidAmount || 0) + amount, dueAmount: newDue, isPaymentDue: newDue > 0 } : b));
         showToast(`Payment of ৳${amount.toLocaleString()} received via ${method} for ${targetB.guestName}!`);
     };
 
@@ -1264,6 +1390,9 @@ export const StayView: React.FC = () => {
             return d.toISOString().split('T')[0];
         })();
 
+        const dailyBase = resolveReservationDailyBaseRate(res, target.roomNumber);
+        const unassignTaxCalc = calculateReservationTaxes(dailyBase * nights, res?.taxApplicable !== false, res?.taxConfigId);
+
         const unItem: UnassignedBooking = {
             id: `un-${Date.now()}`,
             reservationNumber: target.reservationNumber,
@@ -1274,7 +1403,7 @@ export const StayView: React.FC = () => {
             nights,
             totalRooms: 1,
             source: res?.source || 'Front Desk',
-            totalAmount: res?.totalAmount || (nights * 3000),
+            totalAmount: res?.totalAmount ? Number(res.totalAmount) : unassignTaxCalc.grandTotal,
             status: 'unassigned'
         };
 
@@ -1389,19 +1518,31 @@ export const StayView: React.FC = () => {
                     const targetFromDate = targetStartDay?.date || days[b.startIndex]?.date || '2026-07-04';
                     const targetToDate = days[moveDrag.targetEndIndex]?.date || days[b.endIndex]?.date || '2026-07-06';
 
+                    const originalRes = getAllStoredReservations().find(r => r.reservationNumber === b.reservationNumber);
+                    const bNights = Math.max(1, (moveDrag.targetEndIndex - moveDrag.targetStartIndex + 1) || (b.endIndex - b.startIndex + 1));
+                    const dailyBase = resolveReservationDailyBaseRate(originalRes, b.roomNumber);
+
                     const bData: AmendBookingData = {
                         id: b.id,
                         reservationNumber: b.reservationNumber,
                         guestName: b.guestName,
                         roomNumber: b.roomNumber,
-                        roomType: 'Winter Rate Plan',
-                        ratePlan: 'Summer Vacation',
+                        roomType: originalRes?.roomType || 'Deluxe Double',
+                        ratePlan: originalRes?.ratePlan || 'Standard Rate',
                         arrivalDate: targetFromDate,
                         departureDate: targetToDate,
-                        nights: Math.max(1, b.endIndex - b.startIndex),
-                        avgDailyRate: 3000,
+                        nights: bNights,
+                        avgDailyRate: dailyBase,
                         status: b.status.toUpperCase(),
-                        isPast: b.isPast
+                        isPast: b.isPast,
+                        totalAmount: originalRes?.totalAmount,
+                        paidAmount: originalRes?.paidAmount,
+                        dueAmount: originalRes?.dueAmount,
+                        baseAmount: originalRes?.baseAmount,
+                        taxApplicable: originalRes?.taxApplicable,
+                        taxConfigId: originalRes?.taxConfigId,
+                        taxConfigCode: originalRes?.taxConfigCode,
+                        totalTaxAmount: originalRes?.totalTaxAmount
                     };
 
                     setActionDrawerBooking(bData);
@@ -1976,9 +2117,9 @@ export const StayView: React.FC = () => {
                                                                         } ${isBeingExtended ? 'ring-2 ring-white shadow-lg z-30' : ''} ${
                                                                             isBeingMoved ? 'opacity-40 ring-2 ring-dashed ring-amber-300' : ''
                                                                         } ${booking.isPast ? 'opacity-90 ring-1 ring-slate-400/60' : ''}`}
-                                                                        title={`${booking.guestName} (${booking.reservationNumber}) • ${booking.isPast ? 'Historical Reservation (Audit Locked)' : 'Click to view details • Drag edge to extend/shorten • Drag to move'}`}
+                                                                        title={`${booking.guestName} (${booking.reservationNumber})\nRoom ${booking.roomNumber} • ${booking.nights || 1} Night(s)\nTariff: ৳${(booking.totalAmount || 0).toLocaleString()} (${booking.taxApplicable === false ? 'Tax Exempt' : `Tax & VAT: ৳${(booking.totalTaxAmount || 0).toLocaleString()} [${booking.taxConfigCode || 'STD'}]`})${(booking.dueAmount || 0) > 0 ? ` • Due: ৳${(booking.dueAmount || 0).toLocaleString()}` : ' • Fully Paid'}\n${booking.isPast ? 'Historical Reservation (Audit Locked)' : 'Click to open details drawer • Drag edge to extend/shorten'}`}
                                                                     >
-                                                                        {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] */}
+                                                                        {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] [EX Exempt] */}
                                                                         <div className="flex items-center -space-x-1 absolute -top-2 left-1.5 z-20 pointer-events-auto">
                                                                             {booking.isPast && (
                                                                                 <span
@@ -2007,7 +2148,7 @@ export const StayView: React.FC = () => {
                                                                             {booking.isPaymentDue && (
                                                                                 <span
                                                                                     className="w-4 h-4 rounded-full bg-red-600 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
-                                                                                    title="Payment Due / Pending"
+                                                                                    title={`Payment Due: ৳${(booking.dueAmount || 0).toLocaleString()} (Includes Tax: ৳${(booking.totalTaxAmount || 0).toLocaleString()})`}
                                                                                 >
                                                                                     <DollarSign size={9} className="stroke-[3]" />
                                                                                 </span>
@@ -2018,6 +2159,14 @@ export const StayView: React.FC = () => {
                                                                                     title="VIP / Single Lady"
                                                                                 >
                                                                                     <Star size={9} className="fill-white stroke-[1.5]" />
+                                                                                </span>
+                                                                            )}
+                                                                            {booking.taxApplicable === false && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-emerald-600 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0 text-[7px] font-black"
+                                                                                    title="Tax Exempt Reservation (0% VAT & SC)"
+                                                                                >
+                                                                                    EX
                                                                                 </span>
                                                                             )}
                                                                         </div>
@@ -2479,6 +2628,11 @@ export const StayView: React.FC = () => {
                         if (found) {
                             setEditingReservation(found);
                         } else {
+                            const bRate = bookingToEdit.avgDailyRate || getStandardDailyRateForRoom(bookingToEdit.roomNumber, bookingToEdit.roomType);
+                            const bNights = bookingToEdit.nights || 1;
+                            const bTotal = bookingToEdit.totalAmount !== undefined ? bookingToEdit.totalAmount : (bRate * bNights);
+                            const bPaid = bookingToEdit.paidAmount || 0;
+                            const bDue = bookingToEdit.dueAmount !== undefined ? bookingToEdit.dueAmount : Math.max(0, bTotal - bPaid);
                             setEditingReservation({
                                 id: bookingToEdit.id,
                                 reservationNumber: bookingToEdit.reservationNumber,
@@ -2488,11 +2642,11 @@ export const StayView: React.FC = () => {
                                 allocatedRooms: [bookingToEdit.roomNumber],
                                 checkIn: bookingToEdit.arrivalDate,
                                 checkOut: bookingToEdit.departureDate,
-                                nights: bookingToEdit.nights,
+                                nights: bNights,
                                 status: bookingToEdit.status?.toLowerCase() || 'confirmed',
-                                totalAmount: (bookingToEdit.avgDailyRate || 3000) * (bookingToEdit.nights || 1),
-                                paidAmount: 0,
-                                dueAmount: (bookingToEdit.avgDailyRate || 3000) * (bookingToEdit.nights || 1),
+                                totalAmount: bTotal,
+                                paidAmount: bPaid,
+                                dueAmount: bDue,
                                 source: 'Direct'
                             } as any);
                         }

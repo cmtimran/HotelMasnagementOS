@@ -45,13 +45,127 @@ export interface StoredReservation {
     [key: string]: any;
 }
 
-// Room Type ID to Name Map
+export interface DynamicRoomType {
+    id: string | number;
+    propertyId?: string | number;
+    code: string;
+    name: string;
+    baseOccupancy: number;
+    maxAdults: number;
+    maxChildren: number;
+    baseRate: number;
+    extraBedRate: number;
+    description?: string;
+}
+
+const STORAGE_KEY_ROOM_TYPES = 'hotel_room_types_v1';
+
+// Dynamic Database Baseline Seeds (synced directly with PostgreSQL & SQLite room_types table)
+export const DEFAULT_ROOM_TYPES: DynamicRoomType[] = [
+    { id: 1, code: 'DD', name: 'Deluxe Double', baseOccupancy: 2, maxAdults: 2, maxChildren: 1, baseRate: 3000, extraBedRate: 1000, description: 'King bed, city view, high-speed WiFi, work desk' },
+    { id: 2, code: 'SK', name: 'Superior King', baseOccupancy: 2, maxAdults: 2, maxChildren: 1, baseRate: 4500, extraBedRate: 1200, description: 'King bed with panoramic balcony and plush lounge' },
+    { id: 3, code: 'ES', name: 'Executive Suite', baseOccupancy: 3, maxAdults: 3, maxChildren: 2, baseRate: 7500, extraBedRate: 1500, description: 'Separate living room, executive lounge access, bathtub' },
+    { id: 4, code: 'PS', name: 'Presidential Royal Suite', baseOccupancy: 4, maxAdults: 4, maxChildren: 2, baseRate: 18000, extraBedRate: 2500, description: 'Top-tier luxury penthouse with private terrace and jacuzzi' },
+    { id: 5, code: 'SS', name: 'Standard Single', baseOccupancy: 1, maxAdults: 1, maxChildren: 0, baseRate: 2200, extraBedRate: 800, description: 'Cozy single room with premium bed and workspace' }
+];
+
+// Room Type ID to Name Map (dynamic compatibility helper)
 export const ROOM_TYPE_MAP: Record<string, string> = {
     '1': 'Deluxe Double',
     '2': 'Superior King',
     '3': 'Executive Suite',
-    '4': 'Standard Single',
-    '5': 'Presidential Suite'
+    '4': 'Presidential Royal Suite',
+    '5': 'Standard Single'
+};
+
+/**
+ * Retrieves all registered Room Types dynamically cached from the database
+ */
+export const getDynamicRoomTypes = (): DynamicRoomType[] => {
+    try {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(STORAGE_KEY_ROOM_TYPES);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        }
+    } catch {}
+    return DEFAULT_ROOM_TYPES;
+};
+
+/**
+ * Resolves standard rack rate for a room or room type dynamically from the database repository
+ */
+export const getStandardDailyRateForRoom = (roomNumber?: string, roomTypeName?: string): number => {
+    const dynamicTypes = getDynamicRoomTypes();
+
+    if (roomNumber) {
+        const canonical = getCanonicalRooms().find(r => String(r.number) === String(roomNumber));
+        if (canonical) {
+            // Match by roomTypeId
+            const matchedById = dynamicTypes.find(t => String(t.id) === String(canonical.roomTypeId));
+            if (matchedById && Number(matchedById.baseRate) > 0) {
+                return Number(matchedById.baseRate);
+            }
+            // Match by roomTypeName
+            const matchedByName = dynamicTypes.find(t => 
+                t.name.toLowerCase() === canonical.roomTypeName.toLowerCase() ||
+                canonical.roomTypeName.toLowerCase().includes(t.name.toLowerCase())
+            );
+            if (matchedByName && Number(matchedByName.baseRate) > 0) {
+                return Number(matchedByName.baseRate);
+            }
+        }
+    }
+
+    if (roomTypeName) {
+        const query = roomTypeName.trim().toLowerCase();
+        const matched = dynamicTypes.find(t => 
+            t.name.toLowerCase() === query ||
+            t.code.toLowerCase() === query ||
+            query.includes(t.name.toLowerCase()) ||
+            t.name.toLowerCase().includes(query)
+        );
+        if (matched && Number(matched.baseRate) > 0) {
+            return Number(matched.baseRate);
+        }
+    }
+
+    return Number(dynamicTypes[0]?.baseRate || 3000);
+};
+
+/**
+ * Dynamically resolves the base daily rate (before taxes) for any reservation or room
+ */
+export const resolveReservationDailyBaseRate = (res: any, roomNumber?: string): number => {
+    if (!res) return getStandardDailyRateForRoom(roomNumber);
+    // 1. Direct baseAmount / nights
+    if (res.baseAmount && res.nights && res.nights > 0) {
+        return Math.round(Number(res.baseAmount) / Number(res.nights));
+    }
+    // 2. roomsList item price/rate
+    if (Array.isArray(res.roomsList) && res.roomsList.length > 0) {
+        const matching = roomNumber 
+            ? res.roomsList.find((r: any) => String(r.roomNumber) === String(roomNumber))
+            : res.roomsList[0];
+        const targetRoom = matching || res.roomsList[0];
+        if (targetRoom && (targetRoom.rate || targetRoom.price || targetRoom.basePrice)) {
+            return Number(targetRoom.rate || targetRoom.price || targetRoom.basePrice);
+        }
+    }
+    // 3. direct ratePerNight / dailyRate / avgDailyRate
+    if (res.ratePerNight) return Number(res.ratePerNight);
+    if (res.dailyRate) return Number(res.dailyRate);
+    if (res.avgDailyRate) return Number(res.avgDailyRate);
+    // 4. totalAmount minus tax / nights
+    if (res.totalAmount && res.nights && res.nights > 0) {
+        const tax = Number(res.totalTaxAmount || res.taxDetails?.totalTaxAmount || 0);
+        return Math.max(0, Math.round((Number(res.totalAmount) - tax) / Number(res.nights)));
+    }
+    return getStandardDailyRateForRoom(roomNumber || res.roomNumber, res.roomType);
 };
 
 // Canonical Property Inventory (34 Rooms)
@@ -226,18 +340,22 @@ export const getCanonicalRooms = (): CanonicalRoom[] => {
         if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed.map((r: any) => ({
-                    id: r.id,
-                    number: String(r.number),
-                    name: r.name || `Room ${r.number}`,
-                    buildingId: String(r.buildingId || '1'),
-                    floorId: String(r.floorId || '1'),
-                    roomTypeId: String(r.roomTypeId || '1'),
-                    roomTypeName: ROOM_TYPE_MAP[String(r.roomTypeId)] || 'Deluxe Double',
-                    status: r.status || 'Active',
-                    housekeepingStatus: r.housekeepingStatus || 'Clean',
-                    remarks: r.remarks
-                }));
+                const dynamicTypes = getDynamicRoomTypes();
+                return parsed.map((r: any) => {
+                    const matchedType = dynamicTypes.find(t => String(t.id) === String(r.roomTypeId));
+                    return {
+                        id: r.id,
+                        number: String(r.number),
+                        name: r.name || `Room ${r.number}`,
+                        buildingId: String(r.buildingId || '1'),
+                        floorId: String(r.floorId || '1'),
+                        roomTypeId: String(r.roomTypeId || '1'),
+                        roomTypeName: r.roomTypeName || matchedType?.name || ROOM_TYPE_MAP[String(r.roomTypeId)] || 'Deluxe Double',
+                        status: r.status || 'Active',
+                        housekeepingStatus: r.housekeepingStatus || 'Clean',
+                        remarks: r.remarks
+                    };
+                });
             }
         }
     } catch {}
@@ -661,9 +779,69 @@ export const deleteReservationInDB = async (
     return false;
 };
 
-// Initial background sync with SQLite on boot
+/**
+ * Synchronize Dynamic Room Types and Canonical Rooms directly from the PostgreSQL / SQLite database
+ */
+export const syncRoomTypesAndRoomsFromDB = async (): Promise<{ roomTypes: DynamicRoomType[]; rooms: CanonicalRoom[] }> => {
+    if (typeof window === 'undefined') {
+        return { roomTypes: getDynamicRoomTypes(), rooms: getCanonicalRooms() };
+    }
+    try {
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || `http://${window.location.hostname || 'localhost'}:3001`;
+        // Fetch property details containing dynamic roomTypes and physical rooms from database
+        const res = await fetch(`${API_BASE}/api/properties/1`);
+        const json = await res.json();
+        if (json.success && json.data) {
+            const { roomTypes, rooms } = json.data;
+            let mappedTypes: DynamicRoomType[] = [];
+            if (Array.isArray(roomTypes) && roomTypes.length > 0) {
+                mappedTypes = roomTypes.map((rt: any) => ({
+                    id: rt.id,
+                    propertyId: rt.property_id,
+                    code: rt.code,
+                    name: rt.name,
+                    baseOccupancy: Number(rt.base_occupancy || 2),
+                    maxAdults: Number(rt.max_adults || 2),
+                    maxChildren: Number(rt.max_children || 1),
+                    baseRate: Number(rt.base_rate || 3000),
+                    extraBedRate: Number(rt.extra_bed_rate || 1000),
+                    description: rt.description
+                }));
+                localStorage.setItem(STORAGE_KEY_ROOM_TYPES, JSON.stringify(mappedTypes));
+            }
+
+            let mappedRooms: CanonicalRoom[] = [];
+            if (Array.isArray(rooms) && rooms.length > 0) {
+                mappedRooms = rooms.map((r: any) => ({
+                    id: r.id,
+                    number: String(r.room_number || r.number),
+                    name: r.name || `Room ${r.room_number || r.number}`,
+                    buildingId: String(r.building_id || r.buildingId || '1'),
+                    floorId: String(r.floor_id || r.floorId || '1'),
+                    roomTypeId: String(r.room_type_id || r.roomTypeId || '1'),
+                    roomTypeName: r.room_type_name || (mappedTypes.find(t => String(t.id) === String(r.room_type_id || r.roomTypeId))?.name) || 'Deluxe Double',
+                    status: r.status === 'ACTIVE' || r.status === 'Active' ? 'Active' : (r.status === 'OUT_OF_ORDER' || r.status === 'Out of Order' ? 'Out of Order' : 'Maintenance'),
+                    housekeepingStatus: r.housekeeping_status === 'CLEAN' || r.housekeepingStatus === 'Clean' ? 'Clean' : (r.housekeeping_status === 'DIRTY' || r.housekeepingStatus === 'Dirty' ? 'Dirty' : 'Inspected'),
+                    remarks: r.remarks
+                }));
+                localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(mappedRooms));
+            }
+
+            return {
+                roomTypes: mappedTypes.length > 0 ? mappedTypes : getDynamicRoomTypes(),
+                rooms: mappedRooms.length > 0 ? mappedRooms : getCanonicalRooms()
+            };
+        }
+    } catch (err) {
+        console.warn('Could not sync dynamic room types from relational DB, using cached repository:', err);
+    }
+    return { roomTypes: getDynamicRoomTypes(), rooms: getCanonicalRooms() };
+};
+
+// Initial background sync with Database on boot
 if (typeof window !== 'undefined') {
     setTimeout(() => {
+        syncRoomTypesAndRoomsFromDB();
         syncReservationsFromDB();
     }, 500);
 }
