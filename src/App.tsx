@@ -681,11 +681,7 @@ function App() {
     localStorage.setItem('auth_token', 'valid_token_placeholder');
     localStorage.setItem('user_data', JSON.stringify(user));
     updateUserSession(user);
-    if (user.role === 'super_admin') {
-      setActivePage('multi-property');
-    } else {
-      setActivePage('front-desk');
-    }
+    setActivePage('front-desk');
   };
 
   const handleLogout = () => {

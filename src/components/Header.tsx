@@ -9,12 +9,15 @@ import {
     X,
     Check,
     LayoutGrid,
-    Shield
+    Utensils,
+    ChefHat,
+    Plus,
+    CalendarDays,
+    SlidersHorizontal,
+    ExternalLink
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
 import { useProperty } from '../context/PropertyContext';
-import { usePortal } from '../context/PortalContext';
-
 
 interface HeaderProps {
     activePage: string;
@@ -28,12 +31,14 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const [isAddReservationOpen, setIsAddReservationOpen] = useState(false);
     const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
     const [isPropertyPopoverOpen, setIsPropertyPopoverOpen] = useState(false);
+    const [isAlertsPopoverOpen, setIsAlertsPopoverOpen] = useState(false);
+
     const dropdownRef = useRef<HTMLDivElement>(null);
     const datePopoverRef = useRef<HTMLDivElement>(null);
     const propertyPopoverRef = useRef<HTMLDivElement>(null);
-    const { activeProperty, properties, setActivePropertyId } = useProperty();
-    const { portalMode, switchToSuperAdmin, switchToPropertyPMS, isSuperAdmin } = usePortal();
+    const alertsPopoverRef = useRef<HTMLDivElement>(null);
 
+    const { activeProperty, properties, setActivePropertyId } = useProperty();
 
     // Business System Date State (hydrated from localStorage or default '01 Jul 2026')
     const [systemDate, setSystemDate] = useState<string>(() => {
@@ -41,23 +46,44 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     });
     const [tempDateInput, setTempDateInput] = useState<string>('2026-07-01');
 
+    // Recent Operational Alerts
+    const [alerts, setAlerts] = useState([
+        { id: 1, title: 'New Table Order #1042', time: '2m ago', type: 'fnb', desc: 'Table 4 (Dine-in) - ৳ 1,450' },
+        { id: 2, title: 'Express Check-in Ready', time: '15m ago', type: 'frontdesk', desc: 'Room 302 - Dr. Tariqul Islam' },
+        { id: 3, title: 'Room Cleaned & Inspected', time: '34m ago', type: 'hk', desc: 'Room 205 (Executive Suite)' },
+    ]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (dropdownRef.current && !dropdownRef.current.contains(target)) {
                 setIsDropdownOpen(false);
             }
-            if (datePopoverRef.current && !datePopoverRef.current.contains(event.target as Node)) {
+            if (datePopoverRef.current && !datePopoverRef.current.contains(target)) {
                 setIsDatePopoverOpen(false);
             }
-            if (propertyPopoverRef.current && !propertyPopoverRef.current.contains(event.target as Node)) {
+            if (propertyPopoverRef.current && !propertyPopoverRef.current.contains(target)) {
                 setIsPropertyPopoverOpen(false);
             }
+            if (alertsPopoverRef.current && !alertsPopoverRef.current.contains(target)) {
+                setIsAlertsPopoverOpen(false);
+            }
+        };
 
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsDropdownOpen(false);
+                setIsDatePopoverOpen(false);
+                setIsPropertyPopoverOpen(false);
+                setIsAlertsPopoverOpen(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
         };
     }, []);
 
@@ -85,388 +111,427 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
         .map(w => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
 
+    const userInitial = user?.name ? user.name.trim()[0].toUpperCase() : 'A';
+    const userRoleDisplay = user?.role ? user.role.replace('_', ' ').toUpperCase() : 'STAFF';
+
     return (
         <>
-            <header className="h-11 bg-white border-b border-gray-200/90 flex items-center justify-between px-3 sm:px-4 flex-shrink-0 z-40 sticky top-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
-                {/* Left Side - Clean Page Context / Breadcrumb with Active Panel Badge */}
-                <div className="flex items-center gap-2 text-xs font-medium text-gray-500 min-w-0">
-                    <div 
-                        onClick={() => {
-                            if (portalMode === 'super_admin') {
-                                setActivePage('multi-property');
-                            } else {
-                                setActivePage('front-desk');
-                            }
-                        }}
-                        className="cursor-pointer flex items-center gap-1.5 transition-opacity hover:opacity-80 select-none"
+            <header className="h-14 sm:h-14 bg-white border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 flex-shrink-0 z-30 sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.02)] select-none">
+                {/* Left Side - Clean Page Context / Breadcrumb */}
+                <div className="flex items-center gap-2.5 text-xs font-medium text-slate-500 min-w-0">
+                    <button
+                        type="button"
+                        onClick={() => setActivePage('front-desk')}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 transition cursor-pointer"
+                        title="Go to Front Desk Overview"
                     >
-                        {portalMode === 'super_admin' ? (
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/60 text-indigo-700 font-bold text-[10.5px]">
-                                <Shield size={12} className="text-indigo-600" />
-                                <span>Master HQ</span>
-                            </span>
-                        ) : (
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/60 text-emerald-700 font-bold text-[10.5px]">
-                                <Building2 size={12} className="text-emerald-600" />
-                                <span>{activeProperty?.code || 'GPD'} PMS</span>
-                            </span>
-                        )}
-                    </div>
-                    <span className="text-gray-300">/</span>
-                    <span className="font-semibold text-gray-800 text-[11.5px] truncate max-w-[180px] sm:max-w-xs">
+                        <Building2 size={13} className="text-blue-600" />
+                        <span className="font-bold text-[11px] tracking-tight">{activeProperty?.code || 'GPD'}</span>
+                    </button>
+
+                    <span className="text-slate-300 font-light">/</span>
+
+                    <span className="font-bold text-slate-900 text-xs sm:text-[13px] truncate max-w-[200px] sm:max-w-xs">
                         {pageTitle}
                     </span>
                 </div>
 
-                {/* Right Side - Dual-Panel Mode Switcher (Super Admin Only), Active Hotel Switcher, System Date, Action Icons, and User Profile */}
+                {/* Right Side - OrderlyRMS Branch Selector, System Date, Quick Actions, Alerts, and User Profile */}
                 <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
-                    {/* DUAL-PANEL SEGMENTED SWITCHER (Rendered ONLY if user is Super Admin) */}
-                    {isSuperAdmin ? (
-                        <div className="flex items-center bg-gray-100/90 p-0.5 rounded-lg border border-gray-200 shadow-2xs">
-                            <button
-                                type="button"
-                                onClick={() => switchToSuperAdmin('multi-property')}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                    portalMode === 'super_admin'
-                                        ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60'
-                                        : 'text-gray-500 hover:text-gray-900'
-                                }`}
-                                title="Super Admin Master Console (Group HQ & Portfolio)"
-                            >
-                                <Shield size={11} className={portalMode === 'super_admin' ? 'text-indigo-600' : 'text-gray-400'} />
-                                <span className="hidden sm:inline">Super Admin</span>
-                                <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 hidden lg:inline font-mono">HQ</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => switchToPropertyPMS(activeProperty?.id, 'front-desk')}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                    portalMode === 'property_pms'
-                                        ? 'bg-white text-emerald-700 shadow-xs border border-gray-200/60'
-                                        : 'text-gray-500 hover:text-gray-900'
-                                }`}
-                                title="Inspect Hotel Operations (Property Staff PMS)"
-                            >
-                                <Building2 size={11} className={portalMode === 'property_pms' ? 'text-emerald-600' : 'text-gray-400'} />
-                                <span className="hidden sm:inline">Property PMS</span>
-                                <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 font-mono">{activeProperty?.code || 'GPD'}</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-[11px] font-semibold select-none">
-                            <Building2 size={12} className="text-emerald-600" />
-                            <span className="font-bold">{activeProperty?.name || 'Grand Palace'}</span>
-                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-mono font-bold uppercase">
-                                {user?.role ? user.role.replace('_', ' ') : 'Staff'}
-                            </span>
-                        </div>
-                    )}
-
-                    {/* Active Hotel Property Switcher Pill */}
+                    {/* 1. ACTIVE PROPERTY / BRANCH SELECTOR (Matching OrderlyRMS branch picker) */}
                     <div className="relative" ref={propertyPopoverRef}>
                         <button
                             type="button"
-                            onClick={() => setIsPropertyPopoverOpen(!isPropertyPopoverOpen)}
-                            className="h-7 px-2.5 rounded-md border border-gray-200/80 bg-white hover:bg-gray-50 text-gray-700 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer select-none text-[11px] font-semibold"
-                            title="Active Hotel Property (Click to switch)"
+                            onClick={() => {
+                                setIsPropertyPopoverOpen(!isPropertyPopoverOpen);
+                                setIsDatePopoverOpen(false);
+                                setIsAlertsPopoverOpen(false);
+                                setIsDropdownOpen(false);
+                            }}
+                            className="h-8 px-2.5 sm:px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer select-none text-xs font-semibold"
+                            title="Active Hotel Property (Click to switch branch/property)"
                         >
-                            <Building2 size={12} className="text-blue-600 flex-shrink-0" />
-                            <span className="max-w-[120px] truncate hidden md:inline">{activeProperty?.name || 'Grand Palace'}</span>
-                            <span className="md:hidden font-mono text-[10px] font-bold text-blue-600">{activeProperty?.code || 'GPD'}</span>
-                            <ChevronDown size={11} className="text-gray-400" />
+                            <Building2 size={13} className="text-blue-600 flex-shrink-0" />
+                            <span className="max-w-[130px] sm:max-w-[160px] truncate hidden xs:inline">
+                                {activeProperty?.name || 'Grand Palace Dhaka'}
+                            </span>
+                            <span className="xs:hidden font-mono text-[11px] font-bold text-blue-600">
+                                {activeProperty?.code || 'GPD'}
+                            </span>
+                            <ChevronDown
+                                size={12}
+                                className={`text-slate-400 transition-transform duration-200 ${isPropertyPopoverOpen ? 'rotate-180' : ''}`}
+                            />
                         </button>
 
+                        {/* Property Switcher Dropdown */}
                         {isPropertyPopoverOpen && (
-                            <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 animate-in fade-in">
-                                <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hotel Properties</span>
-                                    {isSuperAdmin && (
-                                        <button 
-                                            type="button"
-                                            onClick={() => { setIsPropertyPopoverOpen(false); setActivePage('multi-property'); }}
-                                            className="text-[10px] font-semibold text-blue-600 hover:underline cursor-pointer"
-                                        >
-                                            Chain Console →
-                                        </button>
-                                    )}
+                            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                        Select Hotel Context
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsPropertyPopoverOpen(false);
+                                            setActivePage('multi-property');
+                                        }}
+                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <span>Chain Console</span>
+                                        <ExternalLink size={10} />
+                                    </button>
                                 </div>
-                                {properties.map(p => {
-                                    const isSelected = p.id === activeProperty?.id;
-                                    return (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setActivePropertyId(p.id);
-                                                setIsPropertyPopoverOpen(false);
-                                            }}
-                                            className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
-                                                isSelected ? 'bg-blue-50/80 text-blue-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
-                                                    {p.code}
-                                                </span>
-                                                <div className="min-w-0">
-                                                    <p className="text-xs truncate">{p.name}</p>
-                                                    <p className="text-[9.5px] text-gray-400 font-normal">{p.city} • {p.total_rooms || 0} rooms</p>
+
+                                <div className="py-1 max-h-64 overflow-y-auto">
+                                    {properties.map(p => {
+                                        const isSelected = p.id === activeProperty?.id;
+                                        return (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setActivePropertyId(p.id);
+                                                    setIsPropertyPopoverOpen(false);
+                                                }}
+                                                className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between transition-colors cursor-pointer ${
+                                                    isSelected ? 'bg-blue-50/80 text-blue-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                                        {p.code}
+                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs truncate font-semibold">{p.name}</p>
+                                                        <p className="text-[10px] text-slate-400 font-normal">
+                                                            {p.city} • {p.total_rooms || 0} rooms
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            {isSelected && <Check size={13} className="text-blue-600 flex-shrink-0" />}
-                                        </button>
-                                    );
-                                })}
+                                                {isSelected && (
+                                                    <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0"></span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="border-t border-slate-100 px-3 py-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsPropertyPopoverOpen(false);
+                                            setActivePage('property-create');
+                                        }}
+                                        className="w-full text-left px-2 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-50/60 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <Plus size={12} />
+                                        <span>Register New Property</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* 1. System Date (Compact Pill Button) */}
+                    {/* 2. SYSTEM DATE PILL BUTTON */}
                     <div className="relative" ref={datePopoverRef}>
                         <button
                             type="button"
-                            onClick={() => setIsDatePopoverOpen(!isDatePopoverOpen)}
-                            className="h-7 px-2.5 rounded-md border border-gray-200/80 bg-white hover:bg-gray-100 hover:text-gray-900 transition-colors flex items-center gap-1.5 text-gray-700 shadow-2xs cursor-pointer select-none"
-                            title="PMS Operating System Date (Click to adjust)"
+                            onClick={() => {
+                                setIsDatePopoverOpen(!isDatePopoverOpen);
+                                setIsPropertyPopoverOpen(false);
+                                setIsAlertsPopoverOpen(false);
+                                setIsDropdownOpen(false);
+                            }}
+                            className="h-8 px-2.5 sm:px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer select-none text-xs font-semibold"
+                            title="PMS Operating System Date (Click to adjust business date)"
                         >
-                            <Calendar size={12} className="text-gray-500" />
-                            <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">System Date:</span>
-                            <span className="text-[11px] font-bold text-gray-800 font-mono tracking-tight">{systemDate}</span>
+                            <Calendar size={13} className="text-slate-500" />
+                            <span className="text-[10px] text-slate-400 font-medium hidden md:inline">Date:</span>
+                            <span className="text-[11.5px] font-bold text-slate-800 font-mono tracking-tight">{systemDate}</span>
                         </button>
 
                         {/* Date Adjustment Popover */}
                         {isDatePopoverOpen && (
-                            <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-200 p-3.5 z-50 animate-in fade-in zoom-in-95">
-                                <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
                                     <div className="flex items-center gap-1.5">
-                                        <Calendar size={13} className="text-blue-700" />
-                                        <span className="text-xs font-bold text-gray-900">PMS System Date</span>
+                                        <Calendar size={14} className="text-blue-600" />
+                                        <span className="text-xs font-bold text-slate-900">PMS Business Date</span>
                                     </div>
                                     <button
                                         type="button"
                                         onClick={() => setIsDatePopoverOpen(false)}
-                                        className="text-gray-400 hover:text-gray-600 p-0.5 rounded cursor-pointer"
+                                        className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                                     >
                                         <X size={12} />
                                     </button>
                                 </div>
 
-                                <div className="py-2.5 space-y-2">
-                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                <div className="py-3 space-y-2">
+                                    <p className="text-[11px] text-slate-500 leading-relaxed">
                                         Active business date for night audit, room occupancy timeline, and folio postings:
                                     </p>
                                     <input
                                         type="date"
                                         value={tempDateInput}
                                         onChange={e => setTempDateInput(e.target.value)}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg text-xs font-bold text-blue-900 outline-none focus:border-blue-500"
+                                        className="w-full h-8 px-2.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                                     />
                                 </div>
 
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                                     <button
                                         type="button"
                                         onClick={handleResetDate}
-                                        className="text-[10px] font-semibold text-gray-500 hover:text-blue-700 cursor-pointer"
+                                        className="text-[10px] font-semibold text-slate-500 hover:text-blue-700 cursor-pointer"
                                     >
                                         Reset (01 Jul 2026)
                                     </button>
                                     <button
                                         type="button"
                                         onClick={handleApplyDate}
-                                        className="h-6 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                        className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition shadow-2xs"
                                     >
-                                        <Check size={11} />
-                                        <span>Update</span>
+                                        <Check size={12} />
+                                        <span>Update Date</span>
                                     </button>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* 2. Compact Topbar Action Icons (w-7 h-7 rounded-md border border-gray-200/80) */}
-                    <div className="flex items-center gap-1.5">
-                        {/* Add Reservation Button (Direct navigation to /add-reservation, matching sidebar) */}
+                    {/* 3. QUICK ACTION SHORTCUT ICONS */}
+                    <div className="hidden sm:flex items-center gap-1 bg-slate-50 p-0.5 rounded-xl border border-slate-200/80">
+                        {/* New Reservation Shortcut */}
                         <button
                             type="button"
                             onClick={() => setActivePage('add-reservation')}
-                            title="Add Reservation (/add-reservation)"
-                            className={`w-7 h-7 rounded-md border transition-colors flex items-center justify-center shadow-2xs cursor-pointer group ${
+                            title="Add Reservation"
+                            className={`w-7 h-7 rounded-lg transition flex items-center justify-center cursor-pointer ${
                                 activePage === 'add-reservation' || activePage === 'quick-reservation'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200/80 font-semibold shadow-2xs'
-                                    : 'border-gray-200/80 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                             }`}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 transition-transform group-hover:scale-105" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11v6m-3-3h6" />
-                            </svg>
+                            <Plus size={14} />
                         </button>
 
-                        {/* Stay View Button */}
+                        {/* Stay View Tape Chart */}
                         <button
                             type="button"
                             onClick={() => setActivePage('stay-view')}
-                            title="Stay View Calendar"
-                            className={`w-7 h-7 rounded-md border transition-colors flex items-center justify-center shadow-2xs cursor-pointer group ${
+                            title="Stay View Tape Chart"
+                            className={`w-7 h-7 rounded-lg transition flex items-center justify-center cursor-pointer ${
                                 activePage === 'stay-view'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200/80 font-semibold shadow-2xs'
-                                    : 'border-gray-200/80 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                             }`}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 transition-transform group-hover:scale-105" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                            <CalendarDays size={13} />
                         </button>
 
-                        {/* Room Rack Button */}
+                        {/* Room Rack Grid */}
                         <button
                             type="button"
                             onClick={() => setActivePage('room-rack')}
                             title="Room Rack Grid"
-                            className={`w-7 h-7 rounded-md border transition-colors flex items-center justify-center shadow-2xs cursor-pointer group ${
+                            className={`w-7 h-7 rounded-lg transition flex items-center justify-center cursor-pointer ${
                                 activePage === 'room-rack'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200/80 font-semibold shadow-2xs'
-                                    : 'border-gray-200/80 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                             }`}
                         >
-                            <LayoutGrid size={13} className="transition-transform group-hover:scale-105" />
+                            <LayoutGrid size={13} />
                         </button>
 
-                        {/* Reservation List Button */}
+                        {/* Restaurant POS Shortcut */}
                         <button
                             type="button"
-                            onClick={() => setActivePage('reservations')}
-                            title="Reservations List"
-                            className={`w-7 h-7 rounded-md border transition-colors flex items-center justify-center shadow-2xs cursor-pointer group ${
-                                activePage === 'reservations' || activePage === 'reservations-view'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200/80 font-semibold shadow-2xs'
-                                    : 'border-gray-200/80 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                            onClick={() => setActivePage('pos')}
+                            title="Restaurant POS Terminal"
+                            className={`w-7 h-7 rounded-lg transition flex items-center justify-center cursor-pointer ${
+                                activePage === 'pos'
+                                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                             }`}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 transition-transform group-hover:scale-105" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14h.01M15 14h.01M12 14h.01M9 17h.01M12 17h.01M15 17h.01" />
-                            </svg>
+                            <Utensils size={13} />
                         </button>
 
-                        {/* Notifications Bell Button */}
+                        {/* Kitchen Display (KDS) */}
                         <button
-                            className="w-7 h-7 rounded-md border border-gray-200/80 text-gray-600 flex items-center justify-center hover:bg-gray-100 hover:text-gray-900 transition-colors relative cursor-pointer"
-                            title="Notifications"
+                            type="button"
+                            onClick={() => setActivePage('kds')}
+                            title="Kitchen Display System (KDS)"
+                            className={`w-7 h-7 rounded-lg transition flex items-center justify-center cursor-pointer ${
+                                activePage === 'kds'
+                                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                            }`}
                         >
-                            <Bell size={13} />
-                            <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                            <ChefHat size={13} />
                         </button>
                     </div>
 
-                    {/* Subtle Divider */}
-                    <div className="h-4 w-px bg-gray-200"></div>
+                    {/* 4. NOTIFICATIONS BELL */}
+                    <div className="relative" ref={alertsPopoverRef}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsAlertsPopoverOpen(!isAlertsPopoverOpen);
+                                setIsPropertyPopoverOpen(false);
+                                setIsDatePopoverOpen(false);
+                                setIsDropdownOpen(false);
+                            }}
+                            className="size-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition flex items-center justify-center relative cursor-pointer shadow-2xs"
+                            title="Notifications & Live Alerts"
+                        >
+                            <Bell size={13} />
+                            {alerts.length > 0 && (
+                                <span className="absolute top-1.5 right-1.5 size-1.5 bg-blue-600 rounded-full ring-2 ring-white"></span>
+                            )}
+                        </button>
 
-                    {/* User Profile */}
+                        {isAlertsPopoverOpen && (
+                            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-24px)] rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl p-3 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-slate-800">Operational Alerts</span>
+                                        <span className="text-[10px] text-slate-400">Live Hotel & F&B stream</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setAlerts([])}
+                                        className="text-[11px] text-blue-600 font-semibold cursor-pointer hover:underline"
+                                    >
+                                        Clear all
+                                    </button>
+                                </div>
+                                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                                    {alerts.length > 0 ? (
+                                        alerts.map(a => (
+                                            <div
+                                                key={a.id}
+                                                className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-start gap-2"
+                                            >
+                                                <span className="size-2 rounded-full mt-1 shrink-0 bg-blue-600" />
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-[11.5px] font-bold text-slate-800 truncate">{a.title}</p>
+                                                        <span className="text-[9.5px] text-slate-400">{a.time}</span>
+                                                    </div>
+                                                    <p className="text-[10.5px] text-slate-500 mt-0.5">{a.desc}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-6 text-center text-slate-400 text-xs">
+                                            No pending notifications
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Subtle Divider */}
+                    <div className="h-5 w-px bg-slate-200"></div>
+
+                    {/* 5. USER PROFILE PILL & DROPDOWN (OrderlyRMS TopNavbar Avatar Style) */}
                     <div className="relative" ref={dropdownRef}>
-                        <div
-                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-100/70 p-1 rounded-md transition-colors"
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsDropdownOpen(!isDropdownOpen);
+                                setIsPropertyPopoverOpen(false);
+                                setIsDatePopoverOpen(false);
+                                setIsAlertsPopoverOpen(false);
+                            }}
+                            className="flex items-center gap-2 px-2 py-1 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-2xs group"
                             title="User Account"
                         >
-                            <div className="text-right hidden md:flex flex-col leading-tight">
-                                <span className="text-[11px] font-bold text-gray-800 truncate max-w-[110px]">
-                                    {user?.name || 'John Smith'}
+                            <div className="size-7 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs shrink-0">
+                                {userInitial}
+                            </div>
+                            <div className="hidden sm:flex flex-col text-left max-w-[120px] leading-tight">
+                                <span className="text-xs font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                                    {user?.name || 'Alexander Vance'}
                                 </span>
-                                <span className="text-[9.5px] text-gray-500 font-medium truncate max-w-[110px]">
-                                    {user?.role || 'Admin'} • {activeProperty?.code || 'GPD'}
+                                <span className="text-[9.5px] font-semibold text-blue-600 truncate">
+                                    {userRoleDisplay}
                                 </span>
                             </div>
-
-                            {/* Avatar with subtle online indicator */}
-                            <div className="w-7 h-7 rounded-full border-2 border-emerald-500 p-0.5 overflow-hidden flex items-center justify-center bg-white shadow-2xs hover:scale-105 transition-transform flex-shrink-0">
-                                {user?.image ? (
-                                    <img
-                                        src={user.image}
-                                        alt="User"
-                                        className="w-full h-full object-cover rounded-full"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[11px]">
-                                        {user?.name ? user.name.charAt(0) : <User size={12} />}
-                                    </div>
-                                )}
-                            </div>
-                            <ChevronDown size={11} className="text-gray-400 hidden sm:block" />
-                        </div>
+                            <ChevronDown
+                                size={11}
+                                className={`text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                            />
+                        </button>
 
                         {/* User Dropdown Menu */}
                         {isDropdownOpen && (
-                            <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200/80 py-1 animate-in fade-in slide-in-from-top-1 z-50">
-                                <div className="px-3 py-1.5 border-b border-gray-100">
-                                    <p className="text-[11px] font-bold text-gray-800 truncate">{user?.name || 'John Smith'}</p>
-                                    <p className="text-[9px] text-gray-400 truncate">{user?.email || 'admin@hotelmanagement.os'}</p>
-                                    <div className="flex items-center gap-1 mt-1 text-[9px] text-emerald-700 font-semibold">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <span>Active: {activeProperty?.name ? (activeProperty.code + ' - ' + activeProperty.city) : 'Grand Palace'}</span>
+                            <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150 z-50">
+                                <div className="px-3.5 py-2 border-b border-slate-100">
+                                    <p className="text-xs font-bold text-slate-900 truncate">{user?.name || 'Alexander Vance'}</p>
+                                    <p className="text-[10px] text-slate-400 truncate">{user?.email || 'superadmin@hotelmanagement.os'}</p>
+                                    <div className="flex items-center gap-1.5 mt-1.5 text-[9.5px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/50">
+                                        <span className="size-1.5 rounded-full bg-emerald-500"></span>
+                                        <span className="truncate">{activeProperty?.name || 'Grand Palace Dhaka'}</span>
                                     </div>
                                 </div>
-                                <button
-                                    className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
-                                    onClick={() => {
-                                        setIsDropdownOpen(false);
-                                        setActivePage('user-management');
-                                    }}
-                                >
-                                    <User size={13} className="text-gray-400" />
-                                    My Profile
-                                </button>
-                                {isSuperAdmin && (
-                                    <>
-                                        <button
-                                            className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
-                                            onClick={() => {
-                                                setIsDropdownOpen(false);
-                                                if (portalMode === 'super_admin') {
-                                                    switchToPropertyPMS(activeProperty?.id, 'front-desk');
-                                                } else {
-                                                    switchToSuperAdmin('multi-property');
-                                                }
-                                            }}
-                                        >
-                                            {portalMode === 'super_admin' ? (
-                                                <>
-                                                    <Building2 size={13} className="text-emerald-600" />
-                                                    <span>Open Property PMS ({activeProperty?.code})</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Shield size={13} className="text-indigo-600" />
-                                                    <span>Open Super Admin HQ</span>
-                                                </>
-                                            )}
-                                        </button>
-                                        <button
-                                            className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
-                                            onClick={() => {
-                                                setIsDropdownOpen(false);
-                                                setActivePage('multi-property');
-                                            }}
-                                        >
-                                            <Building2 size={13} className="text-blue-600" />
-                                            Switch Hotel Property
-                                        </button>
-                                    </>
-                                )}
 
-                                <div className="h-px bg-gray-100 my-1"></div>
-                                <div className="px-1.5 pb-0.5">
+                                <div className="py-1">
                                     <button
-                                        className="w-full text-center px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                        type="button"
+                                        onClick={() => {
+                                            setIsDropdownOpen(false);
+                                            setActivePage('user-management');
+                                        }}
+                                        className="w-full text-left px-3.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer font-medium"
+                                    >
+                                        <User size={13} className="text-slate-400" />
+                                        <span>My Profile & Staff</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsDropdownOpen(false);
+                                            setActivePage('multi-property');
+                                        }}
+                                        className="w-full text-left px-3.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer font-medium"
+                                    >
+                                        <Building2 size={13} className="text-blue-600" />
+                                        <span>Multi-Hotel Chain Console</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsDropdownOpen(false);
+                                            setActivePage('hotel-info');
+                                        }}
+                                        className="w-full text-left px-3.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer font-medium"
+                                    >
+                                        <SlidersHorizontal size={13} className="text-slate-400" />
+                                        <span>Hotel Profile & Specs</span>
+                                    </button>
+                                </div>
+
+                                <div className="border-t border-slate-100 my-1"></div>
+
+                                <div className="px-2 pb-0.5">
+                                    <button
+                                        type="button"
                                         onClick={() => {
                                             setIsDropdownOpen(false);
                                             onLogout();
                                         }}
+                                        className="w-full text-left px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition flex items-center gap-2 cursor-pointer"
                                     >
-                                        <LogOut size={12} />
-                                        Sign Out
+                                        <LogOut size={13} />
+                                        <span>Sign Out</span>
                                     </button>
                                 </div>
                             </div>
@@ -475,7 +540,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                 </div>
             </header>
 
-            {/* In-Place Reservation Modal */}
+            {/* In-Place Add Reservation Modal */}
             <AddReservationModal
                 isOpen={isAddReservationOpen}
                 onClose={() => setIsAddReservationOpen(false)}

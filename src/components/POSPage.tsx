@@ -10,7 +10,8 @@ import {
     X,
     Utensils,
     CreditCard,
-    LayoutGrid
+    LayoutGrid,
+    Building2
 } from 'lucide-react';
 
 const TableIcon = () => (
@@ -268,6 +269,36 @@ const POSPage = () => {
                                                 <div className="col-span-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Amount</label>
                                                     <input type="number" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Hotel Room Folio Charge (OrderlyRMS Hotel Integration) */}
+                                        <div className="p-3 bg-blue-50/70 rounded-lg border border-blue-200 flex flex-col gap-3">
+                                            <div className="flex justify-between items-center border-b border-blue-200 pb-2">
+                                                <span className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                                                    <Building2 size={16} className="text-blue-600" /> Charge to Hotel Room Folio
+                                                </span>
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">In-House Guest Bill Posting</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div className="col-span-1 space-y-1">
+                                                    <label className="text-[10px] font-medium text-gray-500 uppercase">Guest Room</label>
+                                                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                                        <option value="101">Room 101 - Dr. Tariqul Islam</option>
+                                                        <option value="102">Room 102 - Michael Scott</option>
+                                                        <option value="201">Room 201 - Sarah Jenkins</option>
+                                                        <option value="205">Room 205 - Alexander Vance</option>
+                                                        <option value="302">Room 302 - Fahim Ahmed</option>
+                                                    </select>
+                                                </div>
+                                                <div className="col-span-1 space-y-1">
+                                                    <label className="text-[10px] font-medium text-gray-500 uppercase">Folio Account</label>
+                                                    <input type="text" readOnly value="GL-4200 (F&B Dining Revenue)" className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-xs font-semibold text-gray-700" />
+                                                </div>
+                                                <div className="col-span-1 space-y-1">
+                                                    <label className="text-[10px] font-medium text-gray-500 uppercase">Amount to Folio</label>
+                                                    <input type="number" defaultValue="0.00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right font-bold outline-none focus:ring-2 focus:ring-blue-500" />
                                                 </div>
                                             </div>
                                         </div>
