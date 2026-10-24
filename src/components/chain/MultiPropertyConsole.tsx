@@ -19,6 +19,7 @@ import {
 import { useProperty, type Property } from '../../context/PropertyContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { useToast } from '../../context/ToastContext';
+import { usePortal } from '../../context/PortalContext';
 
 export const MultiPropertyConsole: React.FC = () => {
     const { 
@@ -34,6 +35,7 @@ export const MultiPropertyConsole: React.FC = () => {
 
     const { setActivePage } = useNavigation();
     const { showToast } = useToast();
+    const { switchToPropertyPMS } = usePortal();
 
     const handleSwitchProperty = (property: Property) => {
         setActivePropertyId(property.id);
@@ -44,17 +46,19 @@ export const MultiPropertyConsole: React.FC = () => {
     };
 
     const handleLaunchFrontDesk = (property: Property) => {
-        setActivePropertyId(property.id);
-        showToast(`Launching Front Desk for ${property.name}`, {
+        showToast(`Switching to Property PMS for ${property.name}`, {
             type: 'info',
             title: 'Hotel Session Active'
         });
-        setActivePage('dashboard');
+        switchToPropertyPMS(property.id, 'front-desk');
     };
 
     const handleLaunchStayView = (property: Property) => {
-        setActivePropertyId(property.id);
-        setActivePage('stayview');
+        showToast(`Opening StayView for ${property.name}`, {
+            type: 'info',
+            title: 'Hotel Session Active'
+        });
+        switchToPropertyPMS(property.id, 'stay-view');
     };
 
     const totalRooms = properties.reduce((sum, p) => sum + (p.total_rooms || 0), 0);

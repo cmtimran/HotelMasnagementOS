@@ -8,10 +8,12 @@ import {
     ChevronDown,
     X,
     Check,
-    LayoutGrid
+    LayoutGrid,
+    Shield
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
 import { useProperty } from '../context/PropertyContext';
+import { usePortal } from '../context/PortalContext';
 
 
 interface HeaderProps {
@@ -30,6 +32,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const datePopoverRef = useRef<HTMLDivElement>(null);
     const propertyPopoverRef = useRef<HTMLDivElement>(null);
     const { activeProperty, properties, setActivePropertyId } = useProperty();
+    const { portalMode, switchToSuperAdmin, switchToPropertyPMS } = usePortal();
 
 
     // Business System Date State (hydrated from localStorage or default '01 Jul 2026')
@@ -85,20 +88,71 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     return (
         <>
             <header className="h-11 bg-white border-b border-gray-200/90 flex items-center justify-between px-3 sm:px-4 flex-shrink-0 z-40 sticky top-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
-                {/* Left Side - Clean Page Context / Breadcrumb */}
+                {/* Left Side - Clean Page Context / Breadcrumb with Active Panel Badge */}
                 <div className="flex items-center gap-2 text-xs font-medium text-gray-500 min-w-0">
-                    <span className="text-gray-400 flex items-center gap-1.5 font-semibold text-[11px] tracking-tight">
-                        <Building2 size={13} className="text-blue-600" />
-                        <span>HotelOS</span>
-                    </span>
+                    <div 
+                        onClick={() => {
+                            if (portalMode === 'super_admin') {
+                                setActivePage('multi-property');
+                            } else {
+                                setActivePage('front-desk');
+                            }
+                        }}
+                        className="cursor-pointer flex items-center gap-1.5 transition-opacity hover:opacity-80 select-none"
+                    >
+                        {portalMode === 'super_admin' ? (
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/60 text-indigo-700 font-bold text-[10.5px]">
+                                <Shield size={12} className="text-indigo-600" />
+                                <span>Master HQ</span>
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/60 text-emerald-700 font-bold text-[10.5px]">
+                                <Building2 size={12} className="text-emerald-600" />
+                                <span>{activeProperty?.code || 'GPD'} PMS</span>
+                            </span>
+                        )}
+                    </div>
                     <span className="text-gray-300">/</span>
-                    <span className="font-semibold text-gray-800 text-[11.5px] truncate max-w-[200px] sm:max-w-xs">
+                    <span className="font-semibold text-gray-800 text-[11.5px] truncate max-w-[180px] sm:max-w-xs">
                         {pageTitle}
                     </span>
                 </div>
 
-                {/* Right Side - Active Hotel Switcher, System Date, Action Icons, and User Profile */}
+                {/* Right Side - Dual-Panel Mode Switcher, Active Hotel Switcher, System Date, Action Icons, and User Profile */}
                 <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
+                    {/* DUAL-PANEL SEGMENTED SWITCHER (Super Admin vs Property PMS) */}
+                    <div className="flex items-center bg-gray-100/90 p-0.5 rounded-lg border border-gray-200 shadow-2xs">
+                        <button
+                            type="button"
+                            onClick={() => switchToSuperAdmin('multi-property')}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                portalMode === 'super_admin'
+                                    ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60'
+                                    : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                            title="Switch to Super Admin Master Console (Group HQ & Portfolio)"
+                        >
+                            <Shield size={11} className={portalMode === 'super_admin' ? 'text-indigo-600' : 'text-gray-400'} />
+                            <span className="hidden sm:inline">Super Admin</span>
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 hidden lg:inline font-mono">HQ</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => switchToPropertyPMS(activeProperty?.id, 'front-desk')}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                portalMode === 'property_pms'
+                                    ? 'bg-white text-emerald-700 shadow-xs border border-gray-200/60'
+                                    : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                            title="Switch to Hotel Operations (Property Staff PMS)"
+                        >
+                            <Building2 size={11} className={portalMode === 'property_pms' ? 'text-emerald-600' : 'text-gray-400'} />
+                            <span className="hidden sm:inline">Property PMS</span>
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 font-mono">{activeProperty?.code || 'GPD'}</span>
+                        </button>
+                    </div>
+
                     {/* Active Hotel Property Switcher Pill */}
                     <div className="relative" ref={propertyPopoverRef}>
                         <button
@@ -351,6 +405,29 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                 >
                                     <User size={13} className="text-gray-400" />
                                     My Profile
+                                </button>
+                                <button
+                                    className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setIsDropdownOpen(false);
+                                        if (portalMode === 'super_admin') {
+                                            switchToPropertyPMS(activeProperty?.id, 'front-desk');
+                                        } else {
+                                            switchToSuperAdmin('multi-property');
+                                        }
+                                    }}
+                                >
+                                    {portalMode === 'super_admin' ? (
+                                        <>
+                                            <Building2 size={13} className="text-emerald-600" />
+                                            <span>Open Property PMS ({activeProperty?.code})</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Shield size={13} className="text-indigo-600" />
+                                            <span>Open Super Admin HQ</span>
+                                        </>
+                                    )}
                                 </button>
                                 <button
                                     className="w-full text-left px-3 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"

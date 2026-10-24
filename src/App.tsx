@@ -569,6 +569,7 @@ function App() {
       case 'housekeeping':
         return <HousekeepingGrid />;
       case 'stay-view':
+      case 'stayview':
         return <StayView />;
       case 'floor-plan':
         return <FloorPlan />;
