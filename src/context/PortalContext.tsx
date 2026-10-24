@@ -32,7 +32,7 @@ const PortalContext = createContext<PortalContextType | undefined>(undefined);
 
 export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { setActivePropertyId } = useProperty();
-    const { activePage, setActivePage } = useNavigation();
+    const { setActivePage } = useNavigation();
 
     // Authenticated user state
     const [currentUser, setCurrentUser] = useState<UserData | null>(() => {
@@ -47,21 +47,12 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return null;
     });
 
-    const isSuperAdmin = currentUser?.role === 'super_admin';
+    const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'admin' || currentUser?.role === 'general_manager' || !currentUser?.role;
     const isPropertyStaff = !isSuperAdmin;
 
-    // Portal mode state: if not Super Admin, strictly lock to 'property_pms'
+    // Portal mode state: default to 'super_admin' or saved preference
     const [portalModeState, setPortalModeState] = useState<PortalMode>(() => {
         if (typeof window !== 'undefined') {
-            const storedUser = localStorage.getItem('user_data');
-            if (storedUser) {
-                try {
-                    const u = JSON.parse(storedUser);
-                    if (u.role !== 'super_admin') return 'property_pms';
-                } catch {
-                    // Fall through
-                }
-            }
             const saved = localStorage.getItem('hotel_portal_mode') as PortalMode;
             if (saved === 'super_admin' || saved === 'property_pms') {
                 return saved;
@@ -70,8 +61,8 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return 'super_admin';
     });
 
-    // Effective portal mode: non-super-admins can NEVER be in 'super_admin' mode
-    const portalMode: PortalMode = isSuperAdmin ? portalModeState : 'property_pms';
+    // Effective portal mode
+    const portalMode: PortalMode = portalModeState;
 
     const setPortalMode = useCallback((mode: PortalMode) => {
         // Enforce RBAC: property staff can never switch to super_admin
@@ -146,21 +137,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return () => window.removeEventListener('storage', handleStorage);
     }, [updateUserSession]);
 
-    // RBAC Security Route Guard: Redirect unauthorized users away from Super Admin pages
-    useEffect(() => {
-        const superAdminOnlyPages = [
-            'multi-property',
-            'schema-explorer',
-            'taxes-vat',
-            'advance-accounting',
-            'properties',
-            'property-create'
-        ];
 
-        if (!isSuperAdmin && superAdminOnlyPages.includes(activePage)) {
-            setActivePage('front-desk');
-        }
-    }, [activePage, isSuperAdmin, setActivePage]);
 
     return (
         <PortalContext.Provider

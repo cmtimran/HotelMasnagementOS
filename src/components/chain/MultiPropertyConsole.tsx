@@ -14,7 +14,8 @@ import {
     Landmark,
     Calendar,
     Sparkles,
-    ShieldCheck
+    ShieldCheck,
+    Plus
 } from 'lucide-react';
 import { useProperty, type Property } from '../../context/PropertyContext';
 import { useNavigation } from '../../context/NavigationContext';
@@ -97,6 +98,13 @@ export const MultiPropertyConsole: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => setActivePage('property-create')}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-xs transition cursor-pointer"
+                    >
+                        <Plus size={15} />
+                        Add Property
+                    </button>
                     <button 
                         onClick={() => refreshProperties()}
                         className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium shadow-xs transition cursor-pointer"

@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if ([
             'taxes-vat', 'tax-vat-settings', 'multi-property', 'properties', 'property-create',
             'printer-settings', 'policy-management', 'holiday-management',
-            'schema-explorer', 'general-settings'
+            'general-settings'
         ].includes(activePage)) {
             setOpenDropdowns(prev => ({ ...prev, 'Settings': true }));
         }
@@ -249,7 +249,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         { id: 'printer-settings', label: 'Printers & Hardware', icon: <Printer size={12} /> },
                         { id: 'policy-management', label: 'Policies & Rules', icon: <FileText size={12} /> },
                         { id: 'holiday-management', label: 'Holiday Calendar', icon: <Calendar size={12} /> },
-                        { id: 'schema-explorer', label: 'Database Schema', icon: <Database size={12} /> },
                         { id: 'general-settings', label: 'General Settings', icon: <Settings size={12} /> },
                     ]
                 }

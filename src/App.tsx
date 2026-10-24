@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Dashboard from './components/Dashboard';
 import POSDashboard from './components/POSDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
@@ -69,10 +69,12 @@ import { syncReservationsFromDB } from './utils/roomInventoryEngine';
 
 import { useNavigation } from './context/NavigationContext';
 import { usePortal, type UserData } from './context/PortalContext';
+import { useProperty } from './context/PropertyContext';
 
 function App() {
   const { activePage, setActivePage } = useNavigation();
   const { updateUserSession } = usePortal();
+  const { properties, activeProperty, setActivePropertyId } = useProperty();
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   // Session Management: Synchronous initialization eliminates login screen flash/flicker on reload
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -229,6 +231,32 @@ function App() {
     }
   ];
 
+  const livePropertiesData = useMemo(() => {
+    if (properties && properties.length > 0) {
+      return properties.map(p => ({
+        id: p.id,
+        logo: `https://placehold.co/40x40?text=${p.code || 'GH'}`,
+        name: p.name,
+        code: p.code,
+        address: p.address || 'Dhaka, Bangladesh',
+        country: p.country || 'Bangladesh',
+        city: p.city || 'Dhaka',
+        currency: p.currency || 'BDT',
+        website: 'www.grandhospitality.com',
+        rooms: p.total_rooms || 34,
+        grade: `${p.star_rating || 5} Star`,
+        phone: p.phone || '+880 2 9882200',
+        email: p.email || 'dhaka@grandhospitality.com',
+        description: `${p.name} - Luxury accommodation and professional hospitality management.`,
+        features: ['High-speed WiFi', 'Executive Lounge', 'Room Service', 'Fine Dining', 'Concierge Desk'],
+        buildings: p.total_buildings || 1,
+        staff: p.total_staff || 0,
+        raw: p
+      }));
+    }
+    return propertiesData;
+  }, [properties]);
+
   const categorySections: FormSection[] = [
     {
       title: 'Basic Information',
@@ -336,9 +364,11 @@ function App() {
       case 'front-desk':
         return <FrontDesk />;
       case 'add-property':
-        return <AddProperty onBack={() => setActivePage('dashboard')} />;
+        return <AddProperty onBack={() => setActivePage('properties')} />;
       case 'edit-property':
         return <AddProperty onBack={() => setActivePage('hotel-info')} initialData={editingProperty || propertiesData[0]} />;
+      case 'property-list':
+      case 'all-properties':
       case 'properties':
         return (
           <>
@@ -394,10 +424,21 @@ function App() {
                   header: 'Actions',
                   className: 'text-right',
                   render: (row) => (
-                    <div className="flex items-center justify-end">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {row.id !== activeProperty?.id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivePropertyId(row.id);
+                          }}
+                          className="h-7 px-2 rounded-lg text-[11px] font-bold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
+                        >
+                          Switch Hotel
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setViewingProperty(row)}
+                        onClick={() => setViewingProperty(row.raw || row)}
                         className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-gray-700 hover:text-blue-600 bg-white hover:bg-blue-50/50 border border-gray-200/90 hover:border-blue-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
                       >
                         View Details
@@ -406,7 +447,7 @@ function App() {
                   )
                 }
               ]}
-              data={propertiesData}
+              data={livePropertiesData}
               onAdd={() => setActivePage('property-create')}
             />
             <PropertyDetailsModal
@@ -666,6 +707,8 @@ function App() {
         return <AdvanceAccountingDashboard />;
       case 'hrm-dashboard':
         return <HRMManagementDashboard />;
+      case 'chain-console':
+      case 'chain':
       case 'multi-property':
         return <MultiPropertyConsole />;
       case 'schema-explorer':
