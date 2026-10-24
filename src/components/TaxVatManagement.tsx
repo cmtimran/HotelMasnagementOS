@@ -12,7 +12,10 @@ import {
     ShieldCheck,
     Save,
     X,
-    SlidersHorizontal
+    SlidersHorizontal,
+    GripVertical,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
@@ -335,6 +338,10 @@ export default function TaxVatManagement() {
     const [builderRemarks, setBuilderRemarks] = useState('');
     const [builderLines, setBuilderLines] = useState<TaxConfigLine[]>([]);
 
+    // Drag-and-Drop Sorting State in Rule Builder
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
     // Simulator Inputs
     const [simBaseAmount, setSimBaseAmount] = useState<number>(1000);
     const [simDiscount, setSimDiscount] = useState<number>(0);
@@ -498,6 +505,53 @@ export default function TaxVatManagement() {
         setBuilderLines(updated.map((l, i) => ({ ...l, executionOrder: i + 1 })));
     };
 
+    // Drag and Drop Sorting Handlers
+    const handleDragStart = (e: React.DragEvent, index: number) => {
+        setDraggedIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', index.toString());
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverIndex !== index) {
+            setDragOverIndex(index);
+        }
+    };
+
+    const handleDragLeave = () => {
+        setDragOverIndex(null);
+    };
+
+    const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+        e.preventDefault();
+        if (draggedIndex === null || draggedIndex === targetIndex) {
+            setDraggedIndex(null);
+            setDragOverIndex(null);
+            return;
+        }
+
+        const updated = [...builderLines];
+        const [movedItem] = updated.splice(draggedIndex, 1);
+        updated.splice(targetIndex, 0, movedItem);
+
+        const reordered = updated.map((line, i) => ({
+            ...line,
+            executionOrder: i + 1,
+        }));
+
+        setBuilderLines(reordered);
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        showToast(`Tax tier sorted to step #${targetIndex + 1}`);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+    };
+
     // Duplicate Configuration
     const handleDuplicateConfig = (cfg: TaxConfiguration) => {
         const newCode = generateUniqueShortCode(`${cfg.code}-CPY`, configurations.map(c => c.code));
@@ -651,8 +705,8 @@ export default function TaxVatManagement() {
             running += amount;
             totalTax += amount;
 
-            const basisText = line.calculationBasis === 'RUNNING_SUBTOTAL' ? 'Running Subtotal' : 'Original Gross';
-            const formula = `${m?.name || 'Tax'} = ${rate}% × $${basis.toFixed(2)} (${basisText}) = $${amount.toFixed(2)}`;
+            const basisText = line.calculationBasis === 'RUNNING_SUBTOTAL' ? 'Running Subtotal' : 'Gross Base';
+            const formula = `${m?.name || 'Tax'} = ${rate}% × ৳ ${basis.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${basisText}) = ৳ ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
             return {
                 step: idx + 1,
@@ -721,7 +775,7 @@ export default function TaxVatManagement() {
                             <ShieldCheck className="size-4" />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{masters.length}</div>
+                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight">{masters.length}</div>
                     <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{masters.filter(m => m.status === 'Active').length} Active Masters</div>
                 </div>
 
@@ -732,7 +786,7 @@ export default function TaxVatManagement() {
                             <Layers className="size-4" />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{configurations.length}</div>
+                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight">{configurations.length}</div>
                     <div className="mt-1 text-[11px] text-slate-400 font-medium">Bundled tax profiles</div>
                 </div>
 
@@ -743,7 +797,7 @@ export default function TaxVatManagement() {
                             <Calculator className="size-4" />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{builderLines.length} Lines</div>
+                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight">{builderLines.length} Lines</div>
                     <div className="mt-1 text-[11px] text-amber-600 font-medium">In builder workspace</div>
                 </div>
 
@@ -754,10 +808,10 @@ export default function TaxVatManagement() {
                             ৳
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight font-mono">
-                        ${simulationResult.totalTax.toFixed(2)}
+                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight font-mono">
+                        ৳ {simulationResult.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Grand: ${simulationResult.grand.toFixed(2)}</div>
+                    <div className="mt-1 text-[11px] text-slate-500 font-medium">Grand: ৳ {simulationResult.grand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
             </div>
 
@@ -769,7 +823,7 @@ export default function TaxVatManagement() {
                         onClick={() => setActiveTab('builder')}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                             activeTab === 'builder'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-slate-900 shadow-xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -782,7 +836,7 @@ export default function TaxVatManagement() {
                         onClick={() => setActiveTab('configurations')}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                             activeTab === 'configurations'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-slate-900 shadow-xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -798,7 +852,7 @@ export default function TaxVatManagement() {
                         onClick={() => setActiveTab('masters')}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                             activeTab === 'masters'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-slate-900 shadow-xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -814,7 +868,7 @@ export default function TaxVatManagement() {
                         onClick={() => setActiveTab('allocations')}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
                             activeTab === 'allocations'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-slate-900 shadow-xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -909,31 +963,54 @@ export default function TaxVatManagement() {
                                     </div>
                                 </div>
 
-                                {/* Pipeline Steps */}
+                                {/* Pipeline Steps with Drag & Drop */}
                                 <div className="space-y-2.5 pt-2">
                                     {builderLines.length === 0 ? (
                                         <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
-                                            No tax lines added yet. Click &quot;Add Tax Step&quot; below.
+                                            No tax lines added yet. Click &quot;Add Tax Step to Pipeline&quot; below.
                                         </div>
                                     ) : (
                                         builderLines.map((line, idx) => {
                                             const master = masters.find(m => m.id === line.taxMasterId);
+                                            const isBeingDragged = draggedIndex === idx;
+                                            const isDragTarget = dragOverIndex === idx;
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 group"
+                                                    draggable
+                                                    onDragStart={e => handleDragStart(e, idx)}
+                                                    onDragOver={e => handleDragOver(e, idx)}
+                                                    onDragLeave={handleDragLeave}
+                                                    onDrop={e => handleDrop(e, idx)}
+                                                    onDragEnd={handleDragEnd}
+                                                    className={`p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-3 group select-none ${
+                                                        isBeingDragged
+                                                            ? 'opacity-40 scale-[0.98] border-dashed border-rose-400 bg-rose-50/40'
+                                                            : isDragTarget
+                                                            ? 'border-t-2 border-t-rose-500 bg-rose-50/20 shadow-xs'
+                                                            : 'bg-slate-50/80 hover:bg-slate-100/70 border-slate-200/90 shadow-2xs hover:shadow-xs'
+                                                    }`}
                                                 >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="size-6 rounded-md bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        {/* Drag Handle */}
+                                                        <div
+                                                            className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition shrink-0"
+                                                            title="Drag up or down to reorder calculation precedence"
+                                                        >
+                                                            <GripVertical className="size-4" />
+                                                        </div>
+
+                                                        {/* Execution Order Badge */}
+                                                        <div className="size-6 rounded-md bg-rose-50 text-rose-700 border border-rose-200/70 font-bold text-xs flex items-center justify-center shrink-0">
                                                             {idx + 1}
                                                         </div>
 
                                                         {/* Tax Master Selector */}
-                                                        <div>
+                                                        <div className="min-w-0">
                                                             <select
                                                                 value={line.taxMasterId}
                                                                 onChange={e => updateLineMaster(idx, e.target.value)}
-                                                                className="px-2.5 py-1 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-900"
+                                                                className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-rose-400 truncate max-w-[200px] sm:max-w-none"
                                                             >
                                                                 {masters.map(m => (
                                                                     <option key={m.id} value={m.id}>
@@ -941,14 +1018,14 @@ export default function TaxVatManagement() {
                                                                     </option>
                                                                 ))}
                                                             </select>
-                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                            <div className="text-[10px] text-slate-400 mt-0.5 truncate">
                                                                 {master?.section || master?.remarks || 'Statutory rate'}
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    {/* Calculation Basis */}
-                                                    <div className="flex items-center gap-2">
+                                                    {/* Calculation Basis & Controls */}
+                                                    <div className="flex items-center gap-2 shrink-0">
                                                         <select
                                                             value={line.calculationBasis}
                                                             onChange={e =>
@@ -959,7 +1036,7 @@ export default function TaxVatManagement() {
                                                                         | 'RUNNING_SUBTOTAL'
                                                                 )
                                                             }
-                                                            className="px-2 py-1 text-[11px] font-semibold bg-white border border-slate-200 rounded-lg text-slate-700"
+                                                            className="px-2 py-1 text-[11px] font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none"
                                                         >
                                                             <option value="ORIGINAL_GROSS">Gross Basis (Flat)</option>
                                                             <option value="RUNNING_SUBTOTAL">
@@ -967,23 +1044,25 @@ export default function TaxVatManagement() {
                                                             </option>
                                                         </select>
 
-                                                        {/* Reorder Up / Down */}
+                                                        {/* Accessible Up / Down Buttons */}
                                                         <div className="flex items-center gap-0.5">
                                                             <button
                                                                 type="button"
                                                                 disabled={idx === 0}
                                                                 onClick={() => moveTaxLine(idx, 'UP')}
-                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center"
+                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+                                                                title="Move Up"
                                                             >
-                                                                ↑
+                                                                <ArrowUp className="size-3" />
                                                             </button>
                                                             <button
                                                                 type="button"
                                                                 disabled={idx === builderLines.length - 1}
                                                                 onClick={() => moveTaxLine(idx, 'DOWN')}
-                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center"
+                                                                className="size-6 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+                                                                title="Move Down"
                                                             >
-                                                                ↓
+                                                                <ArrowDown className="size-3" />
                                                             </button>
                                                         </div>
 
@@ -991,7 +1070,8 @@ export default function TaxVatManagement() {
                                                         <button
                                                             type="button"
                                                             onClick={() => removeTaxLine(idx)}
-                                                            className="size-6 rounded hover:bg-rose-100 text-rose-600 flex items-center justify-center transition"
+                                                            className="size-6 rounded hover:bg-rose-100 text-rose-600 flex items-center justify-center transition cursor-pointer"
+                                                            title="Remove Tax Line"
                                                         >
                                                             <Trash2 className="size-3.5" />
                                                         </button>
@@ -1005,7 +1085,7 @@ export default function TaxVatManagement() {
                                 <button
                                     type="button"
                                     onClick={addTaxLine}
-                                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl border border-dashed border-slate-300 flex items-center justify-center gap-1.5 transition"
+                                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl border border-dashed border-slate-300 flex items-center justify-center gap-1.5 transition cursor-pointer"
                                 >
                                     <Plus className="size-3.5" />
                                     <span>Add Tax Step to Pipeline</span>
@@ -1013,107 +1093,130 @@ export default function TaxVatManagement() {
                             </div>
                         </div>
 
-                        {/* Right Column: Interactive Live Simulator (5 Cols) */}
+                        {/* Right Column: Interactive Live Simulator (5 Cols) - Light Theme */}
                         <div className="lg:col-span-5 space-y-4">
-                            <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 space-y-4 shadow-lg">
-                                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 space-y-4 shadow-2xs hover:shadow-xs transition">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                     <div className="flex items-center gap-2">
-                                        <Calculator className="size-4 text-rose-400" />
-                                        <span className="text-sm font-bold">Interactive Live Bill Simulator</span>
+                                        <div className="size-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                                            <Calculator className="size-4" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-slate-800">Live Bill & Tax Simulator</h3>
+                                            <p className="text-[11px] text-slate-400">Real-time statutory tax evaluation in BDT (৳)</p>
+                                        </div>
                                     </div>
-                                    <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">
-                                        Real-time
+                                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold flex items-center gap-1.5">
+                                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        Live Reactive
                                     </span>
                                 </div>
 
                                 {/* Simulator Inputs */}
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-3 gap-2.5">
                                     <div>
-                                        <label className="block text-[10px] text-slate-400 font-semibold mb-1">
-                                            Base Rate ($)
+                                        <label className="block text-[11px] text-slate-600 font-semibold mb-1">
+                                            Base Tariff (৳)
                                         </label>
                                         <input
                                             type="number"
                                             value={simBaseAmount}
                                             onChange={e => setSimBaseAmount(parseFloat(e.target.value) || 0)}
-                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white font-mono focus:outline-none"
+                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                                        <label className="block text-[11px] text-slate-600 font-semibold mb-1">
                                             Qty / Nights
                                         </label>
                                         <input
                                             type="number"
+                                            min={1}
                                             value={simQty}
                                             onChange={e => setSimQty(parseInt(e.target.value) || 1)}
-                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white font-mono focus:outline-none"
+                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] text-slate-400 font-semibold mb-1">
-                                            Discount ($)
+                                        <label className="block text-[11px] text-slate-600 font-semibold mb-1">
+                                            Discount (৳)
                                         </label>
                                         <input
                                             type="number"
+                                            min={0}
                                             value={simDiscount}
                                             onChange={e => setSimDiscount(parseFloat(e.target.value) || 0)}
-                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white font-mono focus:outline-none"
+                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
                                         />
                                     </div>
                                 </div>
 
                                 {/* Live Breakdown */}
-                                <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
-                                    <div className="flex justify-between text-slate-300">
-                                        <span>Gross Subtotal ({simQty}x)</span>
-                                        <span className="font-mono">${simulationResult.gross.toFixed(2)}</span>
+                                <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
+                                    <div className="flex justify-between text-slate-600 font-medium">
+                                        <span>Gross Room / Service Subtotal ({simQty}x)</span>
+                                        <span className="font-mono font-bold text-slate-800">৳ {simulationResult.gross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                     {simDiscount > 0 && (
-                                        <div className="flex justify-between text-emerald-400">
-                                            <span>Promotion Discount</span>
-                                            <span className="font-mono">-${simDiscount.toFixed(2)}</span>
+                                        <div className="flex justify-between text-emerald-600 font-medium">
+                                            <span>Promotion / Corporate Discount</span>
+                                            <span className="font-mono font-bold">-৳ {simDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between text-slate-200 font-semibold border-b border-slate-800/80 pb-2">
-                                        <span>Net Taxable Base</span>
-                                        <span className="font-mono">${simulationResult.net.toFixed(2)}</span>
+                                    <div className="flex justify-between text-slate-800 font-semibold border-b border-slate-100 pb-2">
+                                        <span>Net Taxable Base Tariff</span>
+                                        <span className="font-mono font-bold text-slate-900">৳ {simulationResult.net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
 
-                                    {/* Breakdown Steps */}
-                                    <div className="space-y-1.5 py-1">
-                                        {simulationResult.breakdown.map((b, idx) => (
-                                            <div key={idx} className="space-y-0.5">
-                                                <div className="flex justify-between text-slate-300">
-                                                    <span className="flex items-center gap-1.5">
-                                                        <span className="size-4 rounded-full bg-slate-800 text-[10px] flex items-center justify-center font-bold text-slate-400">
-                                                            {b.step}
-                                                        </span>
-                                                        {b.name} ({b.rate}%)
-                                                    </span>
-                                                    <span className="font-mono text-rose-300 font-bold">
-                                                        +${b.amount.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                                <div className="text-[10px] text-slate-500 pl-5 font-mono">
-                                                    {b.formula}
-                                                </div>
+                                    {/* Breakdown Steps with clean cards */}
+                                    <div className="space-y-2 py-1">
+                                        <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                                            Itemized Tax Compounding Breakdown
+                                        </div>
+                                        {simulationResult.breakdown.length === 0 ? (
+                                            <div className="p-3 text-center rounded-lg bg-slate-50 text-slate-400 text-xs">
+                                                No tax steps in active rule
                                             </div>
-                                        ))}
+                                        ) : (
+                                            simulationResult.breakdown.map((b, idx) => (
+                                                <div key={idx} className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/70 space-y-1">
+                                                    <div className="flex justify-between items-center text-slate-700">
+                                                        <span className="flex items-center gap-1.5 font-semibold text-xs">
+                                                            <span className="size-5 rounded-md bg-white border border-slate-200 text-[10px] flex items-center justify-center font-bold text-slate-600 shadow-2xs">
+                                                                #{b.step}
+                                                            </span>
+                                                            <span className="text-slate-900">{b.name}</span>
+                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200/50 font-semibold">
+                                                                {b.rate}%
+                                                            </span>
+                                                        </span>
+                                                        <span className="font-mono text-rose-600 font-bold text-xs">
+                                                            +৳ {b.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-500 font-mono bg-white/70 px-2 py-1 rounded border border-slate-200/40">
+                                                        {b.formula}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
 
                                     {/* Total Tax & Grand Total */}
-                                    <div className="pt-3 border-t border-slate-800 space-y-1.5">
-                                        <div className="flex justify-between text-slate-400 text-xs">
-                                            <span>Total Taxes & Surcharges:</span>
-                                            <span className="font-mono text-rose-400 font-bold">
-                                                ${simulationResult.totalTax.toFixed(2)}
+                                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                                        <div className="flex justify-between text-slate-600 text-xs font-medium">
+                                            <span>Total Statutory Taxes & Surcharges:</span>
+                                            <span className="font-mono text-rose-600 font-bold">
+                                                +৳ {simulationResult.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between text-base font-bold text-white pt-1 border-t border-slate-700">
-                                            <span>Grand Total:</span>
-                                            <span className="font-mono text-emerald-400">
-                                                ${simulationResult.grand.toFixed(2)}
+                                        <div className="flex justify-between items-center p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50/60 border border-emerald-200/80">
+                                            <div>
+                                                <span className="text-xs uppercase tracking-wider font-bold text-emerald-900">Grand Total (Net + Taxes)</span>
+                                                <div className="text-[10px] text-emerald-700">Statutory Mushak-6.3 Compliant</div>
+                                            </div>
+                                            <span className="font-mono text-lg font-black text-emerald-700">
+                                                ৳ {simulationResult.grand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
                                     </div>
@@ -1267,17 +1370,17 @@ export default function TaxVatManagement() {
                             <tbody className="divide-y divide-slate-100">
                                 {masters.map(m => (
                                     <tr key={m.id} className="hover:bg-slate-50/70 transition">
-                                        <td className="py-3 px-4 font-bold text-slate-900">
+                                        <td className="py-3 px-4 font-semibold text-slate-800">
                                             {m.name}
                                         </td>
-                                        <td className="py-3 px-4 font-mono font-semibold text-slate-700">
-                                            <span className="px-2 py-0.5 bg-slate-100 rounded border border-slate-200">
+                                        <td className="py-3 px-4 font-mono font-medium text-slate-700">
+                                            <span className="px-2 py-0.5 bg-slate-100 rounded border border-slate-200 text-xs">
                                                 {m.code}
                                             </span>
                                         </td>
                                         <td className="py-3 px-4">
                                             <span
-                                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                                                     m.category === 'VAT'
                                                         ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                                         : m.category === 'SERVICE_CHARGE'
@@ -1288,12 +1391,12 @@ export default function TaxVatManagement() {
                                                 {m.category.replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 text-sm">
+                                        <td className="py-3 px-4 text-right font-mono font-semibold text-rose-600 text-xs">
                                             {m.rate.toFixed(2)}%
                                         </td>
                                         <td className="py-3 px-4 text-slate-500">{m.section || '—'}</td>
                                         <td className="py-3 px-4 text-center">
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                 {m.status}
                                             </span>
                                         </td>
@@ -1450,7 +1553,7 @@ export default function TaxVatManagement() {
                                 <tbody className="divide-y divide-slate-100">
                                     {branchAllocations.map(br => (
                                         <tr key={br.id} className="hover:bg-slate-50/70">
-                                            <td className="py-3 px-4 font-bold text-slate-900">
+                                            <td className="py-3 px-4 font-semibold text-slate-800">
                                                 {br.name}
                                             </td>
                                             <td className="py-3 px-4 font-mono text-slate-700">
