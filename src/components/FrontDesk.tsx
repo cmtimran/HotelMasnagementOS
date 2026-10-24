@@ -4,11 +4,23 @@ import {
     DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, Monitor,
     BedDouble, Key, Printer, Calendar,
     Plus, RefreshCw, CreditCard, Wallet, Check,
-    AlertTriangle, Sparkles
+    AlertTriangle, Sparkles, Car, Plane, Utensils, Gift
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
 import { QuickReservationModal } from './modals/QuickReservationModal';
+import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
+import type {
+    RoomServicesBundle,
+    ExtraBedConfig,
+    PickupConfig,
+    MealPlanConfig,
+    CelebrationDecorConfig,
+    SpaWellnessConfig,
+    TimingFlexConfig,
+    CustomAddonItem
+} from '../types/reservationServices';
+import { getRoomBundleTotal } from '../types/reservationServices';
 import PageHeader from './common/PageHeader';
 
 export interface FrontDeskGuestRecord {
@@ -36,6 +48,15 @@ export interface FrontDeskGuestRecord {
     keyCard?: string;
     specialRequests?: string;
     folioItems?: Array<{ id: number; desc: string; amount: number; time: string; type: string }>;
+    servicesBundle?: RoomServicesBundle;
+    extraBed?: ExtraBedConfig | null;
+    pickup?: PickupConfig | null;
+    mealPlan?: MealPlanConfig | null;
+    celebration?: CelebrationDecorConfig | null;
+    spaWellness?: SpaWellnessConfig | null;
+    timingFlex?: TimingFlexConfig | null;
+    customAddons?: CustomAddonItem[];
+    addonCharges?: any;
 }
 
 const DEFAULT_FRONT_DESK_DATA: FrontDeskGuestRecord[] = [
@@ -61,6 +82,15 @@ const DEFAULT_FRONT_DESK_DATA: FrontDeskGuestRecord[] = [
         source: 'Booking.com',
         vip: 'Gold VIP',
         specialRequests: 'High floor, quiet room, baby cot required',
+        extraBed: {
+            enabled: true,
+            bedType: 'Baby Cot / Crib',
+            quantity: 1,
+            chargePerNight: 0,
+            includesBreakfast: true,
+            isComplimentary: true,
+            remarks: 'Baby cot placed near master bed with infant linens'
+        },
         folioItems: [
             { id: 1, desc: 'Room Tariff (3 Nights)', amount: 9000, time: '2026-07-01 08:00', type: 'Room' },
             { id: 2, desc: 'Advance Deposit Received (Cash)', amount: -3000, time: '2026-07-01 08:05', type: 'Payment' }
@@ -88,6 +118,31 @@ const DEFAULT_FRONT_DESK_DATA: FrontDeskGuestRecord[] = [
         source: 'Corporate (Grameenphone)',
         vip: 'Corporate Diamond',
         specialRequests: 'Late check-out request, airport pickup arranged',
+        pickup: {
+            enabled: true,
+            transferType: 'Airport Pickup',
+            flightNumber: 'BG-084',
+            airline: 'Biman Bangladesh Airlines',
+            pickupDateTime: '2026-07-01 11:15',
+            pickupLocation: 'T2 International Arrivals',
+            vehicleType: 'Executive Sedan (Premio/Allion)',
+            paxCount: 1,
+            luggageCount: 2,
+            chargeAmount: 1500,
+            isComplimentary: false,
+            driverInstructions: 'Placard: Ms. Sara Islam',
+            dropEnabled: true,
+            dropFlightNumber: 'BG-085',
+            dropAirline: 'Biman Bangladesh Airlines',
+            dropDateTime: '2026-07-03 15:30',
+            dropLocation: 'T2 International Departures',
+            dropVehicleType: 'Executive Sedan (Premio/Allion)',
+            dropPaxCount: 1,
+            dropLuggageCount: 2,
+            dropChargeAmount: 1500,
+            dropIsComplimentary: false,
+            dropDriverInstructions: 'Lobby departure pickup at 13:00'
+        },
         folioItems: [
             { id: 1, desc: 'Room Tariff (2 Nights)', amount: 8000, time: '2026-07-01 08:00', type: 'Room' },
             { id: 2, desc: 'Company Direct Billing (Full)', amount: -8000, time: '2026-07-01 08:10', type: 'Payment' }
@@ -239,7 +294,16 @@ export const FrontDesk: React.FC = () => {
                                 status: item.status || 'arriving',
                                 source: item.source || 'Direct',
                                 vip: item.vip || 'None',
-                                specialRequests: item.specialRequests || ''
+                                specialRequests: item.specialRequests || '',
+                                servicesBundle: item.servicesBundle,
+                                extraBed: item.extraBed || item.servicesBundle?.extraBed || null,
+                                pickup: item.pickup || item.servicesBundle?.pickup || null,
+                                mealPlan: item.mealPlan || item.servicesBundle?.mealPlan || null,
+                                celebration: item.celebration || item.servicesBundle?.celebration || null,
+                                spaWellness: item.spaWellness || item.servicesBundle?.spaWellness || null,
+                                timingFlex: item.timingFlex || item.servicesBundle?.timingFlex || null,
+                                customAddons: item.customAddons || item.servicesBundle?.customAddons || [],
+                                addonCharges: item.addonCharges
                             });
                         }
                     });
@@ -274,6 +338,72 @@ export const FrontDesk: React.FC = () => {
     const [checkOutModalRecord, setCheckOutModalRecord] = useState<FrontDeskGuestRecord | null>(null);
     const [regCardRecord, setRegCardRecord] = useState<FrontDeskGuestRecord | null>(null);
     const [folioModalRecord, setFolioModalRecord] = useState<FrontDeskGuestRecord | null>(null);
+    const [serviceModalConfig, setServiceModalConfig] = useState<{
+        isOpen: boolean;
+        guestRecord: FrontDeskGuestRecord | null;
+        initialTab: ServiceTabType;
+    }>({
+        isOpen: false,
+        guestRecord: null,
+        initialTab: 'pickup'
+    });
+
+    const handleSaveGuestServices = (bundle: RoomServicesBundle) => {
+        if (!serviceModalConfig.guestRecord) return;
+        const targetRecord = serviceModalConfig.guestRecord;
+        const nights = Math.max(1, targetRecord.nights || 1);
+        
+        const newAddonsTotal = getRoomBundleTotal(bundle, nights);
+        const oldAddonsTotal = getRoomBundleTotal(targetRecord.servicesBundle || {
+            extraBed: targetRecord.extraBed || undefined,
+            pickup: targetRecord.pickup || undefined,
+            mealPlan: targetRecord.mealPlan || undefined,
+            celebration: targetRecord.celebration || undefined,
+            spaWellness: targetRecord.spaWellness || undefined,
+            timingFlex: targetRecord.timingFlex || undefined,
+            customAddons: targetRecord.customAddons || []
+        }, nights);
+        const diff = newAddonsTotal - oldAddonsTotal;
+
+        const updated = reservations.map(r => {
+            if (r.id !== targetRecord.id) return r;
+            const newTotal = Math.max(0, (r.totalAmount || 0) + diff);
+            const newDue = Math.max(0, (r.dueAmount || 0) + diff);
+
+            const updatedFolios = [...(r.folioItems || [])];
+            if (diff > 0) {
+                updatedFolios.push({
+                    id: Date.now(),
+                    desc: 'Guest Add-On Services (Transfer / Bed / Dining / Spa)',
+                    amount: diff,
+                    time: new Date().toISOString().replace('T', ' ').slice(0, 16),
+                    type: 'Services'
+                });
+            }
+
+            return {
+                ...r,
+                servicesBundle: bundle,
+                extraBed: bundle.extraBed,
+                pickup: bundle.pickup,
+                mealPlan: bundle.mealPlan,
+                celebration: bundle.celebration,
+                spaWellness: bundle.spaWellness,
+                timingFlex: bundle.timingFlex,
+                customAddons: bundle.customAddons,
+                totalAmount: newTotal,
+                dueAmount: newDue,
+                folioItems: updatedFolios
+            };
+        });
+
+        persistReservations(updated);
+        setActionLog(prev => [
+            `[${new Date().toLocaleTimeString()}] Services updated for Room ${targetRecord.roomNumber} (${targetRecord.guestName}) - Svc total: ৳${newAddonsTotal.toLocaleString()}`,
+            ...prev
+        ]);
+        setServiceModalConfig({ isOpen: false, guestRecord: null, initialTab: 'pickup' });
+    };
 
     // Interactive Check-In Fields
     const [checkInKeyCard, setCheckInKeyCard] = useState('');
@@ -818,6 +948,103 @@ export const FrontDesk: React.FC = () => {
                                                                 <span>•</span>
                                                                 <span>{item.phone}</span>
                                                             </div>
+
+                                                            {/* Active Add-on Services Badges */}
+                                                            {(() => {
+                                                                const b = item.servicesBundle || {
+                                                                    extraBed: item.extraBed || undefined,
+                                                                    pickup: item.pickup || undefined,
+                                                                    mealPlan: item.mealPlan || undefined,
+                                                                    celebration: item.celebration || undefined,
+                                                                    spaWellness: item.spaWellness || undefined,
+                                                                    timingFlex: item.timingFlex || undefined,
+                                                                    customAddons: item.customAddons || []
+                                                                };
+                                                                const hasAnyService = b.pickup?.enabled || b.pickup?.dropEnabled || b.extraBed?.enabled || b.mealPlan?.enabled || b.celebration?.enabled || b.spaWellness?.enabled || b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut || (b.customAddons && b.customAddons.length > 0);
+                                                                if (!hasAnyService) return null;
+
+                                                                return (
+                                                                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                                                        {b.pickup?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'pickup' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                title={`Inbound Airport Pickup: ${b.pickup.flightNumber || 'Arr'} (${b.pickup.pickupDateTime || ''})`}
+                                                                            >
+                                                                                <Car size={9} />
+                                                                                <span>Pickup {b.pickup.flightNumber ? `#${b.pickup.flightNumber}` : ''}</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.pickup?.dropEnabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'pickup' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                title={`Outbound Airport Drop: ${b.pickup.dropFlightNumber || 'Dept'} (${b.pickup.dropDateTime || ''})`}
+                                                                            >
+                                                                                <Plane size={9} />
+                                                                                <span>Drop {b.pickup.dropFlightNumber ? `#${b.pickup.dropFlightNumber}` : ''}</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.extraBed?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'extrabed' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                title="Extra Bed / Cot Assigned"
+                                                                            >
+                                                                                <BedDouble size={9} />
+                                                                                <span>Extra Bed</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.mealPlan?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'mealplan' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                title={`Meal Plan: ${b.mealPlan.planType || 'Meal Plan'}`}
+                                                                            >
+                                                                                <Utensils size={9} />
+                                                                                <span>{b.mealPlan.planType ? b.mealPlan.planType.split(' ')[0] : 'Meal'}</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.celebration?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'celebration' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                title="Celebration Setup"
+                                                                            >
+                                                                                <Gift size={9} />
+                                                                                <span>Decor</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.spaWellness?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'spa' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                title="Spa Treatment"
+                                                                            >
+                                                                                <Sparkles size={9} />
+                                                                                <span>Spa</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {(b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut) && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'timing' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                title="Early/Late Flex"
+                                                                            >
+                                                                                <Clock size={9} />
+                                                                                <span>Flex</span>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 </td>
@@ -956,6 +1183,17 @@ export const FrontDesk: React.FC = () => {
                                                             </span>
                                                         )}
 
+                                                        {/* Addon Services Modal Launcher */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'pickup' })}
+                                                            className="h-7 px-2 bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-300 text-slate-700 hover:text-blue-700 font-semibold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                            title="Manage Room Add-on Services (Airport Pickup, Airport Drop, Extra Bed, Meals, Spa, Decor, Time-Flex)"
+                                                        >
+                                                            <Sparkles size={11} className="text-blue-600" />
+                                                            <span className="hidden sm:inline">Addons</span>
+                                                        </button>
+
                                                         {/* Registration Card Print Button */}
                                                         <button
                                                             type="button"
@@ -1081,6 +1319,50 @@ export const FrontDesk: React.FC = () => {
                                 </strong>
                             </div>
                         </div>
+
+                        {/* Concierge Services & Add-ons Briefing */}
+                        {(() => {
+                            const b = checkInModalRecord.servicesBundle || {
+                                extraBed: checkInModalRecord.extraBed || undefined,
+                                pickup: checkInModalRecord.pickup || undefined,
+                                mealPlan: checkInModalRecord.mealPlan || undefined
+                            };
+                            const hasBriefing = b.pickup?.enabled || b.pickup?.dropEnabled || b.extraBed?.enabled || b.mealPlan?.enabled;
+                            if (!hasBriefing) return null;
+
+                            return (
+                                <div className="bg-blue-50/60 rounded-lg p-2.5 border border-blue-200/80 space-y-1 text-[11px]">
+                                    <div className="font-bold text-blue-900 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                                        <Sparkles size={11} className="text-blue-600" />
+                                        <span>Concierge &amp; Room Add-ons Briefing</span>
+                                    </div>
+                                    {b.pickup?.enabled && (
+                                        <div className="flex items-center gap-1.5 text-blue-800">
+                                            <Car size={11} className="text-blue-600" />
+                                            <span><strong>Inbound Pickup:</strong> Flight {b.pickup.flightNumber || 'N/A'} at {b.pickup.pickupDateTime || 'TBD'} ({b.pickup.vehicleType || 'Executive Vehicle'})</span>
+                                        </div>
+                                    )}
+                                    {b.pickup?.dropEnabled && (
+                                        <div className="flex items-center gap-1.5 text-sky-800">
+                                            <Plane size={11} className="text-sky-600" />
+                                            <span><strong>Scheduled Departure Drop:</strong> Flight {b.pickup.dropFlightNumber || 'N/A'} on {b.pickup.dropDateTime || checkInModalRecord.checkOut}</span>
+                                        </div>
+                                    )}
+                                    {b.extraBed?.enabled && (
+                                        <div className="flex items-center gap-1.5 text-indigo-800">
+                                            <BedDouble size={11} className="text-indigo-600" />
+                                            <span><strong>Extra Bed:</strong> {b.extraBed.bedType || 'Rollaway'} ({b.extraBed.quantity || 1} Bed) configured</span>
+                                        </div>
+                                    )}
+                                    {b.mealPlan?.enabled && (
+                                        <div className="flex items-center gap-1.5 text-amber-800">
+                                            <Utensils size={11} className="text-amber-600" />
+                                            <span><strong>Meal Plan:</strong> {b.mealPlan.planType || 'Meal Plan'} ({b.mealPlan.guestsCount || 1} Covers)</span>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Early Check-In Evaluation */}
                         {(() => {
@@ -1213,6 +1495,29 @@ export const FrontDesk: React.FC = () => {
                                 <span className="font-mono font-black text-rose-700">BDT {checkOutModalRecord.dueAmount.toLocaleString()}</span>
                             </div>
                         </div>
+
+                        {/* Outbound Airport Drop Concierge Notification */}
+                        {(() => {
+                            const p = checkOutModalRecord.servicesBundle?.pickup || checkOutModalRecord.pickup;
+                            if (!p?.dropEnabled) return null;
+
+                            return (
+                                <div className="p-2.5 bg-sky-50 border border-sky-200 rounded-lg flex items-start gap-2 text-xs text-sky-900">
+                                    <Plane size={15} className="text-sky-600 mt-0.5 flex-shrink-0" />
+                                    <div>
+                                        <div className="font-bold flex items-center gap-1">
+                                            <span>Outbound Airport Drop Chauffeur Dispatched</span>
+                                            <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-sky-100 text-sky-800 border border-sky-300 font-mono">
+                                                Flight {p.dropFlightNumber || 'N/A'}
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-sky-800 mt-0.5">
+                                            Chauffeur waiting at Main Entrance Porch • {p.dropVehicleType || 'Executive Sedan'} • Dep: {p.dropDateTime || '14:00'} ({p.dropLocation || 'T2'})
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* Return Key Confirmation */}
                         <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg flex items-center gap-2 text-xs text-blue-900">
@@ -1400,6 +1705,30 @@ export const FrontDesk: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            {/* Room Add-On Services Modal for Front Desk Management */}
+            {serviceModalConfig.isOpen && serviceModalConfig.guestRecord && (
+                <RoomAddonServicesModal
+                    isOpen={serviceModalConfig.isOpen}
+                    onClose={() => setServiceModalConfig({ isOpen: false, guestRecord: null, initialTab: 'pickup' })}
+                    roomNumber={serviceModalConfig.guestRecord.roomNumber}
+                    roomType={serviceModalConfig.guestRecord.roomType}
+                    baseRate={3000}
+                    initialTab={serviceModalConfig.initialTab}
+                    nights={serviceModalConfig.guestRecord.nights || 1}
+                    currentServices={serviceModalConfig.guestRecord.servicesBundle || {
+                        extraBed: serviceModalConfig.guestRecord.extraBed || undefined,
+                        pickup: serviceModalConfig.guestRecord.pickup || undefined,
+                        mealPlan: serviceModalConfig.guestRecord.mealPlan || undefined,
+                        celebration: serviceModalConfig.guestRecord.celebration || undefined,
+                        spaWellness: serviceModalConfig.guestRecord.spaWellness || undefined,
+                        timingFlex: serviceModalConfig.guestRecord.timingFlex || undefined,
+                        customAddons: serviceModalConfig.guestRecord.customAddons || []
+                    }}
+                    currentExtraBed={serviceModalConfig.guestRecord.extraBed || undefined}
+                    currentPickup={serviceModalConfig.guestRecord.pickup || undefined}
+                    onSave={handleSaveGuestServices}
+                />
             )}
         </div>
     );

@@ -51,7 +51,8 @@ const INITIAL_FOLIOS: FolioAccount[] = [
         allowances: [
             { service: 'Complimentary Buffet Breakfast', total: 6, used: 2, unit: 'Meals' },
             { service: 'Daily Laundry Valet', total: 6, used: 2, unit: 'Items' },
-            { service: 'Airport Pick & Drop', total: 2, used: 1, unit: 'Trips' },
+            { service: 'Airport Pickup Transfer (Inbound)', total: 1, used: 1, unit: 'Trip' },
+            { service: 'Airport Drop Transfer (Outbound)', total: 1, used: 0, unit: 'Trip' },
             { service: 'Signature Couple Spa (60m)', total: 1, used: 0, unit: 'Session' }
         ],
         transactions: [
@@ -205,8 +206,134 @@ const INITIAL_FOLIOS: FolioAccount[] = [
 
 export const FolioOperations: React.FC = () => {
     const [folios, setFolios] = useState<FolioAccount[]>(() => {
-        const saved = localStorage.getItem('hotel_folios_v2');
-        return saved ? JSON.parse(saved) : INITIAL_FOLIOS;
+        let baseList: FolioAccount[] = [...INITIAL_FOLIOS];
+        try {
+            const saved = localStorage.getItem('hotel_folios_v2');
+            if (saved) {
+                baseList = JSON.parse(saved);
+            }
+            const storedRes = localStorage.getItem('hotel_reservations_v2');
+            if (storedRes) {
+                const resList = JSON.parse(storedRes);
+                if (Array.isArray(resList)) {
+                    resList.forEach((r, idx) => {
+                        const existing = baseList.find(f => f.roomNumber === r.roomNumber || f.folioNumber === `FOL-${r.reservationNumber}`);
+                        if (!existing && r.guestName) {
+                            const newFolioId = 100 + idx + 1;
+                            const txns: Transaction[] = [
+                                {
+                                    id: newFolioId * 10 + 1,
+                                    date: `${r.checkIn || '2026-07-01'} 14:00`,
+                                    refNo: `SYS-TAR-${r.reservationNumber || newFolioId}`,
+                                    particulars: `Room Tariff (${r.nights || 1} Night${(r.nights || 1) > 1 ? 's' : ''})`,
+                                    description: `${r.roomType || 'Deluxe'} base accommodation rate`,
+                                    user: 'system_pms',
+                                    amount: -((r.totalAmount || 3000) - (r.addonCharges?.total || 0)),
+                                    windowId: 1,
+                                    category: 'Room'
+                                }
+                            ];
+                            if (r.paidAmount > 0) {
+                                txns.push({
+                                    id: newFolioId * 10 + 2,
+                                    date: `${r.checkIn || '2026-07-01'} 14:15`,
+                                    refNo: `ADV-PMT-${r.reservationNumber || newFolioId}`,
+                                    particulars: 'Advance Settlement Received',
+                                    description: 'Advance payment collected at booking',
+                                    user: 'frontdesk_pos',
+                                    amount: Number(r.paidAmount),
+                                    windowId: 1,
+                                    category: 'Payment'
+                                });
+                            }
+                            if (r.addonCharges?.pickup > 0 || r.pickup?.enabled) {
+                                txns.push({
+                                    id: newFolioId * 10 + 3,
+                                    date: `${r.checkIn || '2026-07-01'} 11:00`,
+                                    refNo: `TRN-IN-${newFolioId}`,
+                                    particulars: `Airport Pickup (Inbound) - Flight ${r.pickup?.flightNumber || 'Arr'}`,
+                                    description: `Arrival transfer: ${r.pickup?.vehicleType || 'Executive Vehicle'} (${r.pickup?.terminal || 'Airport'})`,
+                                    user: 'concierge_ops',
+                                    amount: -(Number(r.addonCharges?.pickup) || 1500),
+                                    windowId: 2,
+                                    category: 'Transport'
+                                });
+                            }
+                            if (r.addonCharges?.drop > 0 || r.pickup?.dropEnabled) {
+                                txns.push({
+                                    id: newFolioId * 10 + 4,
+                                    date: `${r.checkOut || '2026-07-02'} 12:00`,
+                                    refNo: `TRN-OUT-${newFolioId}`,
+                                    particulars: `Airport Drop (Outbound) - Flight ${r.pickup?.dropFlightNumber || 'Dept'}`,
+                                    description: `Departure transfer: ${r.pickup?.dropVehicleType || 'Executive Vehicle'} (${r.pickup?.dropTerminal || 'Airport'})`,
+                                    user: 'concierge_ops',
+                                    amount: -(Number(r.addonCharges?.drop) || 1500),
+                                    windowId: 2,
+                                    category: 'Transport'
+                                });
+                            }
+                            if (r.addonCharges?.extraBed > 0 || r.extraBed?.enabled) {
+                                txns.push({
+                                    id: newFolioId * 10 + 5,
+                                    date: `${r.checkIn || '2026-07-01'} 15:00`,
+                                    refNo: `HK-BED-${newFolioId}`,
+                                    particulars: `Extra Bed / Baby Cot Surcharge`,
+                                    description: `${r.extraBed?.bedType || 'Rollaway'} setup for stay`,
+                                    user: 'hk_supervisor',
+                                    amount: -(Number(r.addonCharges?.extraBed) || 1000),
+                                    windowId: 2,
+                                    category: 'Room'
+                                });
+                            }
+                            if (r.addonCharges?.mealPlan > 0 || r.mealPlan?.enabled) {
+                                txns.push({
+                                    id: newFolioId * 10 + 6,
+                                    date: `${r.checkIn || '2026-07-01'} 19:30`,
+                                    refNo: `FB-MEAL-${newFolioId}`,
+                                    particulars: `Meal Plan: ${r.mealPlan?.planCode || 'Standard Plan'}`,
+                                    description: `${r.mealPlan?.covers || 1} covers dining package`,
+                                    user: 'pos_cashier',
+                                    amount: -(Number(r.addonCharges?.mealPlan) || 2000),
+                                    windowId: 2,
+                                    category: 'F&B'
+                                });
+                            }
+
+                            const allowances = [];
+                            if (r.pickup?.enabled) {
+                                allowances.push({ service: 'Airport Pickup Transfer', total: 1, used: 1, unit: 'Trip' });
+                            }
+                            if (r.pickup?.dropEnabled) {
+                                allowances.push({ service: 'Airport Drop Transfer', total: 1, used: 0, unit: 'Trip' });
+                            }
+                            if (r.mealPlan?.enabled) {
+                                allowances.push({ service: `${r.mealPlan.planCode} Daily Meals`, total: (r.nights || 1) * (r.mealPlan.covers || 1), used: 0, unit: 'Meals' });
+                            }
+                            if (allowances.length === 0) {
+                                allowances.push({ service: 'Complimentary High-Speed WiFi', total: 1, used: 1, unit: 'Access' });
+                            }
+
+                            baseList.push({
+                                id: newFolioId,
+                                roomNumber: r.roomNumber || String(100 + idx),
+                                guestName: r.guestName,
+                                folioNumber: `FOL-${r.reservationNumber || newFolioId}`,
+                                roomType: r.roomType || 'Standard',
+                                checkIn: r.checkIn || '2026-07-01',
+                                checkOut: r.checkOut || '2026-07-02',
+                                package: r.mealPlan?.enabled ? `${r.mealPlan.planCode} Stay Package` : 'Standard Rate Stay',
+                                company: r.source || 'Direct Leisure',
+                                allowances,
+                                transactions: txns
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Error synchronizing folios', e);
+        }
+        return baseList;
     });
 
     const [selectedFolioId, setSelectedFolioId] = useState<number>(1);

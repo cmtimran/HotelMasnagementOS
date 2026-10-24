@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Ticket, Search, Plus, QrCode, CheckCircle2,
-    Printer, Coffee, Sparkles, Car, Utensils,
+    Printer, Coffee, Sparkles, Car, Plane, Utensils,
     ShieldCheck
 } from 'lucide-react';
 
@@ -10,7 +10,7 @@ export interface GuestVoucher {
     voucherCode: string;
     guestName: string;
     roomNumber: string;
-    serviceCategory: 'Breakfast' | 'F&B Dining' | 'Spa & Wellness' | 'Airport Transport' | 'VIP Lounge';
+    serviceCategory: 'Breakfast' | 'F&B Dining' | 'Spa & Wellness' | 'Airport Transport' | 'Airport Pickup' | 'Airport Drop' | 'VIP Lounge';
     serviceName: string;
     benefitDetails: string;
     paxCount: number;
@@ -51,17 +51,30 @@ const INITIAL_VOUCHERS: GuestVoucher[] = [
     {
         id: '3',
         voucherCode: 'VCH-2026-TRN03',
-        guestName: 'Tarek Rahman',
+        guestName: 'Sara Islam',
         roomNumber: '201',
-        serviceCategory: 'Airport Transport',
-        serviceName: 'Executive Airport Drop Sedan Transfer',
-        benefitDetails: 'Private Toyota Camry chauffeur drop to Hazrat Shahjalal Int Airport',
+        serviceCategory: 'Airport Pickup',
+        serviceName: 'Executive Airport Pickup Transfer (Inbound)',
+        benefitDetails: 'Flight BG-084 arrival pickup at T2. Driver holding placard: Ms. Sara Islam',
         paxCount: 1,
-        issueDate: '2026-06-24',
-        expiryDate: '2026-06-27',
+        issueDate: '2026-07-01',
+        expiryDate: '2026-07-01',
         status: 'REDEEMED',
-        redeemedAt: '2026-06-26 09:15',
-        redeemedBy: 'Concierge - Kabir Hossain'
+        redeemedAt: '2026-07-01 11:20',
+        redeemedBy: 'Chauffeur - Rafiqul Alam'
+    },
+    {
+        id: '4',
+        voucherCode: 'VCH-2026-TRN04',
+        guestName: 'Sara Islam',
+        roomNumber: '201',
+        serviceCategory: 'Airport Drop',
+        serviceName: 'Executive Airport Drop Sedan Transfer (Outbound)',
+        benefitDetails: 'Departure Flight BG-085 (T2). Private Toyota Camry transfer from hotel lobby at 13:00',
+        paxCount: 1,
+        issueDate: '2026-07-01',
+        expiryDate: '2026-07-03',
+        status: 'ACTIVE'
     },
     {
         id: '4',
@@ -184,6 +197,8 @@ export const GuestVoucherSystem: React.FC = () => {
             case 'F&B Dining': return <Utensils size={14} className="text-orange-600" />;
             case 'Spa & Wellness': return <Sparkles size={14} className="text-purple-600" />;
             case 'Airport Transport': return <Car size={14} className="text-blue-600" />;
+            case 'Airport Pickup': return <Car size={14} className="text-blue-600" />;
+            case 'Airport Drop': return <Plane size={14} className="text-sky-600" />;
             case 'VIP Lounge': return <ShieldCheck size={14} className="text-emerald-600" />;
         }
     };
@@ -283,7 +298,7 @@ export const GuestVoucherSystem: React.FC = () => {
             <div className="bg-white rounded-none border-b border-gray-200 px-3.5 py-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center bg-gray-100 p-0.5 rounded border border-gray-200 text-[11px]">
-                        {['ALL', 'Breakfast', 'Spa & Wellness', 'Airport Transport', 'VIP Lounge', 'F&B Dining'].map(cat => (
+                        {['ALL', 'Breakfast', 'Spa & Wellness', 'Airport Pickup', 'Airport Drop', 'VIP Lounge', 'F&B Dining'].map(cat => (
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
@@ -454,9 +469,10 @@ export const GuestVoucherSystem: React.FC = () => {
                                         className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-emerald-500"
                                     >
                                         <option value="Breakfast">Breakfast Coupon</option>
-                                        <option value="Spa & Wellness">Spa & Wellness</option>
-                                        <option value="Airport Transport">Airport Transfer</option>
-                                        <option value="VIP Lounge">VIP Club Lounge</option>
+                                        <option value="Spa & Wellness">Spa & Wellness Pass</option>
+                                        <option value="Airport Pickup">Airport Pickup Transfer (Inbound)</option>
+                                        <option value="Airport Drop">Airport Drop Transfer (Outbound)</option>
+                                        <option value="VIP Lounge">VIP Club Lounge Pass</option>
                                         <option value="F&B Dining">F&B Restaurant Voucher</option>
                                     </select>
                                 </div>

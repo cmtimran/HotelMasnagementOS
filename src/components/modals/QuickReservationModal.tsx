@@ -3,10 +3,33 @@ import {
     Calendar as CalendarIcon,
     Trash2,
     X,
-    Building2
+    Building2,
+    MoreVertical,
+    Car,
+    Plane,
+    BedDouble,
+    Utensils,
+    Gift,
+    Clock,
+    Sparkles
 } from 'lucide-react';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
 import { ChildAgeSelector } from '../common/ChildAgeSelector';
+import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
+import type {
+    RoomServicesBundle,
+    ExtraBedConfig,
+    PickupConfig
+} from '../../types/reservationServices';
+import {
+    getExtraBedTotal,
+    getMealPlanTotal,
+    getCelebrationTotal,
+    getSpaWellnessTotal,
+    getTimingFlexTotal,
+    getCustomAddonsTotal,
+    getRoomBundleTotal
+} from '../../types/reservationServices';
 
 export interface QuickReservationModalProps {
     isOpen: boolean;
@@ -38,6 +61,9 @@ interface RoomItem {
     children: number;
     childrenAges?: number[];
     rate: number;
+    servicesBundle?: RoomServicesBundle;
+    extraBed?: ExtraBedConfig;
+    pickup?: PickupConfig;
 }
 
 interface PaymentRow {
@@ -124,9 +150,50 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     }, [roomInfo, isOpen]);
 
 
+    // Room Add-On Services (Full Bundle) State
+    const [serviceModalConfig, setServiceModalConfig] = useState<{
+        isOpen: boolean;
+        rowId: number | null;
+        initialTab: ServiceTabType;
+    }>({
+        isOpen: false,
+        rowId: null,
+        initialTab: 'pickup'
+    });
+    const [activeMenuRowId, setActiveMenuRowId] = useState<number | null>(null);
+
+    const handleSaveRoomServices = (rowId: number, bundle: RoomServicesBundle) => {
+        setRoomsList(prev => prev.map(r => r.id === rowId ? {
+            ...r,
+            servicesBundle: bundle,
+            extraBed: bundle.extraBed,
+            pickup: bundle.pickup
+        } : r));
+    };
+
+    const activeRowForService = roomsList.find(r => r.id === serviceModalConfig.rowId);
+
     // Calculate financials
     const nightMultiplier = dayUse ? 1 : Math.max(1, nights);
-    const totalAmount = roomsList.reduce((acc, r) => acc + (r.rate * r.noOfRooms * nightMultiplier), 0);
+    const roomBaseTotal = roomsList.reduce((acc, r) => acc + (r.rate * r.noOfRooms * nightMultiplier), 0);
+    const totalExtraBedCharge = roomsList.reduce((acc, r) => acc + getExtraBedTotal(r.servicesBundle?.extraBed || r.extraBed, nightMultiplier), 0);
+    const totalPickupArrivalCharge = roomsList.reduce((acc, r) => {
+        const p = r.servicesBundle?.pickup || r.pickup;
+        return acc + (p?.enabled && !p.isComplimentary ? (Number(p.chargeAmount) || 0) : 0);
+    }, 0);
+    const totalDropDepartureCharge = roomsList.reduce((acc, r) => {
+        const p = r.servicesBundle?.pickup || r.pickup;
+        return acc + (p?.dropEnabled && !p.dropIsComplimentary ? (Number(p.dropChargeAmount) || 0) : 0);
+    }, 0);
+    const totalPickupCharge = totalPickupArrivalCharge + totalDropDepartureCharge;
+    const totalMealPlanCharge = roomsList.reduce((acc, r) => acc + getMealPlanTotal(r.servicesBundle?.mealPlan, nightMultiplier), 0);
+    const totalCelebrationCharge = roomsList.reduce((acc, r) => acc + getCelebrationTotal(r.servicesBundle?.celebration), 0);
+    const totalSpaCharge = roomsList.reduce((acc, r) => acc + getSpaWellnessTotal(r.servicesBundle?.spaWellness), 0);
+    const totalTimingCharge = roomsList.reduce((acc, r) => acc + getTimingFlexTotal(r.servicesBundle?.timingFlex), 0);
+    const totalCustomCharge = roomsList.reduce((acc, r) => acc + getCustomAddonsTotal(r.servicesBundle?.customAddons, nightMultiplier), 0);
+
+    const totalAllAddonsCharges = totalExtraBedCharge + totalPickupCharge + totalMealPlanCharge + totalCelebrationCharge + totalSpaCharge + totalTimingCharge + totalCustomCharge;
+    const totalAmount = roomBaseTotal + totalAllAddonsCharges;
     const discountedAmount = discountType === 'Percentage'
         ? (totalAmount * (discountValue || 0)) / 100
         : (discountValue || 0);
@@ -212,6 +279,27 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             paidAmount: status === 'hold' ? 0 : totalPaid,
             dueAmount: status === 'hold' ? netTotal : totalDue,
             source: businessSource,
+            roomsList: [...roomsList],
+            servicesBundle: roomsList[0]?.servicesBundle || { extraBed: roomsList[0]?.extraBed, pickup: roomsList[0]?.pickup },
+            extraBed: roomsList[0]?.servicesBundle?.extraBed || roomsList[0]?.extraBed || null,
+            pickup: roomsList[0]?.servicesBundle?.pickup || roomsList[0]?.pickup || null,
+            mealPlan: roomsList[0]?.servicesBundle?.mealPlan || null,
+            celebration: roomsList[0]?.servicesBundle?.celebration || null,
+            spaWellness: roomsList[0]?.servicesBundle?.spaWellness || null,
+            timingFlex: roomsList[0]?.servicesBundle?.timingFlex || null,
+            customAddons: roomsList[0]?.servicesBundle?.customAddons || [],
+            addonCharges: {
+                extraBed: totalExtraBedCharge,
+                pickup: totalPickupArrivalCharge,
+                drop: totalDropDepartureCharge,
+                transferTotal: totalPickupCharge,
+                mealPlan: totalMealPlanCharge,
+                celebration: totalCelebrationCharge,
+                spa: totalSpaCharge,
+                timingFlex: totalTimingCharge,
+                custom: totalCustomCharge,
+                total: totalAllAddonsCharges
+            },
             createdAt: new Date().toISOString()
         };
 
@@ -398,20 +486,24 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <table className="w-full text-left border-collapse text-[11px] table-auto">
                                         <thead>
                                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
-                                                <th className="py-2 px-2.5 min-w-[110px]">Room Type</th>
+                                                <th className="py-2 px-2.5 min-w-[120px]">Room Type</th>
                                                 <th className="py-2 px-1 text-center w-11">Qty</th>
                                                 <th className="py-2 px-2 min-w-[120px]">Rate Plan</th>
                                                 <th className="py-2 px-1 text-center w-16">Room No.</th>
                                                 <th className="py-2 px-1 text-center w-11">Adult</th>
                                                 <th className="py-2 px-1 text-center w-22">Child</th>
                                                 <th className="py-2 px-1.5 text-right w-20">Rate</th>
-                                                <th className="py-2 px-2 text-right w-20">Total</th>
-                                                <th className="py-2 px-1 text-center w-8">Del</th>
+                                                <th className="py-2 px-2 text-right w-24">Total</th>
+                                                <th className="py-2 px-1.5 text-center w-16">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {roomsList.map(item => {
-                                                const lineTotal = item.rate * item.noOfRooms * (dayUse ? 1 : Math.max(1, nights));
+                                                const bundle = item.servicesBundle || { extraBed: item.extraBed, pickup: item.pickup };
+                                                const itemAddons = getRoomBundleTotal(bundle, nightMultiplier);
+                                                const baseLineTotal = item.rate * item.noOfRooms * nightMultiplier;
+                                                const lineTotal = baseLineTotal + itemAddons;
+
                                                 return (
                                                     <tr key={item.id} className="hover:bg-blue-50/20 transition-colors">
                                                         <td className="py-1.5 px-2.5">
@@ -425,6 +517,85 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                 <option value="Executive Suite">Executive Suite</option>
                                                                 <option value="Standard Single">Standard Single</option>
                                                             </select>
+                                                            {/* Active Room Add-on Badges */}
+                                                            {(() => {
+                                                                const b = item.servicesBundle || { extraBed: item.extraBed, pickup: item.pickup };
+                                                                const hasServices = b.pickup?.enabled || b.extraBed?.enabled || b.mealPlan?.enabled || b.celebration?.enabled || b.spaWellness?.enabled || b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut || (b.customAddons && b.customAddons.length > 0);
+                                                                if (!hasServices) return null;
+
+                                                                return (
+                                                                    <div className="flex flex-wrap items-center gap-1 mt-1 max-w-[210px]">
+                                                                        {b.pickup?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'pickup' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 cursor-pointer shadow-2xs"
+                                                                                title="Airport Transfer Configured"
+                                                                            >
+                                                                                <Car size={10} />
+                                                                                <span>{b.pickup.flightNumber ? b.pickup.flightNumber : 'Transfer'}</span>
+                                                                                <span className="font-bold">{b.pickup.isComplimentary ? 'Free' : `৳${b.pickup.chargeAmount}`}</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.extraBed?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'extrabed' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 cursor-pointer shadow-2xs"
+                                                                                title="Extra Bed Configured"
+                                                                            >
+                                                                                <BedDouble size={10} />
+                                                                                <span>{b.extraBed.quantity}x Bed</span>
+                                                                                <span className="font-bold">{b.extraBed.isComplimentary ? 'Free' : `৳${getExtraBedTotal(b.extraBed, nightMultiplier)}`}</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.mealPlan?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'mealplan' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 cursor-pointer shadow-2xs"
+                                                                                title="Meal Plan Configured"
+                                                                            >
+                                                                                <Utensils size={10} />
+                                                                                <span>{b.mealPlan.planType.split(' ')[0]}</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.celebration?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'celebration' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 cursor-pointer shadow-2xs"
+                                                                                title="Celebration Setup Configured"
+                                                                            >
+                                                                                <Gift size={10} />
+                                                                                <span>Decor</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {b.spaWellness?.enabled && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'spa' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 cursor-pointer shadow-2xs"
+                                                                                title="Spa Treatment Configured"
+                                                                            >
+                                                                                <Sparkles size={10} />
+                                                                                <span>Spa</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {(b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut) && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'timing' })}
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 cursor-pointer shadow-2xs"
+                                                                                title="Early/Late Check-in/out Flex"
+                                                                            >
+                                                                                <Clock size={10} />
+                                                                                <span>Flex</span>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="py-1.5 px-1 text-center">
                                                             <input
@@ -482,18 +653,187 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                             />
                                                         </td>
                                                         <td className="py-1.5 px-2 text-right font-bold text-slate-800 whitespace-nowrap text-[11px]">
-                                                            ৳{lineTotal.toLocaleString()}
+                                                            <div>৳{lineTotal.toLocaleString()}</div>
+                                                            {itemAddons > 0 && (
+                                                                <div className="text-[9px] text-slate-400 font-normal">
+                                                                    Base: {baseLineTotal.toLocaleString()} + Svc: {itemAddons.toLocaleString()}
+                                                                </div>
+                                                            )}
                                                         </td>
-                                                        <td className="py-1.5 px-1 text-center">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleRemoveRoom(item.id)}
-                                                                disabled={roomsList.length <= 1}
-                                                                className="text-red-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-1 transition-colors mx-auto block"
-                                                                title="Delete Room Row"
-                                                            >
-                                                                <Trash2 size={13} />
-                                                            </button>
+                                                        <td className="py-1.5 px-1.5 text-center">
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {/* 3-dots Menu Button */}
+                                                                <div className="relative">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setActiveMenuRowId(activeMenuRowId === item.id ? null : item.id)}
+                                                                        title="Room Add-On Services (Transfer, Bed, Meals, Spa, Romance, Flex)"
+                                                                        className={`p-1 rounded cursor-pointer transition-all ${
+                                                                            (item.servicesBundle || item.extraBed?.enabled || item.pickup?.enabled)
+                                                                                ? 'text-blue-700 bg-blue-100/70 hover:bg-blue-200/70 ring-1 ring-blue-300'
+                                                                                : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'
+                                                                        }`}
+                                                                    >
+                                                                        <MoreVertical size={13} />
+                                                                    </button>
+
+                                                                    {activeMenuRowId === item.id && (
+                                                                        <>
+                                                                            <div 
+                                                                                className="fixed inset-0 z-20"
+                                                                                onClick={() => setActiveMenuRowId(null)}
+                                                                            />
+                                                                            <div 
+                                                                                className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 text-left animate-in fade-in zoom-in-95 duration-100"
+                                                                                onClick={e => e.stopPropagation()}
+                                                                            >
+                                                                                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                                                                                    <span>Room #{item.roomNumber || item.id} Services</span>
+                                                                                    <span className="text-[9px] text-blue-600 font-semibold">Addons</span>
+                                                                                </div>
+                                                                                
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'pickup' });
+                                                                                        setActiveMenuRowId(null);
+                                                                                    }}
+                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                                                >
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <Car size={13} className="text-blue-600" />
+                                                                                        <span>Airport Pickup (Arrival)</span>
+                                                                                    </span>
+                                                                                    {item.servicesBundle?.pickup?.enabled || item.pickup?.enabled ? (
+                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                                                    )}
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'pickup' });
+                                                                                        setActiveMenuRowId(null);
+                                                                                    }}
+                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                                                >
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <Plane size={13} className="text-sky-600" />
+                                                                                        <span>Airport Drop (Departure)</span>
+                                                                                    </span>
+                                                                                    {item.servicesBundle?.pickup?.dropEnabled || item.pickup?.dropEnabled ? (
+                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                                                    )}
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'extrabed' });
+                                                                                        setActiveMenuRowId(null);
+                                                                                    }}
+                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                                                    >
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <BedDouble size={13} className="text-indigo-600" />
+                                                                                        <span>Extra Bed &amp; Baby Cot</span>
+                                                                                    </span>
+                                                                                    {item.servicesBundle?.extraBed?.enabled || item.extraBed?.enabled ? (
+                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                                                    )}
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'mealplan' });
+                                                                                        setActiveMenuRowId(null);
+                                                                                    }}
+                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                                                >
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <Utensils size={13} className="text-amber-600" />
+                                                                                        <span>Meal Plans &amp; Dining</span>
+                                                                                    </span>
+                                                                                    {item.servicesBundle?.mealPlan?.enabled ? (
+                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                                                    )}
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'celebration' });
+                                                                                        setActiveMenuRowId(null);
+                                                                                    }}
+                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                                                >
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <Gift size={13} className="text-rose-600" />
+                                                                                        <span>Honeymoon &amp; Decor</span>
+                                                                                    </span>
+                                                                                    {item.servicesBundle?.celebration?.enabled ? (
+                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                                                    )}
+                                                                                </button>
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'timing' });
+                                                                                        setActiveMenuRowId(null);
+                                                                                    }}
+                                                                                    className="w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-blue-50 text-slate-700 transition-colors"
+                                                                                >
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <Clock size={13} className="text-sky-600" />
+                                                                                        <span>Early / Late Check-Out</span>
+                                                                                    </span>
+                                                                                    {item.servicesBundle?.timingFlex?.earlyCheckIn || item.servicesBundle?.timingFlex?.lateCheckOut ? (
+                                                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[10px] text-slate-400">+ Add</span>
+                                                                                    )}
+                                                                                </button>
+
+                                                                                <div className="my-1 border-t border-slate-100" />
+
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'pickup' });
+                                                                                        setActiveMenuRowId(null);
+                                                                                    }}
+                                                                                    className="w-full px-3 py-1.5 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
+                                                                                >
+                                                                                    <Sparkles size={13} />
+                                                                                    <span>Manage All Services...</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveRoom(item.id)}
+                                                                    disabled={roomsList.length <= 1}
+                                                                    className="text-red-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer p-1 transition-colors"
+                                                                    title="Delete Room Row"
+                                                                >
+                                                                    <Trash2 size={13} />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -673,23 +1013,81 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                 {/* Right: Summary Box (5 cols) */}
                                 <div className="lg:col-span-5">
                                     <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 shadow-2xs">
-                                        <div className="divide-y divide-slate-200/80 text-[11px]">
-                                            <div className="flex justify-between py-1.5 text-slate-600">
-                                                <span>Subtotal ({nights}N)</span>
-                                                <span className="font-semibold text-slate-900">৳{totalAmount.toLocaleString()}</span>
+                                        <div className="space-y-1 text-[11px]">
+                                            <div className="flex justify-between py-1 border-b border-slate-200 text-slate-600">
+                                                <span>Room Base ({nights}N)</span>
+                                                <span className="font-semibold text-slate-900">৳{roomBaseTotal.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between py-1.5 text-slate-600">
+
+                                            {totalPickupArrivalCharge > 0 && (
+                                                <div className="flex justify-between py-0.5 text-blue-700">
+                                                    <span className="flex items-center gap-1"><Car size={11} /> Airport Pickup (Inbound)</span>
+                                                    <span className="font-bold font-mono">+৳{totalPickupArrivalCharge.toLocaleString()}</span>
+                                                </div>
+                                            )}
+
+                                            {totalDropDepartureCharge > 0 && (
+                                                <div className="flex justify-between py-0.5 text-sky-700">
+                                                    <span className="flex items-center gap-1"><Plane size={11} /> Airport Drop (Outbound)</span>
+                                                    <span className="font-bold font-mono">+৳{totalDropDepartureCharge.toLocaleString()}</span>
+                                                </div>
+                                            )}
+
+                                            {totalExtraBedCharge > 0 && (
+                                                <div className="flex justify-between py-0.5 text-indigo-700">
+                                                    <span className="flex items-center gap-1"><BedDouble size={11} /> Extra Bed &amp; Cot</span>
+                                                    <span className="font-bold font-mono">+৳{totalExtraBedCharge.toLocaleString()}</span>
+                                                </div>
+                                            )}
+
+                                            {totalMealPlanCharge > 0 && (
+                                                <div className="flex justify-between py-0.5 text-amber-700">
+                                                    <span className="flex items-center gap-1"><Utensils size={11} /> Meal Plans</span>
+                                                    <span className="font-bold font-mono">+৳{totalMealPlanCharge.toLocaleString()}</span>
+                                                </div>
+                                            )}
+
+                                            {totalCelebrationCharge > 0 && (
+                                                <div className="flex justify-between py-0.5 text-rose-700">
+                                                    <span className="flex items-center gap-1"><Gift size={11} /> Decor &amp; Romance</span>
+                                                    <span className="font-bold font-mono">+৳{totalCelebrationCharge.toLocaleString()}</span>
+                                                </div>
+                                            )}
+
+                                            {totalSpaCharge > 0 && (
+                                                <div className="flex justify-between py-0.5 text-teal-700">
+                                                    <span className="flex items-center gap-1"><Sparkles size={11} /> Wellness &amp; Spa</span>
+                                                    <span className="font-bold font-mono">+৳{totalSpaCharge.toLocaleString()}</span>
+                                                </div>
+                                            )}
+
+                                            {totalTimingCharge > 0 && (
+                                                <div className="flex justify-between py-0.5 text-sky-700">
+                                                    <span className="flex items-center gap-1"><Clock size={11} /> Time Flex</span>
+                                                    <span className="font-bold font-mono">+৳{totalTimingCharge.toLocaleString()}</span>
+                                                </div>
+                                            )}
+
+                                            <div className="flex justify-between py-1 border-t border-slate-200 text-slate-700 font-semibold">
+                                                <span>Total Gross</span>
+                                                <span className="font-bold text-slate-900">৳{totalAmount.toLocaleString()}</span>
+                                            </div>
+
+                                            <div className="flex justify-between py-1 text-slate-600">
                                                 <span>Discount</span>
                                                 <span className="font-semibold text-emerald-700">-৳{discountedAmount.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between py-1.5 text-slate-600">
+
+                                            <div className="flex justify-between py-1 text-slate-800 font-bold border-t border-dashed border-slate-200">
                                                 <span>Net Payable</span>
-                                                <span className="font-bold text-slate-900">৳{netTotal.toLocaleString()}</span>
+                                                <span className="font-bold text-blue-900">৳{netTotal.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex justify-between py-1.5 text-slate-600">
+
+                                            <div className="flex justify-between py-1 text-slate-600">
                                                 <span>Total Paid</span>
                                                 <span className="font-bold text-emerald-700">৳{totalPaid.toLocaleString()}</span>
                                             </div>
+
                                             <div className="bg-white -mx-3 -mb-3 px-3 py-2.5 flex justify-between font-bold text-xs border-t border-slate-200 rounded-b-lg">
                                                 <span className="text-slate-800">Remaining Balance:</span>
                                                 <span className={totalDue > 0 ? 'text-amber-700' : 'text-emerald-700'}>
@@ -743,6 +1141,23 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Room Add-On Services Modal (All Services Bundle) */}
+            {serviceModalConfig.isOpen && activeRowForService && (
+                <RoomAddonServicesModal
+                    isOpen={serviceModalConfig.isOpen}
+                    onClose={() => setServiceModalConfig(prev => ({ ...prev, isOpen: false, rowId: null }))}
+                    roomNumber={activeRowForService.roomNumber}
+                    roomType={activeRowForService.roomType}
+                    baseRate={activeRowForService.rate}
+                    nights={nightMultiplier}
+                    initialTab={serviceModalConfig.initialTab}
+                    currentServices={activeRowForService.servicesBundle}
+                    currentExtraBed={activeRowForService.extraBed}
+                    currentPickup={activeRowForService.pickup}
+                    onSave={(bundle) => handleSaveRoomServices(activeRowForService.id, bundle)}
+                />
+            )}
         </div>
     );
 };
