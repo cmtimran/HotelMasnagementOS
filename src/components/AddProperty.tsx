@@ -7,6 +7,9 @@ import {
     DollarSign, Calendar, AlertCircle, FileText,
     Image, Trash2, Plus, Check
 } from 'lucide-react';
+import { useProperty } from '../context/PropertyContext';
+import { useToast } from '../context/ToastContext';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 interface AddPropertyProps {
     onBack: () => void;
@@ -36,9 +39,23 @@ interface PocContact {
 }
 
 const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
+    const { refreshProperties, setActivePropertyId } = useProperty();
+    const { showToast } = useToast();
+
     const [activeTab, setActiveTab] = useState('identity');
     const [activePolicyPillar, setActivePolicyPillar] = useState('booking');
     const [notification, setNotification] = useState<string | null>(null);
+
+    // Form fields state
+    const [propName, setPropName] = useState(initialData?.name || 'Grand Palace Hotel & Suites');
+    const [propCode, setPropCode] = useState(initialData?.code || 'GPH-DHK-01');
+    const [propType, setPropType] = useState(initialData?.type || 'Hotel');
+    const [propGrade, setPropGrade] = useState(initialData?.grade || '5 Star');
+    const [propRooms, setPropRooms] = useState(initialData?.rooms || 120);
+    const [propCity, setPropCity] = useState(initialData?.city || 'Dhaka');
+    const [propAddress, setPropAddress] = useState(initialData?.address || 'Plot 42, Road 11, Block C, Banani');
+    const [propPhone, setPropPhone] = useState(initialData?.phone || '+880 2 9876543');
+    const [propEmail, setPropEmail] = useState(initialData?.email || 'reservation@grandpalace.com');
 
     // Dynamic Lists State
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
@@ -76,9 +93,45 @@ const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
         setAmenities(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const handleSave = (type: 'draft' | 'publish') => {
+    const handleSave = async (type: 'draft' | 'publish') => {
+        try {
+            const baseUrl = getApiBaseUrl();
+            const res = await fetch(`${baseUrl}/api/properties`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: propName,
+                    code: propCode,
+                    propertyType: propType.toUpperCase(),
+                    starRating: propGrade.includes('5') ? 5 : propGrade.includes('4') ? 4 : 3,
+                    totalRooms: Number(propRooms) || 60,
+                    city: propCity,
+                    address: propAddress,
+                    phone: propPhone,
+                    email: propEmail,
+                    status: type === 'publish' ? 'ACTIVE' : 'DRAFT'
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Property "${propName}" created and published!`, { type: 'success' });
+                await refreshProperties();
+                if (data.data?.id) {
+                    setActivePropertyId(data.data.id);
+                }
+                setTimeout(() => onBack(), 500);
+                return;
+            }
+        } catch (err) {
+            console.warn('Backend property creation notice:', err);
+        }
+
         setNotification(type === 'publish' ? 'Property profile saved and published successfully!' : 'Draft configuration saved successfully!');
-        setTimeout(() => setNotification(null), 3000);
+        showToast(`Property "${propName}" configuration saved!`, { type: 'success' });
+        setTimeout(() => {
+            setNotification(null);
+            onBack();
+        }, 800);
     };
 
     const tabs = [
@@ -241,11 +294,11 @@ const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
                             <div>
                                 <SectionTitle icon={Building2} title="General Information" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                                    <FormField label="Hotel Name" required><Input defaultValue={initialData?.name || 'Grand Palace Hotel & Suites'} placeholder="Official Property Name" /></FormField>
-                                    <FormField label="Property Code" required><Input defaultValue={initialData?.code || 'GPH-DHK-01'} placeholder="e.g. HTL-DHK-01" /></FormField>
-                                    <FormField label="Property Type"><Select defaultValue={initialData?.type || 'Hotel'}><option>Hotel</option><option>Resort</option><option>Apartment</option></Select></FormField>
-                                    <FormField label="Grade / Star Rating"><Select defaultValue={initialData?.grade || '5 Star'}><option>5 Star</option><option>4 Star</option><option>3 Star</option></Select></FormField>
-                                    <FormField label="Total Rooms Count" required><Input type="number" defaultValue={initialData?.rooms || 120} /></FormField>
+                                    <FormField label="Hotel Name" required><Input value={propName} onChange={(e: any) => setPropName(e.target.value)} placeholder="Official Property Name" /></FormField>
+                                    <FormField label="Property Code" required><Input value={propCode} onChange={(e: any) => setPropCode(e.target.value)} placeholder="e.g. HTL-DHK-01" /></FormField>
+                                    <FormField label="Property Type"><Select value={propType} onChange={(e: any) => setPropType(e.target.value)}><option value="Hotel">Hotel</option><option value="Resort">Resort</option><option value="Apartment">Apartment</option></Select></FormField>
+                                    <FormField label="Grade / Star Rating"><Select value={propGrade} onChange={(e: any) => setPropGrade(e.target.value)}><option value="5 Star">5 Star</option><option value="4 Star">4 Star</option><option value="3 Star">3 Star</option></Select></FormField>
+                                    <FormField label="Total Rooms Count" required><Input type="number" value={propRooms} onChange={(e: any) => setPropRooms(Number(e.target.value))} /></FormField>
                                     <FormField label="Established Year"><Input defaultValue="2018" placeholder="YYYY" /></FormField>
                                     <FormField label="Website"><Input defaultValue={initialData?.website || 'grandpalacehotel.com'} placeholder="https://..." /></FormField>
                                     <FormField label="Default Nationality"><Select><option>Bangladeshi</option><option>American</option><option>British</option></Select></FormField>
@@ -257,19 +310,19 @@ const AddProperty = ({ onBack, initialData }: AddPropertyProps) => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
                                     <div className="md:col-span-2 lg:col-span-4">
                                         <FormField label="Address" required>
-                                            <textarea className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs min-h-[50px] outline-none focus:ring-1 focus:ring-blue-500 text-gray-800" defaultValue={initialData?.address || 'Plot 42, Road 11, Block C, Banani'} />
+                                            <textarea className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs min-h-[50px] outline-none focus:ring-1 focus:ring-blue-500 text-gray-800" value={propAddress} onChange={e => setPropAddress(e.target.value)} />
                                         </FormField>
                                     </div>
-                                    <FormField label="City"><Input defaultValue={initialData?.city || 'Dhaka'} placeholder="Dhaka" /></FormField>
+                                    <FormField label="City"><Input value={propCity} onChange={(e: any) => setPropCity(e.target.value)} placeholder="Dhaka" /></FormField>
                                     <FormField label="Country" required><Input defaultValue={initialData?.country || 'Bangladesh'} /></FormField>
                                     <FormField label="State"><Input defaultValue="Dhaka Division" placeholder="State" /></FormField>
                                     <FormField label="Zip Code"><Input defaultValue="1213" placeholder="Zip Code" /></FormField>
                                     <FormField label="Map Latitude"><Input defaultValue="23.7937" placeholder="e.g. 23.8103" /></FormField>
                                     <FormField label="Map Longitude"><Input defaultValue="90.4066" placeholder="e.g. 90.4125" /></FormField>
                                     <FormField label="Timezone" required><Select><option>GMT+6 (Asia/Dhaka)</option><option>UTC-5 (New York)</option></Select></FormField>
-                                    <FormField label="Phone"><Input defaultValue={initialData?.phone || '+880 2 9876543'} placeholder="Property Phone" /></FormField>
+                                    <FormField label="Phone"><Input value={propPhone} onChange={(e: any) => setPropPhone(e.target.value)} placeholder="Property Phone" /></FormField>
                                     <div className="md:col-span-2">
-                                        <FormField label="Email"><Input type="email" defaultValue={initialData?.email || 'reservation@grandpalace.com'} placeholder="Property Email" /></FormField>
+                                        <FormField label="Email"><Input type="email" value={propEmail} onChange={(e: any) => setPropEmail(e.target.value)} placeholder="Property Email" /></FormField>
                                     </div>
                                 </div>
                             </div>

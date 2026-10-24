@@ -756,6 +756,373 @@ export const updateReservationStatusInDB = async (
 };
 
 /**
+ * Amend Stay directly in SQLite / PostgreSQL Database (Persists across page refresh)
+ */
+export const amendStayInDB = async (
+    reservationIdOrNo: string | number,
+    newDeparture: string,
+    newNights: number,
+    extraData?: {
+        roomNumber?: string;
+        newTotalAmount?: number;
+        newDueAmount?: number;
+        newBaseAmount?: number;
+        taxDetails?: any;
+    }
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/amend`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                newDeparture,
+                newNights,
+                roomNumber: extraData?.roomNumber,
+                newTotalAmount: extraData?.newTotalAmount,
+                newDueAmount: extraData?.newDueAmount,
+                newBaseAmount: extraData?.newBaseAmount,
+                taxDetails: extraData?.taxDetails
+            })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to amend stay in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Move Reservation Room directly in Database
+ */
+export const moveRoomInDB = async (
+    reservationIdOrNo: string | number,
+    newRoomNumber: string,
+    newFromDate?: string,
+    newToDate?: string,
+    oldRoomNumber?: string
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                newRoomNumber,
+                newFromDate,
+                newToDate,
+                oldRoomNumber
+            })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to move room in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Record Payment on Reservation in Database
+ */
+export const recordPaymentInDB = async (
+    reservationIdOrNo: string | number,
+    amount: number,
+    paymentMethod: string = 'Cash',
+    remarks: string = ''
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount, paymentMethod, remarks })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to record payment in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Split Room Stay in Database
+ */
+export const splitStayInDB = async (
+    reservationIdOrNo: string | number,
+    targetRoomNumber: string,
+    splitDate?: string,
+    fromDate?: string,
+    toDate?: string
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/split`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetRoomNumber, splitDate, fromDate, toDate })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to split room stay in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Hold Reservation in Database
+ */
+export const holdReservationInDB = async (
+    reservationIdOrNo: string | number,
+    startDate?: string,
+    endDate?: string,
+    reason?: string
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/hold`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate, reason })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId: reservationIdOrNo });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to hold reservation in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Void Reservation in Database
+ */
+export const voidReservationInDB = async (
+    reservationIdOrNo: string | number,
+    reason: string = 'Voided'
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/void`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const newList = existing.filter(r => String(r.id) !== String(reservationIdOrNo) && r.reservationNumber !== String(reservationIdOrNo));
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to void reservation in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Unassign Room in Database
+ */
+export const unassignRoomInDB = async (
+    reservationIdOrNo: string | number,
+    roomNumber?: string
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/unassign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomNumber })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, roomNumber: 'Unassigned', allocatedRooms: [] } : r);
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to unassign room in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Ungroup Reservation in Database
+ */
+export const ungroupReservationInDB = async (
+    reservationIdOrNo: string | number,
+    selectedRooms?: string[]
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/ungroup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selectedRooms })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, isGroup: false } : r);
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to ungroup reservation in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Change Group Owner in Database
+ */
+export const changeGroupOwnerInDB = async (
+    reservationIdOrNo: string | number,
+    newOwner: string
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/change-owner`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newOwner })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, guestName: newOwner } : r);
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to change group owner in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Full Reservation Update in Database
+ */
+export const updateReservationInDB = async (
+    reservationIdOrNo: string | number,
+    payload: any
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to update reservation in DB:', err);
+    }
+    return null;
+};
+
+/**
  * Delete or cancel reservation directly in SQLite Database
  */
 export const deleteReservationInDB = async (

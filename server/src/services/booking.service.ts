@@ -1,4 +1,5 @@
 import { db } from '../database/db.js';
+import { pgPool, isPostgresConnected } from '../database/postgres.js';
 
 export interface BookingRecord {
   id: string | number;
@@ -405,6 +406,473 @@ export const bookingService = {
 
     const createdBooking = await bookingService.getBookingById(reservationId, propId);
     return createdBooking!;
+  },
+
+  /**
+   * Comprehensive Reservation Update (Guest, Amounts, Dates, Rooms, Status)
+   */
+  updateBooking: async (id: string | number, propertyId: string | number, payload: any): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    const resId = existing.id;
+
+    // 1. Update Guest Details if provided
+    if (payload.guestName || payload.phone || payload.email || payload.salutation || payload.vip) {
+      const rawName = (payload.guestName || existing.guestName).replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim();
+      const nameParts = rawName.split(' ');
+      const firstName = nameParts[0] || 'Valued';
+      const lastName = nameParts.slice(1).join(' ') || 'Guest';
+      const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr)\.?\s+/i)?.[1]) || 'Mr';
+      const phone = payload.phone || existing.phone;
+      const email = payload.email || existing.email;
+      const vip = payload.vip || existing.vip || 'NONE';
+
+      db.prepare(`
+        UPDATE guests
+        SET salutation = ?, first_name = ?, last_name = ?, email = ?, phone = ?, vip_status = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT booker_guest_id FROM reservations WHERE id = ? LIMIT 1)
+      `).run(salutation, firstName, lastName, email, phone, vip === 'None' ? 'NONE' : vip, resId);
+    }
+
+    // 2. Update Reservation Master (Amounts, Status, Special Requests)
+    const newTotal = payload.totalAmount !== undefined ? Number(payload.totalAmount) : existing.totalAmount;
+    const newPaid = payload.paidAmount !== undefined ? Number(payload.paidAmount) : existing.paidAmount;
+    const newDue = payload.dueAmount !== undefined ? Number(payload.dueAmount) : Math.max(0, newTotal - newPaid);
+    const statusDb = payload.status ? (STATUS_UI_TO_DB[payload.status] || payload.status.toUpperCase()) : undefined;
+
+    if (statusDb) {
+      db.prepare(`
+        UPDATE reservations
+        SET total_amount = ?, paid_amount = ?, due_amount = ?, status = ?, special_requests = COALESCE(?, special_requests), updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newTotal, newPaid, newDue, statusDb, payload.specialRequests ?? null, resId);
+    } else {
+      db.prepare(`
+        UPDATE reservations
+        SET total_amount = ?, paid_amount = ?, due_amount = ?, special_requests = COALESCE(?, special_requests), updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newTotal, newPaid, newDue, payload.specialRequests ?? null, resId);
+    }
+
+    // Update Folio balance
+    db.prepare(`
+      UPDATE folios
+      SET balance = ?, status = CASE WHEN ? <= 0 THEN 'SETTLED' ELSE 'OPEN' END
+      WHERE reservation_id = ?
+    `).run(newDue, newDue, resId);
+
+    // 3. Update reservation_rooms (Dates, Nights, Room Assignment)
+    const newCheckIn = payload.checkIn || payload.arrivalDate || existing.checkIn;
+    const newCheckOut = payload.checkOut || payload.departureDate || existing.checkOut;
+    const newNights = Number(payload.nights) || Math.max(1, Math.round((new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime()) / (1000 * 3600 * 24)));
+
+    if (payload.roomsList && Array.isArray(payload.roomsList) && payload.roomsList.length > 0) {
+      for (const r of payload.roomsList) {
+        const rNum = r.roomNumber || r.roomNo;
+        const rIn = r.checkInDate || r.checkIn || newCheckIn;
+        const rOut = r.checkOutDate || r.checkOut || newCheckOut;
+        const rNights = Number(r.nights) || newNights;
+        const rRate = Number(r.rate) || 0;
+
+        const physicalRoom = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(rNum)) as any;
+        if (physicalRoom) {
+          db.prepare(`
+            UPDATE reservation_rooms
+            SET room_id = ?, check_in_date = ?, check_out_date = ?, nights = ?, room_rate = CASE WHEN ? > 0 THEN ? ELSE room_rate END
+            WHERE reservation_id = ? AND (room_id = ? OR id = ?)
+          `).run(physicalRoom.id, rIn, rOut, rNights, rRate, rRate, resId, physicalRoom.id, r.id || 0);
+        }
+      }
+    } else {
+      const targetRoomNum = payload.roomNumber || payload.roomNo || existing.roomNumber;
+      const physicalRoom = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(targetRoomNum)) as any;
+      if (physicalRoom) {
+        db.prepare(`
+          UPDATE reservation_rooms
+          SET room_id = ?, check_in_date = ?, check_out_date = ?, nights = ?
+          WHERE reservation_id = ?
+        `).run(physicalRoom.id, newCheckIn, newCheckOut, newNights, resId);
+      } else {
+        db.prepare(`
+          UPDATE reservation_rooms
+          SET check_in_date = ?, check_out_date = ?, nights = ?
+          WHERE reservation_id = ?
+        `).run(newCheckIn, newCheckOut, newNights, resId);
+      }
+    }
+
+    // Mirror to Postgres Cloud if connected
+    if (isPostgresConnected()) {
+      try {
+        await pgPool.query(
+          `UPDATE reservations SET total_amount = $1, paid_amount = $2, due_amount = $3 WHERE id = $4`,
+          [newTotal, newPaid, newDue, resId]
+        );
+        await pgPool.query(
+          `UPDATE reservation_rooms SET check_in_date = $1, check_out_date = $2, nights = $3 WHERE reservation_id = $4`,
+          [newCheckIn, newCheckOut, newNights, resId]
+        );
+      } catch (err: any) {
+        console.warn('Postgres mirror sync notice:', err.message);
+      }
+    }
+
+    return bookingService.getBookingById(resId, propId);
+  },
+
+  /**
+   * Amend Stay (Extend or Shorten Stay in Stay View)
+   */
+  amendStay: async (id: string | number, propertyId: string | number, payload: {
+    roomNumber?: string;
+    newDeparture: string;
+    newNights: number;
+    newBaseAmount?: number;
+    newTotalAmount?: number;
+    newDueAmount?: number;
+    taxDetails?: any;
+  }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    const resId = existing.id;
+    const { roomNumber, newDeparture, newNights, newTotalAmount, newDueAmount } = payload;
+
+    // 1. Update reservation_rooms
+    if (roomNumber) {
+      const roomRow = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(roomNumber)) as any;
+      if (roomRow) {
+        db.prepare(`
+          UPDATE reservation_rooms
+          SET check_out_date = ?, nights = ?
+          WHERE reservation_id = ? AND room_id = ?
+        `).run(newDeparture, newNights, resId, roomRow.id);
+      }
+    }
+    // Also ensure reservation_rooms row for this reservation is updated
+    db.prepare(`
+      UPDATE reservation_rooms
+      SET check_out_date = ?, nights = ?
+      WHERE reservation_id = ?
+    `).run(newDeparture, newNights, resId);
+
+    // 2. Update amounts if provided
+    if (newTotalAmount !== undefined) {
+      const newTotal = Number(newTotalAmount);
+      const paid = Number(existing.paidAmount || 0);
+      const due = newDueAmount !== undefined ? Number(newDueAmount) : Math.max(0, newTotal - paid);
+
+      db.prepare(`
+        UPDATE reservations
+        SET total_amount = ?, due_amount = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newTotal, due, resId);
+
+      db.prepare(`
+        UPDATE folios
+        SET balance = ?, status = CASE WHEN ? <= 0 THEN 'SETTLED' ELSE 'OPEN' END
+        WHERE reservation_id = ?
+      `).run(due, due, resId);
+    }
+
+    // Mirror to Postgres Cloud if connected
+    if (isPostgresConnected()) {
+      try {
+        await pgPool.query(
+          `UPDATE reservation_rooms SET check_out_date = $1, nights = $2 WHERE reservation_id = $3`,
+          [newDeparture, newNights, resId]
+        );
+        if (newTotalAmount !== undefined) {
+          await pgPool.query(
+            `UPDATE reservations SET total_amount = $1, due_amount = $2 WHERE id = $3`,
+            [newTotalAmount, newDueAmount ?? (Number(newTotalAmount) - Number(existing.paidAmount || 0)), resId]
+          );
+        }
+      } catch (err: any) {
+        console.warn('Postgres amend mirror warning:', err.message);
+      }
+    }
+
+    return bookingService.getBookingById(resId, propId);
+  },
+
+  /**
+   * Room Move (Move Reservation from one Room to another Room)
+   */
+  moveRoom: async (id: string | number, propertyId: string | number, payload: {
+    oldRoomNumber?: string;
+    newRoomNumber: string;
+    newFromDate?: string;
+    newToDate?: string;
+  }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    const resId = existing.id;
+    const { oldRoomNumber, newRoomNumber, newFromDate, newToDate } = payload;
+
+    const targetRoom = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(newRoomNumber)) as any;
+    if (!targetRoom) {
+      throw new Error(`Target room ${newRoomNumber} not found for property ${propId}`);
+    }
+
+    if (oldRoomNumber) {
+      const oldRoom = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(oldRoomNumber)) as any;
+      if (oldRoom) {
+        db.prepare(`
+          UPDATE reservation_rooms
+          SET room_id = ?, 
+              check_in_date = COALESCE(?, check_in_date),
+              check_out_date = COALESCE(?, check_out_date)
+          WHERE reservation_id = ? AND room_id = ?
+        `).run(targetRoom.id, newFromDate || null, newToDate || null, resId, oldRoom.id);
+      }
+    } else {
+      db.prepare(`
+        UPDATE reservation_rooms
+        SET room_id = ?, 
+            check_in_date = COALESCE(?, check_in_date),
+            check_out_date = COALESCE(?, check_out_date)
+        WHERE reservation_id = ?
+      `).run(targetRoom.id, newFromDate || null, newToDate || null, resId);
+    }
+
+    if (isPostgresConnected()) {
+      try {
+        await pgPool.query(
+          `UPDATE reservation_rooms SET room_id = (SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1), check_in_date = COALESCE($3, check_in_date), check_out_date = COALESCE($4, check_out_date) WHERE reservation_id = $5`,
+          [propId, String(newRoomNumber), newFromDate || null, newToDate || null, resId]
+        );
+      } catch (err: any) {
+        console.warn('Postgres move room sync warning:', err.message);
+      }
+    }
+
+    return bookingService.getBookingById(resId, propId);
+  },
+
+  /**
+   * Record Payment on Reservation Folio
+   */
+  recordPayment: async (id: string | number, propertyId: string | number, payload: {
+    amount: number;
+    paymentMethod?: string;
+    remarks?: string;
+  }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    const resId = existing.id;
+    const amount = Number(payload.amount);
+    const newPaid = Number(existing.paidAmount || 0) + amount;
+    const newDue = Math.max(0, Number(existing.totalAmount || 0) - newPaid);
+
+    db.prepare(`
+      UPDATE reservations
+      SET paid_amount = ?, due_amount = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(newPaid, newDue, resId);
+
+    // Update Folio balance
+    db.prepare(`
+      UPDATE folios
+      SET balance = ?, status = CASE WHEN ? <= 0 THEN 'SETTLED' ELSE 'OPEN' END
+      WHERE reservation_id = ?
+    `).run(newDue, newDue, resId);
+
+    // Record Payment
+    const folio = db.prepare('SELECT id FROM folios WHERE reservation_id = ? LIMIT 1').get(resId) as any;
+    const folioId = folio ? folio.id : 1;
+    const paymentMethod = (payload.paymentMethod || 'CASH').toUpperCase();
+    const paymentNumber = `PAY-${Date.now()}`;
+
+    try {
+      db.prepare(`
+        INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(folioId, propId, paymentNumber, paymentMethod, amount, payload.remarks || 'FRONT_DESK_PAYMENT');
+    } catch (payErr) {
+      console.warn('Payment insert warning:', payErr);
+    }
+
+    if (isPostgresConnected()) {
+      try {
+        await pgPool.query(
+          `UPDATE reservations SET paid_amount = $1, due_amount = $2 WHERE id = $3`,
+          [newPaid, newDue, resId]
+        );
+      } catch (err: any) {
+        console.warn('Postgres payment sync warning:', err.message);
+      }
+    }
+
+    return bookingService.getBookingById(resId, propId);
+  },
+
+  /**
+   * Split Stay across two rooms
+   */
+  splitStay: async (id: string | number, propertyId: string | number, payload: {
+    targetRoomNumber: string;
+    splitDate?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    const resId = existing.id;
+    const checkIn = payload.fromDate || existing.checkIn;
+    const checkOut = payload.toDate || existing.checkOut;
+
+    let splitDate = payload.splitDate;
+    if (!splitDate) {
+      const inD = new Date(checkIn);
+      const half = Math.max(1, Math.floor(existing.nights / 2));
+      inD.setDate(inD.getDate() + half);
+      splitDate = inD.toISOString().slice(0, 10);
+    }
+
+    const nights1 = Math.max(1, Math.round((new Date(splitDate).getTime() - new Date(checkIn).getTime()) / 86400000));
+    const nights2 = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(splitDate).getTime()) / 86400000));
+
+    // Update existing room stay to end at splitDate
+    db.prepare(`
+      UPDATE reservation_rooms
+      SET check_out_date = ?, nights = ?
+      WHERE reservation_id = ?
+    `).run(splitDate, nights1, resId);
+
+    // Insert second leg for targetRoomNumber
+    const targetRoom = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(payload.targetRoomNumber)) as any;
+    if (targetRoom) {
+      const guest = db.prepare('SELECT booker_guest_id FROM reservations WHERE id = ?').get(resId) as any;
+      db.prepare(`
+        INSERT INTO reservation_rooms (
+          reservation_id, room_id, guest_id, check_in_date, check_out_date, nights, room_rate, adults, children, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, 'ASSIGNED')
+      `).run(resId, targetRoom.id, guest?.booker_guest_id || 1, splitDate, checkOut, nights2, 3000);
+
+      db.prepare(`
+        UPDATE reservations SET is_group = 1 WHERE id = ?
+      `).run(resId);
+    }
+
+    return bookingService.getBookingById(resId, propId);
+  },
+
+  /**
+   * Void a reservation with audit reason
+   */
+  voidReservation: async (id: string | number, propertyId: string | number, payload: { reason?: string }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    db.prepare(`
+      UPDATE reservations
+      SET status = 'VOIDED', special_requests = COALESCE(special_requests || ' | ', '') || 'Void reason: ' || ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(payload.reason || 'Voided by front desk', existing.id);
+
+    db.prepare(`
+      UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = ?
+    `).run(existing.id);
+
+    if (isPostgresConnected()) {
+      try {
+        await pgPool.query(`UPDATE reservations SET status = 'VOIDED' WHERE id = $1`, [existing.id]);
+        await pgPool.query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1`, [existing.id]);
+      } catch (err: any) {
+        console.warn('Postgres void sync warning:', err.message);
+      }
+    }
+
+    return bookingService.getBookingById(existing.id, propId);
+  },
+
+  /**
+   * Hold a reservation with hold period
+   */
+  holdReservation: async (id: string | number, propertyId: string | number, payload: { startDate?: string; endDate?: string; reason?: string }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    db.prepare(`
+      UPDATE reservations
+      SET status = 'HOLD', special_requests = COALESCE(special_requests || ' | ', '') || 'Hold reason: ' || ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(payload.reason || 'Reservation placed on hold', existing.id);
+
+    if (isPostgresConnected()) {
+      try {
+        await pgPool.query(`UPDATE reservations SET status = 'HOLD' WHERE id = $1`, [existing.id]);
+      } catch (err: any) {
+        console.warn('Postgres hold sync warning:', err.message);
+      }
+    }
+
+    return bookingService.getBookingById(existing.id, propId);
+  },
+
+  /**
+   * Unassign Room allocation
+   */
+  unassignRoom: async (id: string | number, propertyId: string | number, payload: { roomNumber?: string }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    if (payload.roomNumber) {
+      const rm = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(payload.roomNumber)) as any;
+      if (rm) {
+        db.prepare(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = ? AND room_id = ?`).run(existing.id, rm.id);
+      }
+    } else {
+      db.prepare(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = ?`).run(existing.id);
+    }
+
+    return bookingService.getBookingById(existing.id, propId);
+  },
+
+  /**
+   * Ungroup Multi-Room Reservation
+   */
+  ungroupReservation: async (id: string | number, propertyId: string | number, _payload: any): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    db.prepare(`UPDATE reservations SET is_group = 0 WHERE id = ?`).run(existing.id);
+    return bookingService.getBookingById(existing.id, propId);
+  },
+
+  /**
+   * Change Group Owner / Booker Guest
+   */
+  changeGroupOwner: async (id: string | number, propertyId: string | number, payload: { newOwner?: string }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    if (payload.newOwner) {
+      const raw = payload.newOwner.replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim();
+      const parts = raw.split(' ');
+      const fName = parts[0] || 'Valued';
+      const lName = parts.slice(1).join(' ') || 'Guest';
+      db.prepare(`
+        UPDATE guests SET first_name = ?, last_name = ?
+        WHERE id = (SELECT booker_guest_id FROM reservations WHERE id = ? LIMIT 1)
+      `).run(fName, lName, existing.id);
+    }
+    return bookingService.getBookingById(existing.id, propId);
   },
 
   /**

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database/db.js';
+import { pgPool, isPostgresConnected } from '../database/postgres.js';
 
 const router = Router();
 
@@ -92,6 +93,106 @@ router.get('/chain/overview', (req: Request, res: Response) => {
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch chain overview' });
+    }
+});
+
+// POST /api/properties - Create a new hotel property
+router.post('/', async (req: Request, res: Response) => {
+    try {
+        const body = req.body || {};
+        const name = body.name || body.propertyName || 'New Luxury Hotel';
+        const code = (body.code || body.shortCode || name.slice(0, 3).toUpperCase()).toUpperCase();
+        const slug = (body.slug || name.toLowerCase().replace(/[^a-z0-9]/g, '-')).slice(0, 50);
+        const propertyType = body.propertyType || body.type || 'RESORT';
+        const starRating = Number(body.starRating) || 5;
+        const email = body.email || 'info@hotel.com';
+        const phone = body.phone || '+880 1711-000000';
+        const address = body.address || body.addressLine1 || 'Dhaka, Bangladesh';
+        const city = body.city || 'Dhaka';
+        const country = body.country || 'Bangladesh';
+        const currency = body.currency || 'BDT';
+
+        const insertResult = db.prepare(`
+            INSERT INTO properties (
+                organization_id, name, code, slug, property_type, star_rating,
+                email, phone, address_line1, city, country, currency_code, status
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+        `).run(name, code, slug, propertyType, starRating, email, phone, address, city, country, currency);
+
+        const newPropId = Number(insertResult.lastInsertRowid);
+
+        // Bootstrap default building, floors, room types, and initial rooms
+        try {
+            const bldInsert = db.prepare(`
+                INSERT INTO buildings (property_id, code, name, total_floors, sort_order)
+                VALUES (?, 'MAIN', 'Main Wing', 3, 1)
+            `).run(newPropId);
+            const bldId = Number(bldInsert.lastInsertRowid);
+
+            const f1 = db.prepare(`INSERT INTO floors (property_id, building_id, floor_number, name) VALUES (?, ?, 1, 'Floor 1')`).run(newPropId, bldId);
+            const f2 = db.prepare(`INSERT INTO floors (property_id, building_id, floor_number, name) VALUES (?, ?, 2, 'Floor 2')`).run(newPropId, bldId);
+
+            const rt1 = db.prepare(`INSERT INTO room_types (property_id, code, name, category, base_occupancy, max_occupancy, base_rate) VALUES (?, 'DLX', 'Deluxe Double', 'ROOM', 2, 3, 4000)`).run(newPropId);
+            const rt2 = db.prepare(`INSERT INTO room_types (property_id, code, name, category, base_occupancy, max_occupancy, base_rate) VALUES (?, 'SUPK', 'Superior King', 'ROOM', 2, 3, 5500)`).run(newPropId);
+
+            const rt1Id = Number(rt1.lastInsertRowid);
+            const rt2Id = Number(rt2.lastInsertRowid);
+            const f1Id = Number(f1.lastInsertRowid);
+            const f2Id = Number(f2.lastInsertRowid);
+
+            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '101', 'Deluxe 101')`).run(newPropId, bldId, f1Id, rt1Id);
+            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '102', 'Deluxe 102')`).run(newPropId, bldId, f1Id, rt1Id);
+            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '201', 'Superior 201')`).run(newPropId, bldId, f2Id, rt2Id);
+            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '202', 'Superior 202')`).run(newPropId, bldId, f2Id, rt2Id);
+        } catch (bootErr) {
+            console.warn('Property bootstrap assets notice:', bootErr);
+        }
+
+        // Mirror to PostgreSQL if connected
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query(`
+                    INSERT INTO properties (
+                        id, organization_id, name, code, slug, property_type, star_rating,
+                        email, phone, address_line1, city, country, currency_code, status
+                    ) VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'ACTIVE')
+                    ON CONFLICT (id) DO NOTHING
+                `, [newPropId, name, code, slug, propertyType, starRating, email, phone, address, city, country, currency]);
+            } catch (pgErr: any) {
+                console.warn('PG property mirror sync warning:', pgErr.message);
+            }
+        }
+
+        const created = db.prepare('SELECT * FROM properties WHERE id = ?').get(newPropId);
+        res.status(201).json({ success: true, data: created, message: 'Property created successfully' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to create property' });
+    }
+});
+
+// PUT /api/properties/:id - Update property details
+router.put('/:id', async (req: Request, res: Response) => {
+    try {
+        const propertyId = Number(req.params.id);
+        const body = req.body || {};
+
+        db.prepare(`
+            UPDATE properties
+            SET name = COALESCE(?, name),
+                code = COALESCE(?, code),
+                property_type = COALESCE(?, property_type),
+                email = COALESCE(?, email),
+                phone = COALESCE(?, phone),
+                address_line1 = COALESCE(?, address_line1),
+                city = COALESCE(?, city),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(body.name || null, body.code || null, body.propertyType || null, body.email || null, body.phone || null, body.address || null, body.city || null, propertyId);
+
+        const updated = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+        res.json({ success: true, data: updated, message: 'Property updated successfully' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to update property' });
     }
 });
 

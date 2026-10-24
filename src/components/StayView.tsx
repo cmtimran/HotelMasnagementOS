@@ -30,6 +30,16 @@ import {
     syncRoomTypesAndRoomsFromDB,
     getStandardDailyRateForRoom,
     resolveReservationDailyBaseRate,
+    amendStayInDB,
+    moveRoomInDB,
+    recordPaymentInDB,
+    splitStayInDB,
+    holdReservationInDB,
+    voidReservationInDB,
+    unassignRoomInDB,
+    ungroupReservationInDB,
+    changeGroupOwnerInDB,
+    deleteReservationInDB,
     type RoomLock,
     type StoredReservation
 } from '../utils/roomInventoryEngine';
@@ -1069,12 +1079,12 @@ export const StayView: React.FC = () => {
         setIsActionDrawerOpen(true);
     };
 
-    // Save Extended / Shortened Stay to Central PMS Storage
+    // Save Extended / Shortened Stay to Central PMS Storage & Database
     const handleSaveAmendStay = (bookingId: string, newDeparture: string, newNights: number) => {
         const targetB = bookings.find(b => b.id === bookingId);
         if (!targetB) return;
 
-        // Persist to central reservation storage (hotel_reservations_v2)
+        // Persist to central reservation storage (hotel_reservations_v2) & Database
         const stored = getAllStoredReservations();
         const resIdx = stored.findIndex(r => r.reservationNumber === targetB.reservationNumber);
         if (resIdx !== -1) {
@@ -1117,7 +1127,23 @@ export const StayView: React.FC = () => {
 
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+
+            // Persist to Relational Database via API
+            amendStayInDB(targetB.reservationNumber, newDeparture, newNights, {
+                roomNumber: targetB.roomNumber,
+                newTotalAmount: newTaxCalc.grandTotal,
+                newDueAmount: Math.max(0, newTaxCalc.grandTotal - (updated.paidAmount || 0)),
+                newBaseAmount: newBaseAmount,
+                taxDetails: newTaxCalc
+            });
+
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        } else {
+            // Also call API directly with reservation number or ID
+            amendStayInDB(targetB.reservationNumber || bookingId, newDeparture, newNights, {
+                roomNumber: targetB.roomNumber
+            });
         }
 
         setBookings(prev => prev.map(b => {
@@ -1135,7 +1161,7 @@ export const StayView: React.FC = () => {
         showToast(`Reservation ${targetB.reservationNumber} (${targetB.guestName}) updated to ${newDeparture} (${newNights} Nights)!`);
     };
 
-    // Save Room Move to Central PMS Storage
+    // Save Room Move to Central PMS Storage & Database
     const handleSaveRoomMove = (bookingId: string, newRoomNumber: string, newFromDate: string, newToDate: string) => {
         const targetB = bookings.find(b => b.id === bookingId);
         if (!targetB) return;
@@ -1170,7 +1196,14 @@ export const StayView: React.FC = () => {
 
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+
+            // Persist to Relational Database via API
+            moveRoomInDB(targetB.reservationNumber, newRoomNumber, newFromDate, newToDate, targetB.roomNumber);
+
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        } else {
+            moveRoomInDB(targetB.reservationNumber || bookingId, newRoomNumber, newFromDate, newToDate, targetB.roomNumber);
         }
 
         const startIdx = days.findIndex(d => d.date === newFromDate);
@@ -1193,7 +1226,7 @@ export const StayView: React.FC = () => {
     };
 
     // Core PMS Live Action Handlers for Unified Action Drawer
-    const handleSavePayment = (bookingId: string, method: string, amount: number) => {
+    const handleSavePayment = (bookingId: string, method: string, amount: number, remarks: string = '') => {
         const targetB = bookings.find(item => item.id === bookingId);
         if (!targetB) return;
 
@@ -1208,7 +1241,14 @@ export const StayView: React.FC = () => {
             newDue = updated.dueAmount;
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+
+            // Persist to Database via API
+            recordPaymentInDB(targetB.reservationNumber, amount, method, remarks);
+
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        } else {
+            recordPaymentInDB(targetB.reservationNumber || bookingId, amount, method, remarks);
         }
 
         setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, paidAmount: (b.paidAmount || 0) + amount, dueAmount: newDue, isPaymentDue: newDue > 0 } : b));
@@ -1270,6 +1310,11 @@ export const StayView: React.FC = () => {
 
         stored[resIdx] = updated;
         localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+        localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+
+        // Persist to Database via API
+        splitStayInDB(target.reservationNumber, targetRoomNumber, effectiveSplitDate, checkIn, checkOut);
+
         broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
         syncStoredReservations();
         showToast(`Reservation ${target.reservationNumber} split between Room ${target.roomNumber} (until ${effectiveSplitDate}) & Room ${targetRoomNumber}!`);
@@ -1303,7 +1348,14 @@ export const StayView: React.FC = () => {
             };
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+
+            // Persist to Database via API
+            deleteReservationInDB(target.reservationNumber);
+
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        } else {
+            deleteReservationInDB(target.reservationNumber || bookingId);
         }
 
         setBookings(prev => prev.filter(b => b.reservationNumber !== target.reservationNumber));
@@ -1326,14 +1378,21 @@ export const StayView: React.FC = () => {
             };
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+
+            // Persist to Database via API
+            voidReservationInDB(target.reservationNumber, reason);
+
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        } else {
+            voidReservationInDB(target.reservationNumber || bookingId, reason);
         }
 
         setBookings(prev => prev.filter(b => b.reservationNumber !== target.reservationNumber));
         showToast(`Reservation ${target.reservationNumber} voided: "${reason || 'No reason specified'}"`);
     };
 
-    const handleConfirmHold = (bookingId: string, _startDate: string, endDate: string) => {
+    const handleConfirmHold = (bookingId: string, _startDate: string, endDate: string, reason: string = '') => {
         const target = bookings.find(b => b.id === bookingId);
         if (!target) return;
 
@@ -1348,6 +1407,7 @@ export const StayView: React.FC = () => {
             };
             stored[resIdx] = updated;
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
 
             try {
                 const existingHolds = JSON.parse(localStorage.getItem('hotel_holds_v2') || '[]');
@@ -1358,7 +1418,7 @@ export const StayView: React.FC = () => {
                     status: 'Hold',
                     holdStartDate: res.checkIn,
                     holdEndDate: endDate,
-                    reason: 'Tentative booking held from StayView',
+                    reason: reason || 'Tentative booking held from StayView',
                     reservationDate: new Date().toISOString().split('T')[0],
                     checkInDate: res.checkIn,
                     checkOutDate: endDate,
@@ -1368,7 +1428,12 @@ export const StayView: React.FC = () => {
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(existingHolds));
             } catch {}
 
+            // Persist to Database via API
+            holdReservationInDB(target.reservationNumber, res.checkIn, endDate, reason);
+
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
+        } else {
+            holdReservationInDB(target.reservationNumber || bookingId, undefined, endDate, reason);
         }
 
         setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'hold' } : b));
@@ -1412,19 +1477,32 @@ export const StayView: React.FC = () => {
         if (res) {
             const updated = stored.filter(r => r.reservationNumber !== target.reservationNumber);
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(updated));
+            localStorage.setItem('hotel_reservations_v3', JSON.stringify(updated));
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         }
+
+        // Persist to Database via API
+        unassignRoomInDB(target.reservationNumber || bookingId, roomNum);
 
         setBookings(prev => prev.filter(b => b.id !== bookingId));
         showToast(`Reservation ${target.reservationNumber} unassigned from Room ${roomNum}!`);
     };
 
-    const handleConfirmUngroup = (bookingId: string) => {
+    const handleConfirmUngroup = (bookingId: string, selectedRooms?: string[]) => {
+        const target = bookings.find(b => b.id === bookingId);
+        if (target) {
+            ungroupReservationInDB(target.reservationNumber, selectedRooms);
+        }
         setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, isGroupBooking: false, isGroupOwner: false } : b));
         showToast(`Reservation ungrouped successfully!`);
     };
 
-    const handleConfirmChangeOwner = (_bookingId: string, newOwner: string) => {
+    const handleConfirmChangeOwner = (bookingId: string, newOwner: string) => {
+        const target = bookings.find(b => b.id === bookingId);
+        if (target) {
+            changeGroupOwnerInDB(target.reservationNumber, newOwner);
+        }
+        setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, guestName: newOwner } : b));
         showToast(`Group owner changed to ${newOwner}!`);
     };
 

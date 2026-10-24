@@ -104,6 +104,255 @@ export const bookingController = {
     }
   },
 
+  updateBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.updateBooking(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_COMMITTED',
+          reservation: updated,
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast reservation update', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Reservation updated successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  amendBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.amendStay(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_COMMITTED',
+          reservation: updated,
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast amend stay', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Stay amended successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  moveRoom: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.moveRoom(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_COMMITTED',
+          reservation: updated,
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast room move', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Room move executed successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  addPayment: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.recordPayment(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_COMMITTED',
+          reservation: updated,
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast payment', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Payment recorded successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  splitBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.splitStay(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_COMMITTED',
+          reservation: updated,
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast room split', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Room split executed successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  holdBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.holdReservation(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_UPDATED',
+          reservationId: id,
+          status: 'hold',
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast hold', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Reservation placed on hold' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  voidBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.voidReservation(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast void', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Reservation voided successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  unassignRoom: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.unassignRoom(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast unassign', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Room unassigned successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  ungroupBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.ungroupReservation(id, propertyId, req.body);
+      res.json({ success: true, data: updated, message: 'Reservation ungrouped successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  changeOwner: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.changeGroupOwner(id, propertyId, req.body);
+      res.json({ success: true, data: updated, message: 'Group owner updated successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
   deleteBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const propertyId = req.propertyId || 'prop_grand_palace';
