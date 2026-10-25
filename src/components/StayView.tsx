@@ -951,7 +951,7 @@ export const StayView: React.FC = () => {
     };
 
     // Save Extended / Shortened Stay to Central PMS Storage & Database
-    const handleSaveAmendStay = (bookingId: string, newDeparture: string, newNights: number) => {
+    const handleSaveAmendStay = (bookingId: string, _newDeparture: string, newNights: number) => {
         const targetB = bookings.find(b => b.id === bookingId);
         if (!targetB) return;
 
