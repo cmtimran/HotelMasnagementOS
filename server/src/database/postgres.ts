@@ -11,6 +11,8 @@ dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 dotenv.config();
 
 const { Pool } = pg;
+// Prevent node-postgres from converting PostgreSQL DATE (OID 1082) into local midnight Date objects that shift by -1 day on .toISOString()
+pg.types.setTypeParser(1082, (val: string) => val);
 
 function getConnectionString(): string {
     return process.env.DATABASE_URL || 

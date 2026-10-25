@@ -142,7 +142,12 @@ export const bookingService = {
           const formatDate = (val: any): string => {
             if (!val) return todayStr;
             if (typeof val === 'string') return val.slice(0, 10);
-            if (val instanceof Date) return val.toISOString().slice(0, 10);
+            if (val instanceof Date) {
+              const y = val.getFullYear();
+              const m = String(val.getMonth() + 1).padStart(2, '0');
+              const d = String(val.getDate()).padStart(2, '0');
+              return `${y}-${m}-${d}`;
+            }
             return String(val).slice(0, 10);
           };
 
@@ -162,6 +167,8 @@ export const bookingService = {
 
             const primaryCheckIn = formatDate(primaryRoom.check_in_date);
             const primaryCheckOut = formatDate(primaryRoom.check_out_date);
+            const primaryDiffNights = Math.round((new Date(primaryCheckOut).getTime() - new Date(primaryCheckIn).getTime()) / 86400000);
+            const primaryNights = primaryDiffNights > 0 ? primaryDiffNights : (Number(primaryRoom.nights) || 1);
 
             let uiStatus = STATUS_DB_TO_UI[r.db_status] || 'confirmed';
             if (uiStatus === 'confirmed' && primaryCheckIn === todayStr) {
@@ -192,7 +199,7 @@ export const bookingService = {
               departureDate: primaryCheckOut,
               checkIn: primaryCheckIn,
               checkOut: primaryCheckOut,
-              nights: Number(primaryRoom.nights) || 1,
+              nights: primaryNights,
               adults: Number(primaryRoom.adults) || 1,
               children: Number(primaryRoom.children) || 0,
               status: uiStatus,
@@ -205,6 +212,8 @@ export const bookingService = {
               roomsList: rooms.map(rm => {
                 const inD = formatDate(rm.check_in_date);
                 const outD = formatDate(rm.check_out_date);
+                const diffN = Math.round((new Date(outD).getTime() - new Date(inD).getTime()) / 86400000);
+                const calcNights = diffN > 0 ? diffN : (Number(rm.nights) || 1);
                 return {
                   id: rm.id,
                   roomNumber: rm.room_number,
@@ -213,7 +222,7 @@ export const bookingService = {
                   checkOut: outD,
                   checkInDate: inD,
                   checkOutDate: outD,
-                  nights: rm.nights,
+                  nights: calcNights,
                   rate: rm.room_rate,
                   adults: rm.adults,
                   children: rm.children,
@@ -337,7 +346,7 @@ export const bookingService = {
         departureDate: primaryRoom.check_out_date,
         checkIn: primaryRoom.check_in_date,
         checkOut: primaryRoom.check_out_date,
-        nights: Number(primaryRoom.nights) || 1,
+        nights: Math.max(1, Math.round((new Date(primaryRoom.check_out_date).getTime() - new Date(primaryRoom.check_in_date).getTime()) / 86400000) || Number(primaryRoom.nights) || 1),
         adults: Number(primaryRoom.adults) || 1,
         children: Number(primaryRoom.children) || 0,
         status: uiStatus,
@@ -347,20 +356,23 @@ export const bookingService = {
         vip: r.vip_status || 'None',
         isGroup: Boolean(r.is_group),
         specialRequests: r.special_requests || '',
-        roomsList: rooms.map(rm => ({
-          id: rm.id,
-          roomNumber: rm.room_number,
-          roomType: rm.room_type_name,
-          checkIn: rm.check_in_date,
-          checkOut: rm.check_out_date,
-          checkInDate: rm.check_in_date,
-          checkOutDate: rm.check_out_date,
-          nights: rm.nights,
-          rate: rm.room_rate,
-          adults: rm.adults,
-          children: rm.children,
-          status: rm.room_stay_status
-        })),
+        roomsList: rooms.map(rm => {
+          const diffN = Math.round((new Date(rm.check_out_date).getTime() - new Date(rm.check_in_date).getTime()) / 86400000);
+          return {
+            id: rm.id,
+            roomNumber: rm.room_number,
+            roomType: rm.room_type_name,
+            checkIn: rm.check_in_date,
+            checkOut: rm.check_out_date,
+            checkInDate: rm.check_in_date,
+            checkOutDate: rm.check_out_date,
+            nights: diffN > 0 ? diffN : (Number(rm.nights) || 1),
+            rate: rm.room_rate,
+            adults: rm.adults,
+            children: rm.children,
+            status: rm.room_stay_status
+          };
+        }),
         createdAt: r.created_at || new Date().toISOString()
       };
 
@@ -704,23 +716,48 @@ export const bookingService = {
     const resId = existing.id;
     const { roomNumber, newDeparture, newNights, newTotalAmount, newDueAmount } = payload;
 
-    // 1. Update reservation_rooms
-    if (roomNumber) {
-      const roomRow = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(roomNumber)) as any;
-      if (roomRow) {
-        db.prepare(`
-          UPDATE reservation_rooms
-          SET check_out_date = ?, nights = ?
-          WHERE reservation_id = ? AND room_id = ?
-        `).run(newDeparture, newNights, resId, roomRow.id);
+    const targetRoomNo = String(roomNumber || existing.roomNumber);
+    const roomRow = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, targetRoomNo) as any;
+    const targetSubRoom = existing.roomsList?.find((r: any) => String(r.roomNumber) === targetRoomNo);
+    const checkInDate = targetSubRoom?.checkInDate || targetSubRoom?.checkIn || existing.checkIn;
+
+    // Derive canonical departure date from checkInDate + newNights if needed
+    const inDateObj = new Date(checkInDate);
+    const derivedDepObj = new Date(inDateObj);
+    derivedDepObj.setDate(derivedDepObj.getDate() + Math.max(1, Number(newNights) || 1));
+    const canonicalDeparture = newDeparture && newDeparture > checkInDate ? newDeparture : derivedDepObj.toISOString().slice(0, 10);
+    const canonicalNights = Math.max(1, Math.round((new Date(canonicalDeparture).getTime() - inDateObj.getTime()) / 86400000));
+
+    // Strict Overlap / Collision Check in SQLite before amending stay
+    if (roomRow) {
+      const conflict = db.prepare(`
+        SELECT r.reservation_number, rr.check_in_date, rr.check_out_date
+        FROM reservation_rooms rr
+        JOIN reservations r ON r.id = rr.reservation_id
+        WHERE rr.room_id = ?
+          AND rr.reservation_id != ?
+          AND r.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
+          AND rr.check_in_date < ?
+          AND rr.check_out_date > ?
+        LIMIT 1
+      `).get(roomRow.id, resId, canonicalDeparture, checkInDate) as any;
+
+      if (conflict) {
+        throw new Error(`Room ${targetRoomNo} is already booked (${conflict.reservation_number}: ${conflict.check_in_date} to ${conflict.check_out_date})`);
       }
+
+      db.prepare(`
+        UPDATE reservation_rooms
+        SET check_out_date = ?, nights = ?
+        WHERE reservation_id = ? AND room_id = ?
+      `).run(canonicalDeparture, canonicalNights, resId, roomRow.id);
+    } else {
+      db.prepare(`
+        UPDATE reservation_rooms
+        SET check_out_date = ?, nights = ?
+        WHERE reservation_id = ?
+      `).run(canonicalDeparture, canonicalNights, resId);
     }
-    // Also ensure reservation_rooms row for this reservation is updated
-    db.prepare(`
-      UPDATE reservation_rooms
-      SET check_out_date = ?, nights = ?
-      WHERE reservation_id = ?
-    `).run(newDeparture, newNights, resId);
 
     // 2. Update amounts if provided
     if (newTotalAmount !== undefined) {
@@ -744,10 +781,17 @@ export const bookingService = {
     // Mirror to Postgres Cloud if connected
     if (isPostgresConnected()) {
       try {
-        await pgPool.query(
-          `UPDATE reservation_rooms SET check_out_date = $1, nights = $2 WHERE reservation_id = $3`,
-          [newDeparture, newNights, resId]
-        );
+        if (roomRow) {
+          await pgPool.query(
+            `UPDATE reservation_rooms SET check_out_date = $1, nights = $2 WHERE reservation_id = $3 AND room_id = $4`,
+            [canonicalDeparture, canonicalNights, resId, roomRow.id]
+          );
+        } else {
+          await pgPool.query(
+            `UPDATE reservation_rooms SET check_out_date = $1, nights = $2 WHERE reservation_id = $3`,
+            [canonicalDeparture, canonicalNights, resId]
+          );
+        }
         if (newTotalAmount !== undefined) {
           await pgPool.query(
             `UPDATE reservations SET total_amount = $1, due_amount = $2 WHERE id = $3`,
@@ -781,6 +825,26 @@ export const bookingService = {
     const targetRoom = db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propId, String(newRoomNumber)) as any;
     if (!targetRoom) {
       throw new Error(`Target room ${newRoomNumber} not found for property ${propId}`);
+    }
+
+    const effFrom = newFromDate || existing.checkIn;
+    const effTo = newToDate || existing.checkOut;
+
+    // Strict Overlap / Collision Check on targetRoom before moving
+    const moveConflict = db.prepare(`
+      SELECT r.reservation_number, rr.check_in_date, rr.check_out_date
+      FROM reservation_rooms rr
+      JOIN reservations r ON r.id = rr.reservation_id
+      WHERE rr.room_id = ?
+        AND rr.reservation_id != ?
+        AND r.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
+        AND rr.check_in_date < ?
+        AND rr.check_out_date > ?
+      LIMIT 1
+    `).get(targetRoom.id, resId, effTo, effFrom) as any;
+
+    if (moveConflict) {
+      throw new Error(`Target Room ${newRoomNumber} is already booked (${moveConflict.reservation_number}: ${moveConflict.check_in_date} to ${moveConflict.check_out_date})`);
     }
 
     if (oldRoomNumber) {
