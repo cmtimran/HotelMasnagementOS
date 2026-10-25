@@ -1,7 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Building2, Eye, CheckCircle2
 } from 'lucide-react';
+import { 
+    getCanonicalRooms, 
+    getAllStoredReservations, 
+    syncRoomTypesAndRoomsFromDB, 
+    syncReservationsFromDB,
+    updateRoomHousekeepingInDB,
+    subscribeToPMSEvents 
+} from '../utils/roomInventoryEngine';
 
 export interface ArchitecturalRoom {
     id: number;
@@ -21,53 +29,81 @@ export interface ArchitecturalRoom {
     height: number;
 }
 
-const INITIAL_ROOMS_ARCH: ArchitecturalRoom[] = [
-    // Floor 1
-    { id: 101, roomNumber: '101', floor: 1, roomType: 'Deluxe King', status: 'OCCUPIED', guestName: 'Aniya Nusrat', checkIn: '2026-06-25', checkOut: '2026-06-28', folioBalanceBDT: 4500, housekeeper: 'Fatema Begum', ratePerNight: 6500, x: 30, y: 30, width: 140, height: 95 },
-    { id: 102, roomNumber: '102', floor: 1, roomType: 'Deluxe King', status: 'VACANT_CLEAN', housekeeper: 'Fatema Begum', ratePerNight: 6500, x: 190, y: 30, width: 140, height: 95 },
-    { id: 103, roomNumber: '103', floor: 1, roomType: 'Deluxe Twin', status: 'TURNOVER_DIRTY', housekeeper: 'Pending Assignment', ratePerNight: 6000, x: 350, y: 30, width: 140, height: 95 },
-    { id: 104, roomNumber: '104', floor: 1, roomType: 'Deluxe King', status: 'OCCUPIED', guestName: 'Kamrul Hasan', checkIn: '2026-06-24', checkOut: '2026-06-27', folioBalanceBDT: 13000, housekeeper: 'Rina Akter', ratePerNight: 6500, x: 510, y: 30, width: 140, height: 95 },
-    { id: 105, roomNumber: '105', floor: 1, roomType: 'Deluxe King', status: 'RESERVED', guestName: 'British American Tobacco (Arriving)', checkIn: '2026-06-26', checkOut: '2026-06-29', ratePerNight: 6500, x: 30, y: 185, width: 140, height: 95 },
-    { id: 106, roomNumber: '106', floor: 1, roomType: 'Deluxe Twin', status: 'OUT_OF_ORDER', housekeeper: 'AC Maintenance Unit Repaired', ratePerNight: 6000, x: 190, y: 185, width: 140, height: 95 },
-    { id: 107, roomNumber: '107', floor: 1, roomType: 'Deluxe King', status: 'OCCUPIED', guestName: 'Sayed Ahmed', checkIn: '2026-06-23', checkOut: '2026-06-27', folioBalanceBDT: 8500, housekeeper: 'Rina Akter', ratePerNight: 6500, x: 350, y: 185, width: 140, height: 95 },
-    { id: 108, roomNumber: '108', floor: 1, roomType: 'Deluxe Twin', status: 'VACANT_CLEAN', housekeeper: 'Fatema Begum', ratePerNight: 6000, x: 510, y: 185, width: 140, height: 95 },
+const deriveArchitecturalRooms = (): ArchitecturalRoom[] => {
+    const canonical = getCanonicalRooms();
+    const storedRes = getAllStoredReservations();
 
-    // Floor 2
-    { id: 201, roomNumber: '201', floor: 2, roomType: 'Executive Suite', status: 'OCCUPIED', guestName: 'Tarek Rahman (Chevron)', checkIn: '2026-06-24', checkOut: '2026-06-27', folioBalanceBDT: 17000, housekeeper: 'Shahinur Rahman', ratePerNight: 12000, x: 30, y: 30, width: 140, height: 95 },
-    { id: 202, roomNumber: '202', floor: 2, roomType: 'Deluxe King', status: 'VACANT_CLEAN', housekeeper: 'Shahinur Rahman', ratePerNight: 6500, x: 190, y: 30, width: 140, height: 95 },
-    { id: 203, roomNumber: '203', floor: 2, roomType: 'Deluxe King', status: 'OCCUPIED', guestName: 'Engr. Mahbubur Rahman', checkIn: '2026-06-25', checkOut: '2026-06-28', folioBalanceBDT: 0, housekeeper: 'Rina Akter', ratePerNight: 6500, x: 350, y: 30, width: 140, height: 95 },
-    { id: 204, roomNumber: '204', floor: 2, roomType: 'Deluxe Twin', status: 'TURNOVER_DIRTY', housekeeper: 'Pending Assignment', ratePerNight: 6000, x: 510, y: 30, width: 140, height: 95 },
-    { id: 205, roomNumber: '205', floor: 2, roomType: 'Deluxe King', status: 'VACANT_CLEAN', housekeeper: 'Shahinur Rahman', ratePerNight: 6500, x: 30, y: 185, width: 140, height: 95 },
-    { id: 206, roomNumber: '206', floor: 2, roomType: 'Executive Suite', status: 'OCCUPIED', guestName: 'Standard Chartered LPO', checkIn: '2026-06-25', checkOut: '2026-06-29', folioBalanceBDT: 36000, housekeeper: 'Shahinur Rahman', ratePerNight: 12000, x: 190, y: 185, width: 140, height: 95 },
-    { id: 207, roomNumber: '207', floor: 2, roomType: 'Deluxe King', status: 'VACANT_CLEAN', housekeeper: 'Fatema Begum', ratePerNight: 6500, x: 350, y: 185, width: 140, height: 95 },
-    { id: 208, roomNumber: '208', floor: 2, roomType: 'Deluxe Twin', status: 'RESERVED', guestName: 'Arriving VIP - Dr. Farhana', checkIn: '2026-06-26', checkOut: '2026-06-28', ratePerNight: 6000, x: 510, y: 185, width: 140, height: 95 },
+    const floorGroups: Record<number, typeof canonical> = {};
+    canonical.forEach(r => {
+        const floorNum = parseInt(r.floorId, 10) || parseInt(r.number[0], 10) || 1;
+        if (!floorGroups[floorNum]) floorGroups[floorNum] = [];
+        floorGroups[floorNum].push(r);
+    });
 
-    // Floor 3
-    { id: 301, roomNumber: '301', floor: 3, roomType: 'Superior King', status: 'VACANT_CLEAN', housekeeper: 'Abdul Malek', ratePerNight: 5500, x: 30, y: 30, width: 140, height: 95 },
-    { id: 302, roomNumber: '302', floor: 3, roomType: 'Superior King', status: 'OCCUPIED', guestName: 'Mr. Zahirul Islam', checkIn: '2026-06-25', checkOut: '2026-06-27', folioBalanceBDT: 5500, housekeeper: 'Abdul Malek', ratePerNight: 5500, x: 190, y: 30, width: 140, height: 95 },
-    { id: 303, roomNumber: '303', floor: 3, roomType: 'Superior King', status: 'VACANT_CLEAN', housekeeper: 'Abdul Malek', ratePerNight: 5500, x: 350, y: 30, width: 140, height: 95 },
-    { id: 304, roomNumber: '304', floor: 3, roomType: 'Superior King', status: 'TURNOVER_DIRTY', housekeeper: 'Pending Assignment', ratePerNight: 5500, x: 510, y: 30, width: 140, height: 95 },
-    { id: 305, roomNumber: '305', floor: 3, roomType: 'Superior King', status: 'OCCUPIED', guestName: 'Dr. Shahriar Kabir', checkIn: '2026-06-26', checkOut: '2026-06-29', folioBalanceBDT: 11000, housekeeper: 'Abdul Malek', ratePerNight: 5500, x: 30, y: 185, width: 140, height: 95 },
-    { id: 306, roomNumber: '306', floor: 3, roomType: 'Superior King', status: 'VACANT_CLEAN', housekeeper: 'Abdul Malek', ratePerNight: 5500, x: 190, y: 185, width: 140, height: 95 },
-    { id: 307, roomNumber: '307', floor: 3, roomType: 'Superior King', status: 'VACANT_CLEAN', housekeeper: 'Abdul Malek', ratePerNight: 5500, x: 350, y: 185, width: 140, height: 95 },
-    { id: 308, roomNumber: '308', floor: 3, roomType: 'Superior King', status: 'OUT_OF_ORDER', housekeeper: 'Bathroom Plumbing Inspection', ratePerNight: 5500, x: 510, y: 185, width: 140, height: 95 },
+    const result: ArchitecturalRoom[] = [];
 
-    // Floor 4 (Suites)
-    { id: 401, roomNumber: '401', floor: 4, roomType: 'Executive Suite', status: 'OCCUPIED', guestName: 'H.E. Ambassador Delegation', checkIn: '2026-06-24', checkOut: '2026-06-30', folioBalanceBDT: 65000, housekeeper: 'Senior HK Supervisor', ratePerNight: 12000, x: 50, y: 40, width: 280, height: 105 },
-    { id: 402, roomNumber: '402', floor: 4, roomType: 'Executive Suite', status: 'VACANT_CLEAN', housekeeper: 'Senior HK Supervisor', ratePerNight: 12000, x: 370, y: 40, width: 280, height: 105 },
-    { id: 403, roomNumber: '403', floor: 4, roomType: 'Executive Suite', status: 'RESERVED', guestName: 'UNICEF Regional Mission', checkIn: '2026-06-27', checkOut: '2026-07-02', ratePerNight: 12000, x: 50, y: 175, width: 280, height: 105 },
-    { id: 404, roomNumber: '404', floor: 4, roomType: 'Executive Suite', status: 'VACANT_CLEAN', housekeeper: 'Senior HK Supervisor', ratePerNight: 12000, x: 370, y: 175, width: 280, height: 105 },
+    Object.entries(floorGroups).forEach(([floorStr, floorRooms]) => {
+        const floorNum = parseInt(floorStr, 10);
+        floorRooms.forEach((r, idx) => {
+            const activeRes = storedRes.find(res => 
+                (res.roomNumber === r.number || (res.allocatedRooms && res.allocatedRooms.includes(r.number))) &&
+                (res.status === 'in-house' || res.status === 'arrived')
+            );
 
-    // Floor 5 (Penthouse)
-    { id: 501, roomNumber: '501', floor: 5, roomType: 'Presidential Suite', status: 'OCCUPIED', guestName: 'Chairman Syed Manzur Elahi', checkIn: '2026-06-22', checkOut: '2026-06-29', folioBalanceBDT: 145000, housekeeper: 'Executive HK Head', ratePerNight: 28000, x: 80, y: 45, width: 250, height: 210 },
-    { id: 502, roomNumber: '502', floor: 5, roomType: 'Presidential Suite', status: 'VACANT_CLEAN', housekeeper: 'Executive HK Head', ratePerNight: 28000, x: 370, y: 45, width: 250, height: 210 }
-];
+            let status: ArchitecturalRoom['status'] = 'VACANT_CLEAN';
+            if (r.status === 'Out of Order' || r.status === 'Maintenance') {
+                status = 'OUT_OF_ORDER';
+            } else if (activeRes) {
+                status = 'OCCUPIED';
+            } else if (r.housekeepingStatus === 'Dirty') {
+                status = 'TURNOVER_DIRTY';
+            } else {
+                status = 'VACANT_CLEAN';
+            }
+
+            const col = idx % 4;
+            const row = Math.floor(idx / 4);
+            const x = 30 + col * 160;
+            const y = 30 + row * 155;
+            const width = 140;
+            const height = 95;
+
+            result.push({
+                id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || idx + 1,
+                roomNumber: r.number,
+                floor: floorNum,
+                roomType: (r.roomTypeName as any) || 'Deluxe King',
+                status,
+                guestName: activeRes?.guestName,
+                checkIn: activeRes?.checkIn,
+                checkOut: activeRes?.checkOut,
+                folioBalanceBDT: activeRes?.dueAmount || 0,
+                housekeeper: r.housekeepingStatus === 'Clean' ? 'Housekeeping Assigned' : 'Housekeeping Staff',
+                ratePerNight: r.baseRate || 6500,
+                x,
+                y,
+                width,
+                height
+            });
+        });
+    });
+
+    return result;
+};
 
 export const FloorPlan: React.FC = () => {
-    const [rooms, setRooms] = useState<ArchitecturalRoom[]>(() => {
-        const saved = localStorage.getItem('hotel_floorplan_v2');
-        return saved ? JSON.parse(saved) : INITIAL_ROOMS_ARCH;
-    });
+    const [rooms, setRooms] = useState<ArchitecturalRoom[]>(() => deriveArchitecturalRooms());
+
+    useEffect(() => {
+        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+            setRooms(deriveArchitecturalRooms());
+        });
+
+        const unsub = subscribeToPMSEvents(() => {
+            setRooms(deriveArchitecturalRooms());
+        });
+        return () => unsub();
+    }, []);
 
     const [selectedFloor, setSelectedFloor] = useState<number>(1);
     const [selectedRoom, setSelectedRoom] = useState<ArchitecturalRoom | null>(null);
@@ -80,9 +116,12 @@ export const FloorPlan: React.FC = () => {
 
     const floorRooms = rooms.filter(r => r.floor === selectedFloor);
 
-    // Housekeeping status update
+    // Housekeeping status update directly in Database
     const handleUpdateStatus = (newStatus: ArchitecturalRoom['status']) => {
         if (!selectedRoom) return;
+
+        const hkStatus = newStatus === 'VACANT_CLEAN' ? 'Clean' : newStatus === 'TURNOVER_DIRTY' ? 'Dirty' : 'Inspected';
+        updateRoomHousekeepingInDB(selectedRoom.roomNumber, hkStatus);
 
         setRooms(prev => prev.map(r => {
             if (r.id === selectedRoom.id) {
@@ -93,7 +132,6 @@ export const FloorPlan: React.FC = () => {
             return r;
         }));
 
-        localStorage.setItem('hotel_floorplan_v2', JSON.stringify(rooms));
         showToast(`Room ${selectedRoom.roomNumber} updated to ${newStatus.replace('_', ' ')}.`);
     };
 

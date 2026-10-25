@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, BedDouble, Sparkles, User, Calendar, 
     MapPin, Plus, RefreshCw, LayoutGrid, List, CheckCircle2, 
@@ -6,6 +6,14 @@ import {
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
+import { 
+    getCanonicalRooms, 
+    getAllStoredReservations, 
+    syncRoomTypesAndRoomsFromDB, 
+    syncReservationsFromDB,
+    updateRoomHousekeepingInDB,
+    subscribeToPMSEvents
+} from '../utils/roomInventoryEngine';
 
 export interface RoomRackItem {
     id: number;
@@ -24,65 +32,68 @@ export interface RoomRackItem {
     maintenanceReason?: string;
 }
 
-const INITIAL_ROOMS_DATA: RoomRackItem[] = [
-    // Floor 1
-    { id: 1, roomNumber: '101', floor: 1, roomType: 'Deluxe Double', status: 'occupied', guestName: 'Zubair Ahmed', phone: '+880 1611-987654', checkIn: '2026-06-29', checkoutDate: '2026-07-02', rate: 3000, bedType: 'King', features: ['Garden View', 'Balcony'], housekeeper: 'Fatima Begum' },
-    { id: 2, roomNumber: '102', floor: 1, roomType: 'Deluxe Double', status: 'clean', rate: 3000, bedType: 'Queen', features: ['City View'], housekeeper: 'Fatima Begum' },
-    { id: 3, roomNumber: '103', floor: 1, roomType: 'Superior King', status: 'dirty', rate: 4500, bedType: 'King', features: ['Sea View', 'Bathtub'], housekeeper: 'Rahim Mia' },
-    { id: 4, roomNumber: '104', floor: 1, roomType: 'Executive Suite', status: 'inspected', rate: 6500, bedType: 'King', features: ['Living Room', 'Work Desk'], housekeeper: 'Fatima Begum' },
-    { id: 5, roomNumber: '105', floor: 1, roomType: 'Standard Single', status: 'clean', rate: 2200, bedType: 'Single', features: ['Quiet Wing'], housekeeper: 'Rahim Mia' },
-    { id: 6, roomNumber: '106', floor: 1, roomType: 'Standard Single', status: 'clean', rate: 2200, bedType: 'Single', features: ['Courtyard View'], housekeeper: 'Rahim Mia' },
-    { id: 7, roomNumber: '107', floor: 1, roomType: 'Deluxe Double', status: 'occupied', guestName: 'Mohammad Farooq', phone: '+880 1712-445566', checkIn: '2026-06-30', checkoutDate: '2026-07-03', rate: 3000, bedType: 'King', features: ['Garden View'], housekeeper: 'Fatima Begum' },
-    { id: 8, roomNumber: '108', floor: 1, roomType: 'Superior King', status: 'ooo', rate: 4500, bedType: 'King', features: ['Sea View'], maintenanceReason: 'AC Servicing & Coil Replacement', housekeeper: 'Maintenance' },
+const deriveRoomsFromInventory = (): RoomRackItem[] => {
+    const canonical = getCanonicalRooms();
+    const storedRes = getAllStoredReservations();
 
-    // Floor 2
-    { id: 9, roomNumber: '201', floor: 2, roomType: 'Superior King', status: 'inspected', rate: 4500, bedType: 'King', features: ['Sea View', 'Balcony'], housekeeper: 'Anowar Hossain' },
-    { id: 10, roomNumber: '202', floor: 2, roomType: 'Superior King', status: 'occupied', guestName: 'Dr. Kabir Ahmed', phone: '+880 1819-334455', checkIn: '2026-06-28', checkoutDate: '2026-07-01', rate: 4500, bedType: 'King', features: ['Sea View'], housekeeper: 'Anowar Hossain' },
-    { id: 11, roomNumber: '203', floor: 2, roomType: 'Executive Suite', status: 'dirty', rate: 6500, bedType: 'King', features: ['Jacuzzi', 'Sea View'], housekeeper: 'Shahida Akter' },
-    { id: 12, roomNumber: '204', floor: 2, roomType: 'Deluxe Double', status: 'occupied', guestName: 'Nusrat Jahan', phone: '+880 1911-223344', checkIn: '2026-06-29', checkoutDate: '2026-07-02', rate: 3000, bedType: 'Queen', features: ['City View'], housekeeper: 'Shahida Akter' },
-    { id: 13, roomNumber: '205', floor: 2, roomType: 'Standard Single', status: 'clean', rate: 2200, bedType: 'Single', features: ['Quiet Wing'], housekeeper: 'Anowar Hossain' },
-    { id: 14, roomNumber: '206', floor: 2, roomType: 'Deluxe Double', status: 'clean', rate: 3000, bedType: 'Twin', features: ['Garden View'], housekeeper: 'Shahida Akter' },
-    { id: 15, roomNumber: '207', floor: 2, roomType: 'Deluxe Double', status: 'clean', rate: 3000, bedType: 'King', features: ['Balcony'], housekeeper: 'Anowar Hossain' },
-    { id: 16, roomNumber: '208', floor: 2, roomType: 'Superior King', status: 'occupied', guestName: 'Tanvir Hasan', phone: '+880 1714-556677', checkIn: '2026-06-30', checkoutDate: '2026-07-04', rate: 4500, bedType: 'King', features: ['Sea View'], housekeeper: 'Shahida Akter' },
+    return canonical.map(r => {
+        const floorNum = parseInt(r.floorId, 10) || parseInt(r.number[0], 10) || 1;
+        const activeRes = storedRes.find(res => 
+            (res.roomNumber === r.number || (res.allocatedRooms && res.allocatedRooms.includes(r.number))) &&
+            (res.status === 'in-house' || res.status === 'arrived')
+        );
 
-    // Floor 3
-    { id: 17, roomNumber: '301', floor: 3, roomType: 'Deluxe Double', status: 'clean', rate: 3000, bedType: 'King', features: ['Sea View', 'Balcony'], housekeeper: 'Karim Ullah' },
-    { id: 18, roomNumber: '302', floor: 3, roomType: 'Standard Single', status: 'clean', rate: 2200, bedType: 'Single', features: ['City View'], housekeeper: 'Karim Ullah' },
-    { id: 19, roomNumber: '303', floor: 3, roomType: 'Executive Suite', status: 'occupied', guestName: 'Syed Mansoor', phone: '+880 1817-667788', checkIn: '2026-06-29', checkoutDate: '2026-07-03', rate: 6500, bedType: 'King', features: ['Penthouse Level', 'Balcony'], housekeeper: 'Rokeya Begum' },
-    { id: 20, roomNumber: '304', floor: 3, roomType: 'Deluxe Double', status: 'dirty', rate: 3000, bedType: 'King', features: ['Sea View'], housekeeper: 'Karim Ullah' },
-    { id: 21, roomNumber: '305', floor: 3, roomType: 'Deluxe Double', status: 'dirty', rate: 3000, bedType: 'Twin', features: ['City View'], housekeeper: 'Rokeya Begum' },
-    { id: 22, roomNumber: '306', floor: 3, roomType: 'Superior King', status: 'clean', rate: 4500, bedType: 'King', features: ['Sea View'], housekeeper: 'Rokeya Begum' },
-    { id: 23, roomNumber: '307', floor: 3, roomType: 'Deluxe Double', status: 'occupied', guestName: 'Sadia Rahman', phone: '+880 1915-778899', checkIn: '2026-06-30', checkoutDate: '2026-07-02', rate: 3000, bedType: 'King', features: ['Garden View'], housekeeper: 'Karim Ullah' },
-    { id: 24, roomNumber: '308', floor: 3, roomType: 'Superior King', status: 'inspected', rate: 4500, bedType: 'King', features: ['Sea View', 'Bathtub'], housekeeper: 'Rokeya Begum' },
+        let status: 'clean' | 'dirty' | 'inspected' | 'occupied' | 'ooo' = 'clean';
+        if (r.status === 'Out of Order' || r.status === 'Maintenance') {
+            status = 'ooo';
+        } else if (activeRes) {
+            status = 'occupied';
+        } else {
+            const hk = (r.housekeepingStatus || 'Clean').toLowerCase();
+            status = hk === 'dirty' ? 'dirty' : hk === 'inspected' ? 'inspected' : 'clean';
+        }
 
-    // Floor 4
-    { id: 25, roomNumber: '401', floor: 4, roomType: 'Executive Suite', status: 'clean', rate: 6500, bedType: 'King', features: ['Executive Lounge Access', 'Sea View'], housekeeper: 'Nazrul Islam' },
-    { id: 26, roomNumber: '402', floor: 4, roomType: 'Executive Suite', status: 'occupied', guestName: 'Imtiaz Ahmed', phone: '+880 1718-889900', checkIn: '2026-06-27', checkoutDate: '2026-07-01', rate: 6500, bedType: 'King', features: ['Balcony', 'Jacuzzi'], housekeeper: 'Nazrul Islam' },
-    { id: 27, roomNumber: '403', floor: 4, roomType: 'Deluxe Double', status: 'clean', rate: 3000, bedType: 'King', features: ['Panoramic View'], housekeeper: 'Shirin Akter' },
-    { id: 28, roomNumber: '404', floor: 4, roomType: 'Superior King', status: 'occupied', guestName: 'Rezaul Karim', phone: '+880 1819-990011', checkIn: '2026-06-30', checkoutDate: '2026-07-03', rate: 4500, bedType: 'King', features: ['Sea View'], housekeeper: 'Shirin Akter' },
-    { id: 29, roomNumber: '405', floor: 4, roomType: 'Standard Single', status: 'clean', rate: 2200, bedType: 'Single', features: ['Quiet Wing'], housekeeper: 'Nazrul Islam' },
-    { id: 30, roomNumber: '410', floor: 4, roomType: 'Executive Suite', status: 'occupied', guestName: 'Mim Akter', phone: '+880 1733-456789', checkIn: '2026-06-28', checkoutDate: '2026-07-01', rate: 6500, bedType: 'King', features: ['Corner Suite', 'Sea View'], housekeeper: 'Shirin Akter' },
+        const features = [
+            r.viewType || 'Scenic View',
+            r.isConnecting ? 'Connecting Door' : 'Soundproof',
+            r.smokingAllowed ? 'Smoking Permitted' : 'Non-Smoking'
+        ];
 
-    // Floor 5 - Suites & VIP
-    { id: 31, roomNumber: '501', floor: 5, roomType: 'Presidential Suite', status: 'clean', rate: 18000, bedType: 'King', features: ['Private Terrace', 'Jacuzzi', 'Butler Service', 'Dining Hall'], housekeeper: 'Senior HK Supervisor' },
-    { id: 32, roomNumber: '502', floor: 5, roomType: 'Executive Suite', status: 'occupied', guestName: 'Ambassador K. Sterling', phone: '+880 1711-001122', checkIn: '2026-06-25', checkoutDate: '2026-07-05', rate: 8500, bedType: 'King', features: ['Panoramic Penthouse', 'Diplomatic Lounge'], housekeeper: 'Senior HK Supervisor' },
-    { id: 33, roomNumber: '503', floor: 5, roomType: 'Presidential Suite', status: 'occupied', guestName: 'Chaudhry Enterprise VIP', phone: '+880 1811-332211', checkIn: '2026-06-30', checkoutDate: '2026-07-04', rate: 18000, bedType: 'King', features: ['Helipad Access View', 'Full Bar', 'Sauna'], housekeeper: 'Senior HK Supervisor' },
-    { id: 34, roomNumber: '505', floor: 5, roomType: 'Superior King', status: 'clean', rate: 5000, bedType: 'King', features: ['Sky View'], housekeeper: 'Senior HK Supervisor' }
-];
+        return {
+            id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || 1,
+            roomNumber: r.number,
+            floor: floorNum,
+            roomType: (r.roomTypeName as any) || 'Deluxe Double',
+            status,
+            guestName: activeRes ? activeRes.guestName : undefined,
+            phone: activeRes ? activeRes.phone : undefined,
+            checkIn: activeRes ? activeRes.checkIn : undefined,
+            checkoutDate: activeRes ? activeRes.checkOut : undefined,
+            rate: r.baseRate || 3500,
+            bedType: (r.bedConfiguration as any) || 'King',
+            features,
+            housekeeper: r.housekeepingStatus === 'Clean' ? 'Housekeeping Assigned' : 'Duty Staff',
+            maintenanceReason: r.status === 'Out of Order' ? (r.remarks || 'Under Maintenance') : undefined
+        };
+    });
+};
 
 export const RoomRack: React.FC = () => {
     const { setActivePage } = useNavigation();
 
-    // Rooms State
-    const [rooms, setRooms] = useState<RoomRackItem[]>(() => {
-        try {
-            const stored = localStorage.getItem('hotel_rooms_rack_v1');
-            if (stored) return JSON.parse(stored);
-        } catch (e) {
-            console.error(e);
-        }
-        return INITIAL_ROOMS_DATA;
-    });
+    // Rooms State dynamically synchronized with central database
+    const [rooms, setRooms] = useState<RoomRackItem[]>(() => deriveRoomsFromInventory());
+
+    useEffect(() => {
+        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+            setRooms(deriveRoomsFromInventory());
+        });
+
+        const unsub = subscribeToPMSEvents(() => {
+            setRooms(deriveRoomsFromInventory());
+        });
+        return () => unsub();
+    }, []);
 
     const persistRooms = (updated: RoomRackItem[]) => {
         setRooms(updated);
@@ -198,8 +209,14 @@ export const RoomRack: React.FC = () => {
         }
     };
 
-    // Quick status updater for selected room
+    // Quick status updater for selected room with direct Database & PMS Sync
     const handleUpdateRoomStatus = (roomId: number, newStatus: RoomRackItem['status']) => {
+        const targetRoom = rooms.find(r => r.id === roomId);
+        if (targetRoom && (newStatus === 'clean' || newStatus === 'dirty' || newStatus === 'inspected')) {
+            const titleCase = newStatus === 'clean' ? 'Clean' : newStatus === 'dirty' ? 'Dirty' : 'Inspected';
+            updateRoomHousekeepingInDB(targetRoom.roomNumber, titleCase);
+        }
+
         const updated = rooms.map(r => {
             if (r.id === roomId) {
                 return {

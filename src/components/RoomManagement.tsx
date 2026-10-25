@@ -1,9 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Search, Plus, Edit2, Trash2, Save, ChevronLeft,
     MapPin, Key, Layers, CheckCircle2, Building2, AlertTriangle, Sparkles
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import {
+    getCanonicalRooms,
+    getDynamicRoomTypes,
+    syncRoomTypesAndRoomsFromDB,
+    type DynamicRoomType
+} from '../utils/roomInventoryEngine';
 
 interface Room {
     id: number;
@@ -33,22 +40,20 @@ interface Room {
     remarks?: string;
 }
 
+interface Building {
+    id: string;
+    name: string;
+}
+
+interface Floor {
+    id: string;
+    name: string;
+    buildingId: string;
+}
+
 const STORAGE_KEY = 'hotel_rooms_inventory_v1';
 
-const mockBuildings = [
-    { id: '1', name: 'Main Tower (Ocean Front)' },
-    { id: '2', name: 'Executive Wing' }
-];
-
-const mockFloors = [
-    { id: '1', name: 'Floor 1 (Ground & Garden)', buildingId: '1' },
-    { id: '2', name: 'Floor 2 (Standard & Deluxe)', buildingId: '1' },
-    { id: '3', name: 'Floor 3 (Superior Wing)', buildingId: '1' },
-    { id: '4', name: 'Floor 4 (Executive Club)', buildingId: '2' },
-    { id: '5', name: 'Floor 5 (VIP Penthouse)', buildingId: '2' }
-];
-
-const getStoredBuildings = () => {
+const getStoredBuildings = (): Building[] => {
     try {
         const saved = localStorage.getItem('hotel_buildings_v2');
         if (saved) {
@@ -58,10 +63,10 @@ const getStoredBuildings = () => {
             }
         }
     } catch {}
-    return mockBuildings;
+    return [];
 };
 
-const getStoredFloors = () => {
+const getStoredFloors = (): Floor[] => {
     try {
         const saved = localStorage.getItem('hotel_floors_v2');
         if (saved) {
@@ -71,83 +76,21 @@ const getStoredFloors = () => {
             }
         }
     } catch {}
-    return mockFloors;
+    return [];
 };
-
-const mockRoomTypes = [
-    { id: '1', name: 'Deluxe Double', code: 'DLX' },
-    { id: '2', name: 'Superior King', code: 'SUPK' },
-    { id: '3', name: 'Executive Suite', code: 'EXEC' },
-    { id: '4', name: 'Standard Single', code: 'STND' },
-    { id: '5', name: 'Presidential Suite', code: 'PRES' }
-];
-
-// Full property 34-room inventory
-const INITIAL_PROPERTY_ROOMS: Room[] = [
-    // Floor 1
-    { id: 1, number: '101', name: 'Garden Deluxe 101', buildingId: '1', floorId: '1', roomTypeId: '1', sortOrder: 1, phoneExt: '2101', lockId: 'RFID-101', isConnecting: true, connectedTo: '102', smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 2, number: '102', name: 'Garden Deluxe 102', buildingId: '1', floorId: '1', roomTypeId: '1', sortOrder: 2, phoneExt: '2102', lockId: 'RFID-102', isConnecting: true, connectedTo: '101', smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 3, number: '103', name: 'Superior Bay 103', buildingId: '1', floorId: '1', roomTypeId: '2', sortOrder: 3, phoneExt: '2103', lockId: 'RFID-103', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 4, number: '104', name: 'Executive Suite 104', buildingId: '1', floorId: '1', roomTypeId: '3', sortOrder: 4, phoneExt: '2104', lockId: 'RFID-104', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: true, status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 5, number: '105', name: 'Standard Single 105', buildingId: '1', floorId: '1', roomTypeId: '4', sortOrder: 5, phoneExt: '2105', lockId: 'RFID-105', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: true, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 6, number: '106', name: 'Standard Single 106', buildingId: '1', floorId: '1', roomTypeId: '4', sortOrder: 6, phoneExt: '2106', lockId: 'RFID-106', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: true, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 7, number: '107', name: 'Deluxe Courtyard 107', buildingId: '1', floorId: '1', roomTypeId: '1', sortOrder: 7, phoneExt: '2107', lockId: 'RFID-107', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 8, number: '108', name: 'Superior King 108', buildingId: '1', floorId: '1', roomTypeId: '2', sortOrder: 8, phoneExt: '2108', lockId: 'RFID-108', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Out of Order', housekeepingStatus: 'Dirty', remarks: 'AC compressor maintenance' },
-
-    // Floor 2
-    { id: 9, number: '201', name: 'Superior Balcony 201', buildingId: '1', floorId: '2', roomTypeId: '2', sortOrder: 9, phoneExt: '2201', lockId: 'RFID-201', isConnecting: true, connectedTo: '202', smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 10, number: '202', name: 'Superior King 202', buildingId: '1', floorId: '2', roomTypeId: '2', sortOrder: 10, phoneExt: '2202', lockId: 'RFID-202', isConnecting: true, connectedTo: '201', smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 11, number: '203', name: 'Executive Suite 203', buildingId: '1', floorId: '2', roomTypeId: '3', sortOrder: 11, phoneExt: '2203', lockId: 'RFID-203', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 12, number: '204', name: 'Deluxe King 204', buildingId: '1', floorId: '2', roomTypeId: '1', sortOrder: 12, phoneExt: '2204', lockId: 'RFID-204', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 13, number: '205', name: 'Standard Single 205', buildingId: '1', floorId: '2', roomTypeId: '4', sortOrder: 13, phoneExt: '2205', lockId: 'RFID-205', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: true, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 14, number: '206', name: 'Deluxe Twin 206', buildingId: '1', floorId: '2', roomTypeId: '1', sortOrder: 14, phoneExt: '2206', lockId: 'RFID-206', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: true, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 15, number: '207', name: 'Deluxe Double 207', buildingId: '1', floorId: '2', roomTypeId: '1', sortOrder: 15, phoneExt: '2207', lockId: 'RFID-207', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 16, number: '208', name: 'Superior King 208', buildingId: '1', floorId: '2', roomTypeId: '2', sortOrder: 16, phoneExt: '2208', lockId: 'RFID-208', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-
-    // Floor 3
-    { id: 17, number: '301', name: 'Deluxe Sea View 301', buildingId: '1', floorId: '3', roomTypeId: '1', sortOrder: 17, phoneExt: '2301', lockId: 'RFID-301', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 18, number: '302', name: 'Standard Single 302', buildingId: '1', floorId: '3', roomTypeId: '4', sortOrder: 18, phoneExt: '2302', lockId: 'RFID-302', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: true, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 19, number: '303', name: 'Executive Suite 303', buildingId: '1', floorId: '3', roomTypeId: '3', sortOrder: 19, phoneExt: '2303', lockId: 'RFID-303', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 20, number: '304', name: 'Deluxe Double 304', buildingId: '1', floorId: '3', roomTypeId: '1', sortOrder: 20, phoneExt: '2304', lockId: 'RFID-304', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 21, number: '305', name: 'Deluxe Twin 305', buildingId: '1', floorId: '3', roomTypeId: '1', sortOrder: 21, phoneExt: '2305', lockId: 'RFID-305', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 22, number: '306', name: 'Superior King 306', buildingId: '1', floorId: '3', roomTypeId: '2', sortOrder: 22, phoneExt: '2306', lockId: 'RFID-306', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 23, number: '307', name: 'Deluxe Garden 307', buildingId: '1', floorId: '3', roomTypeId: '1', sortOrder: 23, phoneExt: '2307', lockId: 'RFID-307', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 24, number: '308', name: 'Superior King 308', buildingId: '1', floorId: '3', roomTypeId: '2', sortOrder: 24, phoneExt: '2308', lockId: 'RFID-308', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Inspected' },
-
-    // Floor 4
-    { id: 25, number: '401', name: 'Executive Club 401', buildingId: '2', floorId: '4', roomTypeId: '3', sortOrder: 25, phoneExt: '2401', lockId: 'RFID-401', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 26, number: '402', name: 'Executive Club 402', buildingId: '2', floorId: '4', roomTypeId: '3', sortOrder: 26, phoneExt: '2402', lockId: 'RFID-402', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 27, number: '403', name: 'Deluxe Panoramic 403', buildingId: '2', floorId: '4', roomTypeId: '1', sortOrder: 27, phoneExt: '2403', lockId: 'RFID-403', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 28, number: '404', name: 'Superior Sky 404', buildingId: '2', floorId: '4', roomTypeId: '2', sortOrder: 28, phoneExt: '2404', lockId: 'RFID-404', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 29, number: '405', name: 'Standard Single 405', buildingId: '2', floorId: '4', roomTypeId: '4', sortOrder: 29, phoneExt: '2405', lockId: 'RFID-405', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: true, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 30, number: '410', name: 'Corner Executive 410', buildingId: '2', floorId: '4', roomTypeId: '3', sortOrder: 30, phoneExt: '2410', lockId: 'RFID-410', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-
-    // Floor 5 (VIP Suites)
-    { id: 31, number: '501', name: 'Presidential Royal Suite 501', buildingId: '2', floorId: '5', roomTypeId: '5', sortOrder: 31, phoneExt: '2501', lockId: 'VIP-501', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 32, number: '502', name: 'Executive Diplomatic 502', buildingId: '2', floorId: '5', roomTypeId: '3', sortOrder: 32, phoneExt: '2502', lockId: 'VIP-502', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 33, number: '503', name: 'Presidential Penthouse 503', buildingId: '2', floorId: '5', roomTypeId: '5', sortOrder: 33, phoneExt: '2503', lockId: 'VIP-503', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 34, number: '505', name: 'Sky Superior 505', buildingId: '2', floorId: '5', roomTypeId: '2', sortOrder: 34, phoneExt: '2505', lockId: 'VIP-505', isConnecting: false, smokingStatus: 'Non-Smoking', nearElevator: false, status: 'Active', housekeepingStatus: 'Clean' }
-];
 
 export default function RoomManagement({ onBack }: { onBack: () => void }) {
     const [view, setView] = useState<'list' | 'form'>('list');
-    const [rooms, setRooms] = useState<Room[]>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) return JSON.parse(saved);
-        } catch {
-            // fallback
-        }
-        return INITIAL_PROPERTY_ROOMS;
-    });
+    const [rooms, setRooms] = useState<Room[]>(() => getCanonicalRooms() as unknown as Room[]);
+
+    const [availableBuildings, setAvailableBuildings] = useState<Building[]>(() => getStoredBuildings());
+    const [availableFloors, setAvailableFloors] = useState<Floor[]>(() => getStoredFloors());
+    const [availableRoomTypes, setAvailableRoomTypes] = useState<DynamicRoomType[]>(() => getDynamicRoomTypes());
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedFloor, setSelectedFloor] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     const [activeTab, setActiveTab] = useState('location');
-
-    const availableBuildings = useMemo(() => getStoredBuildings(), []);
-    const availableFloors = useMemo(() => getStoredFloors(), []);
 
     const [formData, setFormData] = useState<Room>({
         id: 0,
@@ -164,6 +107,65 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
         housekeepingStatus: 'Clean'
     });
 
+    // On mount: sync from DB and fetch property buildings/floors
+    useEffect(() => {
+        const syncData = async () => {
+            try {
+                // 1. Sync room types and rooms from DB
+                const { roomTypes, rooms: dbRooms } = await syncRoomTypesAndRoomsFromDB(1);
+                if (roomTypes && roomTypes.length > 0) {
+                    setAvailableRoomTypes(roomTypes);
+                }
+                if (dbRooms && dbRooms.length > 0) {
+                    setRooms(dbRooms as unknown as Room[]);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dbRooms));
+                } else {
+                    // Fall back to canonical rooms from localStorage
+                    const canonical = getCanonicalRooms();
+                    if (canonical.length > 0) {
+                        setRooms(canonical as unknown as Room[]);
+                    }
+                }
+
+                // 2. Fetch property details for buildings and floors
+                const API_BASE = getApiBaseUrl();
+                const propRes = await fetch(`${API_BASE}/api/properties/1`);
+                const propJson = await propRes.json();
+                if (propJson.success && propJson.data) {
+                    const { buildings, floors } = propJson.data;
+                    if (Array.isArray(buildings) && buildings.length > 0) {
+                        const mappedBuildings: Building[] = buildings.map((b: any) => ({
+                            id: String(b.id),
+                            name: b.title || b.name
+                        }));
+                        setAvailableBuildings(mappedBuildings);
+                        localStorage.setItem('hotel_buildings_v2', JSON.stringify(buildings));
+                    }
+                    if (Array.isArray(floors) && floors.length > 0) {
+                        const mappedFloors: Floor[] = floors.map((f: any) => ({
+                            id: String(f.id),
+                            name: f.name,
+                            buildingId: String(f.building_id || f.buildingId || '1')
+                        }));
+                        setAvailableFloors(mappedFloors);
+                        localStorage.setItem('hotel_floors_v2', JSON.stringify(floors));
+                    }
+                }
+            } catch (err) {
+                // Fallback to localStorage on network error
+                console.warn('RoomManagement: API sync failed, using cached data', err);
+                const cachedBuildings = getStoredBuildings();
+                const cachedFloors = getStoredFloors();
+                if (cachedBuildings.length > 0) setAvailableBuildings(cachedBuildings);
+                if (cachedFloors.length > 0) setAvailableFloors(cachedFloors);
+                const canonical = getCanonicalRooms();
+                if (canonical.length > 0) setRooms(canonical as unknown as Room[]);
+            }
+        };
+
+        syncData();
+    }, []);
+
     const persistRooms = (updated: Room[]) => {
         setRooms(updated);
         try {
@@ -178,9 +180,9 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
             id: 0,
             number: '',
             name: '',
-            buildingId: '1',
-            floorId: '1',
-            roomTypeId: '1',
+            buildingId: availableBuildings[0]?.id || '1',
+            floorId: availableFloors[0]?.id || '1',
+            roomTypeId: String(availableRoomTypes[0]?.id || '1'),
             sortOrder: rooms.length + 1,
             phoneExt: `2${rooms.length + 101}`,
             lockId: `RFID-${rooms.length + 101}`,
@@ -200,25 +202,100 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
         setActiveTab('location');
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
+        const target = rooms.find(r => r.id === id);
         if (window.confirm('Are you sure you want to delete this room from hotel inventory?')) {
             const updated = rooms.filter(r => r.id !== id);
             persistRooms(updated);
+            if (target?.number) {
+                try {
+                    await fetch(`${getApiBaseUrl()}/api/rooms/${encodeURIComponent(target.number)}`, {
+                        method: 'DELETE'
+                    });
+                } catch {}
+            }
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData.number.trim()) {
             alert('Please specify a room number.');
             return;
         }
-        let updated: Room[];
-        if (formData.id === 0) {
-            updated = [...rooms, { ...formData, id: Date.now() }];
-        } else {
-            updated = rooms.map(r => r.id === formData.id ? formData : r);
+
+        const isNew = formData.id === 0;
+        const API_BASE = getApiBaseUrl();
+
+        try {
+            if (isNew) {
+                // POST new room to API
+                const payload = {
+                    number: formData.number,
+                    name: formData.name,
+                    buildingId: formData.buildingId,
+                    floorId: formData.floorId,
+                    roomTypeId: formData.roomTypeId,
+                    phoneExt: formData.phoneExt,
+                    lockId: formData.lockId,
+                    isConnecting: formData.isConnecting,
+                    connectedTo: formData.connectedTo,
+                    smokingStatus: formData.smokingStatus,
+                    nearElevator: formData.nearElevator,
+                    status: formData.status,
+                    housekeepingStatus: formData.housekeepingStatus,
+                    remarks: formData.remarks
+                };
+                const res = await fetch(`${API_BASE}/api/rooms`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const json = await res.json();
+                const savedRoom: Room = json.data
+                    ? { ...formData, id: json.data.id || Date.now() }
+                    : { ...formData, id: Date.now() };
+                const updated = [...rooms, savedRoom];
+                persistRooms(updated);
+            } else {
+                // Edit: PUT details + PATCH housekeeping status via API
+                try {
+                    await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(formData.number)}/details`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            floorId: formData.floorId,
+                            roomTypeId: formData.roomTypeId,
+                            status: formData.status,
+                            housekeepingStatus: formData.housekeepingStatus
+                        })
+                    });
+                } catch {}
+                const updated = rooms.map(r => r.id === formData.id ? formData : r);
+                persistRooms(updated);
+            }
+
+            // Refresh rooms from DB after save
+            try {
+                const { rooms: dbRooms } = await syncRoomTypesAndRoomsFromDB(1);
+                if (dbRooms && dbRooms.length > 0) {
+                    setRooms(dbRooms as unknown as Room[]);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dbRooms));
+                }
+            } catch {
+                // Keep the locally persisted state on network failure
+            }
+        } catch (err) {
+            // On any API failure, at minimum persist to localStorage
+            console.warn('RoomManagement: API save failed, persisting to localStorage only', err);
+            let updated: Room[];
+            if (isNew) {
+                updated = [...rooms, { ...formData, id: Date.now() }];
+            } else {
+                updated = rooms.map(r => r.id === formData.id ? formData : r);
+            }
+            persistRooms(updated);
         }
-        persistRooms(updated);
+
         setView('list');
     };
 
@@ -431,8 +508,8 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {filteredRooms.map(room => {
-                                const roomType = mockRoomTypes.find(t => t.id === room.roomTypeId);
-                                const floor = availableFloors.find(f => f.id === room.floorId) || mockFloors.find(f => f.id === room.floorId);
+                                const roomType = availableRoomTypes.find(t => String(t.id) === room.roomTypeId);
+                                const floor = availableFloors.find(f => String(f.id) === room.floorId);
 
                                 return (
                                     <div key={room.id} className="card-container p-4 hover:shadow-xs transition relative flex flex-col justify-between group">
@@ -580,8 +657,8 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                             onChange={e => updateField('roomTypeId', e.target.value)}
                                             className="select-standard font-semibold text-slate-800"
                                         >
-                                            {mockRoomTypes.map(t => (
-                                                <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+                                            {availableRoomTypes.map(t => (
+                                                <option key={t.id} value={String(t.id)}>{t.name} ({t.code})</option>
                                             ))}
                                         </select>
                                     </div>

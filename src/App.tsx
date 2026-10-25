@@ -753,7 +753,7 @@ function App() {
       />
       <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden transition-all duration-300">
         <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0 [&>*]:w-full [&>*]:min-w-0">
           {renderContent()}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PageHeader from './common/PageHeader';
 import { toast } from '../context/ToastContext';
 import {
     TrendingUp,
@@ -266,7 +267,7 @@ export const RevenueManagement: React.FC = () => {
     const scApplicableCount = revenueHeads.filter(h => h.serviceChargeApplicable).length;
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5 animate-in fade-in duration-150">
+        <div className="page-container animate-in fade-in duration-150">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
@@ -275,49 +276,32 @@ export const RevenueManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <TrendingUp size={22} />
+            <PageHeader
+                title="Revenue Heads & Groups Management"
+                subtitle="Uniform System of Accounts for the Lodging Industry (USALI) 2-tier chart of accounts, folio charge ledgers, VAT % and Service Charge (SC) rules"
+                icon={<TrendingUp size={20} />}
+                badge="USALI 11th Edition"
+                actions={
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={handleOpenAddGroup}
+                            className="btn-secondary"
+                        >
+                            <Database size={14} />
+                            <span>Add Revenue Group</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleOpenAddHead}
+                            className="btn-primary"
+                        >
+                            <Plus size={14} />
+                            <span>New Revenue Head</span>
+                        </button>
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
-                                Revenue Heads & Groups Management
-                            </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                USALI 11th Edition
-                            </span>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                                GL 4000 Series
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Uniform System of Accounts for the Lodging Industry (USALI) 2-tier chart of accounts, folio charge ledgers, VAT % and Service Charge (SC) rules.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                        type="button"
-                        onClick={handleOpenAddGroup}
-                        className="h-8 px-3 text-xs font-bold bg-white text-gray-700 hover:bg-gray-50 rounded-lg border border-gray-300 shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                        <Database size={13} className="text-blue-600" />
-                        <span>+ Add Revenue Group</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleOpenAddHead}
-                        className="h-8 px-3.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                        <Plus size={14} />
-                        <span>+ New Revenue Head</span>
-                    </button>
-                </div>
-            </div>
+                }
+            />
 
             {/* KPI Metrics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">

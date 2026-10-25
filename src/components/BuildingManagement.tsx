@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { getCanonicalRooms, syncRoomTypesAndRoomsFromDB } from '../utils/roomInventoryEngine';
 
 // ============================================================================
 // DATA MODELS & INTERFACES
@@ -248,182 +250,10 @@ export const INITIAL_AMENITIES_SAFETY: AmenityItem[] = [
     }
 ];
 
-export const INITIAL_BUILDINGS: Building[] = [
-    {
-        id: '1',
-        title: 'Main Tower (Ocean Front)',
-        shortCode: 'MT-OCN',
-        type: 'Main Tower',
-        description: 'Primary beach-facing tower housing guest reception, grand lobby, standard and superior suites.',
-        totalFloors: 3,
-        groundFloorLabel: 'G (Lobby & Garden)',
-        hasBasement: true,
-        hasElevator: true,
-        wheelchairAccess: true,
-        distanceFromLobby: '0 mins (Connected)',
-        mapCoordinates: '21.4272° N, 91.9805° E',
-        specificAddress: 'Wing A, Sea Breeze Boulevard, Marine Drive',
-        status: 'Active',
-        openingDate: '2021-01-15',
-        remarks: 'Main accommodation hub with 24 guest rooms across Floors 1-3',
-        amenityIds: ['ELEV-GST', 'ADA-RMP', 'FIRE-EXT', 'SMK-DET', 'EMRG-LGT', 'CCTV-247', 'WTR-FLTR']
-    },
-    {
-        id: '2',
-        title: 'Executive Wing',
-        shortCode: 'EW-VIP',
-        type: 'Executive Block',
-        description: 'Exclusive private wing featuring private keycard elevators, executive lounge, and VIP penthouses.',
-        totalFloors: 2,
-        groundFloorLabel: 'Private Atrium L4',
-        hasBasement: false,
-        hasElevator: true,
-        wheelchairAccess: true,
-        distanceFromLobby: '2 mins (Skybridge)',
-        mapCoordinates: '21.4276° N, 91.9810° E',
-        specificAddress: 'Wing B, East Garden Promenade',
-        status: 'Active',
-        openingDate: '2022-06-01',
-        remarks: 'High-yield VIP suite wing with 10 club rooms & penthouses across Floors 4-5',
-        amenityIds: ['ELEV-GST', 'SRV-LIFT', 'ADA-RMP', 'FIRE-EXT', 'SMK-DET', 'AED-KIT', 'EMRG-LGT', 'CCTV-247', 'SMART-LCK']
-    }
-];
-
-export const INITIAL_FLOORS: Floor[] = [
-    {
-        id: '1',
-        name: 'Floor 1 (Ground & Garden)',
-        floorNumber: 1,
-        code: 'FL-01',
-        buildingId: '1',
-        category: 'Public & Guest',
-        roomCapacity: 8,
-        hasElevatorAccess: true,
-        hasFireExit: true,
-        hasLinenCloset: true,
-        hasServiceStation: true,
-        hasIceMachine: true,
-        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'WTR-FLTR', 'CCTV-247'],
-        status: 'Open',
-        description: 'Ground garden veranda access rooms with direct walkway to the pool & courtyard.',
-        sortOrder: 1
-    },
-    {
-        id: '2',
-        name: 'Floor 2 (Standard & Deluxe)',
-        floorNumber: 2,
-        code: 'FL-02',
-        buildingId: '1',
-        category: 'Guest Rooms',
-        roomCapacity: 8,
-        hasElevatorAccess: true,
-        hasFireExit: true,
-        hasLinenCloset: true,
-        hasServiceStation: true,
-        hasIceMachine: true,
-        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'CCTV-247'],
-        status: 'Open',
-        description: 'Mid-level standard and deluxe balcony guest rooms overlooking the bay.',
-        sortOrder: 2
-    },
-    {
-        id: '3',
-        name: 'Floor 3 (Superior Wing)',
-        floorNumber: 3,
-        code: 'FL-03',
-        buildingId: '1',
-        category: 'Guest Rooms',
-        roomCapacity: 8,
-        hasElevatorAccess: true,
-        hasFireExit: true,
-        hasLinenCloset: true,
-        hasServiceStation: true,
-        hasIceMachine: false,
-        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'LIN-CLST', 'SRV-STN', 'CCTV-247'],
-        status: 'Open',
-        description: 'Upper floor superior view rooms with quiet zone acoustical doors.',
-        sortOrder: 3
-    },
-    {
-        id: '4',
-        name: 'Floor 4 (Executive Club)',
-        floorNumber: 4,
-        code: 'FL-04',
-        buildingId: '2',
-        category: 'Executive Club',
-        roomCapacity: 6,
-        hasElevatorAccess: true,
-        hasFireExit: true,
-        hasLinenCloset: true,
-        hasServiceStation: true,
-        hasIceMachine: true,
-        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'AED-KIT', 'ELEV-GST', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'LNG-TER', 'WTR-FLTR', 'CCTV-247', 'SMART-LCK'],
-        status: 'Open',
-        description: 'Executive club level with dedicated concierge station and private breakfast lounge.',
-        sortOrder: 4
-    },
-    {
-        id: '5',
-        name: 'Floor 5 (VIP Penthouse)',
-        floorNumber: 5,
-        code: 'FL-05',
-        buildingId: '2',
-        category: 'VIP Penthouse',
-        roomCapacity: 4,
-        hasElevatorAccess: true,
-        hasFireExit: true,
-        hasLinenCloset: true,
-        hasServiceStation: true,
-        hasIceMachine: true,
-        amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'AED-KIT', 'EMRG-LGT', 'ELEV-GST', 'SRV-LIFT', 'ADA-RMP', 'LIN-CLST', 'SRV-STN', 'ICE-MCH', 'LNG-TER', 'CCTV-247', 'SMART-LCK'],
-        status: 'Open',
-        description: 'Top-tier luxury presidential suites with private Jacuzzi terraces and butler quarters.',
-        sortOrder: 5
-    }
-];
-
 const STORAGE_KEY_BUILDINGS = 'hotel_buildings_v2';
 const STORAGE_KEY_FLOORS = 'hotel_floors_v2';
 const STORAGE_KEY_AMENITIES = 'hotel_amenities_safety_catalog_v1';
 const STORAGE_KEY_ROOMS = 'hotel_rooms_inventory_v1';
-
-// Initial fallback rooms
-const INITIAL_ROOM_SUMMARIES: RoomSummary[] = [
-    { id: 1, number: '101', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 2, number: '102', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 3, number: '103', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 4, number: '104', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 5, number: '105', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 6, number: '106', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 7, number: '107', buildingId: '1', floorId: '1', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 8, number: '108', buildingId: '1', floorId: '1', status: 'Out of Order', housekeepingStatus: 'Dirty' },
-    { id: 9, number: '201', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 10, number: '202', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 11, number: '203', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 12, number: '204', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 13, number: '205', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 14, number: '206', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 15, number: '207', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 16, number: '208', buildingId: '1', floorId: '2', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 17, number: '301', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 18, number: '302', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 19, number: '303', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 20, number: '304', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 21, number: '305', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 22, number: '306', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 23, number: '307', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 24, number: '308', buildingId: '1', floorId: '3', status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 25, number: '401', buildingId: '2', floorId: '4', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 26, number: '402', buildingId: '2', floorId: '4', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 27, number: '403', buildingId: '2', floorId: '4', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 28, number: '404', buildingId: '2', floorId: '4', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 29, number: '405', buildingId: '2', floorId: '4', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 30, number: '410', buildingId: '2', floorId: '4', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 31, number: '501', buildingId: '2', floorId: '5', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 32, number: '502', buildingId: '2', floorId: '5', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 33, number: '503', buildingId: '2', floorId: '5', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 34, number: '505', buildingId: '2', floorId: '5', status: 'Active', housekeepingStatus: 'Clean' }
-];
 
 interface BuildingManagementProps {
     initialTab?: 'buildings' | 'floors' | 'amenities' | 'matrix';
@@ -447,12 +277,12 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             const saved = localStorage.getItem(STORAGE_KEY_BUILDINGS);
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].title) return parsed;
             }
         } catch (e) {
             console.error('Failed to load buildings', e);
         }
-        return INITIAL_BUILDINGS;
+        return [];
     });
 
     // State: Floors
@@ -461,12 +291,12 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             const saved = localStorage.getItem(STORAGE_KEY_FLOORS);
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].code) return parsed;
             }
         } catch (e) {
             console.error('Failed to load floors', e);
         }
-        return INITIAL_FLOORS;
+        return [];
     });
 
     // State: Dynamic Amenities & Safety Catalog
@@ -485,17 +315,86 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
     // State: Rooms
     const [rooms, setRooms] = useState<RoomSummary[]>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY_ROOMS);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            }
-        } catch (e) {
-            console.error('Failed to load rooms', e);
-        }
-        return INITIAL_ROOM_SUMMARIES;
+        return getCanonicalRooms().map(r => ({
+            id: r.id,
+            number: r.number,
+            buildingId: r.buildingId,
+            floorId: r.floorId,
+            status: r.status,
+            housekeepingStatus: r.housekeepingStatus
+        }));
     });
+
+    // Fetch buildings, floors, and rooms from backend API on mount
+    useEffect(() => {
+        const loadArchitectureFromDB = async () => {
+            try {
+                const res = await fetch(`${getApiBaseUrl()}/api/properties/1`);
+                const json = await res.json();
+                if (json.success && json.data) {
+                    if (Array.isArray(json.data.buildings) && json.data.buildings.length > 0) {
+                        const mappedBlds: Building[] = json.data.buildings.map((b: any) => ({
+                            id: String(b.id),
+                            title: b.name || b.title || `Building ${b.id}`,
+                            shortCode: b.code || b.shortCode || `BLD-${b.id}`,
+                            type: b.id === 1 ? 'Main Tower' : 'Executive Block',
+                            description: b.description || `${b.name} accommodation wing`,
+                            totalFloors: Number(b.total_floors || b.totalFloors || 3),
+                            groundFloorLabel: 'G (Lobby)',
+                            hasBasement: b.id === 1,
+                            hasElevator: true,
+                            wheelchairAccess: true,
+                            distanceFromLobby: b.id === 1 ? '0 mins (Connected)' : '2 mins (Skybridge)',
+                            mapCoordinates: '21.4272° N, 91.9805° E',
+                            specificAddress: 'Grand Palace Campus',
+                            status: b.status === 'INACTIVE' ? 'Inactive' : 'Active',
+                            openingDate: '2022-01-01',
+                            remarks: b.description || '',
+                            amenityIds: ['ELEV-GST', 'ADA-RMP', 'FIRE-EXT', 'SMK-DET', 'EMRG-LGT', 'CCTV-247']
+                        }));
+                        setBuildings(mappedBlds);
+                        localStorage.setItem(STORAGE_KEY_BUILDINGS, JSON.stringify(mappedBlds));
+                    }
+                    if (Array.isArray(json.data.floors) && json.data.floors.length > 0) {
+                        const mappedFloors: Floor[] = json.data.floors.map((f: any, idx: number) => ({
+                            id: String(f.id),
+                            name: f.name || `Floor ${f.floor_number || idx + 1}`,
+                            floorNumber: Number(f.floor_number || f.floorNumber || idx + 1),
+                            code: f.code || `FL-0${f.floor_number || idx + 1}`,
+                            buildingId: String(f.building_id || f.buildingId || '1'),
+                            category: Number(f.floor_number) >= 4 ? 'Executive Club' : 'Guest Rooms',
+                            roomCapacity: 8,
+                            hasElevatorAccess: true,
+                            hasFireExit: true,
+                            hasLinenCloset: true,
+                            hasServiceStation: true,
+                            hasIceMachine: true,
+                            amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'LIN-CLST', 'CCTV-247'],
+                            status: 'Open',
+                            description: f.description || `${f.name} corridor & rooms`,
+                            sortOrder: idx + 1
+                        }));
+                        setFloors(mappedFloors);
+                        localStorage.setItem(STORAGE_KEY_FLOORS, JSON.stringify(mappedFloors));
+                    }
+                }
+                const { rooms: syncedRooms } = await syncRoomTypesAndRoomsFromDB(1);
+                if (syncedRooms.length > 0) {
+                    setRooms(syncedRooms.map(r => ({
+                        id: r.id,
+                        number: r.number,
+                        buildingId: r.buildingId,
+                        floorId: r.floorId,
+                        status: r.status,
+                        housekeepingStatus: r.housekeepingStatus
+                    })));
+                }
+            } catch (e) {
+                console.warn('BuildingManagement DB sync warning:', e);
+            }
+        };
+        loadArchitectureFromDB();
+    }, []);
 
     // Refresh rooms whenever storage updates
     useEffect(() => {
@@ -771,9 +670,29 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         let updated: Building[];
         if (exists) {
             updated = buildings.map(b => b.id === editingBuilding.id ? editingBuilding : b);
+            fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${editingBuilding.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: editingBuilding.shortCode,
+                    name: editingBuilding.title,
+                    totalFloors: editingBuilding.totalFloors,
+                    description: editingBuilding.description
+                })
+            }).catch(() => {});
             showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) updated!`);
         } else {
             updated = [...buildings, editingBuilding];
+            fetch(`${getApiBaseUrl()}/api/properties/1/buildings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: editingBuilding.shortCode,
+                    name: editingBuilding.title,
+                    totalFloors: editingBuilding.totalFloors,
+                    description: editingBuilding.description
+                })
+            }).catch(() => {});
             showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) created!`);
         }
 
@@ -800,6 +719,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
         const updatedBuildings = buildings.filter(b => b.id !== building.id);
         saveBuildings(updatedBuildings);
+        fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${building.id}`, { method: 'DELETE' }).catch(() => {});
         showToast(`Building "${building.title}" removed.`);
     };
 
@@ -872,9 +792,29 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         let updated: Floor[];
         if (exists) {
             updated = floors.map(f => f.id === editingFloor.id ? editingFloor : f);
+            fetch(`${getApiBaseUrl()}/api/properties/1/floors/${editingFloor.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    buildingId: editingFloor.buildingId,
+                    floorNumber: editingFloor.floorNumber,
+                    name: editingFloor.name,
+                    description: editingFloor.description
+                })
+            }).catch(() => {});
             showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) updated!`);
         } else {
             updated = [...floors, editingFloor];
+            fetch(`${getApiBaseUrl()}/api/properties/1/floors`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    buildingId: editingFloor.buildingId,
+                    floorNumber: editingFloor.floorNumber,
+                    name: editingFloor.name,
+                    description: editingFloor.description
+                })
+            }).catch(() => {});
             showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) created!`);
         }
 
@@ -895,6 +835,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
         const updatedFloors = floors.filter(f => f.id !== floor.id);
         saveFloors(updatedFloors);
+        fetch(`${getApiBaseUrl()}/api/properties/1/floors/${floor.id}`, { method: 'DELETE' }).catch(() => {});
         showToast(`Floor "${floor.name}" deleted.`);
     };
 

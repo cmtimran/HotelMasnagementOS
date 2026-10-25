@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import PageHeader from '../common/PageHeader';
 import {
     Calendar as CalendarIcon,
     Search,
@@ -43,234 +44,6 @@ export interface ReservationItem {
     isMasterGuest?: boolean;
 }
 
-const INITIAL_RESERVATIONS: ReservationItem[] = [
-    // 1. Confirmed / Future Reservations (Belong to "Reservations")
-    {
-        id: 101,
-        reservationNumber: 'RES-009288',
-        guestName: 'Mr. Asif Iqbal',
-        phone: '+880 1711-234567',
-        email: 'asif.iqbal@brac.net',
-        roomNumber: '105',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-10',
-        checkOut: '2026-07-13',
-        nights: 3,
-        adults: 2,
-        children: 0,
-        status: 'confirmed',
-        totalAmount: 10500,
-        paidAmount: 5000,
-        dueAmount: 5500,
-        source: 'Direct Web',
-        vip: 'None',
-        isGroup: false
-    },
-    {
-        id: 102,
-        reservationNumber: 'RES-009289',
-        guestName: 'Mrs. Sabrina Yeasmin',
-        phone: '+880 1819-876543',
-        email: 'sabrina.y@gmail.com',
-        roomNumber: '204',
-        roomType: 'Superior King',
-        checkIn: '2026-07-12',
-        checkOut: '2026-07-15',
-        nights: 3,
-        adults: 2,
-        children: 1,
-        status: 'confirmed',
-        totalAmount: 13500,
-        paidAmount: 13500,
-        dueAmount: 0,
-        source: 'Booking.com',
-        vip: 'VIP-1',
-        isGroup: false
-    },
-    // 2. Arriving Bookings (Belong to "Reservations" and "Arrivals")
-    {
-        id: 103,
-        reservationNumber: 'RES-009283',
-        guestName: 'Engr. Tanvir Ahmed',
-        phone: '+880 1912-384729',
-        email: 'tanvir@apex.com',
-        roomNumber: '104',
-        roomType: 'Executive Suite',
-        checkIn: '2026-07-03',
-        checkOut: '2026-07-06',
-        nights: 3,
-        adults: 2,
-        children: 1,
-        status: 'arriving',
-        totalAmount: 22500,
-        paidAmount: 10000,
-        dueAmount: 12500,
-        source: 'Corporate Contract',
-        vip: 'None',
-        isGroup: true,
-        groupId: 'GRP-APEX-2026',
-        groupName: 'Apex Footwear AGM',
-        isMasterGuest: true
-    },
-    {
-        id: 104,
-        reservationNumber: 'RES-009284',
-        guestName: 'Farhan Kabir',
-        phone: '+880 1611-293847',
-        email: 'farhan@apex.com',
-        roomNumber: '201',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-03',
-        checkOut: '2026-07-06',
-        nights: 3,
-        adults: 2,
-        children: 0,
-        status: 'arriving',
-        totalAmount: 10500,
-        paidAmount: 10500,
-        dueAmount: 0,
-        source: 'Corporate Contract',
-        vip: 'None',
-        isGroup: true,
-        groupId: 'GRP-APEX-2026',
-        groupName: 'Apex Footwear AGM'
-    },
-    // 3. Hold Bookings (Belongs to "Reservations")
-    {
-        id: 105,
-        reservationNumber: 'RES-009287',
-        guestName: 'Rashidul Hasan (Hold)',
-        phone: '+880 1819-384720',
-        email: 'rashidul@gmail.com',
-        roomNumber: '102',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-05',
-        checkOut: '2026-07-08',
-        nights: 3,
-        adults: 2,
-        children: 0,
-        status: 'hold',
-        totalAmount: 10500,
-        paidAmount: 0,
-        dueAmount: 10500,
-        source: 'Phone Tentative',
-        vip: 'None',
-        isGroup: false
-    },
-    // 4. In-House Guests (Belongs to "In House")
-    {
-        id: 106,
-        reservationNumber: 'RES-009281',
-        guestName: 'Md. Tariqul Islam',
-        phone: '+880 1711-928371',
-        email: 'tariqul@grameen.com',
-        roomNumber: '101',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-04',
-        nights: 3,
-        adults: 2,
-        children: 0,
-        status: 'in-house',
-        totalAmount: 10500,
-        paidAmount: 10500,
-        dueAmount: 0,
-        source: 'Direct Corporate',
-        vip: 'VIP-1',
-        isGroup: false
-    },
-    {
-        id: 107,
-        reservationNumber: 'RES-009285',
-        guestName: 'Dr. Jean Dupont',
-        phone: '+33 612-384920',
-        email: 'j.dupont@paris-med.fr',
-        roomNumber: '203',
-        roomType: 'Executive Suite',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-07',
-        nights: 6,
-        adults: 1,
-        children: 0,
-        status: 'in-house',
-        totalAmount: 45000,
-        paidAmount: 25000,
-        dueAmount: 20000,
-        source: 'Direct Web',
-        vip: 'VIP-GM',
-        isGroup: true,
-        groupId: 'GRP-UN-2026',
-        groupName: 'UN Delegation Mission'
-    },
-    // 5. Departing Guest (Belongs to "Departures" and "In House")
-    {
-        id: 108,
-        reservationNumber: 'RES-009280',
-        guestName: 'Shahidul Alam',
-        phone: '+880 1715-443322',
-        email: 'shahidul@drik.net',
-        roomNumber: '103',
-        roomType: 'Superior King',
-        checkIn: '2026-06-29',
-        checkOut: '2026-07-01',
-        nights: 2,
-        adults: 1,
-        children: 0,
-        status: 'departing',
-        totalAmount: 9000,
-        paidAmount: 9000,
-        dueAmount: 0,
-        source: 'Direct Walk-In',
-        vip: 'VIP-2',
-        isGroup: false
-    },
-    // 6. Checked-Out Guests (Belongs to "Check Out")
-    {
-        id: 109,
-        reservationNumber: 'RES-009282',
-        guestName: 'Samantha Chowdhury',
-        phone: '+880 1819-283746',
-        email: 'samantha.c@un.org',
-        roomNumber: '103',
-        roomType: 'Superior King',
-        checkIn: '2026-06-27',
-        checkOut: '2026-06-30',
-        nights: 3,
-        adults: 1,
-        children: 0,
-        status: 'checked-out',
-        totalAmount: 13500,
-        paidAmount: 13500,
-        dueAmount: 0,
-        source: 'UN Diplomatic',
-        vip: 'VIP-2',
-        isGroup: true,
-        groupId: 'GRP-UN-2026',
-        groupName: 'UN Delegation Mission',
-        isMasterGuest: true
-    },
-    {
-        id: 110,
-        reservationNumber: 'RES-009286',
-        guestName: 'Nusrat Jahan',
-        phone: '+880 1712-384729',
-        email: 'nusrat@beximco.com',
-        roomNumber: '202',
-        roomType: 'Superior King',
-        checkIn: '2026-06-28',
-        checkOut: '2026-07-01',
-        nights: 3,
-        adults: 2,
-        children: 0,
-        status: 'checked-out',
-        totalAmount: 13500,
-        paidAmount: 13500,
-        dueAmount: 0,
-        source: 'Direct Walk-In',
-        vip: 'None',
-        isGroup: false
-    }
-];
 
 export const ReservationsView: React.FC = () => {
     const { setActivePage } = useNavigation();
@@ -296,14 +69,16 @@ export const ReservationsView: React.FC = () => {
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // Hydrate state from localStorage or initial, then immediately sync with SQLite DB
+    // Hydrate state from localStorage, then immediately sync with SQLite DB
     const [reservations, setReservations] = useState<ReservationItem[]>(() => {
         try {
             const saved = localStorage.getItem('hotel_reservations_v3');
-            return saved ? JSON.parse(saved) : INITIAL_RESERVATIONS;
-        } catch {
-            return INITIAL_RESERVATIONS;
-        }
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch {}
+        return [];
     });
 
     const loadReservationsFromDB = async () => {
@@ -502,11 +277,28 @@ export const ReservationsView: React.FC = () => {
     };
 
     return (
-        <div className="p-3 sm:p-5 bg-[#f0f4f8] min-h-full flex flex-col gap-3 font-sans text-xs text-gray-800 animate-in fade-in duration-150">
+        <div className="page-container text-xs text-slate-800 animate-in fade-in duration-150">
+            <PageHeader
+                title="Reservations Directory"
+                subtitle="Manage bookings, arrivals, in-house stays, group blocks & folio balances"
+                icon={<CalendarIcon size={20} />}
+                badge={`${reservations.length} Bookings`}
+                actions={
+                    <button
+                        type="button"
+                        onClick={() => setActivePage('add-reservation')}
+                        className="btn-primary"
+                    >
+                        <Plus size={14} className="stroke-[2.5]" />
+                        <span>Add Reservation</span>
+                    </button>
+                }
+            />
+
             {/* Top Control Bar */}
-            <div className="bg-white rounded-lg p-3 sm:px-5 sm:py-3 flex flex-col gap-3 shadow-2xs border border-gray-200/80 select-none">
-                {/* Row 1: Unified All 5 Status Tabs + Primary CTA */}
-                <div className="flex items-center justify-between flex-wrap gap-3 pb-1 border-b border-gray-100">
+            <div className="card-container !p-4 flex flex-col gap-3 select-none">
+                {/* Row 1: Unified All 5 Status Tabs */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-1 border-b border-slate-100">
                     {/* Status Tabs */}
                     <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
                         {[
@@ -523,33 +315,21 @@ export const ReservationsView: React.FC = () => {
                                     type="button"
                                     onClick={() => handleTabChange(t.id as any)}
                                     className={`py-2 text-[13px] transition-colors relative cursor-pointer flex items-center gap-1.5 font-medium ${
-                                        isActive ? 'text-[#1e3a8a] font-bold' : 'text-gray-500 hover:text-gray-900'
+                                        isActive ? 'text-[#6C5CE7] font-bold' : 'text-slate-500 hover:text-slate-900'
                                     }`}
                                 >
                                     <span>{t.label}</span>
                                     <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-bold ${
-                                        isActive ? 'bg-blue-100 text-[#1e3a8a]' : 'bg-gray-100 text-gray-600'
+                                        isActive ? 'bg-purple-100 text-[#6C5CE7]' : 'bg-slate-100 text-slate-600'
                                     }`}>
                                         {t.count}
                                     </span>
                                     {isActive && (
-                                        <span className="absolute bottom-[-5px] left-0 right-0 h-[2.5px] bg-[#1e3a8a] rounded-full"></span>
+                                        <span className="absolute bottom-[-5px] left-0 right-0 h-[2.5px] bg-[#6C5CE7] rounded-full"></span>
                                     )}
                                 </button>
                             );
                         })}
-                    </div>
-
-                    {/* Primary Right Action */}
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setActivePage('add-reservation')}
-                            className="flex items-center gap-1.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors h-8 cursor-pointer shadow-xs"
-                        >
-                            <Plus size={14} className="stroke-[2.5]" />
-                            <span>Add Reservation</span>
-                        </button>
                     </div>
                 </div>
 

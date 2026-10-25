@@ -7,6 +7,7 @@ import {
     ChevronLeft, ChevronRight
 } from 'lucide-react';
 import SendEmailModal from './SendEmailModal';
+import { getAllStoredReservations } from '../utils/roomInventoryEngine';
 
 interface HotelInfoViewProps {
     property: any;
@@ -76,13 +77,15 @@ const HotelInfoView = ({ property, currentUser, onManageProperty }: HotelInfoVie
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // Financial Transactions Mock
-    const transactions = [
-        { id: 'TXN-001', date: '2026-10-15', desc: 'Monthly SaaS Enterprise Plan', amount: -299.00, type: 'debit', status: 'Completed' },
-        { id: 'TXN-002', date: '2026-10-14', desc: 'Booking Commission Settlement', amount: 1250.50, type: 'credit', status: 'Completed' },
-        { id: 'TXN-003', date: '2026-10-10', desc: 'SMS Gateway Credits Top-up', amount: -50.00, type: 'debit', status: 'Completed' },
-        { id: 'TXN-004', date: '2026-09-28', desc: 'Channel Manager Sync Fee', amount: -120.00, type: 'debit', status: 'Pending' },
-    ];
+    // Live Financial Transactions derived from Reservations
+    const transactions = getAllStoredReservations().slice(0, 6).map((r, idx) => ({
+        id: r.id || `TXN-00${idx + 1}`,
+        date: r.checkIn || new Date().toISOString().slice(0, 10),
+        desc: `Folio Settlement - ${r.guestName} (${r.roomType})`,
+        amount: Number(r.totalRate) || 0,
+        type: r.status === 'CANCELLED' ? 'debit' : 'credit',
+        status: r.status === 'CONFIRMED' ? 'Pending' : 'Completed'
+    }));
 
     // Outlets Data
     const outlets = [

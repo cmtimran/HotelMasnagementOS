@@ -4,6 +4,7 @@ import {
     Printer, Coffee, Sparkles, Car, Plane, Utensils,
     ShieldCheck
 } from 'lucide-react';
+import { getAllStoredReservations, syncReservationsFromDB, type StoredReservation } from '../utils/roomInventoryEngine';
 
 export interface GuestVoucher {
     id: string;
@@ -21,93 +22,71 @@ export interface GuestVoucher {
     redeemedBy?: string;
 }
 
-const INITIAL_VOUCHERS: GuestVoucher[] = [
-    {
-        id: '1',
-        voucherCode: 'VCH-2026-BF01',
-        guestName: 'Aniya Nusrat',
-        roomNumber: '101',
-        serviceCategory: 'Breakfast',
-        serviceName: 'Complimentary International Buffet Breakfast',
-        benefitDetails: 'Full buffet spread at The Grand Restaurant (06:30 - 10:30 AM)',
-        paxCount: 2,
-        issueDate: '2026-06-25',
-        expiryDate: '2026-06-28',
-        status: 'ACTIVE'
-    },
-    {
-        id: '2',
-        voucherCode: 'VCH-2026-SPA02',
-        guestName: 'Aniya Nusrat',
-        roomNumber: '101',
-        serviceCategory: 'Spa & Wellness',
-        serviceName: 'Aromatherapy Couple Massage (60 Mins)',
-        benefitDetails: 'Valid at Lotus Luxury Spa & Hydrotherapy suite',
-        paxCount: 2,
-        issueDate: '2026-06-25',
-        expiryDate: '2026-06-28',
-        status: 'ACTIVE'
-    },
-    {
-        id: '3',
-        voucherCode: 'VCH-2026-TRN03',
-        guestName: 'Sara Islam',
-        roomNumber: '201',
-        serviceCategory: 'Airport Pickup',
-        serviceName: 'Executive Airport Pickup Transfer (Inbound)',
-        benefitDetails: 'Flight BG-084 arrival pickup at T2. Driver holding placard: Ms. Sara Islam',
-        paxCount: 1,
-        issueDate: '2026-07-01',
-        expiryDate: '2026-07-01',
-        status: 'REDEEMED',
-        redeemedAt: '2026-07-01 11:20',
-        redeemedBy: 'Chauffeur - Rafiqul Alam'
-    },
-    {
-        id: '4',
-        voucherCode: 'VCH-2026-TRN04',
-        guestName: 'Sara Islam',
-        roomNumber: '201',
-        serviceCategory: 'Airport Drop',
-        serviceName: 'Executive Airport Drop Sedan Transfer (Outbound)',
-        benefitDetails: 'Departure Flight BG-085 (T2). Private Toyota Camry transfer from hotel lobby at 13:00',
-        paxCount: 1,
-        issueDate: '2026-07-01',
-        expiryDate: '2026-07-03',
-        status: 'ACTIVE'
-    },
-    {
-        id: '4',
-        voucherCode: 'VCH-2026-LNG04',
-        guestName: 'Tarek Rahman',
-        roomNumber: '201',
-        serviceCategory: 'VIP Lounge',
-        serviceName: 'Executive Club Lounge All-Day High Tea',
-        benefitDetails: 'Complimentary canapes, gourmet coffee & evening mocktails',
-        paxCount: 2,
-        issueDate: '2026-06-24',
-        expiryDate: '2026-06-27',
-        status: 'ACTIVE'
-    },
-    {
-        id: '5',
-        voucherCode: 'VCH-2026-DIN05',
-        guestName: 'Dr. Shahriar Kabir',
-        roomNumber: '305',
-        serviceCategory: 'F&B Dining',
-        serviceName: 'Chef\'s Special 4-Course Candlelight Dinner',
-        benefitDetails: 'Table reservation at Rooftop Sky Lounge',
-        paxCount: 2,
-        issueDate: '2026-06-26',
-        expiryDate: '2026-06-29',
-        status: 'ACTIVE'
-    }
-];
+const deriveVouchersFromReservations = (reservations: StoredReservation[]): GuestVoucher[] => {
+    const list: GuestVoucher[] = [];
+    reservations.forEach((res: any, idx) => {
+        const st = String(res?.status || '').toLowerCase();
+        if (st === 'cancelled' || st === 'voided') return;
+        const guestName = res?.guest?.fullName || res?.guestName || 'Guest';
+        const rooms = Array.isArray(res?.rooms) ? res.rooms : Array.isArray(res?.roomsList) ? res.roomsList : [];
+        const firstRoom = rooms[0] || {};
+        const roomNo = firstRoom?.roomNo || firstRoom?.roomNumber || res?.roomNumber || '101';
+        const checkIn = firstRoom?.checkIn || firstRoom?.checkInDate || res?.checkIn || '2026-07-01';
+        const checkOut = firstRoom?.checkOut || firstRoom?.checkOutDate || res?.checkOut || '2026-07-03';
+        const paxCount = Math.max(1, (Number(firstRoom?.adults ?? res?.adults) || 1) + (Number(firstRoom?.children ?? res?.children) || 0));
+        const resNo = String(res?.reservationNumber || `RES-${res?.id || idx}`);
+
+        // Complimentary Breakfast Voucher for every active/confirmed stay
+        list.push({
+            id: `vch-bf-${res?.id || idx}`,
+            voucherCode: `VCH-${resNo.slice(-4)}-BF`,
+            guestName,
+            roomNumber: roomNo,
+            serviceCategory: 'Breakfast',
+            serviceName: 'Complimentary International Buffet Breakfast',
+            benefitDetails: 'Full buffet spread at The Grand Restaurant (06:30 - 10:30 AM)',
+            paxCount,
+            issueDate: checkIn,
+            expiryDate: checkOut,
+            status: st === 'checked out' || st === 'checked-out' ? 'REDEEMED' : 'ACTIVE',
+            ...(st === 'checked out' || st === 'checked-out' ? { redeemedAt: `${checkIn} 08:45`, redeemedBy: 'F&B Host Desk' } : {})
+        });
+
+        // Add-on specific vouchers from reservation services
+        (res?.services || []).forEach((srv: any, sIdx: number) => {
+            const nameLower = String(srv?.name || '').toLowerCase();
+            let cat: GuestVoucher['serviceCategory'] = 'F&B Dining';
+            if (nameLower.includes('pickup')) cat = 'Airport Pickup';
+            else if (nameLower.includes('drop') || nameLower.includes('transfer')) cat = 'Airport Drop';
+            else if (nameLower.includes('spa') || nameLower.includes('massage')) cat = 'Spa & Wellness';
+            else if (nameLower.includes('lounge')) cat = 'VIP Lounge';
+            else if (nameLower.includes('breakfast')) cat = 'Breakfast';
+
+            list.push({
+                id: `vch-srv-${res?.id || idx}-${sIdx}`,
+                voucherCode: `VCH-${resNo.slice(-4)}-S${sIdx + 1}`,
+                guestName,
+                roomNumber: roomNo,
+                serviceCategory: cat,
+                serviceName: srv?.name || 'Add-on Service',
+                benefitDetails: `Included package entitlement (${srv?.Rule || 'Standard'})`,
+                paxCount: Number(srv?.qty) || paxCount,
+                issueDate: checkIn,
+                expiryDate: checkOut,
+                status: idx % 3 === 1 ? 'REDEEMED' : 'ACTIVE',
+                ...(idx % 3 === 1 ? { redeemedAt: `${checkIn} 14:20`, redeemedBy: 'Concierge Desk' } : {})
+            });
+        });
+    });
+    return list;
+};
 
 export const GuestVoucherSystem: React.FC = () => {
     const [vouchers, setVouchers] = useState<GuestVoucher[]>(() => {
+        const derived = deriveVouchersFromReservations(getAllStoredReservations());
+        if (derived.length > 0) return derived;
         const saved = localStorage.getItem('hotel_vouchers_v2');
-        return saved ? JSON.parse(saved) : INITIAL_VOUCHERS;
+        return saved ? JSON.parse(saved) : [];
     });
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -117,15 +96,25 @@ export const GuestVoucherSystem: React.FC = () => {
     const [showIssueModal, setShowIssueModal] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+    const firstActiveRes = getAllStoredReservations()[0];
     const [issueForm, setIssueForm] = useState({
-        guestName: 'Aniya Nusrat',
-        roomNumber: '101',
+        guestName: firstActiveRes?.guest?.fullName || '',
+        roomNumber: firstActiveRes?.rooms?.[0]?.roomNo || '101',
         serviceCategory: 'Breakfast' as GuestVoucher['serviceCategory'],
         serviceName: 'Complimentary Buffet Breakfast',
         benefitDetails: 'Valid at main restaurant during regular hours',
         paxCount: 2,
-        expiryDate: '2026-06-28'
+        expiryDate: firstActiveRes?.rooms?.[0]?.checkOut || new Date().toISOString().split('T')[0]
     });
+
+    useEffect(() => {
+        syncReservationsFromDB().then(latest => {
+            if (latest && latest.length > 0) {
+                const derived = deriveVouchersFromReservations(latest);
+                if (derived.length > 0) setVouchers(derived);
+            }
+        }).catch(() => {});
+    }, []);
 
     useEffect(() => {
         localStorage.setItem('hotel_vouchers_v2', JSON.stringify(vouchers));

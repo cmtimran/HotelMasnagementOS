@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PageHeader from './common/PageHeader';
 import {
     Plus, Edit2, Trash2, Save, X,
     Truck, WashingMachine, Waves, Car, Coffee,
@@ -187,20 +188,22 @@ export default function ServiceManagement() {
     };
 
     const renderList = () => (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Service Master Data</h1>
-                    <p className="text-sm text-gray-500">Manage non-room services, transport, and ancillary revenue items</p>
-                </div>
-                <button
-                    onClick={openCreate}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-bold"
-                >
-                    <Plus size={18} />
-                    Create Service
-                </button>
-            </div>
+        <div className="page-container">
+            <PageHeader
+                title="Service Master Data"
+                subtitle="Manage non-room services, laundry, airport transport & ancillary revenue items"
+                icon={<Tag size={20} />}
+                actions={
+                    <button
+                        type="button"
+                        onClick={openCreate}
+                        className="btn-primary"
+                    >
+                        <Plus size={14} className="stroke-[2.5]" />
+                        <span>Create Service</span>
+                    </button>
+                }
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {services.map(service => (

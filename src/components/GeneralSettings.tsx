@@ -11,7 +11,6 @@ import {
     RotateCcw,
     CheckCircle2,
     AlertTriangle,
-    Info,
     Send,
     Database
 } from 'lucide-react';
@@ -97,7 +96,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
     };
 
     return (
-        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
+        <div className="page-container">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed bottom-4 right-4 z-[120] bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200 border border-gray-700">
@@ -106,53 +105,16 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
                 </div>
             )}
 
-            
-            {/* Informative Micro-guide for Hotel Operations */}
-            <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
-                        <Info size={16} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900">Hotel Global Configuration & Regional Compliance</span>
-                            <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">Statutory Standard</span>
-                        </div>
-                        <p className="text-[11px] text-gray-600 mt-0.5">
-                            Configure property profile, base operating currency, statutory VAT/taxes, numbering sequences, and automated cloud backup policies.
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-gray-600 flex-shrink-0 font-medium">
-                    <button
-                        type="button"
-                        onClick={() => showToast('Test cloud backup executed: Snapshot synced to GCS (asia-south1).')}
-                        className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-800 bg-white hover:bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shadow-2xs cursor-pointer transition-colors"
-                    >
-                        <Database size={11} className="text-blue-600" />
-                        <span>Run Test Backup</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => showToast('Test SMS sent via BulkSMS BD API gateway (Mock OK).')}
-                        className="inline-flex items-center gap-1 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 px-2 py-1 rounded-md border border-gray-200 shadow-2xs cursor-pointer transition-colors"
-                    >
-                        <Send size={11} className="text-gray-500" />
-                        <span>Test SMS/Email</span>
-                    </button>
-                </div>
-            </div>
-
             {/* Elevated Header Card */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
-                    <div className="flex items-center gap-3.5">
+                <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3.5 min-w-0">
                         <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0 shadow-2xs">
                             <Settings size={22} className="text-primary" />
                         </div>
                         <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight truncate">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
                                     System & Property General Settings
                                 </h1>
                                 <span className="badge-status-active">
@@ -180,7 +142,23 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => showToast('Test cloud backup executed: Snapshot synced to GCS (asia-south1).')}
+                            className="btn-secondary"
+                        >
+                            <Database size={13} className="text-primary" />
+                            <span>Test Backup</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => showToast('Test SMS sent via BulkSMS BD API gateway (Mock OK).')}
+                            className="btn-secondary"
+                        >
+                            <Send size={13} className="text-slate-400" />
+                            <span>Test SMS/Email</span>
+                        </button>
                         <button
                             type="button"
                             onClick={handleReset}
@@ -201,8 +179,8 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
                 </div>
 
                 {/* Segmented Horizontal Navigation Tabs */}
-                <div className="px-3 sm:px-4 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-                    <div className="flex items-center gap-1 sm:gap-1.5">
+                <div className="px-3 sm:px-4 py-2 bg-slate-50/70 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         {[
                             { id: 'regional', label: 'Property & Regional', icon: Globe },
                             { id: 'currency', label: 'Financial & Taxes', icon: DollarSign },
@@ -215,9 +193,9 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = () => {
                                 key={t.id}
                                 type="button"
                                 onClick={() => setActiveTab(t.id as any)}
-                                className={`h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === t.id
-                                    ? 'bg-white text-blue-700 shadow-2xs border border-gray-200 font-bold'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                                className={`h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === t.id
+                                    ? 'bg-white text-primary shadow-2xs border border-slate-200 font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                                     }`}
                             >
                                 <t.icon size={13} />

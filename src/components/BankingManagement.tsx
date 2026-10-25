@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PageHeader from './common/PageHeader';
 import {
     Landmark,
     Wallet,
@@ -255,7 +256,7 @@ export const BankingManagement: React.FC = () => {
     const defaultBank = bankAccounts.find(b => b.isDefaultSettlement) || bankAccounts[0];
 
     return (
-        <div className="p-3 sm:p-5 max-w-7xl mx-auto space-y-4 font-sans text-gray-800">
+        <div className="page-container text-slate-800">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed bottom-4 right-4 z-[120] bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200 border border-gray-700">
@@ -264,41 +265,32 @@ export const BankingManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Top Informative Guide */}
-            <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-white p-4 rounded-xl border border-blue-200/70 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
-                        <Landmark size={20} />
+            <PageHeader
+                title="Institutional Banking & MFS Payment Gateways"
+                subtitle="Manage commercial operating bank accounts, wire transfer SWIFT codes, and mobile merchant wallets (bKash, Nagad, Rocket, Upay)"
+                icon={<Landmark size={20} />}
+                badge="Financial Architecture"
+                actions={
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleOpenAddBank}
+                            className="btn-secondary"
+                        >
+                            <Plus size={14} />
+                            <span>Add Bank</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleOpenAddMfs}
+                            className="btn-primary"
+                        >
+                            <Plus size={14} />
+                            <span>Add MFS Wallet</span>
+                        </button>
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h2 className="font-bold text-gray-900 text-sm">Institutional Banking & MFS Payment Gateways</h2>
-                            <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Financial Architecture</span>
-                        </div>
-                        <p className="text-[11px] text-gray-600 mt-0.5">
-                            Manage commercial operating bank accounts, wire transfer SWIFT codes, and mobile merchant wallets (bKash, Nagad, Rocket, Upay).
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                        type="button"
-                        onClick={handleOpenAddBank}
-                        className="h-8 px-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                    >
-                        <Plus size={13} className="text-blue-600" />
-                        <span>+ Add Bank</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleOpenAddMfs}
-                        className="h-8 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                    >
-                        <Plus size={13} />
-                        <span>+ Add MFS Wallet</span>
-                    </button>
-                </div>
-            </div>
+                }
+            />
 
             {/* KPI Metric Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">

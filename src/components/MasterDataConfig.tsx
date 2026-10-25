@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '../utils/apiUrl';
 import {
     Coins,
     TrendingUp,
@@ -255,22 +256,6 @@ const INITIAL_MFS_WALLETS: MfsWallet[] = [
     { id: 4, provider: 'Upay UCB', merchantNumber: '01611-293847', counterId: 'COUNTER-01 (Front Desk Primary)', commissionRatePercent: 0.9, linkedBankName: 'Eastern Bank PLC (EBL)', linkedGlCode: 'GL-1033 - MFS Clearing (Upay)', dailyLimitBDT: 200000, status: 'Active' }
 ];
 
-const INITIAL_DEPARTMENTS: Department[] = [
-    { id: 1, code: 'FO', name: 'Front Office & Guest Services', hodName: 'Md. Rafiqul Islam (FOM)', costCenterCode: 'CC-101', type: 'Operational (Revenue Generating)', staffCount: 18, monthlyBudgetBDT: 850000, status: 'Active' },
-    { id: 2, code: 'HK', name: 'Housekeeping & Public Areas', hodName: 'Nasrin Sultana (Executive Housekeeper)', costCenterCode: 'CC-102', type: 'Operational (Revenue Generating)', staffCount: 32, monthlyBudgetBDT: 1100000, status: 'Active' },
-    { id: 3, code: 'FNB', name: 'Food & Beverage Service', hodName: 'Chef Jean Dupont (F&B Director)', costCenterCode: 'CC-201', type: 'Operational (Revenue Generating)', staffCount: 28, monthlyBudgetBDT: 1450000, status: 'Active' },
-    { id: 4, code: 'ENG', name: 'Engineering & Facilities', hodName: 'Engr. Tanvir Ahmed (Chief Engineer)', costCenterCode: 'CC-301', type: 'Support & Administration', staffCount: 12, monthlyBudgetBDT: 650000, status: 'Active' },
-    { id: 5, code: 'ACC', name: 'Accounts & Financial Control', hodName: 'Farhan Chowdhury, FCA (Controller)', costCenterCode: 'CC-401', type: 'Support & Administration', staffCount: 8, monthlyBudgetBDT: 550000, status: 'Active' },
-    { id: 6, code: 'SEC', name: 'Security & Loss Prevention', hodName: 'Major (Retd.) Enamul Haque (CSO)', costCenterCode: 'CC-501', type: 'Support & Administration', staffCount: 16, monthlyBudgetBDT: 480000, status: 'Active' }
-];
-
-const INITIAL_SHIFTS: WorkShift[] = [
-    { id: 1, code: 'SHT-MOR', name: 'Morning Shift', startTime: '07:00', endTime: '15:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 42, color: 'border-amber-400 bg-amber-50 text-amber-800', status: 'Active' },
-    { id: 2, code: 'SHT-EVE', name: 'Evening / Swing Shift', startTime: '15:00', endTime: '23:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 38, color: 'border-blue-400 bg-blue-50 text-blue-800', status: 'Active' },
-    { id: 3, code: 'SHT-NGT', name: 'Night Audit / Graveyard Shift', startTime: '23:00', endTime: '07:30', gracePeriodMinutes: 10, mandatoryCashHandover: true, canTriggerNightAudit: true, assignedStaffCount: 14, color: 'border-purple-400 bg-purple-50 text-purple-800', status: 'Active' },
-    { id: 4, code: 'SHT-DAY', name: 'General Administration Day Shift', startTime: '09:00', endTime: '18:00', gracePeriodMinutes: 20, mandatoryCashHandover: false, canTriggerNightAudit: false, assignedStaffCount: 26, color: 'border-emerald-400 bg-emerald-50 text-emerald-800', status: 'Active' }
-];
-
 const INITIAL_MARKET_CODES: MarketCode[] = [
     { id: 1, code: 'CORP', description: 'Corporate Multinational Accounts', reportGroup: 'Commercial Transient' },
     { id: 2, code: 'OTA', description: 'Online Travel Agencies (Expedia, Booking.com)', reportGroup: 'Wholesale / OTA' },
@@ -352,13 +337,60 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
 
     const [departments, setDepartments] = useState<Department[]>(() => {
         const saved = localStorage.getItem('master_departments_v2');
-        return saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
+        return saved ? JSON.parse(saved) : [];
     });
 
     const [workShifts, setWorkShifts] = useState<WorkShift[]>(() => {
         const saved = localStorage.getItem('master_shifts_v2');
-        return saved ? JSON.parse(saved) : INITIAL_SHIFTS;
+        return saved ? JSON.parse(saved) : [];
     });
+
+    useEffect(() => {
+        const base = getApiBaseUrl();
+        fetch(`${base}/api/hrm/departments`)
+            .then(r => r.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data)) {
+                    setDepartments(json.data.map((d: any) => ({
+                        id: Number(d.id),
+                        code: d.code || 'DEPT',
+                        name: d.name,
+                        hodName: d.hod_name || 'Department Head',
+                        costCenterCode: d.cost_center_code || `CC-${d.code}`,
+                        type: d.department_type === 'SUPPORT' ? 'Support & Administration' : 'Operational (Revenue Generating)',
+                        staffCount: Number(d.active_employees) || 0,
+                        monthlyBudgetBDT: Number(d.monthly_budget) || 500000,
+                        status: d.status === 'INACTIVE' ? 'Inactive' : 'Active'
+                    })));
+                }
+            })
+            .catch(() => {});
+
+        fetch(`${base}/api/hrm/shifts`)
+            .then(r => r.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data)) {
+                    setWorkShifts(json.data.map((s: any) => ({
+                        id: Number(s.id),
+                        code: 'SHT-' + String(s.name || 'SHT').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3),
+                        name: s.name,
+                        startTime: s.start_time || '08:00',
+                        endTime: s.end_time || '16:00',
+                        gracePeriodMinutes: Number(s.grace_period_minutes) || 15,
+                        mandatoryCashHandover: true,
+                        canTriggerNightAudit: String(s.name || '').toLowerCase().includes('night'),
+                        assignedStaffCount: Number(s.assigned_today) || 0,
+                        color: String(s.name || '').toLowerCase().includes('night')
+                            ? 'border-purple-400 bg-purple-50 text-purple-800'
+                            : String(s.name || '').toLowerCase().includes('evening')
+                                ? 'border-blue-400 bg-blue-50 text-blue-800'
+                                : 'border-amber-400 bg-amber-50 text-amber-800',
+                        status: 'Active'
+                    })));
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     const [marketCodes] = useState<MarketCode[]>(INITIAL_MARKET_CODES);
     const [businessSources] = useState<BusinessSource[]>(INITIAL_BUSINESS_SOURCES);
@@ -1073,31 +1105,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
     };
 
     return (
-        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
-            {/* Informative Micro-guide */}
-            <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
-                        <Database size={16} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900">Hotel Master Data & USALI Accounting Architecture</span>
-                            <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Enterprise ERP Core</span>
-                        </div>
-                        <p className="text-[11px] text-gray-600 mt-0.5">
-                            Manage base currency switchers, USALI revenue hierarchy (GL 4000s), extra charges, discounts, bank accounts, and MFS payment channels.
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-gray-600 flex-shrink-0 font-medium">
-                    <span className="inline-flex items-center gap-1 text-emerald-700 bg-white px-2 py-1 rounded-md border border-emerald-200 shadow-2xs">
-                        <CheckCircle2 size={11} className="text-emerald-600" />
-                        <span>USALI 11th Edition Compliant</span>
-                    </span>
-                </div>
-            </div>
-
+        <div className="page-container">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed bottom-4 right-4 z-[120] bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200 border border-gray-700">
@@ -1107,36 +1115,39 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
             )}
 
             {/* Elevated Header Card */}
-            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
-                <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-sm shadow-2xs flex-shrink-0">
-                            <Coins size={22} className="text-blue-600" />
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0 shadow-2xs">
+                            <Coins size={22} className="text-primary" />
                         </div>
                         <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight truncate">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
                                     Master Data & Financial Configuration
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-primary border border-blue-200 flex-shrink-0">
                                     Base: {baseCurrency.name} ({baseCurrency.symbol} {baseCurrency.code})
                                 </span>
+                                <span className="badge-status-active">
+                                    USALI 11th Edition
+                                </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
                                 <span className="flex items-center gap-1">
-                                    <TrendingUp size={11} className="text-gray-400" />
+                                    <TrendingUp size={12} className="text-slate-400" />
                                     <span>{revenueHeads.length} USALI Revenue Heads</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <Receipt size={11} className="text-gray-400" />
+                                    <Receipt size={12} className="text-slate-400" />
                                     <span>{extraCharges.length} Extra Add-ons</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <Landmark size={11} className="text-gray-400" />
+                                    <Landmark size={12} className="text-slate-400" />
                                     <span>{bankAccounts.length} Banks & {mfsWallets.length} MFS</span>
                                 </span>
                                 <span className="hidden sm:flex items-center gap-1">
-                                    <Building2 size={11} className="text-gray-400" />
+                                    <Building2 size={12} className="text-slate-400" />
                                     <span>{departments.length} Depts / {workShifts.length} Shifts</span>
                                 </span>
                             </div>
@@ -1144,34 +1155,34 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     </div>
 
                     {/* Quick Action Buttons */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto flex-shrink-0">
                         {activeTab === 'currency' && (
                             <button
                                 type="button"
                                 onClick={handleOpenAddCurrency}
-                                className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                className="btn-primary"
                             >
-                                <Plus size={13} />
-                                <span>+ New Currency</span>
+                                <Plus size={14} />
+                                <span>Add Currency</span>
                             </button>
                         )}
                         {activeTab === 'revenue' && (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={handleOpenAddRevGroup}
-                                    className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                    className="btn-secondary"
                                 >
-                                    <Plus size={12} className="text-blue-600" />
-                                    <span>+ Rev Group</span>
+                                    <Plus size={13} className="text-primary" />
+                                    <span>Add Rev Group</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleOpenAddRevHead}
-                                    className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                    className="btn-primary"
                                 >
-                                    <Plus size={13} />
-                                    <span>+ Rev Head (GL)</span>
+                                    <Plus size={14} />
+                                    <span>Add Rev Head (GL)</span>
                                 </button>
                             </div>
                         )}
@@ -1179,59 +1190,59 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             <button
                                 type="button"
                                 onClick={handleOpenAddCharge}
-                                className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                className="btn-primary"
                             >
-                                <Plus size={13} />
-                                <span>+ New Add-on Charge</span>
+                                <Plus size={14} />
+                                <span>Add Extra Charge</span>
                             </button>
                         )}
                         {activeTab === 'discounts' && (
                             <button
                                 type="button"
                                 onClick={handleOpenAddDiscount}
-                                className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                className="btn-primary"
                             >
-                                <Plus size={13} />
-                                <span>+ New Discount Policy</span>
+                                <Plus size={14} />
+                                <span>Add Discount Policy</span>
                             </button>
                         )}
                         {activeTab === 'banking' && (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={handleOpenAddBank}
-                                    className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                    className="btn-secondary"
                                 >
-                                    <Plus size={12} className="text-blue-600" />
-                                    <span>+ Bank Account</span>
+                                    <Plus size={13} className="text-primary" />
+                                    <span>Add Bank Account</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleOpenAddMfs}
-                                    className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                    className="btn-primary"
                                 >
-                                    <Plus size={13} />
-                                    <span>+ MFS Wallet</span>
+                                    <Plus size={14} />
+                                    <span>Add MFS Wallet</span>
                                 </button>
                             </div>
                         )}
                         {activeTab === 'departments' && (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={handleOpenAddDept}
-                                    className="h-7 px-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                    className="btn-secondary"
                                 >
-                                    <Plus size={12} className="text-blue-600" />
-                                    <span>+ Department</span>
+                                    <Plus size={13} className="text-primary" />
+                                    <span>Add Department</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleOpenAddShift}
-                                    className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                    className="btn-primary"
                                 >
-                                    <Plus size={13} />
-                                    <span>+ Work Shift</span>
+                                    <Plus size={14} />
+                                    <span>Add Work Shift</span>
                                 </button>
                             </div>
                         )}
@@ -1239,8 +1250,8 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 </div>
 
                 {/* Segmented Navigation Tabs */}
-                <div className="px-3 sm:px-4 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-                    <div className="flex items-center gap-1 sm:gap-1.5">
+                <div className="px-3 sm:px-4 py-2 bg-slate-50/70 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         {[
                             { id: 'currency', label: 'Currencies & Base Switcher', icon: Coins, count: currencies.length },
                             { id: 'revenue', label: 'USALI Revenue Groups & Heads', icon: TrendingUp, count: revenueHeads.length },
@@ -1254,14 +1265,14 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                 key={t.id}
                                 type="button"
                                 onClick={() => setActiveTab(t.id as MasterDataTabType)}
-                                className={`h-7 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === t.id
-                                    ? 'bg-white text-blue-700 shadow-2xs border border-gray-200 font-bold'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                                className={`h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === t.id
+                                    ? 'bg-white text-primary shadow-2xs border border-slate-200 font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                                     }`}
                             >
                                 <t.icon size={13} />
                                 <span>{t.label}</span>
-                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-primary border border-blue-100">
                                     {t.count}
                                 </span>
                             </button>

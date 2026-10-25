@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart3, PieChart, TrendingUp, DollarSign, Percent, Calendar } from 'lucide-react';
+import PageHeader from './common/PageHeader';
+import { getAllStoredReservations, syncReservationsFromDB } from '../utils/roomInventoryEngine';
 
 interface RevenueBySource {
     source: string;
@@ -19,27 +21,95 @@ interface RevenueBySegment {
     color: string;
 }
 
+const SEGMENT_COLORS: Record<string, string> = {
+    CORP: '#3b82f6',
+    LEIS: '#10b981',
+    GRP: '#f59e0b',
+    OTA: '#8b5cf6',
+    DIRECT: '#ef4444',
+    VIP: '#ec4899'
+};
+
+const COMMISSION_RATES: Record<string, number> = {
+    'Booking.com': 0.15,
+    'Agoda': 0.18,
+    'Expedia': 0.16,
+    'OTA': 0.15,
+    'Travel Agent': 0.10
+};
+
 const AdvancedReports = () => {
-    const [selectedMonth, setSelectedMonth] = useState('2026-01');
+    const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+    const [reservations, setReservations] = useState(() => getAllStoredReservations());
 
-    // Mock data - Revenue by Source
-    const revenueBySource: RevenueBySource[] = [
-        { source: 'Booking.com', revenue: 450000, bookings: 85, commission: 67500, netRevenue: 382500, percentage: 35 },
-        { source: 'Direct Website', revenue: 320000, bookings: 62, commission: 0, netRevenue: 320000, percentage: 25 },
-        { source: 'Walk-in', revenue: 280000, bookings: 54, commission: 0, netRevenue: 280000, percentage: 22 },
-        { source: 'Agoda', revenue: 150000, bookings: 28, commission: 27000, netRevenue: 123000, percentage: 12 },
-        { source: 'Amadeus GDS', revenue: 80000, bookings: 15, commission: 8000, netRevenue: 72000, percentage: 6 },
-    ];
+    useEffect(() => {
+        syncReservationsFromDB().then(res => {
+            if (res.length > 0) setReservations(res);
+        }).catch(() => {});
+    }, []);
 
-    // Mock data - Revenue by Market Segment
-    const revenueBySegment: RevenueBySegment[] = [
-        { segment: 'CORP', revenue: 520000, bookings: 95, avgRate: 5474, percentage: 40, color: '#3b82f6' },
-        { segment: 'LEIS', revenue: 390000, bookings: 78, avgRate: 5000, percentage: 30, color: '#10b981' },
-        { segment: 'GRP', revenue: 260000, bookings: 52, avgRate: 5000, percentage: 20, color: '#f59e0b' },
-        { segment: 'NGO', revenue: 65000, bookings: 13, avgRate: 5000, percentage: 5, color: '#8b5cf6' },
-        { segment: 'GOVT', revenue: 45000, bookings: 9, avgRate: 5000, percentage: 3.5, color: '#ef4444' },
-        { segment: 'COMP', revenue: 20000, bookings: 4, avgRate: 0, percentage: 1.5, color: '#ec4899' },
-    ];
+    const { revenueBySource, revenueBySegment } = useMemo(() => {
+        const active = reservations.filter(r => r.status !== 'CANCELLED' && r.status !== 'NO_SHOW');
+        const monthFiltered = active.filter(r => r.checkIn.startsWith(selectedMonth) || r.checkOut.startsWith(selectedMonth));
+        const dataset = monthFiltered.length > 0 ? monthFiltered : active;
+
+        const grandTotal = Math.max(1, dataset.reduce((sum, r) => sum + (Number(r.totalRate) || 0), 0));
+
+        // Group by Booking Source
+        const sourceMap = new Map<string, { revenue: number; bookings: number }>();
+        dataset.forEach(r => {
+            const src = r.bookingSource || 'Direct Walk-In';
+            const curr = sourceMap.get(src) || { revenue: 0, bookings: 0 };
+            curr.revenue += Number(r.totalRate) || 0;
+            curr.bookings += 1;
+            sourceMap.set(src, curr);
+        });
+
+        const bySource: RevenueBySource[] = Array.from(sourceMap.entries())
+            .map(([source, val]) => {
+                const commRate = COMMISSION_RATES[source] ?? (source.toLowerCase().includes('ota') || source.toLowerCase().includes('booking') ? 0.15 : 0);
+                const commission = Math.round(val.revenue * commRate);
+                return {
+                    source,
+                    revenue: val.revenue,
+                    bookings: val.bookings,
+                    commission,
+                    netRevenue: val.revenue - commission,
+                    percentage: Math.round((val.revenue / grandTotal) * 100)
+                };
+            })
+            .sort((a, b) => b.revenue - a.revenue);
+
+        // Group by Market Segment derived from ratePlan / bookingSource
+        const segMap = new Map<string, { revenue: number; bookings: number; rateSum: number }>();
+        dataset.forEach(r => {
+            const src = (r.bookingSource || '').toLowerCase();
+            let seg = 'LEIS';
+            if (src.includes('corp')) seg = 'CORP';
+            else if (src.includes('group') || (Number(r.adults) || 1) > 2) seg = 'GRP';
+            else if (src.includes('ota') || src.includes('booking') || src.includes('agoda')) seg = 'OTA';
+            else if (src.includes('walk') || src.includes('direct')) seg = 'DIRECT';
+
+            const curr = segMap.get(seg) || { revenue: 0, bookings: 0, rateSum: 0 };
+            curr.revenue += Number(r.totalRate) || 0;
+            curr.bookings += 1;
+            curr.rateSum += Number(r.ratePerNight) || Number(r.totalRate) || 0;
+            segMap.set(seg, curr);
+        });
+
+        const bySegment: RevenueBySegment[] = Array.from(segMap.entries())
+            .map(([segment, val]) => ({
+                segment,
+                revenue: val.revenue,
+                bookings: val.bookings,
+                avgRate: val.bookings > 0 ? Math.round(val.rateSum / val.bookings) : 0,
+                percentage: Math.round((val.revenue / grandTotal) * 100),
+                color: SEGMENT_COLORS[segment] || '#3b82f6'
+            }))
+            .sort((a, b) => b.revenue - a.revenue);
+
+        return { revenueBySource: bySource, revenueBySegment: bySegment };
+    }, [reservations, selectedMonth]);
 
     const totalRevenue = revenueBySource.reduce((sum, s) => sum + s.revenue, 0);
     const totalCommission = revenueBySource.reduce((sum, s) => sum + s.commission, 0);
@@ -47,78 +117,77 @@ const AdvancedReports = () => {
     const totalBookings = revenueBySource.reduce((sum, s) => sum + s.bookings, 0);
 
     return (
-        <div className="min-h-screen bg-slate-50/60 p-2.5 sm:p-3 space-y-2.5 font-sans text-xs text-slate-700">
-            {/* Header */}
-            <div className="bg-white rounded-lg border border-slate-200/80 px-3 py-2 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-indigo-600 rounded-md flex items-center justify-center text-white shadow-2xs">
-                        <BarChart3 size={15} />
+        <div className="page-container">
+            <PageHeader
+                title="Advanced Revenue Analytics"
+                subtitle="Live channel distribution, OTA commissions & market segmentation"
+                icon={<BarChart3 size={20} />}
+                badge={<span className="badge-status-active">BI & Yield Engine</span>}
+                actions={
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-slate-600">Period:</label>
+                        <input
+                            type="month"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="input-standard !w-auto !py-1.5"
+                        />
                     </div>
+                }
+            />
+
+            {/* Summary Stats - 4 Standardized KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="kpi-card">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-sm font-bold text-slate-900 tracking-tight">Advanced Revenue Analytics</h1>
-                            <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                                BI & Yield Engine
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500">Channel distribution, OTA commissions & market segmentation</p>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</p>
+                        <p className="text-xl font-bold text-slate-900 mt-1">৳{totalRevenue.toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{totalBookings} total bookings</p>
                     </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold text-slate-600">Period:</label>
-                    <input
-                        type="month"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="h-7 px-2.5 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-indigo-500 outline-none bg-white font-medium shadow-2xs"
-                    />
-                </div>
-            </div>
-
-            {/* Summary Stats - 4 Compact Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-2.5 rounded-lg shadow-2xs text-white">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-bold text-blue-100 uppercase tracking-wider">Total Revenue</p>
-                        <DollarSign size={13} className="text-blue-100 opacity-90" />
+                    <div className="size-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <DollarSign size={16} />
                     </div>
-                    <p className="text-lg font-bold text-white tracking-tight">৳{(totalRevenue / 1000).toFixed(0)}K</p>
-                    <p className="text-[10px] text-blue-100 mt-0.5">{totalBookings} total bookings</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-2.5 rounded-lg shadow-2xs text-white">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-bold text-rose-100 uppercase tracking-wider">Total Commission</p>
-                        <Percent size={13} className="text-rose-100 opacity-90" />
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Commission</p>
+                        <p className="text-xl font-bold text-rose-600 mt-1">৳{totalCommission.toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{totalRevenue > 0 ? ((totalCommission / totalRevenue) * 100).toFixed(1) : '0.0'}% OTA cost</p>
                     </div>
-                    <p className="text-lg font-bold text-white tracking-tight">৳{(totalCommission / 1000).toFixed(0)}K</p>
-                    <p className="text-[10px] text-rose-100 mt-0.5">{((totalCommission / totalRevenue) * 100).toFixed(1)}% OTA cost</p>
+                    <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <Percent size={16} />
+                    </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-2.5 rounded-lg shadow-2xs text-white">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider">Net Revenue</p>
-                        <TrendingUp size={13} className="text-emerald-100 opacity-90" />
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Net Revenue</p>
+                        <p className="text-xl font-bold text-emerald-600 mt-1">৳{totalNetRevenue.toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Retained earnings</p>
                     </div>
-                    <p className="text-lg font-bold text-white tracking-tight">৳{(totalNetRevenue / 1000).toFixed(0)}K</p>
-                    <p className="text-[10px] text-emerald-100 mt-0.5">Retained earnings</p>
+                    <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <TrendingUp size={16} />
+                    </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-purple-600 to-purple-700 p-2.5 rounded-lg shadow-2xs text-white">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-bold text-purple-100 uppercase tracking-wider">Avg. Booking</p>
-                        <Calendar size={13} className="text-purple-100 opacity-90" />
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg. Booking</p>
+                        <p className="text-xl font-bold text-slate-900 mt-1">৳{Math.round(totalRevenue / Math.max(1, totalBookings)).toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Average revenue per stay</p>
                     </div>
-                    <p className="text-lg font-bold text-white tracking-tight">৳{(totalRevenue / totalBookings / 1000).toFixed(1)}K</p>
-                    <p className="text-[10px] text-purple-100 mt-0.5">Average revenue per reservation</p>
+                    <div className="size-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <Calendar size={16} />
+                    </div>
                 </div>
             </div>
 
             {/* Revenue by Source Table */}
-            <div className="bg-white rounded-lg border border-slate-200/80 shadow-2xs overflow-hidden">
-                <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
+            <div className="table-container">
+                <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
                     <div className="flex items-center gap-1.5">
-                        <BarChart3 size={13} className="text-indigo-600" />
+                        <BarChart3 size={14} className="text-primary" />
                         <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Revenue Breakdown by Source & Channel</h2>
                     </div>
                     <span className="text-[10px] text-slate-400 font-mono">Sorted by Volume</span>
@@ -208,7 +277,7 @@ const AdvancedReports = () => {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xs font-bold text-slate-900">৳{(item.revenue / 1000).toFixed(0)}K</p>
+                                        <p className="text-xs font-bold text-slate-900">৳{item.revenue.toLocaleString()}</p>
                                         <p className="text-[10px] text-slate-500">{item.percentage}% share</p>
                                     </div>
                                 </div>
@@ -241,7 +310,7 @@ const AdvancedReports = () => {
                                     <div className="grid grid-cols-3 gap-1.5 text-center">
                                         <div className="bg-white p-1 rounded border border-slate-200/60">
                                             <p className="text-[9px] text-slate-500 font-medium">Revenue</p>
-                                            <p className="text-[11px] font-bold text-blue-600">৳{(item.revenue / 1000).toFixed(0)}K</p>
+                                            <p className="text-[11px] font-bold text-blue-600">৳{item.revenue.toLocaleString()}</p>
                                         </div>
                                         <div className="bg-white p-1 rounded border border-slate-200/60">
                                             <p className="text-[9px] text-slate-500 font-medium">Bookings</p>
@@ -261,10 +330,10 @@ const AdvancedReports = () => {
                     <div className="mt-2.5 pt-2 border-t border-slate-100">
                         <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Executive Yield Insights</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-600">
-                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Corporate (CORP):</span> 40% total revenue</p>
-                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Leisure (LEIS):</span> 30% guest volume</p>
-                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Group (GRP):</span> Prime ADR expansion</p>
-                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">OTA Commission:</span> ৳67.5K on Booking.com</p>
+                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Active Folios:</span> {totalBookings} reservations</p>
+                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Net Retained:</span> ৳{totalNetRevenue.toLocaleString()}</p>
+                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Top Channel:</span> {revenueBySource[0]?.source || 'Direct'}</p>
+                            <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">OTA Commission:</span> ৳{totalCommission.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>

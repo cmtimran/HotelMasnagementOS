@@ -115,60 +115,37 @@ export interface UnassignedBooking {
     status: 'unassigned';
 }
 
-const INITIAL_UNASSIGNED_STAYVIEW: UnassignedBooking[] = [
-    {
-        id: 'un-1',
-        reservationNumber: 'RES-1181-2026',
-        guestName: 'Imran',
-        roomType: 'Winter Rate Plan (Deluxe Double)',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-04',
-        nights: 3,
-        totalRooms: 1,
-        source: 'Direct Website',
-        totalAmount: 10500,
-        status: 'unassigned'
-    },
-    {
-        id: 'un-2',
-        reservationNumber: 'RES-1092-2026',
-        guestName: 'Tanvir Hasan',
-        roomType: 'Superior King',
-        checkIn: '2026-07-02',
-        checkOut: '2026-07-05',
-        nights: 3,
-        totalRooms: 1,
-        source: 'Booking.com',
-        totalAmount: 13500,
-        status: 'unassigned'
-    },
-    {
-        id: 'un-3',
-        reservationNumber: 'RES-1145-2026',
-        guestName: 'Sadia Rahman',
-        roomType: 'Executive Suite',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-03',
-        nights: 2,
-        totalRooms: 1,
-        source: 'Agoda YCS',
-        totalAmount: 16000,
-        status: 'unassigned'
-    },
-    {
-        id: 'un-4',
-        reservationNumber: 'RES-1204-2026',
-        guestName: 'Apex Tech Solutions',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-03',
-        checkOut: '2026-07-06',
-        nights: 3,
-        totalRooms: 1,
-        source: 'Corporate Account',
-        totalAmount: 12000,
-        status: 'unassigned'
-    }
-];
+const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBooking[] => {
+    const list: UnassignedBooking[] = [];
+    stored.forEach((res: any) => {
+        const st = String(res?.status || '').toLowerCase();
+        if (st === 'cancelled' || st === 'checked out' || st === 'checked-out' || st === 'voided') return;
+        const rooms = Array.isArray(res?.rooms) ? res.rooms : Array.isArray(res?.roomsList) ? res.roomsList : [];
+        const flatRoomNo = res?.roomNumber ? String(res.roomNumber) : '';
+        const unassignedRooms = rooms.filter((rm: any) => {
+            const rNo = rm?.roomNo || rm?.roomNumber || (Array.isArray(rm?.assignedRooms) ? rm.assignedRooms[0] : '');
+            return !rNo || rNo === 'Unassigned' || rNo === 'TBA';
+        });
+        const isFlatUnassigned = !flatRoomNo || flatRoomNo === 'Unassigned' || flatRoomNo === 'TBA';
+        if (unassignedRooms.length > 0 || (rooms.length === 0 && isFlatUnassigned)) {
+            const firstRm = unassignedRooms[0] || rooms[0] || {};
+            list.push({
+                id: `un-${res?.id || res?.reservationNumber || Math.random()}`,
+                reservationNumber: res?.reservationNumber || `RES-${res?.id || '100'}`,
+                guestName: res?.guest?.fullName || res?.guestName || 'Guest',
+                roomType: firstRm?.category || firstRm?.roomType || res?.roomType || 'Deluxe Double',
+                checkIn: firstRm?.checkIn || firstRm?.checkInDate || res?.checkIn || res?.createdAt?.split('T')[0] || '2026-07-01',
+                checkOut: firstRm?.checkOut || firstRm?.checkOutDate || res?.checkOut || '2026-07-03',
+                nights: Math.max(1, Number(firstRm?.nights || res?.nights) || 2),
+                totalRooms: Math.max(1, unassignedRooms.length || Number(res?.roomsCount) || 1),
+                source: res?.guest?.reservationType || res?.source || 'Direct Booking',
+                totalAmount: Number(res?.summary?.grandTotal ?? res?.totalAmount) || 0,
+                status: 'unassigned'
+            });
+        }
+    });
+    return list;
+};
 
 export const StayView: React.FC = () => {
     // Current date state - starts 3 days before system date to show backdates (historical) like WingsCRM
@@ -282,18 +259,20 @@ export const StayView: React.FC = () => {
         setExpandedAccordions(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    // Hydrate Unassigned Bookings
+    // Hydrate Unassigned Bookings dynamically from stored reservations
     const [unassignedList, setUnassignedList] = useState<UnassignedBooking[]>(() => {
+        const derived = deriveUnassignedFromStored(getAllStoredReservations());
+        if (derived.length > 0) return derived;
         const saved = localStorage.getItem('hotel_unassigned_v2');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            } catch (e) {
+                if (Array.isArray(parsed)) return parsed;
+            } catch {
                 // fall through
             }
         }
-        return INITIAL_UNASSIGNED_STAYVIEW;
+        return [];
     });
 
     useEffect(() => {
@@ -393,6 +372,7 @@ export const StayView: React.FC = () => {
     }, [colWidth, daysWindow]);
 
     // Dynamic Canonical Rooms Structure (All 34 Rooms across 5 Floors)
+    const [roomsVersion, setRoomsVersion] = useState(0);
     const roomTree: BuildingNode[] = useMemo(() => {
         const canonical = getCanonicalRooms();
         const buildingNames: Record<string, string> = {
@@ -449,7 +429,7 @@ export const StayView: React.FC = () => {
         });
 
         return tree;
-    }, []);
+    }, [roomsVersion]);
 
     // Total rooms count across entire hotel
     const totalRoomsCount = useMemo(() => {
@@ -469,130 +449,8 @@ export const StayView: React.FC = () => {
         return list;
     }, [roomTree]);
 
-    // Seed bookings on the timeline with historical backdated stays and active bookings
-    const [bookings, setBookings] = useState<TimelineBooking[]>([
-        // Historical / Backdated Bookings (Audit Locked, Read-Only)
-        {
-            id: 'b-past-1',
-            reservationNumber: 'RES-108901',
-            guestName: 'Zubair Ahmed',
-            roomNumber: '102',
-            startIndex: 0, // 2026-06-28
-            endIndex: 2,   // 2026-06-30
-            status: 'checked-out',
-            isPast: true
-        },
-        {
-            id: 'b-past-2',
-            reservationNumber: 'RES-108902',
-            guestName: 'Nasir Hossain',
-            roomNumber: '508',
-            startIndex: 0, // 2026-06-28
-            endIndex: 1,   // 2026-06-29
-            status: 'checked-out',
-            isPast: true
-        },
-        // Active & Upcoming Bookings
-        {
-            id: 'b1',
-            reservationNumber: 'RES-109281',
-            guestName: 'Tonmoy',
-            roomNumber: '101',
-            startIndex: 3, // 2026-07-01
-            endIndex: 5,   // 2026-07-03
-            status: 'arrived',
-            isGroupBooking: true,
-            isPaymentDue: true
-        },
-        {
-            id: 'b2',
-            reservationNumber: 'RES-109282',
-            guestName: 'S. Chowdhury',
-            roomNumber: '103',
-            startIndex: 3,
-            endIndex: 4,
-            status: 'arrived',
-            isGroupOwner: true
-        },
-        {
-            id: 'b3',
-            reservationNumber: 'RES-109283',
-            guestName: 'T. Hasan (Hold)',
-            roomNumber: '104',
-            startIndex: 5,
-            endIndex: 8,
-            status: 'hold',
-            isPaymentDue: true
-        },
-        {
-            id: 'b4',
-            reservationNumber: 'RES-109284',
-            guestName: 'Karim',
-            roomNumber: '201',
-            startIndex: 3,
-            endIndex: 6,
-            status: 'arrived',
-            isGroupBooking: true,
-            isPaymentDue: true,
-            isVipOrSingleLady: true
-        },
-        {
-            id: 'b5',
-            reservationNumber: 'RES-109285',
-            guestName: 'BNNN',
-            roomNumber: '202',
-            startIndex: 3,
-            endIndex: 7,
-            status: 'arrived',
-            isGroupOwner: true,
-            isPaymentDue: true
-        },
-        {
-            id: 'b6',
-            reservationNumber: 'RES-109286',
-            guestName: 'Mokter',
-            roomNumber: '203',
-            startIndex: 4,
-            endIndex: 7,
-            status: 'confirmed',
-            isGroupOwner: true,
-            isGroupBooking: true,
-            isPaymentDue: true
-        },
-        {
-            id: 'b7',
-            reservationNumber: 'RES-109287',
-            guestName: 'Imran (VIP Leader)',
-            roomNumber: '501',
-            startIndex: 3,
-            endIndex: 9,
-            status: 'confirmed',
-            isGroupOwner: true,
-            isGroupBooking: true,
-            isPaymentDue: true,
-            isVipOrSingleLady: true
-        },
-        {
-            id: 'b-rokib',
-            reservationNumber: 'RES-1171-2026-01',
-            guestName: 'Rokib vai',
-            roomNumber: '505',
-            startIndex: 5, // 2026-07-03
-            endIndex: 8,   // 2026-07-06
-            status: 'confirmed',
-            isPaymentDue: true
-        },
-        {
-            id: 'b-farhan',
-            reservationNumber: 'RES-1172-2026-02',
-            guestName: 'Dr. Farhan (RD-2 King)',
-            roomNumber: '10023',
-            startIndex: 3, // 2026-07-01
-            endIndex: 7,   // 2026-07-05
-            status: 'confirmed',
-            isPaymentDue: false
-        }
-    ]);
+    // Canonical timeline bookings derived directly from database and centralized storage
+    const [bookings, setBookings] = useState<TimelineBooking[]>([]);
 
     // =========================================================================
     // HIGH-PERFORMANCE PRE-COMPUTED CACHES (EVENT-DRIVEN O(1) LOOKUPS)
@@ -616,90 +474,53 @@ export const StayView: React.FC = () => {
     // Active temporary soft locks on rooms across all executives/tabs
     const [activeLocks, setActiveLocks] = useState<RoomLock[]>(() => getActiveLocks());
 
-    // Single source of truth: Sync stored reservations to timeline bookings
+    // Single source of truth: Sync stored reservations to timeline bookings dynamically by date
     const syncStoredReservations = React.useCallback(() => {
         const stored = getAllStoredReservations();
-        setBookings(prev => {
-            const historicalBookings = prev.filter(b => b.isPast);
-            const syncedList: TimelineBooking[] = [];
+        const baseDate = new Date(days[0]?.date || '2026-06-28');
+        const syncedList: TimelineBooking[] = [];
 
-            for (const res of stored) {
-                if (res.status === 'cancelled' || res.status === 'voided') {
-                    continue;
-                }
+        for (const res of stored) {
+            if (res.status === 'cancelled' || res.status === 'voided') {
+                continue;
+            }
 
-                const isGroup = (res.roomsList && res.roomsList.length > 1) || (res.allocatedRooms && res.allocatedRooms.length > 1);
-                const totalAmt = Number(res.totalAmount) || 0;
-                const paidAmt = Number(res.paidAmount) || 0;
-                const dueAmt = Number(res.dueAmount !== undefined ? res.dueAmount : Math.max(0, totalAmt - paidAmt));
-                const totalTax = Number(res.totalTaxAmount || res.taxDetails?.totalTaxAmount || 0);
-                const baseAmt = Number(res.baseAmount || Math.max(0, totalAmt - totalTax));
-                const taxCode = res.taxConfigCode || res.taxDetails?.configCode || 'HOSP-STD';
-                const isTaxApp = res.taxApplicable !== false;
+            const isGroup = (res.roomsList && res.roomsList.length > 1) || (res.allocatedRooms && res.allocatedRooms.length > 1);
+            const totalAmt = Number(res.totalAmount) || 0;
+            const paidAmt = Number(res.paidAmount) || 0;
+            const dueAmt = Number(res.dueAmount !== undefined ? res.dueAmount : Math.max(0, totalAmt - paidAmt));
+            const totalTax = Number(res.totalTaxAmount || res.taxDetails?.totalTaxAmount || 0);
+            const baseAmt = Number(res.baseAmount || Math.max(0, totalAmt - totalTax));
+            const taxCode = res.taxConfigCode || res.taxDetails?.configCode || 'HOSP-STD';
+            const isTaxApp = res.taxApplicable !== false;
+            const isPastBooking = Boolean(res.isPast || res.status === 'completed' || res.status === 'checked-out');
 
-                if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.length > 0) {
-                    res.roomsList.forEach((r: any, idx: number) => {
-                        const rNum = String(r.roomNumber || res.roomNumber);
-                        const rIn = r.checkInDate || res.checkIn;
-                        const rOut = r.checkOutDate || res.checkOut;
-                        const rNights = Number(r.nights || res.nights || 1);
-
-                        const sIdx = days.findIndex(d => d.date === rIn);
-                        const baseDate = new Date(days[0]?.date || '2026-06-28');
-                        const curInDate = new Date(rIn);
-                        const diffFromStart = Math.round((curInDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
-                        const start = sIdx !== -1 ? sIdx : diffFromStart;
-                        const end = start + Math.max(1, rNights) - 1;
-
-                        syncedList.push({
-                            id: `res-${res.id}-${r.id || idx}-${rNum}`,
-                            reservationNumber: res.reservationNumber,
-                            guestName: isGroup ? `${res.guestName} (${rNum})` : res.guestName,
-                            roomNumber: rNum,
-                            startIndex: start,
-                            endIndex: end,
-                            checkInDate: rIn,
-                            checkOutDate: rOut,
-                            nights: rNights,
-                            status: (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
-                            isGroupOwner: isGroup && idx === 0,
-                            isGroupBooking: isGroup,
-                            isPaymentDue: dueAmt > 0,
-                            isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none'),
-                            totalAmount: totalAmt,
-                            paidAmount: paidAmt,
-                            dueAmount: dueAmt,
-                            baseAmount: baseAmt,
-                            totalTaxAmount: totalTax,
-                            taxConfigCode: taxCode,
-                            taxApplicable: isTaxApp
-                        });
-                    });
-                } else {
-                    const rNum = String(res.roomNumber || (res.allocatedRooms && res.allocatedRooms[0]) || '101');
-                    const rIn = res.checkIn;
-                    const rOut = res.checkOut;
-                    const rNights = Number(res.nights || 1);
+            if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.length > 0) {
+                res.roomsList.forEach((r: any, idx: number) => {
+                    const rNum = String(r.roomNumber || res.roomNumber);
+                    const rIn = r.checkInDate || r.checkIn || res.checkIn;
+                    const rOut = r.checkOutDate || r.checkOut || res.checkOut;
+                    const rNights = Number(r.nights || res.nights || 1);
 
                     const sIdx = days.findIndex(d => d.date === rIn);
-                    const baseDate = new Date(days[0]?.date || '2026-06-28');
                     const curInDate = new Date(rIn);
                     const diffFromStart = Math.round((curInDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
                     const start = sIdx !== -1 ? sIdx : diffFromStart;
                     const end = start + Math.max(1, rNights) - 1;
 
                     syncedList.push({
-                        id: `res-${res.id}-${rNum}`,
+                        id: `res-${res.id}-${r.id || idx}-${rNum}`,
                         reservationNumber: res.reservationNumber,
-                        guestName: res.guestName,
+                        guestName: isGroup ? `${res.guestName} (${rNum})` : res.guestName,
                         roomNumber: rNum,
                         startIndex: start,
                         endIndex: end,
                         checkInDate: rIn,
                         checkOutDate: rOut,
                         nights: rNights,
-                        status: (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
-                        isGroupOwner: isGroup,
+                        status: isPastBooking ? 'checked-out' : (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
+                        isPast: isPastBooking,
+                        isGroupOwner: isGroup && idx === 0,
                         isGroupBooking: isGroup,
                         isPaymentDue: dueAmt > 0,
                         isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none'),
@@ -711,15 +532,47 @@ export const StayView: React.FC = () => {
                         taxConfigCode: taxCode,
                         taxApplicable: isTaxApp
                     });
-                }
+                });
+            } else {
+                const rNum = String(res.roomNumber || (res.allocatedRooms && res.allocatedRooms[0]) || '101');
+                const rIn = res.checkIn;
+                const rOut = res.checkOut;
+                const rNights = Number(res.nights || 1);
+
+                const sIdx = days.findIndex(d => d.date === rIn);
+                const curInDate = new Date(rIn);
+                const diffFromStart = Math.round((curInDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+                const start = sIdx !== -1 ? sIdx : diffFromStart;
+                const end = start + Math.max(1, rNights) - 1;
+
+                syncedList.push({
+                    id: `res-${res.id}-${rNum}`,
+                    reservationNumber: res.reservationNumber,
+                    guestName: res.guestName,
+                    roomNumber: rNum,
+                    startIndex: start,
+                    endIndex: end,
+                    checkInDate: rIn,
+                    checkOutDate: rOut,
+                    nights: rNights,
+                    status: isPastBooking ? 'checked-out' : (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
+                    isPast: isPastBooking,
+                    isGroupOwner: isGroup,
+                    isGroupBooking: isGroup,
+                    isPaymentDue: dueAmt > 0,
+                    isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none'),
+                    totalAmount: totalAmt,
+                    paidAmount: paidAmt,
+                    dueAmount: dueAmt,
+                    baseAmount: baseAmt,
+                    totalTaxAmount: totalTax,
+                    taxConfigCode: taxCode,
+                    taxApplicable: isTaxApp
+                });
             }
+        }
 
-            // Preserve initial mock active bookings only if storage has no reservation with that number
-            const storedResNums = new Set(stored.map(r => r.reservationNumber));
-            const remainingSeedBookings = prev.filter(b => !b.isPast && !b.id.startsWith('res-') && !storedResNums.has(b.reservationNumber));
-
-            return [...historicalBookings, ...remainingSeedBookings, ...syncedList];
-        });
+        setBookings(syncedList);
     }, [days]);
 
     // Subscribe to cross-tab PMS real-time synchronization events
@@ -727,6 +580,7 @@ export const StayView: React.FC = () => {
         // Sync initially on mount from local cache and live DB (PostgreSQL / SQLite)
         syncStoredReservations();
         Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+            setRoomsVersion(v => v + 1);
             syncStoredReservations();
         });
 
@@ -734,6 +588,7 @@ export const StayView: React.FC = () => {
             setActiveLocks(getActiveLocks());
 
             if (event.type === 'RESERVATION_COMMITTED' || event.type === 'INVENTORY_REFRESH') {
+                setRoomsVersion(v => v + 1);
                 syncStoredReservations();
             }
         });
@@ -1565,8 +1420,8 @@ export const StayView: React.FC = () => {
 
                 const minCol = b.startIndex + 1;
                 const targetCol = Math.max(minCol, extendDrag.currentEndIndex);
-                const arrivalDateStr = days[b.startIndex]?.date || '2026-07-04';
-                const targetDepDateStr = days[targetCol]?.date || days[b.endIndex]?.date || '2026-07-06';
+                const arrivalDateStr = b.checkInDate || days[b.startIndex]?.date || '2026-07-04';
+                const targetDepDateStr = days[targetCol]?.date || b.checkOutDate || days[b.endIndex]?.date || '2026-07-06';
                 const start = new Date(arrivalDateStr);
                 const end = new Date(targetDepDateStr);
                 const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -1593,8 +1448,8 @@ export const StayView: React.FC = () => {
                         return;
                     }
 
-                    const targetFromDate = targetStartDay?.date || days[b.startIndex]?.date || '2026-07-04';
-                    const targetToDate = days[moveDrag.targetEndIndex]?.date || days[b.endIndex]?.date || '2026-07-06';
+                    const targetFromDate = targetStartDay?.date || b.checkInDate || days[b.startIndex]?.date || '2026-07-04';
+                    const targetToDate = days[moveDrag.targetEndIndex]?.date || b.checkOutDate || days[b.endIndex]?.date || '2026-07-06';
 
                     const originalRes = getAllStoredReservations().find(r => r.reservationNumber === b.reservationNumber);
                     const bNights = Math.max(1, (moveDrag.targetEndIndex - moveDrag.targetStartIndex + 1) || (b.endIndex - b.startIndex + 1));

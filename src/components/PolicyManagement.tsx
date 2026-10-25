@@ -940,7 +940,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
     };
 
     return (
-        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans text-gray-800">
+        <div className="page-container">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed bottom-4 right-4 z-[120] bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in slide-in-from-bottom-2 duration-200 border border-gray-700">
@@ -951,14 +951,14 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
 
             {/* Elevated Header Card */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
-                    <div className="flex items-center gap-3.5">
+                <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3.5 min-w-0">
                         <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0 shadow-2xs">
                             <ShieldCheck size={24} />
                         </div>
                         <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
                                     Dynamic Hotel Policy & Rules Engine
                                 </h1>
                                 <span className="badge-status-active">
@@ -986,7 +986,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                     </div>
 
                     {/* Header Action Buttons */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                    <div className="flex items-center gap-2 self-start lg:self-auto shrink-0 flex-wrap">
                         <button
                             type="button"
                             onClick={() => setIsSimulatorOpen(!isSimulatorOpen)}
@@ -1018,7 +1018,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
 
                 {/* DYNAMIC SEASONAL STRATEGY PRESET SWITCHER */}
                 <div className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-50/60 via-indigo-50/40 to-white border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <SlidersHorizontal size={13} className="text-blue-600 flex-shrink-0" />
                         <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider">
                             Seasonal Strategy Preset:
@@ -1034,7 +1034,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     type="button"
                                     onClick={() => handleApplyPreset(preset.id as PolicyStrategyPreset)}
                                     className={`h-6 px-2.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${activePreset === preset.id
-                                        ? 'bg-blue-600 text-white shadow-2xs'
+                                        ? 'bg-primary text-white shadow-2xs'
                                         : 'bg-white hover:bg-gray-100 border border-gray-200 text-gray-600'
                                         }`}
                                 >
@@ -1058,8 +1058,8 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                 </div>
 
                 {/* 8 Pillar Horizontal Segmented Navigation Tabs */}
-                <div className="px-3 sm:px-4 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-                    <div className="flex items-center gap-1 sm:gap-1.5">
+                <div className="px-3 sm:px-4 py-2 bg-slate-50/70 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         {categories.map(cat => {
                             const IconComponent = cat.icon;
                             const isActive = activeTab === cat.id;
@@ -1070,14 +1070,14 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     key={cat.id}
                                     type="button"
                                     onClick={() => setActiveTab(cat.id)}
-                                    className={`h-7 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${isActive
-                                        ? 'bg-white text-blue-700 shadow-2xs border border-gray-200 font-bold'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                                    className={`h-8 px-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${isActive
+                                        ? 'bg-white text-primary shadow-2xs border border-slate-200 font-bold'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                                         }`}
                                 >
-                                    <IconComponent size={12} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
+                                    <IconComponent size={12} className={isActive ? 'text-primary' : 'text-slate-400'} />
                                     <span>{cat.label}</span>
-                                    <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isActive ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-gray-100 text-gray-500'}`}>
+                                    <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isActive ? 'bg-blue-50 text-primary border border-blue-100' : 'bg-slate-100 text-slate-500'}`}>
                                         {count}
                                     </span>
                                 </button>

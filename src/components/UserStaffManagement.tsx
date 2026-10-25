@@ -17,10 +17,12 @@ import {
     Lock,
     Unlock,
     Save,
-    ShieldAlert
+    ShieldAlert,
+    Loader2
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode } from '../utils/codeGenerator';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -58,174 +60,11 @@ const AVATAR_COLORS = [
     'bg-sky-600',
 ];
 
-const INITIAL_STAFF: StaffUser[] = [
-    {
-        id: 'usr-001',
-        code: 'EMP-0101',
-        name: 'Imran Hossain',
-        username: 'imran.gm',
-        email: 'imran.hossain@grandpalace.hotel',
-        phone: '+880 1711-000111',
-        role: 'General Manager (Super Admin)',
-        roleCode: 'GM-ADMIN',
-        department: 'Executive Management',
-        property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
-        posPin: '9901',
-        salary: 120000,
-        status: 'active',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastActive: 'Just now',
-        avatarColor: 'bg-rose-600',
-    },
-    {
-        id: 'usr-002',
-        code: 'EMP-0102',
-        name: 'Sarah Jenkins',
-        username: 'sarah.frontdesk',
-        email: 's.jenkins@grandpalace.hotel',
-        phone: '+880 1711-000222',
-        role: 'Front Desk Operations Manager',
-        roleCode: 'FD-MGR',
-        department: 'Front Office',
-        property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
-        posPin: '4412',
-        salary: 65000,
-        status: 'active',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastActive: '10 mins ago',
-        avatarColor: 'bg-blue-600',
-    },
-    {
-        id: 'usr-003',
-        code: 'EMP-0103',
-        name: 'David Miller',
-        username: 'david.audit',
-        email: 'd.miller@grandpalace.hotel',
-        phone: '+880 1711-000333',
-        role: 'Chief Accountant & Night Auditor',
-        roleCode: 'CHIEF-ACC',
-        department: 'Finance & Accounts',
-        property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
-        posPin: '8820',
-        salary: 75000,
-        status: 'active',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastActive: '1 hour ago',
-        avatarColor: 'bg-emerald-600',
-    },
-    {
-        id: 'usr-004',
-        code: 'EMP-0104',
-        name: 'Elena Rostova',
-        username: 'elena.hk',
-        email: 'e.rostova@grandpalace.hotel',
-        phone: '+880 1711-000444',
-        role: 'Executive Housekeeper',
-        roleCode: 'HK-EXEC',
-        department: 'Housekeeping & Rooms',
-        property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
-        posPin: '1124',
-        salary: 55000,
-        status: 'active',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastActive: '25 mins ago',
-        avatarColor: 'bg-purple-600',
-    },
-    {
-        id: 'usr-005',
-        code: 'EMP-0105',
-        name: 'Tariq Al-Mansoor',
-        username: 'tariq.fnb',
-        email: 'tariq.m@grandpalace.hotel',
-        phone: '+880 1711-000555',
-        role: 'F&B Captain & Restaurant Manager',
-        roleCode: 'FNB-CAPT',
-        department: 'Food & Beverage',
-        property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
-        posPin: '5566',
-        salary: 58000,
-        status: 'active',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastActive: '5 mins ago',
-        avatarColor: 'bg-amber-600',
-    },
-    {
-        id: 'usr-006',
-        code: 'EMP-0106',
-        name: 'Maya Lin',
-        username: 'maya.reception',
-        email: 'm.lin@grandpalace.hotel',
-        phone: '+880 1711-000666',
-        role: 'Front Desk Receptionist',
-        roleCode: 'RECEPTION',
-        department: 'Front Office',
-        property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
-        posPin: '3321',
-        salary: 42000,
-        status: 'active',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastActive: '2 hours ago',
-        avatarColor: 'bg-sky-600',
-    },
-    {
-        id: 'usr-007',
-        code: 'EMP-0107',
-        name: 'Alex Rivera',
-        username: 'alex.pos',
-        email: 'a.rivera@grandpalace.hotel',
-        phone: '+880 1711-000777',
-        role: 'POS Cashier & Server',
-        roleCode: 'CASHIER',
-        department: 'Food & Beverage',
-        property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
-        posPin: '7788',
-        salary: 38000,
-        status: 'active',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastActive: 'Yesterday',
-        avatarColor: 'bg-indigo-600',
-    },
-    {
-        id: 'usr-008',
-        code: 'EMP-0108',
-        name: 'Kevin Zhang',
-        username: 'kevin.night',
-        email: 'k.zhang@grandpalace.hotel',
-        phone: '+880 1711-000888',
-        role: 'Front Desk Receptionist',
-        roleCode: 'RECEPTION',
-        department: 'Front Office',
-        property: 'Oceanfront Beach Resort (Cox Bazar)',
-        posPin: '2211',
-        salary: 40000,
-        status: 'locked',
-        failedLoginAttempts: 5,
-        lockedUntil: '2026-10-31T23:59:59Z',
-        lastActive: '3 days ago',
-        avatarColor: 'bg-rose-600',
-    },
-];
-
 export default function UserStaffManagement() {
-    const [users, setUsers] = useState<StaffUser[]>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            return saved ? JSON.parse(saved) : INITIAL_STAFF;
-        } catch {
-            return INITIAL_STAFF;
-        }
-    });
-
-    useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-    }, [users]);
+    const [users, setUsers] = useState<StaffUser[]>([]);
+    const [departments, setDepartments] = useState<{ id: number; name: string; code: string }[]>([]);
+    const [designations, setDesignations] = useState<{ id: number; title: string; department_id: number }[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Toast
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -262,6 +101,65 @@ export default function UserStaffManagement() {
     const [formStatus, setFormStatus] = useState<'active' | 'inactive' | 'locked'>('active');
     const [formPassword, setFormPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+
+    // ==========================================
+    // API FUNCTIONS
+    // ==========================================
+
+    const loadStaff = async () => {
+        try {
+            setIsLoading(true);
+            const res = await fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=1`);
+            const json = await res.json();
+            if (json.success && json.data) {
+                const mapped: StaffUser[] = json.data.map((e: any, idx: number) => ({
+                    id: String(e.id),
+                    code: e.employee_code,
+                    name: `${e.first_name} ${e.last_name}`,
+                    username: `${e.first_name.toLowerCase()}.${e.last_name.toLowerCase()}`,
+                    email: e.email || `${e.employee_code.toLowerCase()}@hotel.com`,
+                    phone: e.phone || '—',
+                    role: e.designation_title || 'Staff',
+                    roleCode: (e.designation_title || 'STAFF').toUpperCase().replace(/\s+/g, '-').slice(0, 12),
+                    department: e.department_name || 'General',
+                    property: 'Grand Palace Hotel & Resort (Dhaka HQ)',
+                    posPin: String(1000 + idx * 111).slice(0, 4),
+                    salary: Number(e.basic_salary) || 40000,
+                    status: e.status === 'INACTIVE' ? 'inactive' : 'active',
+                    failedLoginAttempts: 0,
+                    lockedUntil: null,
+                    lastActive: e.hire_date ? `Hired ${e.hire_date}` : '—',
+                    avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+                }));
+                setUsers(mapped);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+            }
+        } catch (err) {
+            // fallback to localStorage
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) setUsers(JSON.parse(saved));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loadDepts = async () => {
+        try {
+            const [dRes, desRes] = await Promise.all([
+                fetch(`${getApiBaseUrl()}/api/hrm/departments`),
+                fetch(`${getApiBaseUrl()}/api/hrm/designations`),
+            ]);
+            const dJson = await dRes.json();
+            const desJson = await desRes.json();
+            if (dJson.success) setDepartments(dJson.data);
+            if (desJson.success) setDesignations(desJson.data);
+        } catch {}
+    };
+
+    useEffect(() => {
+        loadStaff();
+        loadDepts();
+    }, []);
 
     // Filtered Users
     const filteredUsers = useMemo(() => {
@@ -326,69 +224,101 @@ export default function UserStaffManagement() {
     };
 
     // Save Staff User
-    const handleSaveUser = (e: React.FormEvent) => {
+    const handleSaveUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formName.trim()) return;
 
-        if (editingUserId) {
-            setUsers(prev =>
-                prev.map(u =>
-                    u.id === editingUserId
-                        ? {
-                              ...u,
-                              name: formName.trim(),
-                              username: formUsername.trim(),
-                              email: formEmail.trim(),
-                              phone: formPhone.trim(),
-                              role: formRole,
-                              roleCode: formRoleCode,
-                              department: formDepartment,
-                              property: formProperty,
-                              posPin: formPosPin.trim(),
-                              salary: Number(formSalary) || 0,
-                              status: formStatus,
-                          }
-                        : u
-                )
-            );
-            showToast(`Staff member "${formName.trim()}" updated successfully!`);
-        } else {
-            const newCode = generateUniqueShortCode('EMP', users.map(u => u.code));
-            const newUser: StaffUser = {
-                id: `usr-${Date.now()}`,
-                code: newCode,
-                name: formName.trim(),
-                username: formUsername.trim() || `user.${Date.now().toString().slice(-4)}`,
-                email: formEmail.trim(),
-                phone: formPhone.trim(),
-                role: formRole,
-                roleCode: formRoleCode,
-                department: formDepartment,
-                property: formProperty,
-                posPin: formPosPin.trim() || '1234',
-                salary: Number(formSalary) || 40000,
-                status: formStatus,
-                failedLoginAttempts: 0,
-                lockedUntil: null,
-                lastActive: 'Never',
-                avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
-            };
-            setUsers(prev => [newUser, ...prev]);
-            showToast(`New staff account "${formName.trim()}" registered!`);
-        }
+        try {
+            if (editingUserId) {
+                // --- EDIT: PUT to API ---
+                const resp = await fetch(`${getApiBaseUrl()}/api/hrm/employees/${editingUserId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firstName: formName.split(' ')[0],
+                        lastName: formName.split(' ').slice(1).join(' ') || '—',
+                        email: formEmail,
+                        phone: formPhone,
+                        basicSalary: Number(formSalary),
+                        status: formStatus === 'active' ? 'ACTIVE' : 'INACTIVE',
+                    }),
+                });
+                const rJson = await resp.json();
+                if (rJson.success) {
+                    await loadStaff();
+                    showToast(`Staff member "${formName.trim()}" updated successfully!`);
+                    setIsFormModalOpen(false);
+                } else {
+                    showToast(rJson.message || 'Failed to update staff member.', 'error');
+                }
+            } else {
+                // --- CREATE: POST to API ---
+                // Look up departmentId from departments array by name match
+                const matchedDept = departments.find(
+                    d => d.name.toLowerCase() === formDepartment.toLowerCase()
+                );
+                const departmentId = matchedDept?.id ?? departments[0]?.id ?? 1;
 
-        setIsFormModalOpen(false);
+                // Look up designationId from designations array
+                const matchedDes = designations.find(
+                    d => d.title.toLowerCase() === formRole.toLowerCase()
+                        || d.department_id === matchedDept?.id
+                );
+                const designationId = matchedDes?.id ?? designations[0]?.id ?? 1;
+
+                const newCode = generateUniqueShortCode('EMP', users.map(u => u.code));
+
+                const resp = await fetch(`${getApiBaseUrl()}/api/hrm/employees`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        propertyId: 1,
+                        departmentId,
+                        designationId,
+                        employeeCode: newCode,
+                        firstName: formName.split(' ')[0],
+                        lastName: formName.split(' ').slice(1).join(' ') || '—',
+                        email: formEmail.trim(),
+                        phone: formPhone.trim(),
+                        basicSalary: Number(formSalary) || 40000,
+                        status: formStatus === 'active' ? 'ACTIVE' : 'INACTIVE',
+                    }),
+                });
+                const rJson = await resp.json();
+                if (rJson.success) {
+                    await loadStaff();
+                    showToast(`New staff account "${formName.trim()}" registered!`);
+                    setIsFormModalOpen(false);
+                } else {
+                    showToast(rJson.message || 'Failed to register staff member.', 'error');
+                }
+            }
+        } catch (err) {
+            showToast('Network error. Please check your connection.', 'error');
+        }
     };
 
     // Delete User
-    const handleDeleteUser = (id: string, name: string) => {
+    const handleDeleteUser = async (id: string, name: string) => {
         if (confirm(`Remove staff account "${name}"? This action is logged for compliance.`)) {
-            setUsers(prev => prev.filter(u => u.id !== id));
-            showToast(`Staff account "${name}" removed`);
+            try {
+                const resp = await fetch(`${getApiBaseUrl()}/api/hrm/employees/${id}`, {
+                    method: 'DELETE',
+                });
+                const rJson = await resp.json();
+                if (rJson.success) {
+                    await loadStaff();
+                    showToast(`Staff account "${name}" removed`);
+                } else {
+                    showToast(rJson.message || 'Failed to delete staff member.', 'error');
+                }
+            } catch {
+                showToast('Network error. Please check your connection.', 'error');
+            }
         }
     };
 
-    // Unlock User Account
+    // Unlock User Account (local state only — no server endpoint)
     const handleUnlockUser = (id: string, name: string) => {
         setUsers(prev =>
             prev.map(u =>
@@ -555,6 +485,13 @@ export default function UserStaffManagement() {
 
             {/* Staff Directory Table */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                {/* Loading indicator badge */}
+                {isLoading && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-sky-50 border-b border-sky-100 text-sky-700 text-xs font-semibold">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        <span>Loading staff data from server…</span>
+                    </div>
+                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                         <thead>
@@ -573,7 +510,9 @@ export default function UserStaffManagement() {
                             {filteredUsers.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="py-10 text-center text-slate-400 text-xs">
-                                        No staff members found matching your search criteria.
+                                        {isLoading
+                                            ? 'Loading staff members…'
+                                            : 'No staff members found matching your search criteria.'}
                                     </td>
                                 </tr>
                             ) : (
@@ -665,7 +604,7 @@ export default function UserStaffManagement() {
 
                                             {/* Salary */}
                                             <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                                                ${user.salary.toLocaleString()}
+                                                ৳{user.salary.toLocaleString()}
                                             </td>
 
                                             {/* Status */}
@@ -808,7 +747,7 @@ export default function UserStaffManagement() {
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">BASE SALARY:</span>
                                     <span className="font-mono font-bold text-emerald-600">
-                                        ${viewingUser.salary.toLocaleString()} / mo
+                                        ৳{viewingUser.salary.toLocaleString()} / mo
                                     </span>
                                 </div>
                             </div>
@@ -976,12 +915,22 @@ export default function UserStaffManagement() {
                                         onChange={e => setFormDepartment(e.target.value)}
                                         className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900"
                                     >
-                                        <option value="Executive Management">Executive Management</option>
-                                        <option value="Front Office">Front Office</option>
-                                        <option value="Finance & Accounts">Finance & Accounts</option>
-                                        <option value="Food & Beverage">Food & Beverage</option>
-                                        <option value="Housekeeping & Rooms">Housekeeping & Rooms</option>
-                                        <option value="Engineering & Maintenance">Engineering & Maintenance</option>
+                                        {departments.length > 0 ? (
+                                            departments.map(d => (
+                                                <option key={d.id} value={d.name}>
+                                                    {d.name}
+                                                </option>
+                                            ))
+                                        ) : (
+                                            <>
+                                                <option value="Executive Management">Executive Management</option>
+                                                <option value="Front Office">Front Office</option>
+                                                <option value="Finance & Accounts">Finance & Accounts</option>
+                                                <option value="Food & Beverage">Food & Beverage</option>
+                                                <option value="Housekeeping & Rooms">Housekeeping & Rooms</option>
+                                                <option value="Engineering & Maintenance">Engineering & Maintenance</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
                             </div>
@@ -1029,7 +978,7 @@ export default function UserStaffManagement() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                        Monthly Base Salary ($)
+                                        Monthly Base Salary (৳)
                                     </label>
                                     <input
                                         type="number"

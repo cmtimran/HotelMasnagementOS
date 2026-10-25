@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Wrench, AlertCircle, Clock, User, CheckCircle2 } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 
 interface MaintenanceTask {
     id: number;
@@ -36,70 +37,89 @@ const MaintenanceKanban = () => {
     const completedTasks = tasks.filter(t => t.status === 'completed');
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-orange-50/20 to-gray-50 p-4 md:p-6 lg:p-8">
-            {/* Header */}
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg shadow-orange-600/30">
-                        <Wrench size={24} className="text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Maintenance Kanban</h1>
-                        <p className="text-sm text-gray-500">Track and manage maintenance tasks</p>
-                    </div>
-                </div>
-            </div>
+        <div className="page-container">
+            <PageHeader
+                title="Maintenance & Engineering Board"
+                subtitle="Track room engineering work orders, preventive maintenance & technician assignments"
+                icon={<Wrench size={20} />}
+                badge={<span className="badge-status-active">{tasks.length} Work Orders</span>}
+            />
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Total Tasks</p>
-                    <p className="text-3xl font-bold text-gray-900">{tasks.length}</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Tasks</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{tasks.length}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Logged tickets</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                        <Wrench size={17} />
+                    </div>
                 </div>
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-lg shadow-blue-500/30">
-                    <p className="text-xs font-semibold text-blue-100 uppercase mb-2">To Do</p>
-                    <p className="text-3xl font-bold text-white">{todoTasks.length}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">To Do</p>
+                        <p className="text-xl sm:text-2xl font-bold text-primary mt-1">{todoTasks.length}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Awaiting dispatch</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
+                        <AlertCircle size={17} />
+                    </div>
                 </div>
-                <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-5 rounded-2xl shadow-lg shadow-amber-500/30">
-                    <p className="text-xs font-semibold text-amber-100 uppercase mb-2">In Progress</p>
-                    <p className="text-3xl font-bold text-white">{inProgressTasks.length}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">In Progress</p>
+                        <p className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{inProgressTasks.length}</p>
+                        <p className="text-[11px] text-amber-600 font-medium mt-0.5">Active repairs</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <Wrench size={17} />
+                    </div>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl shadow-lg shadow-emerald-500/30">
-                    <p className="text-xs font-semibold text-emerald-100 uppercase mb-2">Completed</p>
-                    <p className="text-3xl font-bold text-white">{completedTasks.length}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed</p>
+                        <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{completedTasks.length}</p>
+                        <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Resolved & verified</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={17} />
+                    </div>
                 </div>
             </div>
 
             {/* Kanban Board */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* To Do Column */}
-                <div>
-                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 rounded-t-2xl">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <AlertCircle size={20} />
-                            To Do ({todoTasks.length})
+                <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs flex flex-col">
+                    <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <AlertCircle size={14} className="text-primary" />
+                            To Do
                         </h2>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-primary border border-blue-200">{todoTasks.length}</span>
                     </div>
-                    <div className="space-y-4 bg-blue-50/50 p-4 rounded-b-2xl min-h-[600px]">
+                    <div className="space-y-3 bg-slate-50/40 p-3.5 flex-1 min-h-[420px]">
                         {todoTasks.map(task => (
-                            <div key={task.id} className="bg-white rounded-2xl p-5 shadow-md hover:shadow-xl transition-all border-l-4 border-blue-500">
-                                <div className="flex items-start justify-between mb-3">
-                                    <h3 className="text-lg font-bold text-gray-900">{task.title}</h3>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getPriorityColor(task.priority)}`}>
+                            <div key={task.id} className="bg-white rounded-xl p-4 shadow-2xs border border-slate-200/90 border-l-4 border-l-primary">
+                                <div className="flex items-start justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-slate-900">{task.title}</h3>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getPriorityColor(task.priority)}`}>
                                         {task.priority}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="text-sm font-semibold text-blue-600">Room {task.room}</span>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs font-semibold text-primary">Room {task.room}</span>
                                 </div>
-                                <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                                <div className="flex items-center justify-between text-xs text-gray-500">
+                                <p className="text-xs text-slate-600 mb-3">{task.description}</p>
+                                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
                                     <div className="flex items-center gap-1">
                                         <Clock size={12} />
                                         {task.createdAt}
                                     </div>
                                     {task.assignedTo && (
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 font-medium text-slate-700">
                                             <User size={12} />
                                             {task.assignedTo}
                                         </div>
@@ -111,33 +131,34 @@ const MaintenanceKanban = () => {
                 </div>
 
                 {/* In Progress Column */}
-                <div>
-                    <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-4 rounded-t-2xl">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <Wrench size={20} />
-                            In Progress ({inProgressTasks.length})
+                <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs flex flex-col">
+                    <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <Wrench size={14} className="text-amber-600" />
+                            In Progress
                         </h2>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">{inProgressTasks.length}</span>
                     </div>
-                    <div className="space-y-4 bg-amber-50/50 p-4 rounded-b-2xl min-h-[600px]">
+                    <div className="space-y-3 bg-slate-50/40 p-3.5 flex-1 min-h-[420px]">
                         {inProgressTasks.map(task => (
-                            <div key={task.id} className="bg-white rounded-2xl p-5 shadow-md hover:shadow-xl transition-all border-l-4 border-amber-500">
-                                <div className="flex items-start justify-between mb-3">
-                                    <h3 className="text-lg font-bold text-gray-900">{task.title}</h3>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getPriorityColor(task.priority)}`}>
+                            <div key={task.id} className="bg-white rounded-xl p-4 shadow-2xs border border-slate-200/90 border-l-4 border-l-amber-500">
+                                <div className="flex items-start justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-slate-900">{task.title}</h3>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getPriorityColor(task.priority)}`}>
                                         {task.priority}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="text-sm font-semibold text-amber-600">Room {task.room}</span>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs font-semibold text-amber-600">Room {task.room}</span>
                                 </div>
-                                <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                                <div className="flex items-center justify-between text-xs text-gray-500">
+                                <p className="text-xs text-slate-600 mb-3">{task.description}</p>
+                                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
                                     <div className="flex items-center gap-1">
                                         <Clock size={12} />
                                         {task.createdAt}
                                     </div>
                                     {task.assignedTo && (
-                                        <div className="flex items-center gap-1 text-amber-600 font-semibold">
+                                        <div className="flex items-center gap-1 text-amber-700 font-semibold">
                                             <User size={12} />
                                             {task.assignedTo}
                                         </div>
@@ -149,27 +170,28 @@ const MaintenanceKanban = () => {
                 </div>
 
                 {/* Completed Column */}
-                <div>
-                    <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4 rounded-t-2xl">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <CheckCircle2 size={20} />
-                            Completed ({completedTasks.length})
+                <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs flex flex-col">
+                    <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <CheckCircle2 size={14} className="text-emerald-600" />
+                            Completed
                         </h2>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">{completedTasks.length}</span>
                     </div>
-                    <div className="space-y-4 bg-emerald-50/50 p-4 rounded-b-2xl min-h-[600px]">
+                    <div className="space-y-3 bg-slate-50/40 p-3.5 flex-1 min-h-[420px]">
                         {completedTasks.map(task => (
-                            <div key={task.id} className="bg-white rounded-2xl p-5 shadow-md hover:shadow-xl transition-all border-l-4 border-emerald-500 opacity-75">
-                                <div className="flex items-start justify-between mb-3">
-                                    <h3 className="text-lg font-bold text-gray-900 line-through">{task.title}</h3>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getPriorityColor(task.priority)}`}>
+                            <div key={task.id} className="bg-white rounded-xl p-4 shadow-2xs border border-slate-200/90 border-l-4 border-l-emerald-500 opacity-80">
+                                <div className="flex items-start justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-slate-700 line-through">{task.title}</h3>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getPriorityColor(task.priority)}`}>
                                         {task.priority}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="text-sm font-semibold text-emerald-600">Room {task.room}</span>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs font-semibold text-emerald-600">Room {task.room}</span>
                                 </div>
-                                <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                                <div className="flex items-center justify-between text-xs text-gray-500">
+                                <p className="text-xs text-slate-500 mb-3">{task.description}</p>
+                                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100">
                                     <div className="flex items-center gap-1">
                                         <Clock size={12} />
                                         {task.createdAt}

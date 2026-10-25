@@ -218,10 +218,10 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                             title="Active Hotel Property (Click to switch branch/property)"
                         >
                             <Building2 size={13} className="text-blue-600 flex-shrink-0" />
-                            <span className="max-w-[130px] sm:max-w-[160px] truncate hidden xs:inline">
+                            <span className="max-w-[140px] md:max-w-[180px] truncate hidden sm:inline">
                                 {activeProperty?.name || 'Grand Palace Dhaka'}
                             </span>
-                            <span className="xs:hidden font-mono text-[11px] font-bold text-blue-600">
+                            <span className="sm:hidden font-mono text-[11px] font-bold text-blue-600">
                                 {activeProperty?.code || 'GPD'}
                             </span>
                             <ChevronDown

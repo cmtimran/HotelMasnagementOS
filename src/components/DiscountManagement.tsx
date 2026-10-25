@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PageHeader from './common/PageHeader';
 import { toast } from '../context/ToastContext';
 import {
     Percent,
@@ -9,7 +10,6 @@ import {
     CheckCircle2,
     X,
     Search,
-    Shield,
     Lock,
     Unlock,
     Info,
@@ -189,7 +189,7 @@ export const DiscountManagement: React.FC = () => {
     const maxDiscountValue = Math.max(...discounts.map(d => d.maxCapBDT), 0);
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5 animate-in fade-in duration-150">
+        <div className="page-container animate-in fade-in duration-150">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
@@ -198,50 +198,22 @@ export const DiscountManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <Percent size={22} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
-                                Discounts, Allowances & Rebates
-                            </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                                USALI GL-4990
-                            </span>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                                Contra-Revenue
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Manage authorized hotel discount policies, spending caps, and supervisor PIN authorization in compliance with international lodging standards.
-                        </p>
-                    </div>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={handleOpenAdd}
-                    className="h-8 px-3.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer self-start md:self-auto"
-                >
-                    <Plus size={14} />
-                    <span>+ New Discount Policy</span>
-                </button>
-            </div>
-
-            {/* USALI Accounting Principle Card */}
-            <div className="bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-white border border-amber-200/80 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-950 shadow-2xs">
-                <Shield size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                    <span className="font-bold">Proper USALI Hospitality Accounting for Discounts:</span>
-                    <p className="text-[11px] text-amber-900/80 mt-0.5 leading-relaxed">
-                        In professional hotel ERPs, discounts are <strong>never deducted directly from gross tariffs</strong>. Instead, they are posted as a <strong>Debit to Contra-Revenue Account (GL-4990 - Room Revenue Allowances)</strong>. This guarantees that gross tariffs, concessions, and Net Operating Income (NOI) reconcile seamlessly for internal audit and NBR tax compliance.
-                    </p>
-                </div>
-            </div>
+            <PageHeader
+                title="Discounts, Allowances & Rebates"
+                subtitle="Manage authorized hotel discount policies, spending caps, and supervisor PIN authorization in compliance with USALI GL-4990 contra-revenue standards"
+                icon={<Percent size={20} />}
+                badge="USALI GL-4990"
+                actions={
+                    <button
+                        type="button"
+                        onClick={handleOpenAdd}
+                        className="btn-primary"
+                    >
+                        <Plus size={14} />
+                        <span>New Discount Policy</span>
+                    </button>
+                }
+            />
 
             {/* KPI Metrics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">

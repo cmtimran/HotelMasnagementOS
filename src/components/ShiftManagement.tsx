@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PageHeader from './common/PageHeader';
 import {
     Clock,
     Plus,
@@ -16,6 +17,7 @@ import {
     Briefcase,
     AlertCircle
 } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 export interface WorkShift {
     id: number;
@@ -31,13 +33,6 @@ export interface WorkShift {
     status: 'Active' | 'Inactive';
 }
 
-const INITIAL_SHIFTS: WorkShift[] = [
-    { id: 1, code: 'SHT-MOR', name: 'Morning Shift', startTime: '07:00', endTime: '15:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 42, color: 'border-amber-400 bg-amber-50 text-amber-800', status: 'Active' },
-    { id: 2, code: 'SHT-EVE', name: 'Evening / Swing Shift', startTime: '15:00', endTime: '23:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 38, color: 'border-blue-400 bg-blue-50 text-blue-800', status: 'Active' },
-    { id: 3, code: 'SHT-NGT', name: 'Night Audit / Graveyard Shift', startTime: '23:00', endTime: '07:30', gracePeriodMinutes: 10, mandatoryCashHandover: true, canTriggerNightAudit: true, assignedStaffCount: 14, color: 'border-purple-400 bg-purple-50 text-purple-800', status: 'Active' },
-    { id: 4, code: 'SHT-DAY', name: 'General Administration Day Shift', startTime: '09:00', endTime: '18:00', gracePeriodMinutes: 20, mandatoryCashHandover: false, canTriggerNightAudit: false, assignedStaffCount: 26, color: 'border-emerald-400 bg-emerald-50 text-emerald-800', status: 'Active' }
-];
-
 export const ShiftManagement: React.FC = () => {
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -47,15 +42,50 @@ export const ShiftManagement: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state from localStorage
-    const [shifts, setShifts] = useState<WorkShift[]>(() => {
-        const saved = localStorage.getItem('master_shifts_v2');
-        return saved ? JSON.parse(saved) : INITIAL_SHIFTS;
-    });
+    // Hydrate state from API
+    const [shifts, setShifts] = useState<WorkShift[]>([]);
 
-    useEffect(() => {
-        localStorage.setItem('master_shifts_v2', JSON.stringify(shifts));
-    }, [shifts]);
+    const loadShifts = async () => {
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/hrm/shifts`);
+            const json = await res.json();
+            if (json.success) {
+                const data = json.data;
+                const shiftColorMap: Record<string, string> = {
+                    'Morning': 'border-amber-400 bg-amber-50 text-amber-800',
+                    'Evening': 'border-blue-400 bg-blue-50 text-blue-800',
+                    'Night': 'border-purple-400 bg-purple-50 text-purple-800',
+                    'General': 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                };
+                const getColor = (name: string) => {
+                    if (name.toLowerCase().includes('morning') || name.toLowerCase().includes('(a)')) return shiftColorMap.Morning;
+                    if (name.toLowerCase().includes('evening') || name.toLowerCase().includes('(b)')) return shiftColorMap.Evening;
+                    if (name.toLowerCase().includes('night') || name.toLowerCase().includes('audit') || name.toLowerCase().includes('(c)')) return shiftColorMap.Night;
+                    return shiftColorMap.General;
+                };
+                const getCode = (name: string) => 'SHT-' + name.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+
+                const mapped: WorkShift[] = data.map((s: any) => ({
+                    id: s.id,
+                    code: getCode(s.name),
+                    name: s.name,
+                    startTime: s.start_time,
+                    endTime: s.end_time,
+                    gracePeriodMinutes: Number(s.grace_period_minutes) || 15,
+                    mandatoryCashHandover: s.name.toLowerCase().includes('night') || s.name.toLowerCase().includes('morning') || s.name.toLowerCase().includes('evening'),
+                    canTriggerNightAudit: s.name.toLowerCase().includes('night') || s.name.toLowerCase().includes('audit'),
+                    assignedStaffCount: Number(s.assigned_today) || 0,
+                    color: getColor(s.name),
+                    status: 'Active' as WorkShift['status']
+                }));
+                setShifts(mapped);
+            }
+        } catch (err) {
+            console.error('Failed to load shifts:', err);
+        }
+    };
+
+    useEffect(() => { loadShifts(); }, []);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -107,31 +137,49 @@ export const ShiftManagement: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.code || !formData.name) return;
 
-        if (editingShift) {
-            setShifts(prev =>
-                prev.map(s => s.id === editingShift.id ? { ...s, ...formData } : s)
-            );
-            showToast(`Work Shift "${formData.name}" updated successfully.`);
-        } else {
-            const newShift: WorkShift = {
-                id: Date.now(),
-                ...formData
+        try {
+            const body = {
+                name: formData.name,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+                gracePeriodMinutes: formData.gracePeriodMinutes
             };
-            setShifts(prev => [...prev, newShift]);
-            showToast(`Work Shift "${newShift.name}" registered successfully.`);
+            if (editingShift) {
+                await fetch(`${getApiBaseUrl()}/api/hrm/shifts/${editingShift.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                showToast(`Work Shift "${formData.name}" updated successfully.`);
+            } else {
+                await fetch(`${getApiBaseUrl()}/api/hrm/shifts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                showToast(`Work Shift "${formData.name}" registered successfully.`);
+            }
+            await loadShifts();
+        } catch (err) {
+            console.error('Failed to save shift:', err);
         }
         setIsModalOpen(false);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         const item = shifts.find(s => s.id === id);
         if (window.confirm(`Are you sure you want to delete work shift "${item?.name}"?`)) {
-            setShifts(prev => prev.filter(s => s.id !== id));
-            showToast('Work Shift removed.');
+            try {
+                await fetch(`${getApiBaseUrl()}/api/hrm/shifts/${id}`, { method: 'DELETE' });
+                showToast('Work Shift removed.');
+                await loadShifts();
+            } catch (err) {
+                console.error('Failed to delete shift:', err);
+            }
         }
     };
 
@@ -163,7 +211,7 @@ export const ShiftManagement: React.FC = () => {
     const cashHandoverShifts = shifts.filter(s => s.mandatoryCashHandover).length;
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5 animate-in fade-in duration-150">
+        <div className="page-container animate-in fade-in duration-150">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
@@ -172,39 +220,22 @@ export const ShiftManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <Clock size={22} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
-                                24/7 Work Shifts & Handover Protocols
-                            </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                                24/7 Operations
-                            </span>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Blind Cash Drop
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Manage hotel shift timings, attendance grace periods, cash drawer blind counts, and End-of-Day (EOD) Night Audit pipeline authorizations.
-                        </p>
-                    </div>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={handleOpenAdd}
-                    className="h-8 px-3.5 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer self-start md:self-auto"
-                >
-                    <Plus size={14} />
-                    <span>+ Create Work Shift</span>
-                </button>
-            </div>
+            <PageHeader
+                title="24/7 Work Shifts & Handover Protocols"
+                subtitle="Manage hotel shift timings, attendance grace periods, cash drawer blind counts, and End-of-Day (EOD) Night Audit pipeline authorizations"
+                icon={<Clock size={20} />}
+                badge="24/7 Operations"
+                actions={
+                    <button
+                        type="button"
+                        onClick={handleOpenAdd}
+                        className="btn-primary"
+                    >
+                        <Plus size={14} />
+                        <span>Create Work Shift</span>
+                    </button>
+                }
+            />
 
             {/* KPI Metrics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">

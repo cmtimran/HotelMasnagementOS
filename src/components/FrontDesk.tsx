@@ -10,7 +10,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
 import { QuickReservationModal } from './modals/QuickReservationModal';
 import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
-import { syncReservationsFromDB, updateReservationStatusInDB } from '../utils/roomInventoryEngine';
+import { syncReservationsFromDB, updateReservationStatusInDB, getCanonicalRooms } from '../utils/roomInventoryEngine';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -494,9 +494,18 @@ export const FrontDesk: React.FC = () => {
     const departuresList = useMemo(() => reservations.filter(r => r.status === 'in-house' && r.checkOut <= '2026-07-01'), [reservations]);
     const checkedOutToday = useMemo(() => reservations.filter(r => r.status === 'checked-out'), [reservations]);
 
+    const canonicalRooms = useMemo(() => getCanonicalRooms(), [reservations]);
     const totalOccupied = inHouseList.length;
-    const totalCapacity = 48;
+    const totalCapacity = Math.max(1, canonicalRooms.length || 34);
     const occupancyRate = Math.round((totalOccupied / totalCapacity) * 100);
+    const cleanVacantCount = useMemo(
+        () => canonicalRooms.filter(r => r.status === 'Active' && r.housekeepingStatus !== 'Dirty').length,
+        [canonicalRooms]
+    );
+    const dirtyRoomsCount = useMemo(
+        () => canonicalRooms.filter(r => r.housekeepingStatus === 'Dirty').length,
+        [canonicalRooms]
+    );
 
     const totalCollectionsToday = useMemo(() => {
         return reservations.reduce((acc, r) => acc + (Number(r.paidAmount) || 0), 0);
@@ -658,24 +667,24 @@ export const FrontDesk: React.FC = () => {
     };
 
     return (
-        <div className="p-3 sm:p-4 max-w-[1400px] mx-auto space-y-3 font-sans select-none animate-in fade-in duration-150">
+        <div className="page-container select-none animate-in fade-in duration-150">
             {/* Standardized Thesis Page Header */}
             <PageHeader
                 title="Front Desk Operations Hub"
                 subtitle={
-                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 font-medium">
-                        <span className="flex items-center gap-1 font-semibold text-slate-700">
-                            <Calendar size={12} className="text-primary" /> System Date: <strong>{systemDate}</strong>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 font-medium">
+                        <span className="flex items-center gap-1 font-semibold text-slate-700 whitespace-nowrap">
+                            <Calendar size={12} className="text-primary" /> {systemDate}
                         </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1 whitespace-nowrap">
                             <Clock size={12} className="text-amber-600" /> Morning Shift (07:00 - 15:00)
                         </span>
-                        <span>•</span>
-                        <span className="text-primary font-semibold">Cashier Drawer #1</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-primary font-semibold whitespace-nowrap">Cashier Drawer #1</span>
                     </div>
                 }
-                icon={<Monitor size={22} />}
+                icon={<Monitor size={20} />}
                 badge={
                     <span className="badge-status-active">
                         <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -803,10 +812,10 @@ export const FrontDesk: React.FC = () => {
                         <Sparkles size={13} className="text-emerald-600" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-xl font-black text-emerald-800 font-mono">18</span>
+                        <span className="text-xl font-black text-emerald-800 font-mono">{cleanVacantCount}</span>
                         <span className="text-[10.5px] text-emerald-600 font-semibold">Vacant Ready</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1.5">4 rooms in housekeeping</p>
+                    <p className="text-[10px] text-slate-500 mt-1.5">{dirtyRoomsCount} rooms in housekeeping</p>
                 </div>
 
                 {/* 6. Today's Collections */}
@@ -1146,7 +1155,7 @@ export const FrontDesk: React.FC = () => {
                                                 </td>
 
                                                 {/* Stay Period */}
-                                                <td className="py-2.5 px-3">
+                                                <td className="py-2.5 px-3 whitespace-nowrap">
                                                     <div className="text-[11px] font-medium text-slate-800 leading-tight">
                                                         <span>{item.checkIn}</span> ➔ <span>{item.checkOut}</span>
                                                     </div>
@@ -1164,14 +1173,14 @@ export const FrontDesk: React.FC = () => {
                                                 </td>
 
                                                 {/* Pax */}
-                                                <td className="py-2.5 px-2.5 text-center">
+                                                <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
                                                     <span className="font-bold text-slate-700 text-xs">
                                                         {item.adults}A {item.children > 0 ? `+ ${item.children}C` : ''}
                                                     </span>
                                                 </td>
 
                                                 {/* Source */}
-                                                <td className="py-2.5 px-3">
+                                                <td className="py-2.5 px-3 whitespace-nowrap">
                                                     <span className="text-[11px] font-semibold text-slate-700 block">
                                                         {item.source}
                                                     </span>
@@ -1181,7 +1190,7 @@ export const FrontDesk: React.FC = () => {
                                                 </td>
 
                                                 {/* Tariff & Balance */}
-                                                <td className="py-2.5 px-3 text-right">
+                                                <td className="py-2.5 px-3 text-right whitespace-nowrap">
                                                     <div className="font-mono font-bold text-slate-900 text-xs">
                                                         ৳{item.totalAmount.toLocaleString()}
                                                     </div>
@@ -1199,13 +1208,13 @@ export const FrontDesk: React.FC = () => {
                                                 </td>
 
                                                 {/* Actions */}
-                                                <td className="py-2.5 px-3.5 text-right">
+                                                <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                                                     <div className="flex items-center justify-end gap-1.5">
                                                         {item.status === 'arriving' && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleOpenCheckInModal(item)}
-                                                                className="h-7 px-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                                className="h-7 px-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                                                             >
                                                                 <LogIn size={11} className="stroke-[2.5]" />
                                                                 <span>Check In</span>
@@ -1217,7 +1226,7 @@ export const FrontDesk: React.FC = () => {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setFolioModalRecord(item)}
-                                                                    className="h-7 px-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                                    className="h-7 px-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                                                                     title="Add Restaurant / Laundry charge to Folio"
                                                                 >
                                                                     <Plus size={11} className="text-blue-600" />
@@ -1227,7 +1236,7 @@ export const FrontDesk: React.FC = () => {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleOpenCheckOutModal(item)}
-                                                                    className={`h-7 px-3 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs ${
+                                                                    className={`h-7 px-3 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap ${
                                                                         isDueDeparture
                                                                             ? 'bg-amber-600 hover:bg-amber-700 text-white'
                                                                             : 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-800'

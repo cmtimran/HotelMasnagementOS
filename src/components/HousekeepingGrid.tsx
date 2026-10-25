@@ -3,6 +3,7 @@ import { Search, Sparkles, BedDouble, AlertCircle, Users, CheckCircle2, XCircle,
 import { getCanonicalRooms, broadcastPMSEvent, subscribeToPMSEvents } from '../utils/roomInventoryEngine';
 import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
 import { getApiBaseUrl } from '../utils/apiUrl';
+import PageHeader from './common/PageHeader';
 
 
 interface HousekeepingRoom {
@@ -176,79 +177,100 @@ const HousekeepingGrid = () => {
     };
 
     return (
-        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-2.5 font-sans">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-200">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-emerald-600 rounded-md flex items-center justify-center text-white shadow-xs">
-                        <Sparkles size={15} />
-                    </div>
-                    <div>
-                        <h1 className="text-base font-bold text-gray-900 tracking-tight leading-none flex items-center gap-2">
-                            Housekeeping Grid & Task Board
-                            {isSyncing && <RefreshCw size={12} className="animate-spin text-emerald-600" />}
-                        </h1>
-                        <p className="text-[11px] text-gray-500 font-medium leading-none mt-1">Live SQLite DB room states, supervisor inspections & real-time sync</p>
-                    </div>
-                </div>
-
-                <div className="text-xs text-gray-500 font-medium flex items-center gap-2">
-                    <span>Turnover Queue:</span>
-                    <span className="px-2 py-0.5 bg-rose-50 text-rose-700 font-bold rounded border border-rose-200">
+        <div className="page-container">
+            <PageHeader
+                title="Housekeeping & Room Turnover"
+                subtitle="Live room cleanliness states, supervisor inspections & real-time front-desk sync"
+                icon={<Sparkles size={20} />}
+                badge={
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                         {stats.dirty} Pending Cleaning
                     </span>
+                }
+                actions={
                     <button
+                        type="button"
                         onClick={fetchRooms}
                         title="Reload canonical room states from database"
-                        className="px-2 py-1 bg-white border border-gray-300 rounded text-[11px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1 shadow-2xs"
+                        className="btn-secondary"
                     >
-                        <RefreshCw size={11} className={isSyncing ? 'animate-spin' : ''} />
-                        Sync DB
+                        <RefreshCw size={13} className={isSyncing ? 'animate-spin text-primary' : 'text-slate-400'} />
+                        <span>Sync Inventory</span>
                     </button>
-                </div>
-            </div>
+                }
+            />
 
-            {/* Compact Stats Bar */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                <div className="bg-white p-2.5 rounded-lg border border-gray-200/80 shadow-2xs">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Total Inventory</p>
-                    <p className="text-base font-bold text-gray-900 mt-0.5">{stats.total} Rooms</p>
+            {/* Standardized KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Inventory</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{stats.total} Rooms</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Physical keys</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
+                        <BedDouble size={17} />
+                    </div>
                 </div>
-                <div className="bg-rose-50/70 p-2.5 rounded-lg border border-rose-200 shadow-2xs">
-                    <p className="text-[10px] font-bold text-rose-700 uppercase">Dirty (Turnover)</p>
-                    <p className="text-base font-bold text-rose-900 mt-0.5">{stats.dirty}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dirty (Turnover)</p>
+                        <p className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{stats.dirty}</p>
+                        <p className="text-[11px] text-rose-600 font-medium mt-0.5">Needs housekeeping</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                        <AlertCircle size={17} />
+                    </div>
                 </div>
-                <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200 shadow-2xs">
-                    <p className="text-[10px] font-bold text-emerald-700 uppercase">Clean & Ready</p>
-                    <p className="text-base font-bold text-emerald-900 mt-0.5">{stats.clean}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Clean & Ready</p>
+                        <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{stats.clean}</p>
+                        <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Ready for check-in</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <Sparkles size={17} />
+                    </div>
                 </div>
-                <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200 shadow-2xs">
-                    <p className="text-[10px] font-bold text-amber-700 uppercase">Inspected</p>
-                    <p className="text-base font-bold text-amber-900 mt-0.5">{stats.inspected}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inspected</p>
+                        <p className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{stats.inspected}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Supervisor verified</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={17} />
+                    </div>
                 </div>
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-300 shadow-2xs">
-                    <p className="text-[10px] font-bold text-gray-600 uppercase">Out of Order</p>
-                    <p className="text-base font-bold text-gray-900 mt-0.5">{stats.outOfOrder}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Out of Order</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-700 mt-1">{stats.outOfOrder}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Maintenance block</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                        <XCircle size={17} />
+                    </div>
                 </div>
             </div>
 
             {/* Filter Bar */}
-            <div className="bg-white p-2 rounded-lg border border-gray-200/80 shadow-2xs">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="card-container !p-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="relative flex items-center">
-                        <Search className="absolute left-2.5 text-gray-400 pointer-events-none" size={13} />
+                        <Search className="absolute left-3 text-slate-400 pointer-events-none" size={14} />
                         <input
                             type="text"
                             placeholder="Search room or assigned housekeeper..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-7 pr-3 py-1 text-xs border border-gray-200 rounded-md focus:border-emerald-500 focus:outline-none"
+                            className="input-standard pl-9"
                         />
                     </div>
                     <select
                         value={filterFloor}
                         onChange={(e) => setFilterFloor(e.target.value)}
-                        className="px-2 py-1 border border-gray-200 rounded-md text-xs font-medium text-gray-700 bg-white"
+                        className="select-standard"
                     >
                         <option value="all">All Floors</option>
                         {uniqueFloors.map(fl => (
@@ -258,7 +280,7 @@ const HousekeepingGrid = () => {
                     <select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-2 py-1 border border-gray-200 rounded-md text-xs font-medium text-gray-700 bg-white"
+                        className="select-standard"
                     >
                         <option value="all">All Housekeeping Statuses</option>
                         <option value="dirty">Dirty</option>
@@ -269,75 +291,77 @@ const HousekeepingGrid = () => {
                 </div>
             </div>
 
-            {/* High-Density Housekeeping Table */}
-            <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs overflow-hidden">
+            {/* Standardized Housekeeping Table */}
+            <div className="table-container">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        <thead>
                             <tr>
-                                <th className="px-3 py-2">Room</th>
-                                <th className="px-3 py-2">Type</th>
-                                <th className="px-3 py-2">Status (Click to cycle)</th>
-                                <th className="px-3 py-2">Housekeeper</th>
-                                <th className="px-3 py-2">Priority</th>
-                                <th className="px-3 py-2">Last Cleaned</th>
-                                <th className="px-3 py-2">Turnover Notes</th>
-                                <th className="px-3 py-2 text-right">Action</th>
+                                <th>Room</th>
+                                <th>Type</th>
+                                <th>Status (Click to cycle)</th>
+                                <th>Housekeeper</th>
+                                <th>Priority</th>
+                                <th>Last Cleaned</th>
+                                <th>Turnover Notes</th>
+                                <th className="text-right">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 text-xs">
+                        <tbody>
                             {filteredRooms.map(room => (
-                                <tr key={room.id} className="hover:bg-gray-50/70 transition-colors">
-                                    <td className="px-3 py-1.5 font-bold text-gray-900">
+                                <tr key={room.id} className="hover:bg-slate-50/70 transition-colors">
+                                    <td className="font-bold text-slate-900">
                                         {room.roomNumber}
                                     </td>
-                                    <td className="px-3 py-1.5 text-gray-600 font-medium">
+                                    <td className="text-slate-600 font-medium">
                                         {room.roomType}
                                     </td>
-                                    <td className="px-3 py-1.5">
+                                    <td>
                                         <button
+                                            type="button"
                                             onClick={() => cycleStatus(room.roomNumber)}
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border transition-all hover:shadow-2xs cursor-pointer ${getStatusStyle(room.status)}`}
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all hover:shadow-2xs cursor-pointer ${getStatusStyle(room.status)}`}
                                             title="Click to cycle status in database"
                                         >
                                             {getStatusIcon(room.status)}
                                             <span className="capitalize">{room.status}</span>
                                         </button>
                                     </td>
-                                    <td className="px-3 py-1.5">
+                                    <td>
                                         {room.assignedTo ? (
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-800">
-                                                <Users size={12} className="text-blue-500" />
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                                                <Users size={13} className="text-primary" />
                                                 {room.assignedTo}
                                             </span>
                                         ) : (
-                                            <span className="text-[10px] text-gray-400 italic">Unassigned</span>
+                                            <span className="text-xs text-slate-400 italic">Unassigned</span>
                                         )}
                                     </td>
-                                    <td className="px-3 py-1.5">
-                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${room.priority === 'high' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-600'}`}>
+                                    <td>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${room.priority === 'high' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
                                             {room.priority}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-1.5 text-gray-500 text-[11px]">
+                                    <td className="text-slate-500 text-xs">
                                         {room.lastCleaned ? (
                                             <span className="flex items-center gap-1">
-                                                <Clock size={11} className="text-gray-400" /> {room.lastCleaned}
+                                                <Clock size={12} className="text-slate-400" /> {room.lastCleaned}
                                             </span>
                                         ) : '-'}
                                     </td>
-                                    <td className="px-3 py-1.5 text-gray-500 text-[11px]">
+                                    <td className="text-slate-500 text-xs">
                                         {room.notes ? (
-                                            <span className="flex items-center gap-1 text-amber-700">
-                                                <AlertCircle size={11} className="flex-shrink-0" />
+                                            <span className="flex items-center gap-1 text-amber-700 font-medium">
+                                                <AlertCircle size={12} className="flex-shrink-0" />
                                                 <span className="truncate max-w-[180px]">{room.notes}</span>
                                             </span>
                                         ) : '-'}
                                     </td>
-                                    <td className="px-3 py-1.5 text-right">
-                                        <button 
+                                    <td className="text-right">
+                                        <button
+                                            type="button"
                                             onClick={() => cycleStatus(room.roomNumber)}
-                                            className="h-6 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors shadow-2xs cursor-pointer"
+                                            className="btn-secondary !py-1 !px-2.5 !text-[11px]"
                                         >
                                             Cycle Status
                                         </button>

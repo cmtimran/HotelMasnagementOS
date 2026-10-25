@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Layers, Plus, Save, Edit2, Trash2, ChevronLeft, Link as LinkIcon, Check, ShieldCheck, Search, Filter
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
+import {
+    getCanonicalRooms,
+    getDynamicRoomTypes,
+    syncRoomTypesAndRoomsFromDB
+} from '../utils/roomInventoryEngine';
 
 interface ComponentRoom {
     roomTypeId: string;
@@ -22,90 +27,74 @@ interface ConnectingRoom {
 
 const STORAGE_KEY = 'hotel_connecting_rooms_v1';
 
-// Real property room types
-const existingRoomTypes = [
-    { id: '1', name: 'Deluxe Double', code: 'DLX', price: 3000 },
-    { id: '2', name: 'Superior King', code: 'SUPK', price: 4500 },
-    { id: '3', name: 'Executive Suite', code: 'EXEC', price: 6500 },
-    { id: '4', name: 'Standard Single', code: 'STND', price: 2200 },
-    { id: '5', name: 'Presidential Suite', code: 'PRES', price: 18000 },
-];
-
-// Physical rooms mapping to actual hotel inventory
-const mockPhysicalRooms = [
-    // Floor 1
-    { id: '101', number: '101', typeId: '1' },
-    { id: '102', number: '102', typeId: '1' },
-    { id: '103', number: '103', typeId: '2' },
-    { id: '104', number: '104', typeId: '3' },
-    { id: '105', number: '105', typeId: '4' },
-    { id: '106', number: '106', typeId: '4' },
-    { id: '107', number: '107', typeId: '1' },
-    { id: '108', number: '108', typeId: '2' },
-    // Floor 2
-    { id: '201', number: '201', typeId: '2' },
-    { id: '202', number: '202', typeId: '2' },
-    { id: '203', number: '203', typeId: '3' },
-    { id: '204', number: '204', typeId: '1' },
-    { id: '205', number: '205', typeId: '4' },
-    { id: '206', number: '206', typeId: '1' },
-    { id: '207', number: '207', typeId: '1' },
-    { id: '208', number: '208', typeId: '2' },
-    // Floor 3
-    { id: '301', number: '301', typeId: '1' },
-    { id: '302', number: '302', typeId: '4' },
-    { id: '303', number: '303', typeId: '3' },
-    { id: '304', number: '304', typeId: '1' },
-    { id: '305', number: '305', typeId: '1' },
-    { id: '306', number: '306', typeId: '2' },
-    { id: '307', number: '307', typeId: '1' },
-    { id: '308', number: '308', typeId: '2' },
-    // Floor 4 & 5
-    { id: '401', number: '401', typeId: '3' },
-    { id: '402', number: '402', typeId: '3' },
-    { id: '403', number: '403', typeId: '1' },
-    { id: '404', number: '404', typeId: '2' },
-    { id: '501', number: '501', typeId: '5' },
-    { id: '502', number: '502', typeId: '3' },
-];
-
-const INITIAL_CONNECTING_ROOMS: ConnectingRoom[] = [
-    {
-        id: 1,
-        name: 'Family Interconnecting Deluxe Suite (101-102)',
-        componentRooms: [
-            { roomTypeId: '1', count: 1, roomNumbers: ['101'] },
-            { roomTypeId: '1', count: 1, roomNumbers: ['102'] }
-        ],
-        inventoryLogic: 'Auto-Sync',
-        pricingStrategy: 'Sum of Rates',
-        status: 'Active'
-    },
-    {
-        id: 2,
-        name: 'Executive & Superior Adjoining Suite (201-202)',
-        componentRooms: [
-            { roomTypeId: '2', count: 1, roomNumbers: ['201'] },
-            { roomTypeId: '2', count: 1, roomNumbers: ['202'] }
-        ],
-        inventoryLogic: 'Auto-Sync',
-        pricingStrategy: 'Fixed Rate',
-        fixedPrice: 8500,
-        status: 'Active'
+const deriveDefaultConnectingRooms = (roomsList: ReturnType<typeof getCanonicalRooms>): ConnectingRoom[] => {
+    const connectingUnits = roomsList.filter(r => r.isConnecting);
+    if (connectingUnits.length >= 2) {
+        return [{
+            id: 1,
+            name: `Interconnecting Suite (${connectingUnits.slice(0, 2).map(u => u.number).join('-')})`,
+            componentRooms: connectingUnits.slice(0, 2).map(u => ({
+                roomTypeId: String(u.roomTypeId),
+                count: 1,
+                roomNumbers: [u.number]
+            })),
+            inventoryLogic: 'Auto-Sync',
+            pricingStrategy: 'Sum of Rates',
+            status: 'Active'
+        }];
     }
-];
+    if (roomsList.length >= 2) {
+        return [{
+            id: 1,
+            name: `Adjoining Suite (${roomsList[0].number}-${roomsList[1].number})`,
+            componentRooms: [
+                { roomTypeId: String(roomsList[0].roomTypeId), count: 1, roomNumbers: [roomsList[0].number] },
+                { roomTypeId: String(roomsList[1].roomTypeId), count: 1, roomNumbers: [roomsList[1].number] }
+            ],
+            inventoryLogic: 'Auto-Sync',
+            pricingStrategy: 'Sum of Rates',
+            status: 'Active'
+        }];
+    }
+    return [];
+};
 
 const ConnectingRoomManagement = () => {
     const [view, setView] = useState<'list' | 'form'>('list');
+    const [roomTypes, setRoomTypes] = useState(() => getDynamicRoomTypes());
+    const [physicalRoomsState, setPhysicalRoomsState] = useState(() => getCanonicalRooms());
+
+    useEffect(() => {
+        syncRoomTypesAndRoomsFromDB(1).then(({ roomTypes: rt, rooms: r }) => {
+            if (rt.length > 0) setRoomTypes(rt);
+            if (r.length > 0) setPhysicalRoomsState(r);
+        }).catch(() => {});
+    }, []);
+
+    const existingRoomTypes = useMemo(() => roomTypes.map(rt => ({
+        id: String(rt.id),
+        name: rt.name,
+        code: rt.code,
+        price: Number(rt.baseRate) || 3000
+    })), [roomTypes]);
+
+    const physicalRoomsList = useMemo(() => physicalRoomsState.map(r => ({
+        id: r.number,
+        number: r.number,
+        typeId: String(r.roomTypeId)
+    })), [physicalRoomsState]);
 
     const [connectingRooms, setConnectingRooms] = useState<ConnectingRoom[]>(() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) return JSON.parse(saved);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
         } catch {
             // ignore
         }
-        return INITIAL_CONNECTING_ROOMS;
+        return deriveDefaultConnectingRooms(getCanonicalRooms());
     });
 
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -473,7 +462,7 @@ const ConnectingRoomManagement = () => {
 
                     <div className="space-y-3">
                         {formData?.componentRooms.map((comp, index) => {
-                            const availableRooms = mockPhysicalRooms.filter(r => r.typeId === comp.roomTypeId);
+                            const availableRooms = physicalRoomsList.filter(r => r.typeId === comp.roomTypeId);
 
                             return (
                                 <div key={index} className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80">

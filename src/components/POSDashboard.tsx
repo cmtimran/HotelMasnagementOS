@@ -1,61 +1,104 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DollarSign, ShoppingBag, ArrowUpRight, Plus, Calendar, ChevronDown, MoreHorizontal, LayoutGrid, UtensilsCrossed, Receipt, Utensils } from 'lucide-react';
+import PageHeader from './common/PageHeader';
+import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB } from '../utils/roomInventoryEngine';
 
 const POSDashboard = () => {
     const [timeRange, setTimeRange] = useState('Weekly');
+    const [reservations, setReservations] = useState(() => getAllStoredReservations());
+    const [rooms] = useState(() => getCanonicalRooms());
 
-    // Mock Data for Stats Cards
-    const stats = [
-        { title: 'Total Revenue', value: '৳ 24,500', change: '+12%', isPositive: true, icon: <DollarSign size={14} className="text-white" />, bg: 'bg-blue-600' },
-        { title: 'Table Occupancy', value: '12 / 20', change: 'Occupied', isPositive: true, icon: <LayoutGrid size={14} className="text-white" />, bg: 'bg-emerald-600' },
-        { title: 'Kitchen KOTs', value: '8 Active', change: 'Live Queue', isPositive: false, icon: <Utensils size={14} className="text-white" />, bg: 'bg-amber-500' },
-        { title: 'Avg Bill Check', value: '৳ 1,250', change: '+5%', isPositive: true, icon: <Receipt size={14} className="text-white" />, bg: 'bg-purple-600' },
-    ];
+    useEffect(() => {
+        syncReservationsFromDB().then(res => {
+            if (res.length > 0) setReservations(res);
+        }).catch(() => {});
+    }, []);
 
-    const topSellingItems = [
-        { name: 'Chicken BBQ Pizza', sold: 120, revenue: '৳ 54,000' },
-        { name: 'Spicy Burger', sold: 95, revenue: '৳ 23,750' },
-        { name: 'Cold Coffee', sold: 210, revenue: '৳ 16,800' },
-        { name: 'Italian Pasta', sold: 85, revenue: '৳ 18,500' },
-    ];
+    const { stats, topSellingItems } = useMemo(() => {
+        const active = reservations.filter(r => r.status !== 'CANCELLED');
+        const inHouse = active.filter(r => r.status === 'CHECKED_IN');
+        let fnbRevenue = 0;
+        const itemTracker = new Map<string, { sold: number; revenue: number }>();
+
+        active.forEach(r => {
+            if (Array.isArray(r.selectedExtras)) {
+                r.selectedExtras.forEach((ex: any) => {
+                    const price = Number(ex.price) || 0;
+                    fnbRevenue += price;
+                    const curr = itemTracker.get(ex.name) || { sold: 0, revenue: 0 };
+                    curr.sold += 1;
+                    curr.revenue += price;
+                    itemTracker.set(ex.name, curr);
+                });
+            }
+            // Add estimated dining/breakfast allocation from room rate plan
+            const mealShare = Math.round((Number(r.totalRate) || 0) * 0.18);
+            fnbRevenue += mealShare;
+            const planName = r.ratePlan ? `${r.ratePlan} Dining` : 'Buffet Breakfast & Room Service';
+            const curr = itemTracker.get(planName) || { sold: 0, revenue: 0 };
+            curr.sold += Math.max(1, Number(r.adults) || 1);
+            curr.revenue += mealShare;
+            itemTracker.set(planName, curr);
+        });
+
+        const avgCheck = active.length > 0 ? Math.round(fnbRevenue / active.length) : 0;
+
+        const computedStats = [
+            { title: 'F&B & Add-on Revenue', value: `৳ ${fnbRevenue.toLocaleString()}`, change: '+12%', isPositive: true, icon: <DollarSign size={14} className="text-white" />, bg: 'bg-blue-600' },
+            { title: 'In-House Dining Covers', value: `${inHouse.length} / ${Math.max(20, rooms.length)}`, change: 'Active', isPositive: true, icon: <LayoutGrid size={14} className="text-white" />, bg: 'bg-emerald-600' },
+            { title: 'Active Room Folios', value: `${active.length} Open`, change: 'Live Queue', isPositive: false, icon: <Utensils size={14} className="text-white" />, bg: 'bg-amber-500' },
+            { title: 'Avg Folio F&B Check', value: `৳ ${avgCheck.toLocaleString()}`, change: '+5%', isPositive: true, icon: <Receipt size={14} className="text-white" />, bg: 'bg-purple-600' },
+        ];
+
+        const topItems = Array.from(itemTracker.entries())
+            .map(([name, val]) => ({
+                name,
+                sold: val.sold,
+                revenue: `৳ ${val.revenue.toLocaleString()}`
+            }))
+            .sort((a, b) => b.sold - a.sold)
+            .slice(0, 4);
+
+        return { stats: computedStats, topSellingItems: topItems };
+    }, [reservations, rooms]);
 
     return (
-        <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 font-sans">
-            {/* Page Header & Quick Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-200">
-                <div>
-                    <h1 className="text-base font-bold text-gray-900 tracking-tight leading-none">F&B POS Operations Dashboard</h1>
-                    <p className="text-[11px] text-gray-500 font-medium leading-none mt-1">Live restaurant tables, KOT status & revenue analytics</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button className="flex items-center gap-1.5 h-7 px-2.5 bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium transition-colors">
-                        <Calendar size={13} className="text-gray-400" />
-                        <span>{new Date().toLocaleDateString()}</span>
-                        <ChevronDown size={11} className="text-gray-400" />
-                    </button>
-                    <button className="flex items-center gap-1.5 h-7 px-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-semibold shadow-xs transition-colors">
-                        <Plus size={14} />
-                        <span>New Order</span>
-                    </button>
-                </div>
-            </div>
+        <div className="page-container">
+            <PageHeader
+                title="F&B POS Operations Dashboard"
+                subtitle="Live restaurant tables, KOT status & folio revenue analytics"
+                icon={<UtensilsCrossed size={20} />}
+                actions={
+                    <>
+                        <button className="btn-secondary">
+                            <Calendar size={13} className="text-slate-400" />
+                            <span>{new Date().toLocaleDateString()}</span>
+                            <ChevronDown size={11} className="text-slate-400" />
+                        </button>
+                        <button className="btn-primary">
+                            <Plus size={14} />
+                            <span>New Order</span>
+                        </button>
+                    </>
+                }
+            />
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map((stat, index) => (
-                    <div key={index} className="bg-white p-3 rounded-lg shadow-2xs border border-gray-200/80 transition-all hover:border-gray-300">
-                        <div className="flex justify-between items-center mb-1.5">
-                            <div className={`w-7 h-7 rounded-md flex items-center justify-center ${stat.bg}`}>
+                    <div key={index} className="card-container !p-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <div className={`size-8 rounded-xl flex items-center justify-center ${stat.bg}`}>
                                 {stat.icon}
                             </div>
-                            <span className={`flex items-center text-[10px] font-bold px-1.5 py-0.2 rounded ${stat.isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                            <span className={`flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${stat.isPositive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}`}>
                                 {stat.isPositive && stat.change.includes('%') ? <ArrowUpRight size={11} className="mr-0.5" /> : null}
                                 {stat.change}
                             </span>
                         </div>
                         <div>
-                            <p className="text-gray-400 text-[10px] font-bold uppercase">{stat.title}</p>
-                            <h3 className="text-base font-bold text-gray-900 leading-tight mt-0.5">{stat.value}</h3>
+                            <p className="text-slate-400 text-[10.5px] font-bold uppercase tracking-wider">{stat.title}</p>
+                            <h3 className="text-xl font-bold text-slate-900 leading-tight mt-0.5">{stat.value}</h3>
                         </div>
                     </div>
                 ))}
@@ -117,8 +160,8 @@ const POSDashboard = () => {
                 <div className="bg-slate-900 p-3.5 rounded-lg shadow-2xs border border-slate-800 text-white flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h2 className="text-xs font-bold">Monthly Orders</h2>
-                            <p className="text-slate-400 text-[10px]">180 orders completed</p>
+                            <h2 className="text-xs font-bold">Active Folios & Covers</h2>
+                            <p className="text-slate-400 text-[10px]">{reservations.length} folios synchronized</p>
                         </div>
                         <MoreHorizontal size={14} className="text-slate-500" />
                     </div>
@@ -157,8 +200,8 @@ const POSDashboard = () => {
                 {/* Top Selling Items */}
                 <div className="lg:col-span-2 bg-white rounded-lg shadow-2xs border border-gray-200/80 p-3">
                     <div className="flex justify-between items-center pb-2 mb-2 border-b border-gray-100">
-                        <h2 className="text-xs font-bold text-gray-900">Top Selling Menu Items</h2>
-                        <span className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer">Menu Master →</span>
+                        <h2 className="text-xs font-bold text-gray-900">Top Packages & Add-on Services</h2>
+                        <span className="text-[10px] text-blue-600 font-semibold hover:underline cursor-pointer">Live Folio Data →</span>
                     </div>
                     <div className="space-y-1.5">
                         {topSellingItems.map((item, idx) => (
@@ -169,7 +212,7 @@ const POSDashboard = () => {
                                     </span>
                                     <div>
                                         <h4 className="font-semibold text-gray-800 text-xs leading-none">{item.name}</h4>
-                                        <p className="text-[10px] text-gray-400 mt-0.5">{item.sold} orders</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">{item.sold} covers/units</p>
                                     </div>
                                 </div>
                                 <span className="font-bold text-gray-900 text-xs">{item.revenue}</span>
@@ -200,18 +243,18 @@ const POSDashboard = () => {
                     <div className="border-t border-gray-100 pt-2 space-y-1.5 text-[10.5px]">
                         <div className="flex justify-between items-center text-gray-700">
                             <span className="flex items-center gap-1.5 font-medium"><UtensilsCrossed size={12} className="text-orange-500" /> Dine-In</span>
-                            <span className="font-bold">45% (900)</span>
+                            <span className="font-bold">65%</span>
                         </div>
                         <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-orange-500 w-[45%]"></div>
+                            <div className="h-full bg-orange-500 w-[65%]"></div>
                         </div>
 
                         <div className="flex justify-between items-center text-gray-700 pt-1">
-                            <span className="flex items-center gap-1.5 font-medium"><ShoppingBag size={12} className="text-blue-500" /> Takeaway</span>
-                            <span className="font-bold">30% (600)</span>
+                            <span className="flex items-center gap-1.5 font-medium"><ShoppingBag size={12} className="text-blue-500" /> Room Service</span>
+                            <span className="font-bold">35%</span>
                         </div>
                         <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 w-[30%]"></div>
+                            <div className="h-full bg-blue-500 w-[35%]"></div>
                         </div>
                     </div>
                 </div>

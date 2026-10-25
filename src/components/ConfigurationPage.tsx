@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, Search, Filter, Edit2, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Search, Filter, Edit2, Trash2, Building2 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 
 interface Column {
@@ -12,6 +12,7 @@ interface Column {
 interface ConfigurationPageProps {
     title: string;
     description?: string;
+    icon?: React.ReactNode;
     columns: Column[];
     data: any[];
     onAdd?: () => void;
@@ -22,18 +23,37 @@ interface ConfigurationPageProps {
 const ConfigurationPage: React.FC<ConfigurationPageProps> = ({
     title,
     description,
+    icon,
     columns,
     data,
     onAdd,
     onEdit,
     onDelete
 }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const singularTitle = title === 'Properties'
+        ? 'Property'
+        : title.endsWith('ies')
+            ? `${title.slice(0, -3)}y`
+            : title.endsWith('s')
+                ? title.slice(0, -1)
+                : title;
+
+    const filteredData = data.filter((row) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return Object.values(row).some((val) =>
+            String(val ?? '').toLowerCase().includes(q)
+        );
+    });
+
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto font-sans space-y-4 text-slate-800">
+        <div className="page-container">
             {/* Standardized Page Header */}
             <PageHeader
                 title={title}
                 subtitle={description}
+                icon={icon || <Building2 size={20} />}
                 actions={
                     onAdd ? (
                         <button
@@ -42,23 +62,25 @@ const ConfigurationPage: React.FC<ConfigurationPageProps> = ({
                             className="btn-primary"
                         >
                             <Plus size={14} className="stroke-[2.5]" />
-                            <span>Add New {title}</span>
+                            <span>Add {singularTitle}</span>
                         </button>
                     ) : undefined
                 }
             />
 
             {/* Toolbar & Search Bar */}
-            <div className="card-container p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="relative w-full sm:w-72">
+            <div className="card-container !p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="relative w-full sm:w-80">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
-                        placeholder={`Search ${title}...`}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={`Search ${title.toLowerCase()}...`}
                         className="input-standard pl-9"
                     />
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-2 w-full sm:w-auto justify-end">
                     <button type="button" className="btn-secondary">
                         <Filter size={13} className="text-slate-400" />
                         <span>Filters</span>
@@ -79,7 +101,7 @@ const ConfigurationPage: React.FC<ConfigurationPageProps> = ({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {data.map((row, index) => (
+                            {filteredData.map((row, index) => (
                                 <tr key={index} className="hover:bg-primary-subtle/30 transition-colors">
                                     {columns.map((col) => (
                                         <td key={col.key} className={`px-4 py-3 ${col.className || ''}`}>
@@ -110,7 +132,7 @@ const ConfigurationPage: React.FC<ConfigurationPageProps> = ({
 
                 {/* Pagination */}
                 <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 bg-slate-50/50">
-                    <span>Showing 1 to {data.length} of {data.length} results</span>
+                    <span>Showing {filteredData.length > 0 ? 1 : 0} to {filteredData.length} of {filteredData.length} results</span>
                     <div className="flex items-center gap-1.5">
                         <button type="button" className="btn-secondary py-1 px-3 text-xs">Previous</button>
                         <button type="button" className="btn-secondary py-1 px-3 text-xs">Next</button>

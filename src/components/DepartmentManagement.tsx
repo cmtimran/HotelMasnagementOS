@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PageHeader from './common/PageHeader';
 import {
     Building2,
     Plus,
@@ -12,6 +13,7 @@ import {
     DollarSign,
     Briefcase
 } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 export interface Department {
     id: number;
@@ -25,15 +27,6 @@ export interface Department {
     status: 'Active' | 'Inactive';
 }
 
-const INITIAL_DEPARTMENTS: Department[] = [
-    { id: 1, code: 'FO', name: 'Front Office & Guest Services', hodName: 'Md. Rafiqul Islam (FOM)', costCenterCode: 'CC-101', type: 'Operational (Revenue Generating)', staffCount: 18, monthlyBudgetBDT: 850000, status: 'Active' },
-    { id: 2, code: 'HK', name: 'Housekeeping & Public Areas', hodName: 'Nasrin Sultana (Executive Housekeeper)', costCenterCode: 'CC-102', type: 'Operational (Revenue Generating)', staffCount: 32, monthlyBudgetBDT: 1100000, status: 'Active' },
-    { id: 3, code: 'FNB', name: 'Food & Beverage Service', hodName: 'Chef Jean Dupont (F&B Director)', costCenterCode: 'CC-201', type: 'Operational (Revenue Generating)', staffCount: 28, monthlyBudgetBDT: 1450000, status: 'Active' },
-    { id: 4, code: 'ENG', name: 'Engineering & Facilities', hodName: 'Engr. Tanvir Ahmed (Chief Engineer)', costCenterCode: 'CC-301', type: 'Support & Administration', staffCount: 12, monthlyBudgetBDT: 650000, status: 'Active' },
-    { id: 5, code: 'ACC', name: 'Accounts & Financial Control', hodName: 'Farhan Chowdhury, FCA (Controller)', costCenterCode: 'CC-401', type: 'Support & Administration', staffCount: 8, monthlyBudgetBDT: 550000, status: 'Active' },
-    { id: 6, code: 'SEC', name: 'Security & Loss Prevention', hodName: 'Major (Retd.) Enamul Haque (CSO)', costCenterCode: 'CC-501', type: 'Support & Administration', staffCount: 16, monthlyBudgetBDT: 480000, status: 'Active' }
-];
-
 export const DepartmentManagement: React.FC = () => {
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -44,15 +37,34 @@ export const DepartmentManagement: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state from localStorage
-    const [departments, setDepartments] = useState<Department[]>(() => {
-        const saved = localStorage.getItem('master_departments_v2');
-        return saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
-    });
+    // Hydrate state from API
+    const [departments, setDepartments] = useState<Department[]>([]);
 
-    useEffect(() => {
-        localStorage.setItem('master_departments_v2', JSON.stringify(departments));
-    }, [departments]);
+    const loadDepartments = async () => {
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/hrm/departments`);
+            const json = await res.json();
+            if (json.success) {
+                const data = json.data;
+                const mapped: Department[] = data.map((d: any) => ({
+                    id: d.id,
+                    code: d.code,
+                    name: d.name,
+                    hodName: d.hod_name || '—',
+                    costCenterCode: d.cost_center_code || `CC-${d.code}`,
+                    type: d.department_type === 'SUPPORT' ? 'Support & Administration' : 'Operational (Revenue Generating)',
+                    staffCount: Number(d.active_employees) || 0,
+                    monthlyBudgetBDT: Number(d.monthly_budget) || 500000,
+                    status: d.status === 'INACTIVE' ? 'Inactive' : 'Active'
+                }));
+                setDepartments(mapped);
+            }
+        } catch (err) {
+            console.error('Failed to load departments:', err);
+        }
+    };
+
+    useEffect(() => { loadDepartments(); }, []);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -98,31 +110,44 @@ export const DepartmentManagement: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.code || !formData.name) return;
 
-        if (editingDepartment) {
-            setDepartments(prev =>
-                prev.map(d => d.id === editingDepartment.id ? { ...d, ...formData } : d)
-            );
-            showToast(`Department "${formData.name}" updated successfully.`);
-        } else {
-            const newDept: Department = {
-                id: Date.now(),
-                ...formData
-            };
-            setDepartments(prev => [...prev, newDept]);
-            showToast(`Department "${newDept.name}" created successfully.`);
+        try {
+            const body = { code: formData.code, name: formData.name, costCenterCode: formData.costCenterCode };
+            if (editingDepartment) {
+                await fetch(`${getApiBaseUrl()}/api/hrm/departments/${editingDepartment.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                showToast(`Department "${formData.name}" updated successfully.`);
+            } else {
+                await fetch(`${getApiBaseUrl()}/api/hrm/departments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                showToast(`Department "${formData.name}" created successfully.`);
+            }
+            await loadDepartments();
+        } catch (err) {
+            console.error('Failed to save department:', err);
         }
         setIsModalOpen(false);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         const item = departments.find(d => d.id === id);
         if (window.confirm(`Are you sure you want to delete department "${item?.name}"?`)) {
-            setDepartments(prev => prev.filter(d => d.id !== id));
-            showToast('Department removed.');
+            try {
+                await fetch(`${getApiBaseUrl()}/api/hrm/departments/${id}`, { method: 'DELETE' });
+                showToast('Department removed.');
+                await loadDepartments();
+            } catch (err) {
+                console.error('Failed to delete department:', err);
+            }
         }
     };
 
@@ -151,7 +176,7 @@ export const DepartmentManagement: React.FC = () => {
     const supportCount = departments.filter(d => d.type.includes('Support')).length;
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5 animate-in fade-in duration-150">
+        <div className="page-container animate-in fade-in duration-150">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
@@ -160,39 +185,22 @@ export const DepartmentManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <Building2 size={22} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
-                                Hotel Department & Cost Center Management
-                            </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                                USALI Cost Centers
-                            </span>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                HR & Budgeting
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Organize operational divisions, administrative cost centers, department heads (HODs), staffing quotas, and monthly operating expense budgets.
-                        </p>
-                    </div>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={handleOpenAdd}
-                    className="h-8 px-3.5 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer self-start md:self-auto"
-                >
-                    <Plus size={14} />
-                    <span>+ Add Department</span>
-                </button>
-            </div>
+            <PageHeader
+                title="Hotel Department & Cost Center Management"
+                subtitle="Organize operational divisions, administrative cost centers, department heads (HODs), staffing quotas, and monthly operating expense budgets"
+                icon={<Building2 size={20} />}
+                badge="USALI Cost Centers"
+                actions={
+                    <button
+                        type="button"
+                        onClick={handleOpenAdd}
+                        className="btn-primary"
+                    >
+                        <Plus size={14} />
+                        <span>Add Department</span>
+                    </button>
+                }
+            />
 
             {/* KPI Metrics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">

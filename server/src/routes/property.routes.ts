@@ -102,6 +102,13 @@ router.get('/:id', (req: Request, res: Response) => {
         }
 
         const buildings = db.prepare('SELECT * FROM buildings WHERE property_id = ? ORDER BY sort_order').all(propertyId);
+        const floors = db.prepare(`
+            SELECT f.*
+            FROM floors f
+            JOIN buildings b ON b.id = f.building_id
+            WHERE b.property_id = ?
+            ORDER BY f.floor_number ASC
+        `).all(propertyId);
         const roomTypes = db.prepare('SELECT * FROM room_types WHERE property_id = ?').all(propertyId);
         const rooms = db.prepare(`
             SELECT r.*, rt.name as room_type_name, f.name as floor_name, b.name as building_name
@@ -118,6 +125,7 @@ router.get('/:id', (req: Request, res: Response) => {
             data: {
                 property,
                 buildings,
+                floors,
                 roomTypes,
                 rooms,
                 stats: {
@@ -229,6 +237,210 @@ router.put('/:id', async (req: Request, res: Response) => {
         res.json({ success: true, data: updated, message: 'Property updated successfully' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to update property' });
+    }
+});
+
+// POST /api/properties/:id/buildings - Create building
+router.post('/:id/buildings', async (req: Request, res: Response) => {
+    try {
+        const propertyId = Number(req.params.id) || 1;
+        const { code, name, sortOrder } = req.body;
+        const bCode = (code || 'BLD').toUpperCase();
+        const bName = name || 'New Wing';
+        const result = db.prepare(`
+            INSERT INTO buildings (property_id, code, name, sort_order)
+            VALUES (?, ?, ?, ?)
+        `).run(propertyId, bCode, bName, Number(sortOrder) || 1);
+        const newId = Number(result.lastInsertRowid);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query(
+                    `INSERT INTO buildings (id, property_id, code, name, sort_order) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
+                    [newId, propertyId, bCode, bName, Number(sortOrder) || 1]
+                );
+            } catch {}
+        }
+        res.status(201).json({ success: true, data: { id: newId, code: bCode, name: bName } });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to create building' });
+    }
+});
+
+// PUT /api/properties/:id/buildings/:buildingId - Update building
+router.put('/:id/buildings/:buildingId', async (req: Request, res: Response) => {
+    try {
+        const buildingId = Number(req.params.buildingId);
+        const { code, name, sortOrder } = req.body;
+        db.prepare(`
+            UPDATE buildings
+            SET code = COALESCE(?, code),
+                name = COALESCE(?, name),
+                sort_order = COALESCE(?, sort_order)
+            WHERE id = ?
+        `).run(code ? code.toUpperCase() : null, name || null, sortOrder ? Number(sortOrder) : null, buildingId);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query(
+                    `UPDATE buildings SET code = COALESCE($1, code), name = COALESCE($2, name), sort_order = COALESCE($3, sort_order) WHERE id = $4`,
+                    [code ? code.toUpperCase() : null, name || null, sortOrder ? Number(sortOrder) : null, buildingId]
+                );
+            } catch {}
+        }
+        res.json({ success: true, message: 'Building updated' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to update building' });
+    }
+});
+
+// DELETE /api/properties/:id/buildings/:buildingId - Delete building
+router.delete('/:id/buildings/:buildingId', async (req: Request, res: Response) => {
+    try {
+        const buildingId = Number(req.params.buildingId);
+        db.prepare('DELETE FROM buildings WHERE id = ?').run(buildingId);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query('DELETE FROM buildings WHERE id = $1', [buildingId]);
+            } catch {}
+        }
+        res.json({ success: true, message: 'Building deleted' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to delete building' });
+    }
+});
+
+// POST /api/properties/:id/floors - Create floor
+router.post('/:id/floors', async (req: Request, res: Response) => {
+    try {
+        const { buildingId, floorNumber, name } = req.body;
+        const result = db.prepare(`
+            INSERT INTO floors (building_id, floor_number, name, sort_order)
+            VALUES (?, ?, ?, ?)
+        `).run(Number(buildingId) || 1, Number(floorNumber) || 1, name || 'Floor', Number(floorNumber) || 1);
+        const newId = Number(result.lastInsertRowid);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query(
+                    `INSERT INTO floors (id, building_id, floor_number, name, sort_order) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
+                    [newId, Number(buildingId) || 1, Number(floorNumber) || 1, name || 'Floor', Number(floorNumber) || 1]
+                );
+            } catch {}
+        }
+        res.status(201).json({ success: true, data: { id: newId } });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to create floor' });
+    }
+});
+
+// PUT /api/properties/:id/floors/:floorId - Update floor
+router.put('/:id/floors/:floorId', async (req: Request, res: Response) => {
+    try {
+        const floorId = Number(req.params.floorId);
+        const { buildingId, floorNumber, name } = req.body;
+        db.prepare(`
+            UPDATE floors
+            SET building_id = COALESCE(?, building_id),
+                floor_number = COALESCE(?, floor_number),
+                name = COALESCE(?, name)
+            WHERE id = ?
+        `).run(buildingId ? Number(buildingId) : null, floorNumber ? Number(floorNumber) : null, name || null, floorId);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query(
+                    `UPDATE floors SET building_id = COALESCE($1, building_id), floor_number = COALESCE($2, floor_number), name = COALESCE($3, name) WHERE id = $4`,
+                    [buildingId ? Number(buildingId) : null, floorNumber ? Number(floorNumber) : null, name || null, floorId]
+                );
+            } catch {}
+        }
+        res.json({ success: true, message: 'Floor updated' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to update floor' });
+    }
+});
+
+// DELETE /api/properties/:id/floors/:floorId - Delete floor
+router.delete('/:id/floors/:floorId', async (req: Request, res: Response) => {
+    try {
+        const floorId = Number(req.params.floorId);
+        db.prepare('DELETE FROM floors WHERE id = ?').run(floorId);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query('DELETE FROM floors WHERE id = $1', [floorId]);
+            } catch {}
+        }
+        res.json({ success: true, message: 'Floor deleted' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to delete floor' });
+    }
+});
+
+// POST /api/properties/:id/room-types - Create room type
+router.post('/:id/room-types', async (req: Request, res: Response) => {
+    try {
+        const propertyId = Number(req.params.id) || 1;
+        const { code, name, baseOccupancy, maxOccupancy, baseRate, description } = req.body;
+        const rtCode = (code || 'RT').toUpperCase();
+        const rtName = name || 'New Room Type';
+        const result = db.prepare(`
+            INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, description)
+            VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+        `).run(propertyId, rtCode, rtName, Number(baseOccupancy) || 2, Number(maxOccupancy) || 3, Number(baseRate) || 3500, description || null);
+        const newId = Number(result.lastInsertRowid);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query(
+                    `INSERT INTO room_types (id, property_id, code, name, base_occupancy, max_adults, max_children, base_rate, description) VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8) ON CONFLICT (id) DO NOTHING`,
+                    [newId, propertyId, rtCode, rtName, Number(baseOccupancy) || 2, Number(maxOccupancy) || 3, Number(baseRate) || 3500, description || null]
+                );
+            } catch {}
+        }
+        res.status(201).json({ success: true, data: { id: newId, code: rtCode, name: rtName } });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to create room type' });
+    }
+});
+
+// PUT /api/properties/:id/room-types/:roomTypeId - Update room type
+router.put('/:id/room-types/:roomTypeId', async (req: Request, res: Response) => {
+    try {
+        const roomTypeId = Number(req.params.roomTypeId);
+        const { code, name, baseOccupancy, maxOccupancy, baseRate, description } = req.body;
+        db.prepare(`
+            UPDATE room_types
+            SET code = COALESCE(?, code),
+                name = COALESCE(?, name),
+                base_occupancy = COALESCE(?, base_occupancy),
+                max_adults = COALESCE(?, max_adults),
+                base_rate = COALESCE(?, base_rate),
+                description = COALESCE(?, description)
+            WHERE id = ?
+        `).run(code ? code.toUpperCase() : null, name || null, baseOccupancy ? Number(baseOccupancy) : null, maxOccupancy ? Number(maxOccupancy) : null, baseRate ? Number(baseRate) : null, description || null, roomTypeId);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query(
+                    `UPDATE room_types SET code = COALESCE($1, code), name = COALESCE($2, name), base_occupancy = COALESCE($3, base_occupancy), max_adults = COALESCE($4, max_adults), base_rate = COALESCE($5, base_rate), description = COALESCE($6, description) WHERE id = $7`,
+                    [code ? code.toUpperCase() : null, name || null, baseOccupancy ? Number(baseOccupancy) : null, maxOccupancy ? Number(maxOccupancy) : null, baseRate ? Number(baseRate) : null, description || null, roomTypeId]
+                );
+            } catch {}
+        }
+        res.json({ success: true, message: 'Room type updated' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to update room type' });
+    }
+});
+
+// DELETE /api/properties/:id/room-types/:roomTypeId - Delete room type
+router.delete('/:id/room-types/:roomTypeId', async (req: Request, res: Response) => {
+    try {
+        const roomTypeId = Number(req.params.roomTypeId);
+        db.prepare('DELETE FROM room_types WHERE id = ?').run(roomTypeId);
+        if (isPostgresConnected()) {
+            try {
+                await pgPool.query('DELETE FROM room_types WHERE id = $1', [roomTypeId]);
+            } catch {}
+        }
+        res.json({ success: true, message: 'Room type deleted' });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to delete room type' });
     }
 });
 

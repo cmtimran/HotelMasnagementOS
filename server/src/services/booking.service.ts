@@ -68,11 +68,174 @@ const resolvePropertyId = (propertyId: string | number | undefined): number => {
 
 export const bookingService = {
   /**
-   * Fetch all bookings for a property directly from SQLite database
+   * Fetch all bookings for a property directly from PostgreSQL Cloud or embedded SQLite database
    */
   getAllBookings: async (propertyId: string | number, status?: string): Promise<BookingRecord[]> => {
     const propId = resolvePropertyId(propertyId);
 
+    // 1. Query Cloud PostgreSQL (TiDB) if connected
+    if (isPostgresConnected()) {
+      try {
+        const reservationsRes = await pgPool.query(`
+          SELECT 
+            r.id,
+            r.property_id,
+            r.reservation_number,
+            r.source,
+            r.channel,
+            r.agent,
+            r.is_group,
+            r.status as db_status,
+            r.total_amount,
+            r.paid_amount,
+            r.due_amount,
+            r.special_requests,
+            r.created_at,
+            g.id as guest_id,
+            g.salutation,
+            g.first_name,
+            g.last_name,
+            g.email,
+            g.phone,
+            g.vip_status,
+            ca.company_name as corporate_name
+          FROM reservations r
+          JOIN guests g ON g.id = r.booker_guest_id
+          LEFT JOIN corporate_accounts ca ON ca.id = r.corporate_account_id
+          WHERE r.property_id = $1
+          ORDER BY r.id DESC
+        `, [propId]);
+
+        const roomsRes = await pgPool.query(`
+          SELECT 
+            rr.id,
+            rr.reservation_id,
+            rr.room_id,
+            rr.check_in_date,
+            rr.check_out_date,
+            rr.nights,
+            rr.room_rate,
+            rr.adults,
+            rr.children,
+            rr.status as room_stay_status,
+            rm.room_number,
+            rm.name as room_name,
+            rt.name as room_type_name,
+            rt.code as room_type_code
+          FROM reservation_rooms rr
+          JOIN rooms rm ON rm.id = rr.room_id
+          JOIN room_types rt ON rt.id = rm.room_type_id
+          ORDER BY rr.id ASC
+        `);
+
+        if (reservationsRes.rows.length > 0) {
+          const roomsMap = new Map<number | string, any[]>();
+          for (const rm of roomsRes.rows) {
+            const list = roomsMap.get(rm.reservation_id);
+            if (list) list.push(rm);
+            else roomsMap.set(rm.reservation_id, [rm]);
+          }
+
+          const results: BookingRecord[] = [];
+          const todayStr = new Date().toISOString().slice(0, 10);
+
+          const formatDate = (val: any): string => {
+            if (!val) return todayStr;
+            if (typeof val === 'string') return val.slice(0, 10);
+            if (val instanceof Date) return val.toISOString().slice(0, 10);
+            return String(val).slice(0, 10);
+          };
+
+          for (const r of reservationsRes.rows) {
+            const rooms = roomsMap.get(r.id) || [];
+            const allocatedRoomNumbers = rooms.map(rm => rm.room_number);
+            const primaryRoom = rooms[0] || {
+              room_number: 'Unassigned',
+              room_type_name: 'Standard Single',
+              check_in_date: todayStr,
+              check_out_date: todayStr,
+              nights: 1,
+              adults: 1,
+              children: 0,
+              room_rate: r.total_amount || 0
+            };
+
+            const primaryCheckIn = formatDate(primaryRoom.check_in_date);
+            const primaryCheckOut = formatDate(primaryRoom.check_out_date);
+
+            let uiStatus = STATUS_DB_TO_UI[r.db_status] || 'confirmed';
+            if (uiStatus === 'confirmed' && primaryCheckIn === todayStr) {
+              uiStatus = 'arriving';
+            } else if (uiStatus === 'in-house' && primaryCheckOut === todayStr) {
+              uiStatus = 'departing';
+            }
+
+            const guestFullName = `${r.salutation ? r.salutation + ' ' : ''}${r.first_name} ${r.last_name}`.trim();
+
+            results.push({
+              id: r.id,
+              resNo: r.reservation_number,
+              reservationNumber: r.reservation_number,
+              guestName: guestFullName,
+              phone: r.phone || '',
+              email: r.email || '',
+              roomNo: primaryRoom.room_number,
+              roomNumber: primaryRoom.room_number,
+              allocatedRooms: allocatedRoomNumbers.length > 0 ? allocatedRoomNumbers : [primaryRoom.room_number],
+              roomType: primaryRoom.room_type_name,
+              ratePlan: r.corporate_name || r.source || 'Standard Plan',
+              rateAmount: Number(r.total_amount) || 0,
+              totalAmount: Number(r.total_amount) || 0,
+              paidAmount: Number(r.paid_amount) || 0,
+              dueAmount: Number(r.due_amount) || 0,
+              arrivalDate: primaryCheckIn,
+              departureDate: primaryCheckOut,
+              checkIn: primaryCheckIn,
+              checkOut: primaryCheckOut,
+              nights: Number(primaryRoom.nights) || 1,
+              adults: Number(primaryRoom.adults) || 1,
+              children: Number(primaryRoom.children) || 0,
+              status: uiStatus,
+              propertyId: r.property_id,
+              source: r.source || 'Direct',
+              channel: r.channel || 'Front Desk',
+              vip: r.vip_status || 'None',
+              isGroup: Boolean(r.is_group),
+              specialRequests: r.special_requests || '',
+              roomsList: rooms.map(rm => {
+                const inD = formatDate(rm.check_in_date);
+                const outD = formatDate(rm.check_out_date);
+                return {
+                  id: rm.id,
+                  roomNumber: rm.room_number,
+                  roomType: rm.room_type_name,
+                  checkIn: inD,
+                  checkOut: outD,
+                  checkInDate: inD,
+                  checkOutDate: outD,
+                  nights: rm.nights,
+                  rate: rm.room_rate,
+                  adults: rm.adults,
+                  children: rm.children,
+                  status: rm.room_stay_status
+                };
+              }),
+              createdAt: r.created_at ? (typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString()) : new Date().toISOString()
+            });
+          }
+
+          if (status && status !== 'all') {
+            const target = status.toLowerCase();
+            return results.filter(b => b.status === target || (target === 'reservations' && b.status !== 'cancelled' && b.status !== 'voided'));
+          }
+          return results;
+        }
+      } catch (err: any) {
+        console.warn('Postgres query notice in getAllBookings, falling back to SQLite:', err.message);
+      }
+    }
+
+    // 2. High-speed Fallback to embedded SQLite
     const reservationsQuery = `
       SELECT 
         r.id,

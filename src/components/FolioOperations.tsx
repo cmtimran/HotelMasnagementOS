@@ -5,7 +5,7 @@ import {
     ShieldCheck, CheckCircle2,
     Search
 } from 'lucide-react';
-import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
+import { broadcastPMSEvent, getAllStoredReservations } from '../utils/roomInventoryEngine';
 import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
 import { getApiBaseUrl } from '../utils/apiUrl';
 
@@ -43,180 +43,68 @@ interface FolioAccount {
     transactions: Transaction[];
 }
 
-const INITIAL_FOLIOS: FolioAccount[] = [
-    {
-        id: 1,
-        roomNumber: '101',
-        guestName: 'Aniya Nusrat',
-        folioNumber: 'FOL-2026-0101',
-        roomType: 'Deluxe King',
-        checkIn: '2026-06-25',
-        checkOut: '2026-06-28',
-        package: 'Ultimate Honeymoon & Spa Package',
-        company: 'Individual Leisure',
-        allowances: [
-            { service: 'Complimentary Buffet Breakfast', total: 6, used: 2, unit: 'Meals' },
-            { service: 'Daily Laundry Valet', total: 6, used: 2, unit: 'Items' },
-            { service: 'Airport Pickup Transfer (Inbound)', total: 1, used: 1, unit: 'Trip' },
-            { service: 'Airport Drop Transfer (Outbound)', total: 1, used: 0, unit: 'Trip' },
-            { service: 'Signature Couple Spa (60m)', total: 1, used: 0, unit: 'Session' }
-        ],
-        transactions: [
+const buildFoliosFromCanonicalReservations = (): FolioAccount[] => {
+    const canonical = getAllStoredReservations();
+    return canonical.map((r, idx) => {
+        const folioId = idx + 1;
+        const nights = Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+        const total = Number(r.totalRate) || 0;
+        const paid = Number(r.paidAmount) || 0;
+        const txns: Transaction[] = [
             {
-                id: 101,
-                date: '25/06/2026 14:00',
-                refNo: 'DEP-9921',
-                particulars: 'Security Deposit (bKash)',
-                description: 'Pre-authorization advance payment received via MFS',
-                user: 'admin_imran',
-                amount: 15000.00,
-                windowId: 1,
-                category: 'Payment'
-            },
-            {
-                id: 102,
-                date: '25/06/2026 23:59',
-                refNo: 'SYS-AUDIT-01',
-                particulars: 'Room Rent (Night 1)',
-                description: 'Room Rate + 15% VAT & 10% Service Charge posted by EOD Audit',
-                user: 'system_audit',
-                amount: -6500.00,
-                windowId: 1,
-                category: 'Room'
-            },
-            {
-                id: 103,
-                date: '26/06/2026 12:30',
-                refNo: 'POS-REST-401',
-                particulars: 'The Grand Buffet Lunch',
-                description: 'Table 4 room posting - Seafood platter & mocktails',
-                user: 'pos_cashier',
-                amount: -3200.00,
-                windowId: 2,
-                category: 'F&B'
-            },
-            {
-                id: 104,
-                date: '26/06/2026 16:45',
-                refNo: 'MBN-0044',
-                particulars: 'Minibar Premium Selection',
-                description: 'Imported chocolates and sparkling water replenishment',
-                user: 'hk_supervisor',
-                amount: -1250.00,
-                windowId: 2,
-                category: 'Minibar'
-            }
-        ]
-    },
-    {
-        id: 2,
-        roomNumber: '201',
-        guestName: 'Standard Chartered Corp (Tarek Rahman)',
-        folioNumber: 'FOL-2026-0201',
-        roomType: 'Executive Suite',
-        checkIn: '2026-06-24',
-        checkOut: '2026-06-27',
-        package: 'Corporate Executive Bed & Board',
-        company: 'Standard Chartered Bank Ltd.',
-        allowances: [
-            { service: 'Executive Club Lounge Access', total: 3, used: 2, unit: 'Days' },
-            { service: 'Airport Transfer Sedan', total: 2, used: 1, unit: 'Trips' },
-            { service: 'Express Laundry Service', total: 4, used: 3, unit: 'Items' }
-        ],
-        transactions: [
-            {
-                id: 201,
-                date: '24/06/2026 11:30',
-                refNo: 'CORP-LPO-881',
-                particulars: 'Company Direct Billing Authorization',
-                description: 'Approved LPO #SCB-DH-4402 on 30-day city ledger credit',
-                user: 'fom_rafiq',
-                amount: 30000.00,
-                windowId: 1,
-                category: 'Payment'
-            },
-            {
-                id: 202,
-                date: '24/06/2026 23:59',
-                refNo: 'SYS-AUDIT-02',
-                particulars: 'Suite Rent (Night 1)',
-                description: 'Executive Suite 201 room charge',
-                user: 'system_audit',
-                amount: -9500.00,
-                windowId: 1,
-                category: 'Room'
-            },
-            {
-                id: 203,
-                date: '25/06/2026 23:59',
-                refNo: 'SYS-AUDIT-03',
-                particulars: 'Suite Rent (Night 2)',
-                description: 'Executive Suite 201 room charge',
-                user: 'system_audit',
-                amount: -9500.00,
-                windowId: 1,
-                category: 'Room'
-            },
-            {
-                id: 204,
-                date: '25/06/2026 19:40',
-                refNo: 'POS-CAFE-112',
-                particulars: 'Business Center & Coffee Bar',
-                description: 'Color printing and espresso service',
-                user: 'cafe_barista',
-                amount: -850.00,
-                windowId: 2,
-                category: 'F&B'
-            }
-        ]
-    },
-    {
-        id: 3,
-        roomNumber: '305',
-        guestName: 'Dr. Shahriar Kabir',
-        folioNumber: 'FOL-2026-0305',
-        roomType: 'Superior King',
-        checkIn: '2026-06-26',
-        checkOut: '2026-06-29',
-        package: 'Standard Best Available Rate',
-        company: 'Dhaka Medical College',
-        allowances: [
-            { service: 'Buffet Breakfast', total: 3, used: 0, unit: 'Meals' }
-        ],
-        transactions: [
-            {
-                id: 301,
-                date: '26/06/2026 15:00',
-                refNo: 'VISA-AUTH-909',
-                particulars: 'Pre-Auth Credit Card Deposit',
-                description: 'Visa Card ending in 4421 authorization held',
-                user: 'frontdesk_sultana',
-                amount: 10000.00,
-                windowId: 1,
-                category: 'Payment'
-            },
-            {
-                id: 302,
-                date: '26/06/2026 23:59',
-                refNo: 'SYS-AUDIT-04',
-                particulars: 'Room Rent (Night 1)',
-                description: 'Superior Room 305 daily posting',
-                user: 'system_audit',
-                amount: -4500.00,
+                id: folioId * 100 + 1,
+                date: `${r.checkIn} 14:00`,
+                refNo: `TAR-${r.id}`,
+                particulars: `Room Tariff (${nights} Night${nights > 1 ? 's' : ''})`,
+                description: `${r.roomType} stay charge`,
+                user: 'system_pms',
+                amount: -total,
                 windowId: 1,
                 category: 'Room'
             }
-        ]
-    }
-];
+        ];
+        if (paid > 0) {
+            txns.push({
+                id: folioId * 100 + 2,
+                date: `${r.checkIn} 14:10`,
+                refNo: `PMT-${r.id}`,
+                particulars: `Advance Payment (${r.paymentMethod || 'Cash'})`,
+                description: 'Collected at reservation/check-in',
+                user: 'frontdesk_pos',
+                amount: paid,
+                windowId: 1,
+                category: 'Payment'
+            });
+        }
+        return {
+            id: folioId,
+            roomNumber: r.roomNo || '101',
+            guestName: r.guestName,
+            folioNumber: `FOL-${r.id}`,
+            roomType: r.roomType || 'Deluxe',
+            checkIn: r.checkIn,
+            checkOut: r.checkOut,
+            company: r.bookingSource || 'Direct Walk-In',
+            package: r.ratePlan || 'Best Available Rate',
+            allowances: [
+                { service: 'Complimentary Buffet Breakfast', total: nights * (Number(r.adults) || 1), used: 0, unit: 'Meals' },
+                { service: 'High-Speed Wi-Fi', total: 1, used: 1, unit: 'Access' }
+            ],
+            transactions: txns
+        };
+    });
+};
 
 export const FolioOperations: React.FC = () => {
     const [folios, setFolios] = useState<FolioAccount[]>(() => {
-        let baseList: FolioAccount[] = [...INITIAL_FOLIOS];
+        let baseList: FolioAccount[] = buildFoliosFromCanonicalReservations();
         try {
             const saved = localStorage.getItem('hotel_folios_v2');
             if (saved) {
-                baseList = JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    baseList = parsed;
+                }
             }
             const storedRes = localStorage.getItem('hotel_reservations_v2');
             if (storedRes) {

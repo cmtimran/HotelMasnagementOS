@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Building2, Plus, Edit, Trash2, Search, X, Save } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Search, X, Save, CheckCircle2, AlertCircle, DollarSign } from 'lucide-react';
 import { toast } from '../context/ToastContext';
+import PageHeader from './common/PageHeader';
 
 interface CorporateProfile {
     id: number;
@@ -186,140 +187,170 @@ const CorporateProfileManagement = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50 p-4 md:p-6 lg:p-8">
-            {/* Header */}
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/30">
-                        <Building2 size={24} className="text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Corporate Profiles (City Ledger)</h1>
-                        <p className="text-sm text-gray-500">B2B accounts with credit facilities</p>
-                    </div>
-                </div>
-            </div>
+        <div className="page-container">
+            <PageHeader
+                title="Corporate Profiles (City Ledger)"
+                subtitle="B2B corporate accounts, negotiated contract rates & direct billing credit limits"
+                icon={<Building2 size={20} />}
+                actions={
+                    <button
+                        type="button"
+                        onClick={() => setShowForm(true)}
+                        className="btn-primary"
+                    >
+                        <Plus size={14} className="stroke-[2.5]" />
+                        <span>Add Corporate Profile</span>
+                    </button>
+                }
+            />
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Total Accounts</p>
-                    <p className="text-3xl font-bold text-gray-900">{profiles.length}</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Accounts</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{profiles.length}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Contracted companies</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
+                        <Building2 size={17} />
+                    </div>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl shadow-lg shadow-emerald-500/30">
-                    <p className="text-xs font-semibold text-emerald-100 uppercase mb-2">Active</p>
-                    <p className="text-3xl font-bold text-white">{profiles.filter(p => !p.isBlacklisted).length}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Accounts</p>
+                        <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{profiles.filter(p => !p.isBlacklisted).length}</p>
+                        <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Approved for credit</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={17} />
+                    </div>
                 </div>
-                <div className="bg-gradient-to-br from-red-500 to-red-600 p-5 rounded-2xl shadow-lg shadow-red-500/30">
-                    <p className="text-xs font-semibold text-red-100 uppercase mb-2">Blacklisted</p>
-                    <p className="text-3xl font-bold text-white">{profiles.filter(p => p.isBlacklisted).length}</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Blacklisted</p>
+                        <p className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{profiles.filter(p => p.isBlacklisted).length}</p>
+                        <p className="text-[11px] text-rose-600 font-medium mt-0.5">Credit suspended</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                        <AlertCircle size={17} />
+                    </div>
                 </div>
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-lg shadow-blue-500/30">
-                    <p className="text-xs font-semibold text-blue-100 uppercase mb-2">Total Outstanding</p>
-                    <p className="text-3xl font-bold text-white">৳{(profiles.reduce((sum, p) => sum + p.currentBalance, 0) / 1000).toFixed(0)}K</p>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Outstanding</p>
+                        <p className="text-xl sm:text-2xl font-bold text-primary mt-1">৳{profiles.reduce((sum, p) => sum + p.currentBalance, 0).toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Receivable AR balance</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <DollarSign size={17} />
+                    </div>
                 </div>
             </div>
 
             {/* Search & Add */}
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border border-gray-200 shadow-lg mb-6">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 relative">
-                        <Search size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <div className="card-container !p-3.5">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="w-full sm:w-96 relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
                             placeholder="Search by company name or contact person..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="input-standard pl-9"
                         />
                     </div>
                     <button
+                        type="button"
                         onClick={() => setShowForm(true)}
-                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg flex items-center gap-2"
+                        className="btn-primary"
                     >
-                        <Plus size={20} />
-                        Add Corporate Profile
+                        <Plus size={14} />
+                        <span>Add Corporate Profile</span>
                     </button>
                 </div>
             </div>
 
             {/* Profiles Table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+            <div className="table-container">
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                        <thead>
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Company</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Type</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Contact</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Credit Limit</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Outstanding</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Payment Term</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
+                                <th>Company</th>
+                                <th>Type</th>
+                                <th>Contact</th>
+                                <th>Credit Limit</th>
+                                <th>Outstanding</th>
+                                <th>Payment Term</th>
+                                <th>Status</th>
+                                <th className="text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody>
                             {filteredProfiles.map((profile) => {
                                 const status = getCreditStatus(profile);
                                 const utilization = (profile.currentBalance / profile.creditLimit) * 100;
 
                                 return (
-                                    <tr key={profile.id} className="hover:bg-blue-50/50 transition-colors">
-                                        <td className="px-6 py-4">
+                                    <tr key={profile.id} className="hover:bg-slate-50 transition-colors">
+                                        <td>
                                             <div>
-                                                <p className="text-sm font-bold text-gray-900">{profile.companyName}</p>
-                                                <p className="text-xs text-gray-500">Rate: {profile.linkedRateCode}</p>
+                                                <p className="text-xs font-bold text-slate-900">{profile.companyName}</p>
+                                                <p className="text-[11px] text-slate-500">Rate: <span className="font-mono font-semibold">{profile.linkedRateCode}</span></p>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                                        <td>
+                                            <span className="px-2.5 py-0.5 bg-blue-50 text-primary border border-blue-200 rounded-full text-[10px] font-bold">
                                                 {profile.accountType}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td>
                                             <div>
-                                                <p className="text-sm font-semibold text-gray-700">{profile.contactPerson}</p>
-                                                <p className="text-xs text-gray-500">{profile.billingEmail}</p>
+                                                <p className="text-xs font-semibold text-slate-700">{profile.contactPerson}</p>
+                                                <p className="text-[11px] text-slate-500">{profile.billingEmail}</p>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm font-bold text-gray-900">৳{profile.creditLimit.toLocaleString()}</span>
+                                        <td>
+                                            <span className="text-xs font-bold font-mono text-slate-900">৳{profile.creditLimit.toLocaleString()}</span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div>
-                                                <p className="text-sm font-bold text-gray-900">৳{profile.currentBalance.toLocaleString()}</p>
-                                                <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                        <td>
+                                            <div className="min-w-[120px]">
+                                                <p className="text-xs font-bold font-mono text-slate-900">৳{profile.currentBalance.toLocaleString()}</p>
+                                                <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
                                                     <div
-                                                        className={`${status.color} h-2 rounded-full transition-all`}
+                                                        className={`${status.color} h-1.5 rounded-full transition-all`}
                                                         style={{ width: `${Math.min(utilization, 100)}%` }}
                                                     />
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm font-semibold text-gray-700">{profile.paymentTerm}</span>
+                                        <td>
+                                            <span className="text-xs font-semibold text-slate-700">{profile.paymentTerm}</span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${status.textColor} bg-opacity-20`} style={{ backgroundColor: status.color.replace('bg-', '') + '20' }}>
+                                        <td>
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${status.textColor} bg-slate-100 border border-slate-200`}>
                                                 {status.text}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
+                                        <td className="text-right">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleEdit(profile)}
-                                                    className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                                                    className="btn-icon"
                                                     title="Edit"
                                                 >
-                                                    <Edit size={16} className="text-blue-600" />
+                                                    <Edit size={13} />
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleDelete(profile.id)}
-                                                    className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                                                    className="btn-icon-danger"
                                                     title="Delete"
                                                 >
-                                                    <Trash2 size={16} className="text-red-600" />
+                                                    <Trash2 size={13} />
                                                 </button>
                                             </div>
                                         </td>

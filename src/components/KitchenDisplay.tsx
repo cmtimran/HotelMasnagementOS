@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Clock, CheckCircle, AlertCircle, ChefHat, Flame } from 'lucide-react';
+import PageHeader from './common/PageHeader';
 
 interface OrderItem {
     id: number;
@@ -107,83 +108,103 @@ const KitchenDisplay = () => {
     const readyOrders = orders.filter(o => o.status === 'ready');
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
-            {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
-                            <ChefHat size={24} className="text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-white">Kitchen Display System</h1>
-                            <p className="text-sm text-gray-400">Real-time order management</p>
-                        </div>
+        <div className="page-container">
+            <PageHeader
+                title="Kitchen Display System (KDS)"
+                subtitle="Real-time KOT order preparation queue, station routing & pickup telemetry"
+                icon={<ChefHat size={20} />}
+                badge={<span className="badge-status-active">{orders.length} Active Orders</span>}
+                actions={
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                        <Clock size={13} className="text-primary" />
+                        <span>Kitchen Clock: <strong className="font-mono text-slate-900">14:35</strong></span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="bg-white/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-white/20">
-                            <p className="text-white/70 text-xs font-medium mb-1">Active Orders</p>
-                            <p className="text-3xl font-bold text-white">{orders.length}</p>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-white/20">
-                            <p className="text-white/70 text-xs font-medium mb-1">Current Time</p>
-                            <p className="text-3xl font-bold text-white">14:35</p>
-                        </div>
+                }
+            />
+
+            {/* KPI Summary Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">New Orders (KOT)</p>
+                        <p className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{newOrders.length}</p>
+                        <p className="text-[11px] text-rose-600 font-medium mt-0.5">Awaiting fire</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                        <Flame size={17} />
+                    </div>
+                </div>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Preparing</p>
+                        <p className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{preparingOrders.length}</p>
+                        <p className="text-[11px] text-amber-600 font-medium mt-0.5">On kitchen line</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                        <ChefHat size={17} />
+                    </div>
+                </div>
+                <div className="kpi-card">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ready for Pickup</p>
+                        <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{readyOrders.length}</p>
+                        <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Pass / Expediter</p>
+                    </div>
+                    <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <CheckCircle size={17} />
                     </div>
                 </div>
             </div>
 
             {/* Order Columns */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* New Orders */}
-                <div>
-                    <div className="bg-gradient-to-r from-red-500 to-red-600 p-4 rounded-t-2xl">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Flame size={20} />
-                                New Orders
-                            </h2>
-                            <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold text-white">
-                                {newOrders.length}
-                            </span>
-                        </div>
+                <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs flex flex-col">
+                    <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <Flame size={14} className="text-rose-600" />
+                            New Orders
+                        </h2>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            {newOrders.length}
+                        </span>
                     </div>
-                    <div className="space-y-4 bg-gray-800/50 p-4 rounded-b-2xl min-h-[600px]">
+                    <div className="space-y-3 bg-slate-50/40 p-3.5 flex-1 min-h-[460px]">
                         {newOrders.map(order => (
-                            <div key={order.id} className="bg-white rounded-2xl p-5 shadow-xl border-l-4 border-red-500">
-                                <div className="flex items-start justify-between mb-4">
+                            <div key={order.id} className="bg-white rounded-xl p-4 shadow-2xs border border-slate-200/90 border-l-4 border-l-rose-500">
+                                <div className="flex items-start justify-between mb-3">
                                     <div>
-                                        <h3 className="text-xl font-bold text-gray-900">{order.orderNumber}</h3>
-                                        <p className="text-sm text-gray-500 font-medium">{order.table}</p>
+                                        <h3 className="text-sm font-bold text-slate-900">{order.orderNumber}</h3>
+                                        <p className="text-xs text-slate-500 font-medium">{order.table}</p>
                                     </div>
                                     <div className="text-right">
-                                        <div className="flex items-center gap-1 text-sm font-bold mb-1">
-                                            <Clock size={14} className={getWaitTimeColor(order.waitTime)} />
+                                        <div className="flex items-center gap-1 text-xs font-bold mb-0.5">
+                                            <Clock size={12} className={getWaitTimeColor(order.waitTime)} />
                                             <span className={getWaitTimeColor(order.waitTime)}>{order.waitTime} min</span>
                                         </div>
-                                        <p className="text-xs text-gray-500">{order.orderTime}</p>
+                                        <p className="text-[11px] text-slate-400">{order.orderTime}</p>
                                     </div>
                                 </div>
 
                                 {order.priority === 'urgent' && (
-                                    <div className="bg-red-100 border border-red-300 rounded-lg p-2 mb-3 flex items-center gap-2">
-                                        <AlertCircle size={16} className="text-red-600" />
-                                        <span className="text-xs font-bold text-red-700 uppercase">Urgent Order</span>
+                                    <div className="bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5 mb-3 flex items-center gap-1.5">
+                                        <AlertCircle size={13} className="text-rose-600" />
+                                        <span className="text-[10px] font-bold text-rose-700 uppercase">Urgent Order</span>
                                     </div>
                                 )}
 
-                                <div className="space-y-2 mb-4">
+                                <div className="space-y-1.5 mb-3">
                                     {order.items.map(item => (
-                                        <div key={item.id} className="flex items-start justify-between bg-gray-50 p-3 rounded-lg">
+                                        <div key={item.id} className="flex items-start justify-between bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-100">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                                    <span className="size-5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md flex items-center justify-center text-[11px] font-bold">
                                                         {item.quantity}
                                                     </span>
-                                                    <span className="font-bold text-gray-900">{item.name}</span>
+                                                    <span className="text-xs font-bold text-slate-800">{item.name}</span>
                                                 </div>
                                                 {item.notes && (
-                                                    <p className="text-xs text-amber-600 font-medium mt-1 ml-8">⚠️ {item.notes}</p>
+                                                    <p className="text-[11px] text-amber-700 font-medium mt-1 ml-7">Note: {item.notes}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -191,8 +212,9 @@ const KitchenDisplay = () => {
                                 </div>
 
                                 <button
+                                    type="button"
                                     onClick={() => updateOrderStatus(order.id, 'preparing')}
-                                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl font-bold hover:from-amber-600 hover:to-amber-700 transition-all shadow-lg"
+                                    className="btn-primary w-full"
                                 >
                                     Start Preparing
                                 </button>
@@ -202,47 +224,45 @@ const KitchenDisplay = () => {
                 </div>
 
                 {/* Preparing Orders */}
-                <div>
-                    <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-4 rounded-t-2xl">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                <ChefHat size={20} />
-                                Preparing
-                            </h2>
-                            <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold text-white">
-                                {preparingOrders.length}
-                            </span>
-                        </div>
+                <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs flex flex-col">
+                    <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <ChefHat size={14} className="text-amber-600" />
+                            Preparing
+                        </h2>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            {preparingOrders.length}
+                        </span>
                     </div>
-                    <div className="space-y-4 bg-gray-800/50 p-4 rounded-b-2xl min-h-[600px]">
+                    <div className="space-y-3 bg-slate-50/40 p-3.5 flex-1 min-h-[460px]">
                         {preparingOrders.map(order => (
-                            <div key={order.id} className="bg-white rounded-2xl p-5 shadow-xl border-l-4 border-amber-500">
-                                <div className="flex items-start justify-between mb-4">
+                            <div key={order.id} className="bg-white rounded-xl p-4 shadow-2xs border border-slate-200/90 border-l-4 border-l-amber-500">
+                                <div className="flex items-start justify-between mb-3">
                                     <div>
-                                        <h3 className="text-xl font-bold text-gray-900">{order.orderNumber}</h3>
-                                        <p className="text-sm text-gray-500 font-medium">{order.table}</p>
+                                        <h3 className="text-sm font-bold text-slate-900">{order.orderNumber}</h3>
+                                        <p className="text-xs text-slate-500 font-medium">{order.table}</p>
                                     </div>
                                     <div className="text-right">
-                                        <div className="flex items-center gap-1 text-sm font-bold mb-1">
-                                            <Clock size={14} className={getWaitTimeColor(order.waitTime)} />
+                                        <div className="flex items-center gap-1 text-xs font-bold mb-0.5">
+                                            <Clock size={12} className={getWaitTimeColor(order.waitTime)} />
                                             <span className={getWaitTimeColor(order.waitTime)}>{order.waitTime} min</span>
                                         </div>
-                                        <p className="text-xs text-gray-500">{order.orderTime}</p>
+                                        <p className="text-[11px] text-slate-400">{order.orderTime}</p>
                                     </div>
                                 </div>
 
-                                <div className="space-y-2 mb-4">
+                                <div className="space-y-1.5 mb-3">
                                     {order.items.map(item => (
-                                        <div key={item.id} className="flex items-start justify-between bg-gray-50 p-3 rounded-lg">
+                                        <div key={item.id} className="flex items-start justify-between bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-100">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                                    <span className="size-5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md flex items-center justify-center text-[11px] font-bold">
                                                         {item.quantity}
                                                     </span>
-                                                    <span className="font-bold text-gray-900">{item.name}</span>
+                                                    <span className="text-xs font-bold text-slate-800">{item.name}</span>
                                                 </div>
                                                 {item.notes && (
-                                                    <p className="text-xs text-amber-600 font-medium mt-1 ml-8">⚠️ {item.notes}</p>
+                                                    <p className="text-[11px] text-amber-700 font-medium mt-1 ml-7">Note: {item.notes}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -250,8 +270,9 @@ const KitchenDisplay = () => {
                                 </div>
 
                                 <button
+                                    type="button"
                                     onClick={() => updateOrderStatus(order.id, 'ready')}
-                                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg"
+                                    className="btn-primary w-full !bg-emerald-600 hover:!bg-emerald-700"
                                 >
                                     Mark as Ready
                                 </button>
@@ -261,46 +282,44 @@ const KitchenDisplay = () => {
                 </div>
 
                 {/* Ready Orders */}
-                <div>
-                    <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4 rounded-t-2xl">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                <CheckCircle size={20} />
-                                Ready
-                            </h2>
-                            <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold text-white">
-                                {readyOrders.length}
-                            </span>
-                        </div>
+                <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs flex flex-col">
+                    <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <CheckCircle size={14} className="text-emerald-600" />
+                            Ready
+                        </h2>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {readyOrders.length}
+                        </span>
                     </div>
-                    <div className="space-y-4 bg-gray-800/50 p-4 rounded-b-2xl min-h-[600px]">
+                    <div className="space-y-3 bg-slate-50/40 p-3.5 flex-1 min-h-[460px]">
                         {readyOrders.map(order => (
-                            <div key={order.id} className="bg-white rounded-2xl p-5 shadow-xl border-l-4 border-emerald-500">
-                                <div className="flex items-start justify-between mb-4">
+                            <div key={order.id} className="bg-white rounded-xl p-4 shadow-2xs border border-slate-200/90 border-l-4 border-l-emerald-500">
+                                <div className="flex items-start justify-between mb-3">
                                     <div>
-                                        <h3 className="text-xl font-bold text-gray-900">{order.orderNumber}</h3>
-                                        <p className="text-sm text-gray-500 font-medium">{order.table}</p>
+                                        <h3 className="text-sm font-bold text-slate-900">{order.orderNumber}</h3>
+                                        <p className="text-xs text-slate-500 font-medium">{order.table}</p>
                                     </div>
                                     <div className="text-right">
-                                        <div className="flex items-center gap-1 text-sm font-bold mb-1">
-                                            <Clock size={14} className={getWaitTimeColor(order.waitTime)} />
+                                        <div className="flex items-center gap-1 text-xs font-bold mb-0.5">
+                                            <Clock size={12} className={getWaitTimeColor(order.waitTime)} />
                                             <span className={getWaitTimeColor(order.waitTime)}>{order.waitTime} min</span>
                                         </div>
-                                        <p className="text-xs text-gray-500">{order.orderTime}</p>
+                                        <p className="text-[11px] text-slate-400">{order.orderTime}</p>
                                     </div>
                                 </div>
 
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
-                                    <p className="text-sm font-bold text-emerald-700 text-center">✓ Ready for Pickup</p>
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg py-2 px-3 mb-3">
+                                    <p className="text-xs font-bold text-emerald-700 text-center">✓ Ready for Service Pickup</p>
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     {order.items.map(item => (
-                                        <div key={item.id} className="flex items-center gap-2 text-sm">
-                                            <span className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                        <div key={item.id} className="flex items-center gap-2 text-xs">
+                                            <span className="size-5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md flex items-center justify-center text-[11px] font-bold">
                                                 {item.quantity}
                                             </span>
-                                            <span className="font-semibold text-gray-700">{item.name}</span>
+                                            <span className="font-semibold text-slate-700">{item.name}</span>
                                         </div>
                                     ))}
                                 </div>

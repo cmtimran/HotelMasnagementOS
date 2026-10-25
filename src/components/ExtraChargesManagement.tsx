@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PageHeader from './common/PageHeader';
 import {
     Plus,
     Edit2,
@@ -176,7 +177,7 @@ export const ExtraChargesManagement: React.FC = () => {
     const autoPostCount = extraCharges.filter(c => c.autoPostTrigger !== 'On Demand / Manual').length;
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5 animate-in fade-in duration-150">
+        <div className="page-container animate-in fade-in duration-150">
             {/* Toast Notification */}
             {toastMessage && (
                 <div className="fixed top-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
@@ -185,68 +186,40 @@ export const ExtraChargesManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start md:items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                        <Plus size={22} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
-                                Extra Charges & Ancillary Add-ons
-                            </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                Folio Surcharges
-                            </span>
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Auto Accounting
-                            </span>
+            <PageHeader
+                title="Extra Charges & Ancillary Add-ons"
+                subtitle="Configure supplemental folio services (Airport limos, extra beds, early check-in, laundry) with automated VAT, Service Charge, and GL posting rules"
+                icon={<SlidersHorizontal size={20} />}
+                badge="Folio Surcharges"
+                actions={
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('grid')}
+                                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                Cards
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('table')}
+                                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${viewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                Table
+                            </button>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Configure supplemental folio services (Airport limos, extra beds, early check-in, laundry) with automated VAT, Service Charge, and GL posting rules.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
                         <button
                             type="button"
-                            onClick={() => setViewMode('grid')}
-                            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500 hover:text-gray-800'}`}
+                            onClick={handleOpenAdd}
+                            className="btn-primary"
                         >
-                            Cards
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setViewMode('table')}
-                            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'table' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500 hover:text-gray-800'}`}
-                        >
-                            Table
+                            <Plus size={14} />
+                            <span>Add Extra Charge</span>
                         </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleOpenAdd}
-                        className="h-8 px-3.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                        <Plus size={14} />
-                        <span>+ Add Extra Charge</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Accounting Guide Banner */}
-            <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white border border-blue-200/70 rounded-xl p-3.5 flex items-start gap-3 text-xs text-blue-900 shadow-2xs">
-                <Shield size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                <div>
-                    <span className="font-bold text-gray-900">USALI Revenue Mapping & Automated Folio Billing:</span>
-                    <p className="text-[11px] text-gray-600 mt-0.5 leading-relaxed">
-                        Every ancillary charge is linked to its parent Revenue Head and GL code. When applied during reservation or check-in, the hotel PMS automatically computes <strong>15% VAT</strong> and <strong>10% Service Charge</strong>, preventing folio leakage and ensuring 100% compliance during EOD Night Audit.
-                    </p>
-                </div>
-            </div>
+                }
+            />
 
             {/* KPI Metrics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">

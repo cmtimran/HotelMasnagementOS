@@ -5,6 +5,7 @@ import {
     Heart, CheckCircle2,
     Building2, Printer, Clock
 } from 'lucide-react';
+import { getAllStoredReservations, syncReservationsFromDB, type StoredReservation } from '../utils/roomInventoryEngine';
 
 export interface GuestRecord {
     id: number;
@@ -47,116 +48,86 @@ export interface GuestRecord {
     }[];
 }
 
-const INITIAL_GUESTS: GuestRecord[] = [
-    {
-        id: 1,
-        title: 'Ms.',
-        name: 'Aniya Nusrat',
-        phone: '+880 1711-889900',
-        email: 'aniya.nusrat@gmail.com',
-        vipTier: 'Platinum VIP',
-        nationality: 'Bangladesh',
-        idType: 'Passport',
-        idNumber: 'A04819284',
-        dob: '1992-04-18',
-        gender: 'Female',
-        homeCity: 'Dhaka',
-        homeCountry: 'Bangladesh',
-        company: 'Standard Chartered Bank Ltd.',
-        designation: 'Vice President, Retail Banking',
-        totalStays: 8,
-        totalNights: 22,
-        lifetimeSpendBDT: 245000,
-        lastStayDate: '2026-06-25',
-        loyaltyPoints: 12450,
-        preferences: {
-            roomType: 'Deluxe King or Suite',
-            floorPreference: 'High Floor',
-            pillowType: 'Feather / Down',
-            dietary: 'Strictly Halal, lactose-intolerant (Almond milk preferred)',
-            newspaper: 'The Daily Star & Financial Times',
-            specialNotes: 'VIP guest. Prefers fresh jasmine flowers and late checkout at 14:00.'
-        },
-        stayHistory: [
-            { resNumber: 'RES-009180', roomNumber: '101', roomType: 'Deluxe King', checkIn: '2026-06-25', checkOut: '2026-06-28', nights: 3, totalAmountBDT: 28500, status: 'In-House' },
-            { resNumber: 'RES-008442', roomNumber: '201', roomType: 'Executive Suite', checkIn: '2026-04-10', checkOut: '2026-04-14', nights: 4, totalAmountBDT: 48000, status: 'Checked-Out' },
-            { resNumber: 'RES-007910', roomNumber: '104', roomType: 'Deluxe King', checkIn: '2026-01-05', checkOut: '2026-01-08', nights: 3, totalAmountBDT: 25500, status: 'Checked-Out' }
-        ]
-    },
-    {
-        id: 2,
-        title: 'Mr.',
-        name: 'Tarek Rahman',
-        phone: '+880 1819-223344',
-        email: 'trahman@chevron.com',
-        vipTier: 'Corporate VIP',
-        nationality: 'Bangladesh',
-        idType: 'National ID (NID)',
-        idNumber: '1984269182391',
-        dob: '1984-09-12',
-        gender: 'Male',
-        homeCity: 'Chittagong',
-        homeCountry: 'Bangladesh',
-        company: 'Chevron Bangladesh Ltd.',
-        designation: 'Operations Director',
-        totalStays: 14,
-        totalNights: 38,
-        lifetimeSpendBDT: 420000,
-        lastStayDate: '2026-06-24',
-        loyaltyPoints: 21800,
-        preferences: {
-            roomType: 'Executive Suite',
-            floorPreference: 'Quiet Corner',
-            pillowType: 'Orthopedic',
-            dietary: 'Diabetic sugar-free breakfast options',
-            newspaper: 'Prothom Alo & Business Standard',
-            specialNotes: 'Direct billing to Chevron corporate account under annual MSA.'
-        },
-        stayHistory: [
-            { resNumber: 'RES-009181', roomNumber: '201', roomType: 'Executive Suite', checkIn: '2026-06-24', checkOut: '2026-06-27', nights: 3, totalAmountBDT: 36000, status: 'In-House' },
-            { resNumber: 'RES-008620', roomNumber: '401', roomType: 'Executive Suite', checkIn: '2026-05-12', checkOut: '2026-05-15', nights: 3, totalAmountBDT: 34500, status: 'Checked-Out' }
-        ]
-    },
-    {
-        id: 3,
-        title: 'Dr.',
-        name: 'Shahriar Kabir',
-        phone: '+880 1911-334455',
-        email: 'skabir@dmc.edu.bd',
-        vipTier: 'Gold',
-        nationality: 'Bangladesh',
-        idType: 'Passport',
-        idNumber: 'B0918231',
-        dob: '1979-11-03',
-        gender: 'Male',
-        homeCity: 'Dhaka',
-        homeCountry: 'Bangladesh',
-        company: 'Dhaka Medical College Hospital',
-        designation: 'Professor of Cardiology',
-        totalStays: 5,
-        totalNights: 11,
-        lifetimeSpendBDT: 95000,
-        lastStayDate: '2026-06-26',
-        loyaltyPoints: 4800,
-        preferences: {
-            roomType: 'Superior King',
-            floorPreference: 'High Floor',
-            pillowType: 'Hypoallergenic',
-            dietary: 'Low sodium, fresh fruit basket',
-            newspaper: 'The Daily Star',
-            specialNotes: 'Frequent medical conference guest.'
-        },
-        stayHistory: [
-            { resNumber: 'RES-009182', roomNumber: '305', roomType: 'Superior King', checkIn: '2026-06-26', checkOut: '2026-06-29', nights: 3, totalAmountBDT: 19500, status: 'In-House' }
-        ]
-    }
-];
+const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestRecord[] => {
+    const map = new Map<string, GuestRecord>();
+    reservations.forEach((r, idx) => {
+        const key = (r.guestName || `Guest ${idx + 1}`).trim().toLowerCase();
+        const nights = Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+        const spend = Number(r.totalRate) || 0;
+        const stayItem: GuestRecord['stayHistory'][0] = {
+            resNumber: String(r.reservationNumber || r.id),
+            roomNumber: r.roomNo || '101',
+            roomType: r.roomType || 'Deluxe',
+            checkIn: r.checkIn,
+            checkOut: r.checkOut,
+            nights,
+            totalAmountBDT: spend,
+            status: r.status === 'CANCELLED' ? 'Cancelled' : r.status === 'CHECKED_OUT' ? 'Checked-Out' : 'In-House'
+        };
+
+        const existing = map.get(key);
+        if (existing) {
+            existing.totalStays += 1;
+            existing.totalNights += nights;
+            existing.lifetimeSpendBDT += spend;
+            existing.loyaltyPoints = Math.round(existing.lifetimeSpendBDT / 20);
+            if (r.checkIn > existing.lastStayDate) existing.lastStayDate = r.checkIn;
+            existing.stayHistory.push(stayItem);
+            if (existing.lifetimeSpendBDT > 100000) existing.vipTier = 'Platinum VIP';
+            else if (existing.lifetimeSpendBDT > 50000) existing.vipTier = 'Gold';
+        } else {
+            map.set(key, {
+                id: idx + 1,
+                title: r.guestName.startsWith('Dr.') ? 'Dr.' : r.guestName.startsWith('Ms.') ? 'Ms.' : 'Mr.',
+                name: r.guestName.replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.)\s*/i, ''),
+                phone: r.guestPhone || '+880 1711-000000',
+                email: r.guestEmail || `${r.guestName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                vipTier: spend > 50000 ? 'Gold' : r.bookingSource === 'Corporate' ? 'Corporate VIP' : 'Regular',
+                nationality: r.nationality || 'Bangladesh',
+                idType: r.passportNo ? 'Passport' : 'National ID (NID)',
+                idNumber: r.passportNo || r.nidNumber || `KYC-${10000 + idx}`,
+                dob: '1988-05-15',
+                gender: 'Male',
+                homeCity: 'Dhaka',
+                homeCountry: r.nationality || 'Bangladesh',
+                company: r.bookingSource === 'Corporate' ? 'Corporate Partner' : undefined,
+                designation: r.bookingSource === 'Corporate' ? 'Executive' : undefined,
+                totalStays: 1,
+                totalNights: nights,
+                lifetimeSpendBDT: spend,
+                lastStayDate: r.checkIn,
+                loyaltyPoints: Math.round(spend / 20),
+                preferences: {
+                    roomType: r.roomType || 'Deluxe Double',
+                    floorPreference: 'High Floor',
+                    pillowType: 'Feather / Down',
+                    dietary: 'Standard Halal',
+                    newspaper: 'The Daily Star',
+                    specialNotes: r.notes || 'Registered via Reservation PMS.'
+                },
+                stayHistory: [stayItem]
+            });
+        }
+    });
+    return Array.from(map.values());
+};
 
 export const GuestProfile: React.FC = () => {
     const [guests, setGuests] = useState<GuestRecord[]>(() => {
+        const derived = deriveGuestsFromReservations(getAllStoredReservations());
+        if (derived.length > 0) return derived;
         const saved = localStorage.getItem('hotel_guest_profiles_v2');
-        return saved ? JSON.parse(saved) : INITIAL_GUESTS;
+        return saved ? JSON.parse(saved) : [];
     });
+
+    useEffect(() => {
+        syncReservationsFromDB().then(res => {
+            if (res.length > 0) {
+                const derived = deriveGuestsFromReservations(res);
+                if (derived.length > 0) setGuests(derived);
+            }
+        }).catch(() => {});
+    }, []);
 
     const [selectedGuestId, setSelectedGuestId] = useState<number>(1);
     const [searchQuery, setSearchQuery] = useState('');

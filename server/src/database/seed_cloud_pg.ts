@@ -254,7 +254,10 @@ export async function seedCloudPostgres(connectionUrl?: string) {
       (13, 1, 'Mr', 'Rashidul', 'Hasan', 'rashidul@gmail.com', '+880 1819-384720', 'Bangladeshi', 'National ID (NID)', '199101928355', 'NONE'),
       (14, 1, 'Mr', 'Md. Tariqul', 'Islam', 'tariqul@grameen.com', '+880 1711-928371', 'Bangladeshi', 'National ID (NID)', '198901928366', 'NONE'),
       (15, 1, 'Dr', 'Imran', 'Hossain', 'imran@hospitality.com', '+880 1711-987654', 'Bangladeshi', 'Passport', 'P09823412', 'VVIP'),
-      (16, 1, 'Mr', 'Shahidul', 'Alam', 'shahidul@drik.net', '+880 1715-443322', 'Bangladeshi', 'National ID (NID)', '197501928399', 'VIP')
+      (16, 1, 'Mr', 'Shahidul', 'Alam', 'shahidul@drik.net', '+880 1715-443322', 'Bangladeshi', 'National ID (NID)', '197501928399', 'VIP'),
+      (17, 1, 'Mr', 'Zubair', 'Ahmed', 'zubair@gmail.com', '+880 1711-112233', 'Bangladeshi', 'National ID (NID)', '199001928312', 'NONE'),
+      (18, 1, 'Mr', 'S.', 'Chowdhury', 'schowdhury@gmail.com', '+880 1712-223344', 'Bangladeshi', 'National ID (NID)', '198801928322', 'NONE'),
+      (19, 1, 'Mr', 'Nasir', 'Hossain', 'nasir@gmail.com', '+880 1713-334455', 'Bangladeshi', 'National ID (NID)', '198701928333', 'NONE')
       ON CONFLICT (id) DO NOTHING;
     `);
 
@@ -267,7 +270,10 @@ export async function seedCloudPostgres(connectionUrl?: string) {
       (105, 1, 'RES-009287', 13, 'Phone Tentative', 'Phone Call', false, 'HOLD', 9000.00, 0.00, 9000.00),
       (106, 1, 'RES-009281', 14, 'Direct Walk-In', 'Front Desk', false, 'IN_HOUSE', 9000.00, 9000.00, 0.00),
       (107, 1, 'RES-009284', 15, 'Executive Suite Web', 'VIP Direct', false, 'IN_HOUSE', 108000.00, 50000.00, 58000.00),
-      (108, 1, 'RES-009280', 16, 'Direct Walk-In', 'Front Desk', false, 'IN_HOUSE', 9000.00, 9000.00, 0.00)
+      (108, 1, 'RES-009280', 16, 'Direct Walk-In', 'Front Desk', false, 'IN_HOUSE', 9000.00, 9000.00, 0.00),
+      (109, 1, 'RES-108901', 17, 'Direct Walk-In', 'Front Desk', false, 'COMPLETED', 9000.00, 9000.00, 0.00),
+      (110, 1, 'RES-108902', 19, 'Direct Web', 'Website', false, 'COMPLETED', 15000.00, 15000.00, 0.00),
+      (111, 1, 'RES-109282', 18, 'Corporate Contract', 'Corporate Desk', true, 'IN_HOUSE', 9000.00, 9000.00, 0.00)
       ON CONFLICT (id) DO NOTHING;
     `);
 
@@ -278,10 +284,13 @@ export async function seedCloudPostgres(connectionUrl?: string) {
       (102, 102, (SELECT id FROM rooms WHERE room_number = '204' LIMIT 1), 11, '2026-07-12', '2026-07-15', 3, 3000.00, 2, 1, 'ASSIGNED'),
       (103, 103, (SELECT id FROM rooms WHERE room_number = '102' LIMIT 1), 12, '2026-07-03', '2026-07-06', 3, 3000.00, 2, 0, 'ASSIGNED'),
       (104, 103, (SELECT id FROM rooms WHERE room_number = '201' LIMIT 1), 12, '2026-07-03', '2026-07-06', 3, 4000.00, 2, 0, 'ASSIGNED'),
-      (105, 105, (SELECT id FROM rooms WHERE room_number = '102' LIMIT 1), 13, '2026-07-05', '2026-07-08', 3, 3000.00, 2, 0, 'ASSIGNED'),
+      (105, 105, (SELECT id FROM rooms WHERE room_number = '104' LIMIT 1), 13, '2026-07-05', '2026-07-08', 3, 3000.00, 2, 0, 'ASSIGNED'),
       (106, 106, (SELECT id FROM rooms WHERE room_number = '101' LIMIT 1), 14, '2026-07-01', '2026-07-04', 3, 3000.00, 2, 0, 'CHECKED_IN'),
       (107, 107, (SELECT id FROM rooms WHERE room_number = '501' LIMIT 1), 15, '2026-07-01', '2026-07-07', 6, 18000.00, 2, 0, 'CHECKED_IN'),
-      (108, 108, (SELECT id FROM rooms WHERE room_number = '103' LIMIT 1), 16, '2026-06-29', '2026-07-01', 2, 4500.00, 1, 0, 'CHECKED_IN')
+      (108, 108, (SELECT id FROM rooms WHERE room_number = '103' LIMIT 1), 16, '2026-06-29', '2026-07-01', 2, 4500.00, 1, 0, 'CHECKED_IN'),
+      (109, 109, (SELECT id FROM rooms WHERE room_number = '102' LIMIT 1), 17, '2026-06-25', '2026-06-28', 3, 3000.00, 1, 0, 'CHECKED_OUT'),
+      (110, 110, (SELECT id FROM rooms WHERE room_number = '508' LIMIT 1), 19, '2026-06-26', '2026-06-28', 2, 7500.00, 1, 0, 'CHECKED_OUT'),
+      (111, 111, (SELECT id FROM rooms WHERE room_number = '103' LIMIT 1), 18, '2026-07-01', '2026-07-03', 2, 4500.00, 2, 0, 'CHECKED_IN')
       ON CONFLICT (id) DO NOTHING;
     `);
 

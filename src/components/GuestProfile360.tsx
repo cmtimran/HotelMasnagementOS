@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { User, Mail, Phone, MapPin, Calendar, Star, Heart, AlertCircle, TrendingUp, Award, Clock, MessageSquare, X, ChevronRight, Building2 } from 'lucide-react';
+import { getAllStoredReservations } from '../utils/roomInventoryEngine';
 
 interface GuestStay {
     id: number;
@@ -50,42 +51,55 @@ interface GuestProfile360Props {
     onClose: () => void;
 }
 
-const GuestProfile360 = ({ onClose }: GuestProfile360Props) => {
+const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'preferences' | 'complaints'>('overview');
 
-    // Mock data - replace with API call
-    const [guest] = useState<Guest>({
-        id: 1,
-        name: 'John Anderson',
-        email: 'john.anderson@email.com',
-        phone: '+880 1711-123456',
-        address: 'Gulshan 2, Dhaka 1212, Bangladesh',
-        dateOfBirth: '1985-05-15',
-        nationality: 'Bangladeshi',
-        vipStatus: 'Gold',
-        totalStays: 12,
-        totalSpent: 450000,
-        averageSpending: 37500,
-        lastVisit: '2026-01-10',
-        memberSince: '2023-03-15',
-        stays: [
-            { id: 1, checkIn: '2026-01-08', checkOut: '2026-01-10', roomNumber: '305', roomType: 'Executive Suite', nights: 2, totalSpent: 25000, status: 'completed' },
-            { id: 2, checkIn: '2025-12-20', checkOut: '2025-12-23', roomNumber: '201', roomType: 'Deluxe', nights: 3, totalSpent: 18000, status: 'completed' },
-            { id: 3, checkIn: '2025-11-05', checkOut: '2025-11-08', roomNumber: '402', roomType: 'Suite', nights: 3, totalSpent: 30000, status: 'completed' },
-            { id: 4, checkIn: '2026-02-15', checkOut: '2026-02-18', roomNumber: '305', roomType: 'Executive Suite', nights: 3, totalSpent: 0, status: 'upcoming' },
-        ],
-        preferences: [
-            { category: 'Room', items: ['High Floor', 'Sea View', 'King Bed', 'Non-Smoking'] },
-            { category: 'Amenities', items: ['Extra Pillows', 'Bathrobe', 'Coffee Machine'] },
-            { category: 'Dietary', items: ['Vegetarian', 'No Pork', 'Gluten-Free Options'] },
-            { category: 'Services', items: ['Early Check-in', 'Late Checkout', 'Airport Pickup'] },
-        ],
-        complaints: [
-            { id: 1, date: '2025-12-21', issue: 'AC not cooling properly', status: 'resolved', resolution: 'Technician fixed within 30 minutes' },
-            { id: 2, date: '2025-11-06', issue: 'Room service delayed', status: 'resolved', resolution: 'Complimentary breakfast provided' },
-        ],
-        notes: 'Prefers quiet rooms away from elevator. Celebrates anniversary in November. Allergic to seafood.',
-    });
+    const guest = useMemo<Guest>(() => {
+        const allRes = getAllStoredReservations();
+        const targetRes = (guestId ? allRes[guestId - 1] : allRes[0]) || allRes[0];
+        const guestName = targetRes?.guestName || 'Valued Guest';
+        const matchingStays = allRes.filter(r => r.guestName?.toLowerCase() === guestName.toLowerCase());
+        const staysList: GuestStay[] = (matchingStays.length > 0 ? matchingStays : allRes.slice(0, 3)).map((r, idx) => {
+            const nights = Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+            return {
+                id: idx + 1,
+                checkIn: r.checkIn,
+                checkOut: r.checkOut,
+                roomNumber: r.roomNo || '101',
+                roomType: r.roomType || 'Deluxe Room',
+                nights,
+                totalSpent: Number(r.totalRate) || 0,
+                status: r.status === 'CANCELLED' ? 'cancelled' : r.status === 'CONFIRMED' ? 'upcoming' : 'completed'
+            };
+        });
+        const totalSpent = staysList.reduce((s, st) => s + st.totalSpent, 0);
+        const totalStays = Math.max(1, staysList.length);
+
+        return {
+            id: guestId || 1,
+            name: guestName,
+            email: targetRes?.guestEmail || `${guestName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+            phone: targetRes?.guestPhone || '+880 1711-000000',
+            address: 'Dhaka, Bangladesh',
+            dateOfBirth: '1988-05-15',
+            nationality: targetRes?.nationality || 'Bangladeshi',
+            vipStatus: totalSpent > 80000 ? 'Platinum' : totalSpent > 40000 ? 'Gold' : 'Silver',
+            totalStays,
+            totalSpent,
+            averageSpending: Math.round(totalSpent / totalStays),
+            lastVisit: targetRes?.checkIn || new Date().toISOString().slice(0, 10),
+            memberSince: '2024-01-15',
+            stays: staysList,
+            preferences: [
+                { category: 'Room', items: [targetRes?.roomType || 'Deluxe', 'Non-Smoking', 'High Floor'] },
+                { category: 'Amenities', items: ['Extra Pillows', 'High-Speed Wi-Fi', 'Coffee Machine'] },
+                { category: 'Dietary', items: ['Halal Certified', 'Fresh Fruit Platter'] },
+                { category: 'Services', items: ['Express Check-in', 'Airport Transfer'] },
+            ],
+            complaints: [],
+            notes: targetRes?.notes || 'Guest profile synchronized from live reservation ledger.',
+        };
+    }, [guestId]);
 
     const getVIPColor = (status: Guest['vipStatus']) => {
         switch (status) {
@@ -170,11 +184,11 @@ const GuestProfile360 = ({ onClose }: GuestProfile360Props) => {
                         </div>
                         <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
                             <p className="text-white/80 text-xs font-medium mb-1">Total Spent</p>
-                            <p className="text-2xl font-bold">৳ {(guest.totalSpent / 1000).toFixed(0)}K</p>
+                            <p className="text-2xl font-bold">৳ {guest.totalSpent.toLocaleString()}</p>
                         </div>
                         <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
                             <p className="text-white/80 text-xs font-medium mb-1">Avg. Spending</p>
-                            <p className="text-2xl font-bold">৳ {(guest.averageSpending / 1000).toFixed(0)}K</p>
+                            <p className="text-2xl font-bold">৳ {guest.averageSpending.toLocaleString()}</p>
                         </div>
                         <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
                             <p className="text-white/80 text-xs font-medium mb-1">Member Since</p>

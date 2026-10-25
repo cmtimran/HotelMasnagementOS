@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Tags, Users, BedDouble, Star, ChevronLeft, Plus, Save, Edit2, Trash2, Upload, X, Search,
     RefreshCw, AlertTriangle, CheckCircle2, DollarSign, Layers
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { getDynamicRoomTypes, syncRoomTypesAndRoomsFromDB } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
 interface RoomType {
@@ -37,148 +39,34 @@ interface RoomType {
 
 const STORAGE_KEY = 'hotel_room_types_v1';
 
-const INITIAL_ROOM_TYPES: RoomType[] = [
-    {
-        id: 1,
-        name: 'Standard Single',
-        shortCode: 'STND',
-        description: 'Cozy, quiet room ideal for solo travelers and business guests.',
-        size: 280,
-        status: 'Active',
-        displayOrder: 1,
-        baseAdult: 1,
-        baseChild: 0,
-        maxAdult: 1,
-        maxChild: 1,
-        totalCapacity: 2,
-        extraBedAllowed: false,
-        extraBedQuantity: 0,
-        babyCotAllowed: false,
-        isConnecting: false,
-        basePrice: 2200,
-        extraAdultPrice: 0,
-        extraChildPrice: 800,
-        pricingUnit: 'Per Room',
-        bedType: 'Single',
-        viewType: 'Courtyard View',
-        smokingPolicy: 'Non-Smoking',
-        amenities: ['AC', 'TV', 'Wifi', 'Desk', 'Safe'],
-        photos: [],
-        showOnWebsite: true
-    },
-    {
-        id: 2,
-        name: 'Deluxe Double',
-        shortCode: 'DLX',
-        description: 'Spacious room with king or twin bedding, ideal for couples and leisure.',
-        size: 380,
-        status: 'Active',
-        displayOrder: 2,
-        baseAdult: 2,
-        baseChild: 1,
-        maxAdult: 3,
-        maxChild: 2,
-        totalCapacity: 4,
-        extraBedAllowed: true,
-        extraBedQuantity: 1,
-        babyCotAllowed: true,
-        isConnecting: true,
-        basePrice: 3000,
-        extraAdultPrice: 1000,
-        extraChildPrice: 500,
-        pricingUnit: 'Per Room',
-        bedType: 'King',
-        viewType: 'City View',
-        smokingPolicy: 'Non-Smoking',
-        amenities: ['AC', 'TV', 'Wifi', 'Minibar', 'Safe', 'Desk'],
-        photos: [],
-        showOnWebsite: true
-    },
-    {
-        id: 3,
-        name: 'Superior King',
-        shortCode: 'SUPK',
-        description: 'Premium sea-view room featuring a private balcony and bathtub.',
-        size: 450,
-        status: 'Active',
-        displayOrder: 3,
-        baseAdult: 2,
-        baseChild: 1,
-        maxAdult: 3,
-        maxChild: 2,
-        totalCapacity: 4,
-        extraBedAllowed: true,
-        extraBedQuantity: 1,
-        babyCotAllowed: true,
-        isConnecting: true,
-        basePrice: 4500,
-        extraAdultPrice: 1500,
-        extraChildPrice: 800,
-        pricingUnit: 'Per Room',
-        bedType: 'King',
-        viewType: 'Sea View',
-        smokingPolicy: 'Non-Smoking',
-        amenities: ['AC', 'TV', 'Wifi', 'Minibar', 'Bathtub', 'Balcony', 'Safe', 'Hair Dryer'],
-        photos: [],
-        showOnWebsite: true
-    },
-    {
-        id: 4,
-        name: 'Executive Suite',
-        shortCode: 'EXEC',
-        description: 'High-floor suite with separate living room, work station, and executive lounge privileges.',
-        size: 650,
-        status: 'Active',
-        displayOrder: 4,
-        baseAdult: 2,
-        baseChild: 2,
-        maxAdult: 4,
-        maxChild: 2,
-        totalCapacity: 5,
-        extraBedAllowed: true,
-        extraBedQuantity: 2,
-        babyCotAllowed: true,
-        isConnecting: false,
-        basePrice: 6500,
-        extraAdultPrice: 2000,
-        extraChildPrice: 1000,
-        pricingUnit: 'Per Room',
-        bedType: 'King',
-        viewType: 'Sea View',
-        smokingPolicy: 'Non-Smoking',
-        amenities: ['AC', 'TV', 'Wifi', 'Minibar', 'Bathtub', 'Balcony', 'Safe', 'Hair Dryer', 'Desk'],
-        photos: [],
-        showOnWebsite: true
-    },
-    {
-        id: 5,
-        name: 'Presidential Suite',
-        shortCode: 'PRES',
-        description: 'Top penthouse suite with private terrace, personal jacuzzi, and dedicated butler service.',
-        size: 1200,
-        status: 'Active',
-        displayOrder: 5,
-        baseAdult: 4,
-        baseChild: 2,
-        maxAdult: 6,
-        maxChild: 3,
-        totalCapacity: 8,
-        extraBedAllowed: true,
-        extraBedQuantity: 2,
-        babyCotAllowed: true,
-        isConnecting: false,
-        basePrice: 18000,
-        extraAdultPrice: 3000,
-        extraChildPrice: 1500,
-        pricingUnit: 'Per Room',
-        bedType: 'King',
-        viewType: 'Sea View',
-        smokingPolicy: 'Non-Smoking',
-        amenities: ['AC', 'TV', 'Wifi', 'Minibar', 'Bathtub', 'Balcony', 'Safe', 'Hair Dryer', 'Desk'],
-        photos: [],
-        showOnWebsite: true
-    }
-];
+const mapDynamicToRoomType = (rt: any, idx: number): RoomType => ({
+    id: Number(rt.id) || (idx + 1),
+    name: rt.name || 'Room Category',
+    shortCode: rt.code || rt.shortCode || `RT${idx + 1}`,
+    description: rt.description || `${rt.name} category configured in property inventory.`,
+    size: Number(rt.size) || 350,
+    status: rt.status || 'Active',
+    displayOrder: Number(rt.displayOrder) || (idx + 1),
+    baseAdult: Number(rt.baseOccupancy || rt.baseAdult) || 2,
+    baseChild: Number(rt.baseChild) || 1,
+    maxAdult: Number(rt.maxOccupancy || rt.maxAdult) || 3,
+    maxChild: Number(rt.maxChild) || 2,
+    totalCapacity: (Number(rt.maxOccupancy || rt.maxAdult) || 3) + (Number(rt.maxChild) || 1),
+    extraBedAllowed: rt.extraBedAllowed ?? true,
+    extraBedQuantity: Number(rt.extraBedQuantity) || 1,
+    babyCotAllowed: rt.babyCotAllowed ?? true,
+    isConnecting: Boolean(rt.isConnecting),
+    basePrice: Number(rt.baseRate || rt.basePrice) || 3500,
+    extraAdultPrice: Number(rt.extraAdultPrice) || 1000,
+    extraChildPrice: Number(rt.extraChildPrice) || 500,
+    pricingUnit: rt.pricingUnit || 'Per Room',
+    bedType: rt.bedType || 'King',
+    viewType: rt.viewType || 'City View',
+    smokingPolicy: rt.smokingPolicy || 'Non-Smoking',
+    amenities: Array.isArray(rt.amenities) ? rt.amenities : ['AC', 'TV', 'Wifi', 'Safe', 'Desk'],
+    photos: Array.isArray(rt.photos) ? rt.photos : [],
+    showOnWebsite: rt.showOnWebsite ?? true
+});
 
 const RoomTypeManagement = () => {
     const [view, setView] = useState<'list' | 'form'>('list');
@@ -187,12 +75,38 @@ const RoomTypeManagement = () => {
     const [roomTypes, setRoomTypes] = useState<RoomType[]>(() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) return JSON.parse(saved);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].shortCode) {
+                    return parsed;
+                }
+            }
         } catch {
             // fallback
         }
-        return INITIAL_ROOM_TYPES;
+        return getDynamicRoomTypes().map(mapDynamicToRoomType);
     });
+
+    useEffect(() => {
+        syncRoomTypesAndRoomsFromDB(1).then(({ roomTypes: dbRoomTypes }) => {
+            if (dbRoomTypes && dbRoomTypes.length > 0) {
+                setRoomTypes(prev => {
+                    const mapped = dbRoomTypes.map((dbRt: any, idx: number) => {
+                        const existing = prev.find(p => Number(p.id) === Number(dbRt.id) || p.shortCode === dbRt.code);
+                        return existing ? {
+                            ...existing,
+                            id: Number(dbRt.id),
+                            name: dbRt.name || existing.name,
+                            shortCode: dbRt.code || existing.shortCode,
+                            basePrice: Number(dbRt.baseRate || dbRt.basePrice || existing.basePrice)
+                        } : mapDynamicToRoomType(dbRt, idx);
+                    });
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+                    return mapped;
+                });
+            }
+        }).catch(() => {});
+    }, []);
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [formData, setFormData] = useState<RoomType | null>(null);
@@ -264,7 +178,7 @@ const RoomTypeManagement = () => {
         setFormData({ ...formData, name, shortCode: nextCode });
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData || !formData.name.trim() || !formData.shortCode.trim()) {
             alert('Please provide a Room Type Name and Short Code.');
             return;
@@ -278,16 +192,48 @@ const RoomTypeManagement = () => {
 
         let updated: RoomType[];
         if (editingId) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/properties/1/room-types/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: formData.shortCode,
+                        name: formData.name,
+                        baseOccupancy: formData.baseAdult,
+                        maxOccupancy: formData.maxAdult,
+                        baseRate: formData.basePrice
+                    })
+                });
+            } catch {}
             updated = roomTypes.map(rt => rt.id === editingId ? formData : rt);
         } else {
-            updated = [...roomTypes, formData];
+            let newId = formData.id;
+            try {
+                const res = await fetch(`${getApiBaseUrl()}/api/properties/1/room-types`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: formData.shortCode,
+                        name: formData.name,
+                        baseOccupancy: formData.baseAdult,
+                        maxOccupancy: formData.maxAdult,
+                        baseRate: formData.basePrice
+                    })
+                });
+                const json = await res.json();
+                if (json.success && json.data?.id) newId = Number(json.data.id);
+            } catch {}
+            updated = [...roomTypes, { ...formData, id: newId }];
         }
         persistRoomTypes(updated);
         setView('list');
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this room type? Rooms assigned to it will need to be reallocated.')) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/properties/1/room-types/${id}`, { method: 'DELETE' });
+            } catch {}
             const updated = roomTypes.filter(rt => rt.id !== id);
             persistRoomTypes(updated);
         }

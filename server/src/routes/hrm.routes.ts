@@ -29,6 +29,54 @@ router.get('/departments', (req: Request, res: Response) => {
     }
 });
 
+// POST /api/hrm/departments - Create department
+router.post('/departments', (req: Request, res: Response) => {
+    try {
+        const { propertyId = 1, code, name, costCenterCode } = req.body;
+        if (!code || !name) {
+            return res.status(400).json({ success: false, error: 'code and name are required' });
+        }
+        const result = db.prepare(`
+            INSERT INTO departments (property_id, code, name, cost_center_code)
+            VALUES (?, ?, ?, ?)
+        `).run(propertyId, code.toUpperCase(), name, costCenterCode || `CC-${code.toUpperCase()}`);
+
+        res.status(201).json({ success: true, id: Number(result.lastInsertRowid), message: 'Department created successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to create department' });
+    }
+});
+
+// PUT /api/hrm/departments/:id - Update department
+router.put('/departments/:id', (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const { code, name, costCenterCode } = req.body;
+        db.prepare(`
+            UPDATE departments
+            SET code = COALESCE(?, code),
+                name = COALESCE(?, name),
+                cost_center_code = COALESCE(?, cost_center_code)
+            WHERE id = ?
+        `).run(code ? code.toUpperCase() : null, name || null, costCenterCode || null, id);
+
+        res.json({ success: true, message: 'Department updated successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to update department' });
+    }
+});
+
+// DELETE /api/hrm/departments/:id - Delete department
+router.delete('/departments/:id', (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        db.prepare('DELETE FROM departments WHERE id = ?').run(id);
+        res.json({ success: true, message: 'Department deleted successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to delete department' });
+    }
+});
+
 // GET /api/hrm/designations - List all designations
 router.get('/designations', (req: Request, res: Response) => {
     try {
@@ -147,6 +195,65 @@ router.post('/employees', (req: Request, res: Response) => {
     }
 });
 
+// PUT /api/hrm/employees/:id - Update employee
+router.put('/employees/:id', (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const {
+            departmentId,
+            designationId,
+            employeeCode,
+            firstName,
+            lastName,
+            email,
+            phone,
+            basicSalary,
+            status
+        } = req.body;
+
+        db.prepare(`
+            UPDATE employees
+            SET department_id = COALESCE(?, department_id),
+                designation_id = COALESCE(?, designation_id),
+                employee_code = COALESCE(?, employee_code),
+                first_name = COALESCE(?, first_name),
+                last_name = COALESCE(?, last_name),
+                email = COALESCE(?, email),
+                phone = COALESCE(?, phone),
+                basic_salary = COALESCE(?, basic_salary),
+                status = COALESCE(?, status),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(
+            departmentId || null,
+            designationId || null,
+            employeeCode || null,
+            firstName || null,
+            lastName || null,
+            email || null,
+            phone || null,
+            basicSalary !== undefined ? basicSalary : null,
+            status || null,
+            id
+        );
+
+        res.json({ success: true, message: 'Employee updated successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to update employee' });
+    }
+});
+
+// DELETE /api/hrm/employees/:id - Delete employee
+router.delete('/employees/:id', (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        db.prepare('DELETE FROM employees WHERE id = ?').run(id);
+        res.json({ success: true, message: 'Employee deleted successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to delete employee' });
+    }
+});
+
 // ==========================================
 // 3. 24/7 SHIFTS & ROSTER
 // ==========================================
@@ -167,6 +274,55 @@ router.get('/shifts', (req: Request, res: Response) => {
         res.json({ success: true, data: shifts });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch shifts' });
+    }
+});
+
+// POST /api/hrm/shifts - Create shift
+router.post('/shifts', (req: Request, res: Response) => {
+    try {
+        const { propertyId = 1, name, startTime, endTime, gracePeriodMinutes = 15 } = req.body;
+        if (!name || !startTime || !endTime) {
+            return res.status(400).json({ success: false, error: 'name, startTime, and endTime are required' });
+        }
+        const result = db.prepare(`
+            INSERT INTO shifts (property_id, name, start_time, end_time, grace_period_minutes)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(propertyId, name, startTime, endTime, gracePeriodMinutes);
+
+        res.status(201).json({ success: true, id: Number(result.lastInsertRowid), message: 'Shift created successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to create shift' });
+    }
+});
+
+// PUT /api/hrm/shifts/:id - Update shift
+router.put('/shifts/:id', (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const { name, startTime, endTime, gracePeriodMinutes } = req.body;
+        db.prepare(`
+            UPDATE shifts
+            SET name = COALESCE(?, name),
+                start_time = COALESCE(?, start_time),
+                end_time = COALESCE(?, end_time),
+                grace_period_minutes = COALESCE(?, grace_period_minutes)
+            WHERE id = ?
+        `).run(name || null, startTime || null, endTime || null, gracePeriodMinutes !== undefined ? gracePeriodMinutes : null, id);
+
+        res.json({ success: true, message: 'Shift updated successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to update shift' });
+    }
+});
+
+// DELETE /api/hrm/shifts/:id - Delete shift
+router.delete('/shifts/:id', (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        db.prepare('DELETE FROM shifts WHERE id = ?').run(id);
+        res.json({ success: true, message: 'Shift deleted successfully' });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to delete shift' });
     }
 });
 

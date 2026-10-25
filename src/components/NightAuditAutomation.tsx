@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import PageHeader from './common/PageHeader';
 import {
     Moon, CheckCircle2,
     RefreshCw, Printer,
     Landmark, Play
 } from 'lucide-react';
+import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB } from '../utils/roomInventoryEngine';
 
 interface AuditStep {
     id: number;
@@ -55,24 +57,49 @@ const INITIAL_STEPS: AuditStep[] = [
     }
 ];
 
-const INITIAL_GL_POSTINGS: GLPosting[] = [
-    { id: 1, accountCode: '10010-01', accountName: 'Master Room Rent (In-House 24 Rooms)', debitBDT: 0, creditBDT: 156000, department: 'Front Desk' },
-    { id: 2, accountCode: '40010-01', accountName: 'F&B Buffet Breakfast & Restaurant Sales', debitBDT: 0, creditBDT: 42500, department: 'Food & Beverage' },
-    { id: 3, accountCode: '60010-02', accountName: 'Laundry Valet & Dry Cleaning Service', debitBDT: 0, creditBDT: 6800, department: 'Housekeeping' },
-    { id: 4, accountCode: '50020-01', accountName: 'Airport Chauffeur Transport Surcharge', debitBDT: 0, creditBDT: 4500, department: 'Transportation' },
-    { id: 5, accountCode: '22010-01', accountName: 'Govt VAT 15% (Mushak-6.3 Output Tax)', debitBDT: 0, creditBDT: 31470, department: 'Tax Authority' },
-    { id: 6, accountCode: '22020-01', accountName: 'Hotel Service Charge Pool 10%', debitBDT: 0, creditBDT: 20980, department: 'Tax Authority' },
-    { id: 7, accountCode: '11010-01', accountName: 'Guest Ledger Accounts Receivable (A/R)', debitBDT: 262250, creditBDT: 0, department: 'Front Desk' }
-];
-
 export const NightAuditAutomation: React.FC = () => {
-    const [businessDate, setBusinessDate] = useState<string>('2026-06-25');
+    const [reservations, setReservations] = useState(() => getAllStoredReservations());
+    const [rooms] = useState(() => getCanonicalRooms());
+
+    useEffect(() => {
+        syncReservationsFromDB().then(res => {
+            if (res.length > 0) setReservations(res);
+        }).catch(() => {});
+    }, []);
+
+    const glPostings = useMemo<GLPosting[]>(() => {
+        const active = reservations.filter(r => r.status !== 'CANCELLED' && r.status !== 'NO_SHOW');
+        const roomRev = active.reduce((sum, r) => sum + (Number(r.ratePerNight) || Math.round((Number(r.totalRate) || 0) / 2)), 0);
+        const fnbRev = Math.round(roomRev * 0.22);
+        const hkRev = Math.round(roomRev * 0.05);
+        const trnRev = active.reduce((sum, r) => {
+            if (Array.isArray(r.selectedExtras)) {
+                return sum + r.selectedExtras.reduce((s, e: any) => s + (Number(e.price) || 0), 0);
+            }
+            return sum;
+        }, 0);
+        const vatAmt = Math.round((roomRev + fnbRev) * 0.15);
+        const scAmt = Math.round((roomRev + fnbRev) * 0.10);
+        const totalAR = roomRev + fnbRev + hkRev + trnRev + vatAmt + scAmt;
+
+        return [
+            { id: 1, accountCode: '10010-01', accountName: `Master Room Rent (Active ${active.length} Folios)`, debitBDT: 0, creditBDT: roomRev, department: 'Front Desk' },
+            { id: 2, accountCode: '40010-01', accountName: 'F&B Buffet Breakfast & Restaurant Sales', debitBDT: 0, creditBDT: fnbRev, department: 'Food & Beverage' },
+            { id: 3, accountCode: '60010-02', accountName: 'Laundry Valet & Housekeeping Services', debitBDT: 0, creditBDT: hkRev, department: 'Housekeeping' },
+            { id: 4, accountCode: '50020-01', accountName: 'Ancillary Add-ons & Transport Surcharge', debitBDT: 0, creditBDT: trnRev, department: 'Transportation' },
+            { id: 5, accountCode: '22010-01', accountName: 'Govt VAT 15% (Mushak-6.3 Output Tax)', debitBDT: 0, creditBDT: vatAmt, department: 'Tax Authority' },
+            { id: 6, accountCode: '22020-01', accountName: 'Hotel Service Charge Pool 10%', debitBDT: 0, creditBDT: scAmt, department: 'Tax Authority' },
+            { id: 7, accountCode: '11010-01', accountName: 'Guest Ledger Accounts Receivable (A/R)', debitBDT: totalAR, creditBDT: 0, department: 'Front Desk' }
+        ];
+    }, [reservations]);
+
+    const [businessDate, setBusinessDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [steps, setSteps] = useState<AuditStep[]>(INITIAL_STEPS);
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [auditCompleted, setAuditCompleted] = useState<boolean>(false);
-    const [auditLogs, setAuditLogs] = useState<string[]>([
+    const [auditLogs, setAuditLogs] = useState<string[]>(() => [
         'System initialized in Standby Mode. Ready for End of Day (EOD) Night Audit sequence.',
-        'Total active in-house rooms: 24 (Occupancy: 85.7%).',
+        `Total physical rooms: ${rooms.length} | Active reservations: ${reservations.length}.`,
         'Unposted cashier tickets: 0. System ready.'
     ]);
     const [activeTab, setActiveTab] = useState<'pipeline' | 'gl-ledger' | 'report'>('pipeline');
@@ -139,11 +166,11 @@ export const NightAuditAutomation: React.FC = () => {
         showToast('Night Audit reset to pre-audit mode.');
     };
 
-    const totalDebits = INITIAL_GL_POSTINGS.reduce((acc, p) => acc + p.debitBDT, 0);
-    const totalCredits = INITIAL_GL_POSTINGS.reduce((acc, p) => acc + p.creditBDT, 0);
+    const totalDebits = glPostings.reduce((acc, p) => acc + p.debitBDT, 0);
+    const totalCredits = glPostings.reduce((acc, p) => acc + p.creditBDT, 0);
 
     return (
-        <div className="h-full min-h-[calc(100vh-48px)] bg-gray-50 flex flex-col font-sans text-xs select-none animate-in fade-in duration-150">
+        <div className="page-container text-xs select-none animate-in fade-in duration-150">
             {toastMessage && (
                 <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
                     <CheckCircle2 size={14} className="text-emerald-400" />
@@ -151,81 +178,67 @@ export const NightAuditAutomation: React.FC = () => {
                 </div>
             )}
 
-            {/* Header */}
-            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex items-center justify-between shadow-2xs z-20">
-                <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shrink-0">
-                        <Moon size={18} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
-                                End of Day (EOD) Night Audit Automation
-                            </h1>
-                            <span className="badge-status-active">
-                                EOD Pipeline
+            <PageHeader
+                title="End of Day (EOD) Night Audit Automation"
+                subtitle="Automatic room rent & tax posting, cashier shift reconciliation, no-show forfeiture, and GL rollover"
+                icon={<Moon size={20} />}
+                badge="EOD Pipeline"
+                actions={
+                    <div className="flex items-center gap-3">
+                        <div className="text-right hidden sm:block">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">System Business Date</span>
+                            <span className="text-sm font-mono font-bold text-[#6C5CE7] mt-1 block leading-tight">
+                                {businessDate}
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                            Automatic room rent & tax posting, cashier shift reconciliation, no-show forfeiture, and GL rollover.
-                        </p>
-                    </div>
-                </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="text-right">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">System Business Date</span>
-                        <span className="text-sm font-mono font-bold text-purple-700 mt-1 block leading-tight">
-                            {businessDate}
-                        </span>
-                    </div>
+                        <div className="flex items-center gap-2 sm:border-l sm:border-slate-200 sm:pl-3">
+                            {auditCompleted ? (
+                                <button
+                                    onClick={handleResetAudit}
+                                    className="btn-secondary"
+                                >
+                                    <RefreshCw size={14} />
+                                    <span>Reset / Re-run</span>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleRunFullAudit}
+                                    disabled={isRunning}
+                                    className="btn-primary"
+                                >
+                                    {isRunning ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
+                                    <span>{isRunning ? 'Running EOD Audit...' : 'Execute Night Audit'}</span>
+                                </button>
+                            )}
 
-                    <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-                        {auditCompleted ? (
                             <button
-                                onClick={handleResetAudit}
+                                onClick={() => window.print()}
                                 className="btn-secondary"
                             >
-                                <RefreshCw size={13} />
-                                <span>Reset / Re-run</span>
+                                <Printer size={14} />
+                                <span>Print Report</span>
                             </button>
-                        ) : (
-                            <button
-                                onClick={handleRunFullAudit}
-                                disabled={isRunning}
-                                className="btn-primary"
-                            >
-                                {isRunning ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />}
-                                <span>{isRunning ? 'Running EOD Audit...' : 'Execute Night Audit'}</span>
-                            </button>
-                        )}
-
-                        <button
-                            onClick={() => window.print()}
-                            className="btn-secondary"
-                        >
-                            <Printer size={13} />
-                            <span>Print Report</span>
-                        </button>
+                        </div>
                     </div>
-                </div>
-            </header>
+                }
+            />
 
             {/* Navigation Tabs */}
-            <div className="bg-white border-b border-gray-200 px-3.5 flex items-center justify-between">
-                <div className="flex">
+            <div className="card-container !p-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-1">
                     {[
-                        { key: 'pipeline', label: 'Audit Execution Pipeline', icon: <Moon size={12} /> },
-                        { key: 'gl-ledger', label: 'General Ledger (GL) Postings', icon: <Landmark size={12} /> },
-                        { key: 'report', label: 'Manager\'s Daily Flash Report', icon: <Printer size={12} /> }
+                        { key: 'pipeline', label: 'Audit Execution Pipeline', icon: <Moon size={13} /> },
+                        { key: 'gl-ledger', label: 'General Ledger (GL) Postings', icon: <Landmark size={13} /> },
+                        { key: 'report', label: 'Manager\'s Daily Flash Report', icon: <Printer size={13} /> }
                     ].map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key as any)}
-                            className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold transition-all border-b-2 cursor-pointer ${
+                            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                                 activeTab === tab.key
-                                    ? 'border-purple-600 text-purple-600 bg-purple-50/20'
-                                    : 'border-transparent text-gray-500 hover:text-gray-900'
+                                    ? 'bg-[#6C5CE7] text-white shadow-xs'
+                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                         >
                             {tab.icon}
@@ -234,14 +247,14 @@ export const NightAuditAutomation: React.FC = () => {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-2 text-[10.5px]">
-                    <span className="text-gray-400">Total Audit Revenue:</span>
-                    <span className="font-mono font-bold text-gray-900">৳ 209,800 BDT</span>
+                <div className="flex items-center gap-2 text-xs px-2">
+                    <span className="text-slate-500">Total Audit Revenue:</span>
+                    <span className="font-mono font-bold text-slate-900">৳ {totalCredits.toLocaleString()} BDT</span>
                 </div>
             </div>
 
             {/* Main Area */}
-            <div className="flex-1 p-3.5 flex gap-3 overflow-hidden">
+            <div className="flex-1 flex gap-4 overflow-hidden">
                 {/* Tab: Pipeline */}
                 {activeTab === 'pipeline' && (
                     <div className="flex-1 flex gap-3 overflow-hidden">
@@ -361,7 +374,7 @@ export const NightAuditAutomation: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-[11.5px]">
-                                {INITIAL_GL_POSTINGS.map(gl => (
+                                {glPostings.map(gl => (
                                     <tr key={gl.id} className="hover:bg-gray-50/70 transition-colors">
                                         <td className="px-3 py-2 font-mono font-bold text-purple-700">
                                             {gl.accountCode}

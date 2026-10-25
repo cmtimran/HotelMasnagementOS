@@ -28,6 +28,7 @@ import {
     Info,
     Calendar
 } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -424,328 +425,6 @@ const INITIAL_ROLES: SecurityRole[] = [
     },
 ];
 
-const INITIAL_STAFF: StaffMember[] = [
-    {
-        id: 'usr-101',
-        staffCode: 'EMP-1001',
-        name: 'Imran Hossain',
-        username: 'imran.admin',
-        email: 'imran@thegrandpalace.com',
-        phone: '+880 1711 000001',
-        avatarInitials: 'IH',
-        department: 'Executive Management',
-        designation: 'Managing Director & CIO',
-        role: 'Super Administrator',
-        roleTier: 'L1 Executive',
-        shift: 'General Day (09:00 - 18:00)',
-        propertyScope: 'All 3 Group Properties (HQ Scope)',
-        twoFactorEnabled: true,
-        deviceBinding: 'HQ-MacBook-Pro (Bound)',
-        maxDiscountPercent: 100,
-        canVoidBills: true,
-        status: 'Active',
-        isOnline: true,
-        lastLogin: '4 mins ago',
-        lastIp: '192.168.1.10',
-        nidPassport: 'NID-9182374619',
-        bankName: 'Eastern Bank PLC',
-        bankAccount: '104100293847',
-        mfsNumber: '+880 1711 000001 (bKash)',
-    },
-    {
-        id: 'usr-102',
-        staffCode: 'EMP-1002',
-        name: 'Tanvir Ahmed',
-        username: 'tanvir.gm',
-        email: 'gm@thegrandpalace.com',
-        phone: '+880 1819 123456',
-        avatarInitials: 'TA',
-        department: 'Executive Management',
-        designation: 'General Manager',
-        role: 'General Manager (GM)',
-        roleTier: 'L1 Executive',
-        shift: 'General Day (09:00 - 18:00)',
-        propertyScope: 'The Grand Palace Hotel (Primary)',
-        twoFactorEnabled: true,
-        deviceBinding: 'GM-Office-PC (Bound)',
-        maxDiscountPercent: 50,
-        canVoidBills: true,
-        status: 'Active',
-        isOnline: true,
-        lastLogin: '18 mins ago',
-        lastIp: '192.168.1.12',
-        nidPassport: 'NID-8127391823',
-        bankName: 'BRAC Bank PLC',
-        bankAccount: '150120394857',
-        mfsNumber: '+880 1819 123456 (Nagad)',
-    },
-    {
-        id: 'usr-103',
-        staffCode: 'EMP-1014',
-        name: 'Farhana Kabir',
-        username: 'farhana.fom',
-        email: 'farhana.k@thegrandpalace.com',
-        phone: '+880 1912 345678',
-        avatarInitials: 'FK',
-        department: 'Front Office',
-        designation: 'Front Office Manager',
-        role: 'Front Office Manager (FOM)',
-        roleTier: 'L2 Operations',
-        shift: 'Morning (07:00 - 15:30)',
-        propertyScope: 'The Grand Palace Hotel (Primary)',
-        twoFactorEnabled: true,
-        deviceBinding: 'FrontDesk-Station-01',
-        maxDiscountPercent: 25,
-        canVoidBills: true,
-        status: 'Active',
-        isOnline: true,
-        lastLogin: '32 mins ago',
-        lastIp: '192.168.1.21',
-        nidPassport: 'NID-7261948291',
-        bankName: 'City Bank PLC',
-        bankAccount: '110293847561',
-        mfsNumber: '+880 1912 345678 (bKash)',
-    },
-    {
-        id: 'usr-104',
-        staffCode: 'EMP-1025',
-        name: 'Kamrul Islam',
-        username: 'kamrul.na',
-        email: 'kamrul.na@thegrandpalace.com',
-        phone: '+880 1715 456789',
-        avatarInitials: 'KI',
-        department: 'Front Office',
-        designation: 'Senior Night Auditor',
-        role: 'Night Auditor',
-        roleTier: 'L3 Cashier/POS',
-        shift: 'Night Audit (23:00 - 07:30)',
-        propertyScope: 'The Grand Palace Hotel (Primary)',
-        twoFactorEnabled: true,
-        deviceBinding: 'NightAudit-Secure-01',
-        maxDiscountPercent: 15,
-        canVoidBills: true,
-        status: 'Active',
-        isOnline: false,
-        lastLogin: 'Yesterday 11:15 PM',
-        lastIp: '192.168.1.25',
-        nidPassport: 'NID-6152948192',
-        bankName: 'Dutch-Bangla Bank',
-        bankAccount: '115120394857',
-        mfsNumber: '+880 1715 456789 (Rocket)',
-    },
-    {
-        id: 'usr-105',
-        staffCode: 'EMP-1033',
-        name: 'Sadia Rahman',
-        username: 'sadia.fd',
-        email: 'sadia.r@thegrandpalace.com',
-        phone: '+880 1618 987654',
-        avatarInitials: 'SR',
-        department: 'Front Office',
-        designation: 'Guest Relations Officer',
-        role: 'Front Desk Receptionist',
-        roleTier: 'L3 Cashier/POS',
-        shift: 'Morning (07:00 - 15:30)',
-        propertyScope: 'The Grand Palace Hotel (Primary)',
-        twoFactorEnabled: true,
-        deviceBinding: 'FrontDesk-Station-02',
-        maxDiscountPercent: 10,
-        canVoidBills: false,
-        status: 'Active',
-        isOnline: true,
-        lastLogin: '1 hour ago',
-        lastIp: '192.168.1.22',
-        nidPassport: 'NID-5192847193',
-        bankName: 'Eastern Bank PLC',
-        bankAccount: '104192837465',
-        mfsNumber: '+880 1618 987654 (bKash)',
-    },
-    {
-        id: 'usr-106',
-        staffCode: 'EMP-1048',
-        name: 'Mahmudul Hasan',
-        username: 'mahmud.hk',
-        email: 'mahmud.hk@thegrandpalace.com',
-        phone: '+880 1714 112233',
-        avatarInitials: 'MH',
-        department: 'Housekeeping',
-        designation: 'Executive Housekeeper',
-        role: 'Housekeeping Supervisor',
-        roleTier: 'L4 Service',
-        shift: 'Morning (07:00 - 15:30)',
-        propertyScope: 'The Grand Palace Hotel (Primary)',
-        twoFactorEnabled: false,
-        deviceBinding: 'HK-Tablet-Samsung-01',
-        maxDiscountPercent: 0,
-        canVoidBills: false,
-        status: 'Active',
-        isOnline: true,
-        lastLogin: '2 hours ago',
-        lastIp: '192.168.1.34',
-        nidPassport: 'NID-4192837482',
-        bankName: 'Islami Bank Bangladesh',
-        bankAccount: '205019283748',
-        mfsNumber: '+880 1714 112233 (Nagad)',
-    },
-    {
-        id: 'usr-107',
-        staffCode: 'EMP-1052',
-        name: 'Shakil Chowdhury',
-        username: 'shakil.fnb',
-        email: 'shakil.c@thegrandpalace.com',
-        phone: '+880 1817 223344',
-        avatarInitials: 'SC',
-        department: 'Food & Beverage',
-        designation: 'Restaurant Cashier & Captain',
-        role: 'F&B Service Captain / Cashier',
-        roleTier: 'L3 Cashier/POS',
-        shift: 'Evening (15:00 - 23:30)',
-        propertyScope: 'The Grand Palace Hotel (Primary)',
-        twoFactorEnabled: true,
-        deviceBinding: 'Restaurant-POS-Touch-01',
-        maxDiscountPercent: 10,
-        canVoidBills: false,
-        status: 'Active',
-        isOnline: false,
-        lastLogin: 'Yesterday 10:45 PM',
-        lastIp: '192.168.1.41',
-        nidPassport: 'NID-3192847561',
-        bankName: 'BRAC Bank PLC',
-        bankAccount: '150192837465',
-        mfsNumber: '+880 1817 223344 (bKash)',
-    },
-    {
-        id: 'usr-108',
-        staffCode: 'EMP-1060',
-        name: 'Rashedul Karim',
-        username: 'rashed.acc',
-        email: 'accounts@thegrandpalace.com',
-        phone: '+880 1916 334455',
-        avatarInitials: 'RK',
-        department: 'Accounts & Finance',
-        designation: 'Financial Controller',
-        role: 'Financial Controller & Accountant',
-        roleTier: 'L2 Operations',
-        shift: 'General Day (09:00 - 18:00)',
-        propertyScope: 'All 3 Group Properties (HQ Scope)',
-        twoFactorEnabled: true,
-        deviceBinding: 'Finance-Desktop-01',
-        maxDiscountPercent: 20,
-        canVoidBills: true,
-        status: 'Active',
-        isOnline: true,
-        lastLogin: '45 mins ago',
-        lastIp: '192.168.1.18',
-        nidPassport: 'NID-2192837465',
-        bankName: 'Standard Chartered Bank',
-        bankAccount: '019283746501',
-        mfsNumber: '+880 1916 334455 (bKash)',
-    },
-    {
-        id: 'usr-109',
-        staffCode: 'EMP-1072',
-        name: 'Nusrat Jahan',
-        username: 'nusrat.rec',
-        email: 'nusrat.j@thegrandpalace.com',
-        phone: '+880 1515 556677',
-        avatarInitials: 'NJ',
-        department: 'Front Office',
-        designation: 'Front Desk Cashier',
-        role: 'Front Desk Receptionist',
-        roleTier: 'L3 Cashier/POS',
-        shift: 'Evening (15:00 - 23:30)',
-        propertyScope: 'The Grand Palace Hotel (Primary)',
-        twoFactorEnabled: true,
-        deviceBinding: 'FrontDesk-Station-03',
-        maxDiscountPercent: 10,
-        canVoidBills: false,
-        status: 'On Leave',
-        isOnline: false,
-        lastLogin: '3 days ago',
-        lastIp: '192.168.1.23',
-        nidPassport: 'NID-1192837465',
-        bankName: 'City Bank PLC',
-        bankAccount: '110293847588',
-        mfsNumber: '+880 1515 556677 (Nagad)',
-    },
-];
-
-const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
-    {
-        id: 'aud-901',
-        user: 'Tanvir Ahmed',
-        staffCode: 'EMP-1002',
-        role: 'General Manager',
-        action: 'Approved 25% Discount Override on Booking #RES-9941 (Executive Suite)',
-        module: 'Front Desk & Cashiering',
-        severity: 'warning',
-        timestamp: 'Today 10:24 AM',
-        ip: '192.168.1.12',
-        device: 'GM-Office-PC',
-    },
-    {
-        id: 'aud-902',
-        user: 'Kamrul Islam',
-        staffCode: 'EMP-1025',
-        role: 'Night Auditor',
-        action: 'Completed Night Audit Automation for Business Date 2026-01-19 (0 Errors)',
-        module: 'Night Audit',
-        severity: 'info',
-        timestamp: 'Today 03:15 AM',
-        ip: '192.168.1.25',
-        device: 'NightAudit-Secure-01',
-    },
-    {
-        id: 'aud-903',
-        user: 'Farhana Kabir',
-        staffCode: 'EMP-1014',
-        role: 'Front Office Manager',
-        action: 'Authorized Void Bill #INV-4081 ($185.00) - Reason: Guest Folio Duplicate Entry',
-        module: 'Cashiering',
-        severity: 'warning',
-        timestamp: 'Yesterday 04:45 PM',
-        ip: '192.168.1.21',
-        device: 'FrontDesk-Station-01',
-    },
-    {
-        id: 'aud-904',
-        user: 'System Guard',
-        staffCode: 'SYS-SEC',
-        role: 'Automated Sentinel',
-        action: 'Blocked Remote Login Attempt for user @sadia.fd from unauthorized IP: 103.45.12.98',
-        module: 'Security & Auth',
-        severity: 'critical',
-        timestamp: 'Yesterday 02:18 PM',
-        ip: '103.45.12.98 (External)',
-        device: 'Unknown Browser',
-    },
-    {
-        id: 'aud-905',
-        user: 'Imran Hossain',
-        staffCode: 'EMP-1001',
-        role: 'Super Administrator',
-        action: 'Modified Role Permissions Matrix for "F&B Service Captain / Cashier"',
-        module: 'RBAC Governance',
-        severity: 'info',
-        timestamp: '2026-01-18 11:30 AM',
-        ip: '192.168.1.10',
-        device: 'HQ-MacBook-Pro',
-    },
-];
-
-const INITIAL_ACTIVE_SESSIONS: ActiveSession[] = [
-    { id: 'sess-1', staffName: 'Imran Hossain', role: 'Super Administrator', terminal: 'HQ-MacBook-Pro', ip: '192.168.1.10', loginTime: '08:45 AM', idleTime: 'Active now' },
-    { id: 'sess-2', staffName: 'Tanvir Ahmed', role: 'General Manager', terminal: 'GM-Office-PC', ip: '192.168.1.12', loginTime: '09:00 AM', idleTime: '2 mins' },
-    { id: 'sess-3', staffName: 'Farhana Kabir', role: 'Front Office Manager', terminal: 'FrontDesk-Station-01', ip: '192.168.1.21', loginTime: '06:55 AM', idleTime: 'Active now' },
-    { id: 'sess-4', staffName: 'Sadia Rahman', role: 'Front Desk Receptionist', terminal: 'FrontDesk-Station-02', ip: '192.168.1.22', loginTime: '07:05 AM', idleTime: '12 mins' },
-    { id: 'sess-5', staffName: 'Mahmudul Hasan', role: 'Housekeeping Supervisor', terminal: 'HK-Tablet-Samsung-01', ip: '192.168.1.34', loginTime: '07:30 AM', idleTime: '5 mins' },
-    { id: 'sess-6', staffName: 'Rashedul Karim', role: 'Financial Controller', terminal: 'Finance-Desktop-01', ip: '192.168.1.18', loginTime: '09:10 AM', idleTime: '18 mins' },
-];
-
-// ==========================================
-// COMPONENT PROPS
-// ==========================================
-
 interface AdminSecurityProps {
     initialTab?: 'users' | 'roles' | 'departments' | 'shifts' | 'policies' | 'audit';
     onNavigate?: (page: string) => void;
@@ -766,33 +445,112 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
     }, [initialTab]);
 
     // Data Collections State
-    const [staffList, setStaffList] = useState<StaffMember[]>(INITIAL_STAFF);
+    const [staffList, setStaffList] = useState<StaffMember[]>([]);
     const [rolesList, setRolesList] = useState<SecurityRole[]>(INITIAL_ROLES);
-    const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
-    const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(INITIAL_ACTIVE_SESSIONS);
+    const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+    const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+    const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+    const [shiftsList, setShiftsList] = useState<any[]>([]);
 
-    // Organization Master Data (Synced with Master Data Config)
-    const [departmentsList] = useState(() => {
-        const saved = localStorage.getItem('master_departments_v2');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, code: 'FO', name: 'Front Office & Guest Services', hodName: 'Md. Rafiqul Islam (FOM)', costCenterCode: 'CC-101', type: 'Operational (Revenue Generating)', staffCount: 18, monthlyBudgetBDT: 850000, status: 'Active' },
-            { id: 2, code: 'HK', name: 'Housekeeping & Public Areas', hodName: 'Nasrin Sultana (Executive Housekeeper)', costCenterCode: 'CC-102', type: 'Operational (Revenue Generating)', staffCount: 32, monthlyBudgetBDT: 1100000, status: 'Active' },
-            { id: 3, code: 'FNB', name: 'Food & Beverage Service', hodName: 'Chef Jean Dupont (F&B Director)', costCenterCode: 'CC-201', type: 'Operational (Revenue Generating)', staffCount: 28, monthlyBudgetBDT: 1450000, status: 'Active' },
-            { id: 4, code: 'ENG', name: 'Engineering & Facilities', hodName: 'Engr. Tanvir Ahmed (Chief Engineer)', costCenterCode: 'CC-301', type: 'Support & Administration', staffCount: 12, monthlyBudgetBDT: 650000, status: 'Active' },
-            { id: 5, code: 'ACC', name: 'Accounts & Financial Control', hodName: 'Farhan Chowdhury, FCA (Controller)', costCenterCode: 'CC-401', type: 'Support & Administration', staffCount: 8, monthlyBudgetBDT: 550000, status: 'Active' },
-            { id: 6, code: 'SEC', name: 'Security & Loss Prevention', hodName: 'Major (Retd.) Enamul Haque (CSO)', costCenterCode: 'CC-501', type: 'Support & Administration', staffCount: 16, monthlyBudgetBDT: 480000, status: 'Active' }
-        ];
-    });
+    useEffect(() => {
+        const API_BASE = getApiBaseUrl();
+        fetch(`${API_BASE}/api/hrm/employees?propertyId=1`)
+            .then(r => r.json())
+            .then(j => {
+                if (j.success && Array.isArray(j.data)) {
+                    const mappedStaff: StaffMember[] = j.data.map((e: any, idx: number) => ({
+                        id: String(e.id),
+                        staffCode: e.employee_code || `EMP-${1001 + idx}`,
+                        name: `${e.first_name} ${e.last_name}`,
+                        username: `${e.first_name.toLowerCase()}.${e.last_name.toLowerCase()}`,
+                        email: e.email || `${e.employee_code.toLowerCase()}@hotel.com`,
+                        phone: e.phone || '+880 1711 000000',
+                        avatarInitials: `${e.first_name?.[0] || 'S'}${e.last_name?.[0] || 'M'}`.toUpperCase(),
+                        department: (e.department_name || 'Front Office') as StaffDepartment,
+                        designation: e.designation_title || 'Staff',
+                        role: e.designation_title || 'Front Desk Receptionist',
+                        roleTier: idx === 0 ? 'L1 Executive' : idx < 3 ? 'L2 Operations' : 'L3 Cashier/POS',
+                        shift: 'General Day (09:00 - 18:00)',
+                        propertyScope: 'Grand Palace Hotel & Resort (Primary)',
+                        twoFactorEnabled: true,
+                        deviceBinding: `Workstation-0${idx + 1}`,
+                        maxDiscountPercent: idx === 0 ? 50 : 15,
+                        canVoidBills: idx < 2,
+                        status: e.status === 'INACTIVE' ? 'Suspended' : 'Active',
+                        isOnline: true,
+                        lastLogin: 'Active Session',
+                        lastIp: `192.168.1.${10 + idx}`,
+                        nidPassport: `NID-${8192000 + idx}`,
+                        bankName: 'Eastern Bank PLC',
+                        bankAccount: `1041002938${10 + idx}`,
+                        mfsNumber: `${e.phone || '+880 1711 000000'} (bKash)`
+                    }));
+                    setStaffList(mappedStaff);
+                    setActiveSessions(mappedStaff.map((s, idx) => ({
+                        id: `sess-${s.id}`,
+                        staffName: s.name,
+                        role: s.role,
+                        terminal: s.deviceBinding,
+                        ip: s.lastIp,
+                        loginTime: `0${8 + (idx % 3)}:00 AM`,
+                        idleTime: 'Active now'
+                    })));
+                    setAuditLogs(mappedStaff.slice(0, 4).map((s, idx) => ({
+                        id: `aud-${900 + idx}`,
+                        user: s.name,
+                        staffCode: s.staffCode,
+                        role: s.role,
+                        action: `Authenticated RBAC session on ${s.deviceBinding} (${s.department})`,
+                        module: s.department,
+                        severity: 'info',
+                        timestamp: 'Today',
+                        ip: s.lastIp,
+                        device: s.deviceBinding
+                    })));
+                }
+            })
+            .catch(() => {});
 
-    const [shiftsList] = useState(() => {
-        const saved = localStorage.getItem('master_shifts_v2');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, code: 'SHT-MOR', name: 'Morning Shift', startTime: '07:00', endTime: '15:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 42, color: 'border-amber-400 bg-amber-50 text-amber-800', status: 'Active' },
-            { id: 2, code: 'SHT-EVE', name: 'Evening / Swing Shift', startTime: '15:00', endTime: '23:30', gracePeriodMinutes: 15, mandatoryCashHandover: true, canTriggerNightAudit: false, assignedStaffCount: 38, color: 'border-blue-400 bg-blue-50 text-blue-800', status: 'Active' },
-            { id: 3, code: 'SHT-NGT', name: 'Night Audit / Graveyard Shift', startTime: '23:00', endTime: '07:30', gracePeriodMinutes: 10, mandatoryCashHandover: true, canTriggerNightAudit: true, assignedStaffCount: 14, color: 'border-purple-400 bg-purple-50 text-purple-800', status: 'Active' },
-            { id: 4, code: 'SHT-DAY', name: 'General Administration Day Shift', startTime: '09:00', endTime: '18:00', gracePeriodMinutes: 20, mandatoryCashHandover: false, canTriggerNightAudit: false, assignedStaffCount: 26, color: 'border-emerald-400 bg-emerald-50 text-emerald-800', status: 'Active' }
-        ];
-    });
+        fetch(`${API_BASE}/api/hrm/departments`)
+            .then(r => r.json())
+            .then(j => {
+                if (j.success && Array.isArray(j.data)) {
+                    setDepartmentsList(j.data.map((d: any) => ({
+                        id: d.id,
+                        code: d.code,
+                        name: d.name,
+                        hodName: 'Department Head',
+                        costCenterCode: d.cost_center_code || `CC-${d.code}`,
+                        type: 'Operational (Revenue Generating)',
+                        staffCount: Number(d.active_employees) || 0,
+                        monthlyBudgetBDT: 500000,
+                        status: 'Active'
+                    })));
+                }
+            })
+            .catch(() => {});
+
+        fetch(`${API_BASE}/api/hrm/shifts`)
+            .then(r => r.json())
+            .then(j => {
+                if (j.success && Array.isArray(j.data)) {
+                    setShiftsList(j.data.map((s: any) => ({
+                        id: s.id,
+                        code: 'SHT-' + s.name.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3),
+                        name: s.name,
+                        startTime: s.start_time,
+                        endTime: s.end_time,
+                        gracePeriodMinutes: Number(s.grace_period_minutes) || 15,
+                        mandatoryCashHandover: true,
+                        canTriggerNightAudit: s.name.toLowerCase().includes('night'),
+                        assignedStaffCount: Number(s.assigned_today) || 0,
+                        color: 'border-blue-400 bg-blue-50 text-blue-800',
+                        status: 'Active'
+                    })));
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     // Filter States for Users
     const [searchQuery, setSearchQuery] = useState('');
