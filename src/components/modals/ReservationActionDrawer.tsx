@@ -30,7 +30,8 @@ import {
 } from 'lucide-react';
 import type { AmendBookingData } from './AmendStayModal';
 import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
-import { getStandardDailyRateForRoom } from '../../utils/roomInventoryEngine';
+import { getStandardDailyRateForRoom, getAvailableRoomsForStay } from '../../utils/roomInventoryEngine';
+import { toast } from '../../context/ToastContext';
 
 export type DrawerMode =
     | 'overview'
@@ -255,41 +256,103 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const baseAmount = currentBaseAmount;
     const dailyRate = Math.round(baseAmount / Math.max(1, nights));
 
-    // Handle departure change in amend mode
+    // Handle departure change in amend mode (with overbooking collision guard)
     const handleDepartureChange = (newDep: string) => {
-        setDepartureDate(newDep);
         if (!booking?.arrivalDate) return;
         const start = new Date(booking.arrivalDate);
         const end = new Date(newDep);
         const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        setNights(diff > 0 ? diff : 1);
+        if (diff < 1) {
+            toast.warning('Departure date must be at least 1 night after arrival date.');
+            return;
+        }
+        const avail = getAvailableRoomsForStay(booking.arrivalDate, newDep, undefined, {
+            excludeReservationId: booking.reservationNumber || booking.id
+        });
+        const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(booking.roomNumber));
+        if (rmStatus && !rmStatus.isAvailable && rmStatus.conflictingReservation) {
+            const cr = rmStatus.conflictingReservation;
+            toast.error(`Cannot extend Room ${booking.roomNumber}: Already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn}!`);
+            return;
+        }
+        setDepartureDate(newDep);
+        setNights(diff);
     };
 
-    // Handle nights change in amend mode
+    // Handle nights change in amend mode (with overbooking collision guard)
     const handleNightsChange = (newNights: number) => {
         const n = Math.max(1, newNights);
-        setNights(n);
         if (!booking?.arrivalDate) return;
         const start = new Date(booking.arrivalDate);
         start.setDate(start.getDate() + n);
-        setDepartureDate(start.toISOString().split('T')[0]);
+        const candidateDep = start.toISOString().split('T')[0];
+
+        const avail = getAvailableRoomsForStay(booking.arrivalDate, candidateDep, undefined, {
+            excludeReservationId: booking.reservationNumber || booking.id
+        });
+        const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(booking.roomNumber));
+        if (rmStatus && !rmStatus.isAvailable && rmStatus.conflictingReservation) {
+            const cr = rmStatus.conflictingReservation;
+            toast.error(`Cannot extend Room ${booking.roomNumber}: Already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn}!`);
+            return;
+        }
+        setNights(n);
+        setDepartureDate(candidateDep);
     };
 
     // Primary Action Execution based on active mode
     const handlePrimaryAction = () => {
         switch (mode) {
-            case 'amend':
+            case 'amend': {
+                const avail = getAvailableRoomsForStay(booking.arrivalDate, departureDate, undefined, {
+                    excludeReservationId: booking.reservationNumber || booking.id
+                });
+                const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(booking.roomNumber));
+                if (rmStatus && !rmStatus.isAvailable && rmStatus.conflictingReservation) {
+                    const cr = rmStatus.conflictingReservation;
+                    toast.error(`Cannot extend Room ${booking.roomNumber}: Already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn}!`);
+                    return;
+                }
                 if (onSaveAmendStay) onSaveAmendStay(booking.id, departureDate, nights);
                 break;
-            case 'move':
+            }
+            case 'move': {
+                const avail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
+                    excludeReservationId: booking.reservationNumber || booking.id
+                });
+                const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(moveSelectedRoom));
+                if (rmStatus && !rmStatus.isAvailable) {
+                    const cr = rmStatus.conflictingReservation;
+                    toast.error(
+                        cr
+                            ? `Cannot move to Room ${moveSelectedRoom}: Already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn} to ${cr.checkOut}!`
+                            : `Cannot move to Room ${moveSelectedRoom}: Room is ${rmStatus.reason || 'unavailable'}!`
+                    );
+                    return;
+                }
                 if (onSaveRoomMove) onSaveRoomMove(booking.id, moveSelectedRoom, moveFromDate, moveToDate);
                 break;
+            }
             case 'payment':
                 if (onSavePayment) onSavePayment(booking.id, paymentMethod, paymentAmount, paymentRemarks);
                 break;
-            case 'split':
+            case 'split': {
+                const avail = getAvailableRoomsForStay(splitFromDate, splitToDate, undefined, {
+                    excludeReservationId: booking.reservationNumber || booking.id
+                });
+                const rmStatus = avail.allRoomsStatus.find(s => String(s.room.number) === String(splitRoom));
+                if (rmStatus && !rmStatus.isAvailable && String(splitRoom) !== String(booking.roomNumber)) {
+                    const cr = rmStatus.conflictingReservation;
+                    toast.error(
+                        cr
+                            ? `Cannot split into Room ${splitRoom}: Already booked by ${cr.guestName} (${cr.reservationNumber})!`
+                            : `Cannot split into Room ${splitRoom}: Room is ${rmStatus.reason || 'unavailable'}!`
+                    );
+                    return;
+                }
                 if (onSaveRoomSplit) onSaveRoomSplit(booking.id, splitRoom, splitFromDate, splitToDate);
                 break;
+            }
             case 'stop_move':
                 if (onStopRoomMove) onStopRoomMove(booking.id, allowRoomMove);
                 break;
@@ -1130,11 +1193,25 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     onChange={e => setMoveSelectedRoom(e.target.value)}
                                                     className="w-full h-8 px-2.5 border border-blue-300 rounded text-xs bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
                                                 >
-                                                    {allRooms.map(r => (
-                                                        <option key={r.id || r.roomNumber} value={r.roomNumber}>
-                                                            A-({r.roomNumber}) {r.type ? `• ${r.type}` : ''}
-                                                        </option>
-                                                    ))}
+                                                    {(() => {
+                                                        const moveAvail = getAvailableRoomsForStay(moveFromDate, moveToDate, undefined, {
+                                                            excludeReservationId: booking.reservationNumber || booking.id
+                                                        });
+                                                        return allRooms.map(r => {
+                                                            const st = moveAvail.allRoomsStatus.find(s => String(s.room.number) === String(r.roomNumber));
+                                                            const isBooked = st ? !st.isAvailable : false;
+                                                            const guestNote = st?.conflictingReservation ? `Booked: ${st.conflictingReservation.guestName}` : (st?.reason || 'Occupied');
+                                                            return (
+                                                                <option
+                                                                    key={r.id || r.roomNumber}
+                                                                    value={r.roomNumber}
+                                                                    disabled={isBooked && String(r.roomNumber) !== String(moveSelectedRoom)}
+                                                                >
+                                                                    A-({r.roomNumber}) {r.type ? `• ${r.type}` : ''} {isBooked ? `[${guestNote}]` : '[Available]'}
+                                                                </option>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </select>
                                                 <ChevronDown size={12} className="absolute right-2 top-2.5 text-gray-600 pointer-events-none" />
                                             </div>

@@ -685,24 +685,66 @@ export const getAvailableRoomsForStay = (
             };
         }
 
-        // 2. Check Overlapping Existing Reservations
+        // 2. Check Overlapping Existing Reservations (including multi-room & split sub-stays)
+        let matchedSubStayIn = '';
+        let matchedSubStayOut = '';
         const conflictBooking = allReservations.find(res => {
-            if (options?.excludeReservationId && String(res.id) === String(options.excludeReservationId)) {
+            if (options?.excludeReservationId) {
+                const excl = String(options.excludeReservationId);
+                if (
+                    String(res.id) === excl ||
+                    String(res.reservationNumber) === excl ||
+                    excl.startsWith(`${res.reservationNumber}-`)
+                ) {
+                    return false;
+                }
+            }
+            const normStatus = String(res.status || '').toLowerCase();
+            if (normStatus === 'cancelled' || normStatus === 'voided' || normStatus === 'checked-out' || normStatus === 'completed') {
                 return false;
             }
-            if (res.status === 'cancelled' || res.status === 'voided') {
-                return false;
+
+            // First check room-level sub-stays in roomsList if present
+            if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.length > 0) {
+                const matchingSubs = res.roomsList.filter((sub: any) => {
+                    const subStatus = String(sub.status || '').toLowerCase();
+                    if (subStatus === 'cancelled' || subStatus === 'voided' || subStatus === 'checked-out') return false;
+                    const assigned = Array.isArray(sub.assignedRooms) && sub.assignedRooms.length > 0
+                        ? sub.assignedRooms.map(String)
+                        : [String(sub.roomNumber || '')];
+                    return assigned.includes(String(room.number));
+                });
+
+                for (const sub of matchingSubs) {
+                    const subIn = sub.checkInDate || sub.checkIn || res.checkIn;
+                    const subOut = sub.checkOutDate || sub.checkOut || res.checkOut;
+                    if (checkIntervalOverlap(subIn, subOut, checkIn, checkOut)) {
+                        matchedSubStayIn = subIn;
+                        matchedSubStayOut = subOut;
+                        return true;
+                    }
+                }
             }
 
             const allocatedRoomsList = res.allocatedRooms && res.allocatedRooms.length > 0
-                ? res.allocatedRooms
-                : [res.roomNumber];
+                ? res.allocatedRooms.map(String)
+                : [String(res.roomNumber)];
 
-            if (!allocatedRoomsList.includes(room.number)) {
+            if (!allocatedRoomsList.includes(String(room.number))) {
                 return false;
             }
 
-            return checkIntervalOverlap(res.checkIn, res.checkOut, checkIn, checkOut);
+            // If roomsList had entries for this room and none overlapped above, don't false-positive on master horizon
+            if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.some((sub: any) => String(sub.roomNumber) === String(room.number))) {
+                return false;
+            }
+
+            if (checkIntervalOverlap(res.checkIn, res.checkOut, checkIn, checkOut)) {
+                matchedSubStayIn = res.checkIn;
+                matchedSubStayOut = res.checkOut;
+                return true;
+            }
+            return false;
         });
 
         if (conflictBooking) {
@@ -713,8 +755,8 @@ export const getAvailableRoomsForStay = (
                 conflictingReservation: {
                     reservationNumber: conflictBooking.reservationNumber,
                     guestName: conflictBooking.guestName,
-                    checkIn: conflictBooking.checkIn,
-                    checkOut: conflictBooking.checkOut
+                    checkIn: matchedSubStayIn || conflictBooking.checkIn,
+                    checkOut: matchedSubStayOut || conflictBooking.checkOut
                 }
             };
         }
@@ -786,8 +828,24 @@ export const validateAndCommitReservation = (
     const { checkIn, checkOut, allocatedRooms, roomNumber } = reservationData;
     const targetRooms = allocatedRooms && allocatedRooms.length > 0 ? allocatedRooms : [roomNumber];
 
+    // Phase 0: Prevent duplicate room selection within the same reservation payload
+    const seenInRequest = new Set<string>();
+    for (const rm of targetRooms) {
+        const normRm = String(rm).trim();
+        if (seenInRequest.has(normRm)) {
+            return {
+                success: false,
+                errorTitle: 'Duplicate Room Selected',
+                errorMessage: `Room ${normRm} is selected more than once in this reservation! Each room row must have a unique physical room.`,
+                conflictingRooms: [normRm]
+            };
+        }
+        seenInRequest.add(normRm);
+    }
+
     // Phase 1: Re-verify all allocated rooms in real time right now
     const conflictingRooms: string[] = [];
+    const conflictDetails: string[] = [];
     const suggestedAlternates: { requestedRoom: string; roomType: string; alternatives: CanonicalRoom[] }[] = [];
 
     const canonicalRooms = getCanonicalRooms();
@@ -802,7 +860,7 @@ export const validateAndCommitReservation = (
         const roomOut = rowData?.checkOutDate || checkOut;
 
         const check = getAvailableRoomsForStay(roomIn, roomOut, undefined, {
-            excludeReservationId: reservationData.id
+            excludeReservationId: reservationData.reservationNumber || reservationData.id
         });
 
         const status = check.allRoomsStatus.find(s => s.room.number === roomNum);
@@ -812,6 +870,12 @@ export const validateAndCommitReservation = (
             const isOurOwnLock = sessionLockIds && status?.conflictingLock && sessionLockIds.includes(status.conflictingLock.lockId);
             if (!isOurOwnLock) {
                 conflictingRooms.push(roomNum);
+                if (status?.conflictingReservation) {
+                    const cr = status.conflictingReservation;
+                    conflictDetails.push(`Room ${roomNum} is already booked by ${cr.guestName} (${cr.reservationNumber}) from ${cr.checkIn} to ${cr.checkOut}`);
+                } else {
+                    conflictDetails.push(`Room ${roomNum} is currently ${status?.reason || 'unavailable'} for ${roomIn} to ${roomOut}`);
+                }
 
                 // Find same category available alternatives
                 const sameCatAvailable = check.availableRooms.filter(r => 
@@ -829,8 +893,10 @@ export const validateAndCommitReservation = (
     if (conflictingRooms.length > 0) {
         return {
             success: false,
-            errorTitle: 'Double-Booking Collision Detected',
-            errorMessage: `Room(s) ${conflictingRooms.join(', ')} cannot be booked because another executive or online channel has already booked or locked them for dates ${checkIn} to ${checkOut}.`,
+            errorTitle: 'Overbooking Prevented — Room Already Booked',
+            errorMessage: conflictDetails.length > 0
+                ? `${conflictDetails.join('; ')}.`
+                : `Room(s) ${conflictingRooms.join(', ')} cannot be booked because they are already occupied or locked for ${checkIn} to ${checkOut}.`,
             conflictingRooms,
             suggestedAlternates
         };
@@ -839,8 +905,13 @@ export const validateAndCommitReservation = (
     // Phase 2: Commit Atomically to LocalStorage & Database
     try {
         const existing = getAllStoredReservations();
-        const updated = [reservationData, ...existing.filter(r => String(r.id) !== String(reservationData.id))];
+        const updated = [
+            reservationData,
+            ...existing.filter(r => String(r.id) !== String(reservationData.id) && r.reservationNumber !== reservationData.reservationNumber)
+        ];
         localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(updated));
+        localStorage.setItem('hotel_reservations_v3', JSON.stringify(updated));
+        localStorage.setItem('hotel_reservations_v10', JSON.stringify(updated));
 
         // Direct Real-Time SQLite Database Persistence
         if (typeof window !== 'undefined') {

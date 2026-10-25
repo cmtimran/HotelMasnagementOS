@@ -204,41 +204,59 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     // Live Availability Report for selected stay dates
     const liveAvailabilityReport = useMemo(() => {
-        return getAvailableRoomsForStay(checkIn, checkOut);
-    }, [checkIn, checkOut]);
+        return getAvailableRoomsForStay(checkIn, checkOut, undefined, {
+            excludeReservationId: editingReservation?.reservationNumber || editingReservation?.id
+        });
+    }, [checkIn, checkOut, editingReservation]);
 
-    // Self-healing room validation: Ensure no row is assigned to an Occupied room!
+    // Self-healing room validation: Ensure no row is assigned to an Occupied room or duplicate room!
     useEffect(() => {
         if (editingReservation) return; // When editing an existing reservation, preserve its rooms
         setRoomsList(prev => {
             let changed = false;
-            const updated = prev.map(row => {
-                const isCurrentAvailable = liveAvailabilityReport.availableRooms.some(ar => ar.number === row.roomNumber);
-                if (!isCurrentAvailable && liveAvailabilityReport.availableRooms.length > 0) {
-                    const freeMatch = liveAvailabilityReport.availableRooms.find(ar => 
-                        ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) ||
-                        row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())
-                    ) || liveAvailabilityReport.availableRooms[0];
+            const usedInForm = new Set<string>();
 
-                    if (freeMatch && freeMatch.number !== row.roomNumber) {
-                        changed = true;
-                        const count = Number(row.roomsCount) || 1;
-                        const autoAssigned = liveAvailabilityReport.availableRooms
-                            .filter(ar => ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) || row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase()))
-                            .slice(0, count)
-                            .map(ar => ar.number);
+            const updated = prev.map(row => {
+                const count = Number(row.roomsCount) || 1;
+                const isCurrentAvailable =
+                    liveAvailabilityReport.availableRooms.some(ar => ar.number === row.roomNumber) &&
+                    !usedInForm.has(row.roomNumber);
+
+                if (!isCurrentAvailable && liveAvailabilityReport.availableRooms.length > 0) {
+                    const freeMatches = liveAvailabilityReport.availableRooms.filter(ar =>
+                        !usedInForm.has(ar.number) && (
+                            ar.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) ||
+                            row.roomType.toLowerCase().includes(ar.roomTypeName.toLowerCase())
+                        )
+                    );
+                    const fallbackFree = liveAvailabilityReport.availableRooms.filter(ar => !usedInForm.has(ar.number));
+                    const chosenPool = freeMatches.length > 0 ? freeMatches : fallbackFree;
+                    const freeMatch = chosenPool[0];
+
+                    if (freeMatch) {
+                        if (freeMatch.number !== row.roomNumber) {
+                            changed = true;
+                        }
+                        const autoAssigned = chosenPool.slice(0, count).map(ar => ar.number);
+                        autoAssigned.forEach(rn => usedInForm.add(rn));
                         return {
                             ...row,
                             roomNumber: freeMatch.number,
                             assignedRooms: autoAssigned.length > 0 ? autoAssigned : [freeMatch.number]
                         };
                     }
+                } else {
+                    if (row.assignedRooms && row.assignedRooms.length === count) {
+                        row.assignedRooms.forEach(rn => usedInForm.add(rn));
+                    } else {
+                        usedInForm.add(row.roomNumber);
+                    }
                 }
                 return row;
             });
             return changed ? updated : prev;
         });
-    }, [checkIn, checkOut, liveAvailabilityReport]);
+    }, [checkIn, checkOut, liveAvailabilityReport, editingReservation]);
 
     // Total actual room count across all rows in this form
     const totalRoomsAllocatedInForm = useMemo(() => {
@@ -496,26 +514,79 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     // Handlers
     const handleAddRoomRow = () => {
+        if (remainingOverallFreeRooms <= 0) {
+            toast.error('Overbooking Prevented: No more available rooms in inventory for the selected dates!');
+            return;
+        }
         const nextId = roomsList.length > 0 ? Math.max(...roomsList.map(r => r.id)) + 1 : 1;
+        const usedRooms = new Set<string>();
+        roomsList.forEach(r => {
+            if (r.assignedRooms && r.assignedRooms.length > 0) {
+                r.assignedRooms.forEach(rn => usedRooms.add(rn));
+            } else if (r.roomNumber) {
+                usedRooms.add(r.roomNumber);
+            }
+        });
+        const freeRoom = liveAvailabilityReport.availableRooms.find(r =>
+            (r.roomTypeName === 'Deluxe Double' || r.roomTypeName.includes('Deluxe')) && !usedRooms.has(r.number)
+        ) || liveAvailabilityReport.availableRooms.find(r => !usedRooms.has(r.number));
+
+        if (!freeRoom) {
+            toast.error('Overbooking Prevented: All available rooms are already assigned in this form!');
+            return;
+        }
+
         setRoomsList([
             ...roomsList,
             {
                 id: nextId,
-                roomType: 'Deluxe Double',
+                roomType: freeRoom.roomTypeName || 'Deluxe Double',
                 roomsCount: 1,
                 ratePlan: 'BAR Rack Rate',
-                roomNumber: '102',
+                roomNumber: freeRoom.number,
+                assignedRooms: [freeRoom.number],
                 adults: 1,
                 children: 0,
-                rate: 3000,
+                rate: freeRoom.baseRate || 3000,
                 isAssign: true
             }
         ]);
     };
 
     const handleCopyRoomRow = (row: RoomRow) => {
+        if (remainingOverallFreeRooms <= 0) {
+            toast.error('Overbooking Prevented: No more available rooms in inventory for the selected dates!');
+            return;
+        }
         const nextId = Math.max(...roomsList.map(r => r.id)) + 1;
-        setRoomsList([...roomsList, { ...row, id: nextId }]);
+        const usedRooms = new Set<string>();
+        roomsList.forEach(r => {
+            if (r.assignedRooms && r.assignedRooms.length > 0) {
+                r.assignedRooms.forEach(rn => usedRooms.add(rn));
+            } else if (r.roomNumber) {
+                usedRooms.add(r.roomNumber);
+            }
+        });
+        const freeRoom = liveAvailabilityReport.availableRooms.find(r =>
+            (r.roomTypeName === row.roomType || r.roomTypeName.includes(row.roomType)) && !usedRooms.has(r.number)
+        ) || liveAvailabilityReport.availableRooms.find(r => !usedRooms.has(r.number));
+
+        if (!freeRoom) {
+            toast.error('Overbooking Prevented: No more free rooms available to duplicate this row!');
+            return;
+        }
+
+        setRoomsList([
+            ...roomsList,
+            {
+                ...row,
+                id: nextId,
+                roomType: freeRoom.roomTypeName || row.roomType,
+                roomsCount: 1,
+                roomNumber: freeRoom.number,
+                assignedRooms: [freeRoom.number]
+            }
+        ]);
     };
 
     const handleRemoveRoomRow = (id: number) => {
@@ -649,41 +720,55 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     // Save Reservation to LocalStorage
     const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
+        if (hasOverbookingError) {
+            toast.error('Overbooking Prevented: Requested rooms exceed available inventory for the selected dates!');
+            return;
+        }
+
         const reservationNumber = editingReservation?.reservationNumber || `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
         const reservationId = editingReservation?.id || Date.now();
 
         // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
         const usedRoomsAcrossBooking = new Set<string>();
         const allocatedRoomNumbers: string[] = [];
+        const rowAllocatedMap = new Map<number, string[]>();
 
-        roomsList.forEach(r => {
+        for (const r of roomsList) {
             const countNeeded = Number(r.roomsCount) || 1;
             let roomsForThisRow: string[] = [];
 
-            if (!r.isAssign && r.assignedRooms && r.assignedRooms.length === countNeeded) {
+            if (!r.isAssign && r.assignedRooms && r.assignedRooms.length === countNeeded && r.assignedRooms.every(rm => !usedRoomsAcrossBooking.has(rm))) {
                 roomsForThisRow = [...r.assignedRooms];
-            } else if (!r.isAssign && countNeeded === 1 && r.roomNumber) {
+            } else if (!r.isAssign && countNeeded === 1 && r.roomNumber && !usedRoomsAcrossBooking.has(r.roomNumber)) {
                 roomsForThisRow = [r.roomNumber];
             } else {
-                const report = getAvailableRoomsForStay(checkIn, checkOut, r.roomType);
+                const report = getAvailableRoomsForStay(checkIn, checkOut, r.roomType, {
+                    excludeReservationId: editingReservation?.reservationNumber || editingReservation?.id
+                });
                 const freeRooms = report.availableRooms.filter(ar => !usedRoomsAcrossBooking.has(ar.number));
                 roomsForThisRow = freeRooms.slice(0, countNeeded).map(ar => ar.number);
 
                 if (roomsForThisRow.length < countNeeded) {
                     const fallback = getAutoAssignedRoomsForRow(r);
                     fallback.forEach(f => {
-                        if (roomsForThisRow.length < countNeeded && !roomsForThisRow.includes(f)) {
+                        if (roomsForThisRow.length < countNeeded && !roomsForThisRow.includes(f) && !usedRoomsAcrossBooking.has(f)) {
                             roomsForThisRow.push(f);
                         }
                     });
                 }
             }
 
+            if (roomsForThisRow.length < countNeeded) {
+                toast.error(`Overbooking Prevented: Only ${roomsForThisRow.length} available room(s) found for ${r.roomType} (requested ${countNeeded})!`);
+                return;
+            }
+
+            rowAllocatedMap.set(r.id, roomsForThisRow);
             roomsForThisRow.forEach(rm => {
                 allocatedRoomNumbers.push(rm);
                 usedRoomsAcrossBooking.add(rm);
             });
-        });
+        }
 
         const mainRoom = roomsList[0] || { roomNumber: '101', roomType: 'Deluxe Double' };
         const primaryRoomNumber = allocatedRoomNumbers[0] || mainRoom.roomNumber;
@@ -732,9 +817,11 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             customAddons: mainRoom.servicesBundle?.customAddons || [],
             roomsList: roomsList.flatMap((r) => {
                 const countNeeded = Number(r.roomsCount) || 1;
-                const assigned = (r.assignedRooms && r.assignedRooms.length === countNeeded)
-                    ? r.assignedRooms
-                    : [r.roomNumber];
+                const assigned = rowAllocatedMap.get(r.id) || (
+                    (r.assignedRooms && r.assignedRooms.length === countNeeded)
+                        ? r.assignedRooms
+                        : [r.roomNumber]
+                );
                 return assigned.map(rm => {
                     const dateConf = r.roomDatesMap?.[rm];
                     return {

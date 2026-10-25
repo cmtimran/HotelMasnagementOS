@@ -212,8 +212,10 @@ export const StayView: React.FC = () => {
     // Extend / Shorten Drag State
     const [extendDrag, setExtendDrag] = useState<{
         booking: TimelineBooking;
+        startX: number;
         originalEndIndex: number;
         currentEndIndex: number;
+        attemptedEndIndex?: number;
         hasMoved?: boolean;
     } | null>(null);
 
@@ -224,6 +226,7 @@ export const StayView: React.FC = () => {
         startY: number;
         currentX: number;
         currentY: number;
+        grabOffsetCols?: number;
         isDragging: boolean;
         targetRoomNumber: string;
         targetStartIndex: number;
@@ -687,14 +690,11 @@ export const StayView: React.FC = () => {
         const bStart = days.findIndex(d => d.date === booking.checkIn);
         const bEnd = days.findIndex(d => d.date === booking.checkOut);
         const startIdx = bStart >= 0 ? bStart : 0;
-        const endIdx = bEnd >= 0 ? bEnd : startIdx + booking.nights;
+        const endIdx = bEnd >= 0 ? Math.max(startIdx, bEnd - 1) : startIdx + Math.max(1, booking.nights) - 1;
 
         return allRooms.filter(room => {
-            const isOccupied = bookings.some(b => {
-                if (b.roomNumber !== room.roomNumber) return false;
-                return b.startIndex < endIdx && b.endIndex > startIdx;
-            });
-            return !isOccupied;
+            const conflict = findRoomConflict(room.roomNumber, startIdx, endIdx);
+            return !conflict;
         });
     };
 
@@ -893,6 +893,16 @@ export const StayView: React.FC = () => {
             d.setDate(d.getDate() + 1);
             targetDeparture = d.toISOString().split('T')[0];
             targetNights = currentNights + 1;
+        }
+
+        // Guard against extending into an already booked slot on this room
+        const desiredEndCol = booking.startIndex + Math.max(1, targetNights || currentNights + 1) - 1;
+        if (desiredEndCol > booking.endIndex) {
+            const conflict = findRoomConflict(booking.roomNumber, booking.startIndex, desiredEndCol, booking.id);
+            if (conflict) {
+                toast.error(`Cannot extend Room ${booking.roomNumber}: Already booked by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate}!`);
+                return;
+            }
         }
 
         const stored = getAllStoredReservations();
@@ -1423,10 +1433,52 @@ export const StayView: React.FC = () => {
     // Global mousemove and mouseup listeners for drag-to-select, extend/shorten drag, and move drag
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            if (moveDrag && !moveDrag.isDragging) {
+            // Smooth pixel-accurate Extend & Shorten calculation during drag
+            if (extendDrag) {
+                const deltaX = e.clientX - extendDrag.startX;
+                const moved = Math.abs(deltaX) > 6 || Boolean(extendDrag.hasMoved);
+                const deltaCols = Math.round(deltaX / colWidth);
+                const minCol = extendDrag.booking.startIndex;
+                const rawTargetCol = Math.max(minCol, extendDrag.originalEndIndex + deltaCols);
+
+                const roomBookings = bookingsByRoom.get(extendDrag.booking.roomNumber) || [];
+                const nextBookings = roomBookings.filter(
+                    other => other.id !== extendDrag.booking.id && other.startIndex > extendDrag.booking.startIndex
+                );
+                const maxAllowedCol = nextBookings.length > 0
+                    ? Math.min(...nextBookings.map(nb => nb.startIndex - 1))
+                    : daysWindow - 1;
+
+                const clampedCol = Math.min(maxAllowedCol, rawTargetCol);
+
+                if (
+                    clampedCol !== extendDrag.currentEndIndex ||
+                    rawTargetCol !== extendDrag.attemptedEndIndex ||
+                    moved !== extendDrag.hasMoved
+                ) {
+                    setExtendDrag(prev => prev ? ({
+                        ...prev,
+                        currentEndIndex: clampedCol,
+                        attemptedEndIndex: rawTargetCol,
+                        hasMoved: moved
+                    }) : null);
+                }
+            }
+
+            if (moveDrag) {
                 const dist = Math.hypot(e.clientX - moveDrag.startX, e.clientY - moveDrag.startY);
-                if (dist > 4) {
-                    setMoveDrag(prev => prev ? ({ ...prev, isDragging: true }) : null);
+                if (!moveDrag.isDragging && dist > 5) {
+                    const deltaCols = Math.round((e.clientX - moveDrag.startX) / colWidth);
+                    const stayDuration = moveDrag.booking.endIndex - moveDrag.booking.startIndex;
+                    const newStart = Math.max(0, Math.min(daysWindow - 1 - stayDuration, moveDrag.booking.startIndex + deltaCols));
+                    setMoveDrag(prev => prev ? ({
+                        ...prev,
+                        isDragging: true,
+                        currentX: e.clientX,
+                        currentY: e.clientY,
+                        targetStartIndex: newStart,
+                        targetEndIndex: newStart + stayDuration
+                    }) : null);
                 }
             }
         };
@@ -1476,7 +1528,7 @@ export const StayView: React.FC = () => {
                 setIsQuickReservationOpen(true);
             }
 
-            // Handle Extend OR Shorten Stay Drag Release
+            // Handle Extend OR Shorten Stay Drag Release (or Resize Handle Click)
             if (extendDrag) {
                 const b = extendDrag.booking;
                 if (b.isPast) {
@@ -1486,16 +1538,26 @@ export const StayView: React.FC = () => {
                 }
 
                 const minCol = b.startIndex;
-                const targetCol = Math.max(minCol, extendDrag.currentEndIndex);
+                // If user clicked the resize handle without dragging, treat as +1 night extend request
+                const desiredCol = extendDrag.hasMoved
+                    ? Math.max(minCol, extendDrag.attemptedEndIndex ?? extendDrag.currentEndIndex)
+                    : (b.endIndex + 1);
 
-                // Check for room collision across [b.startIndex, targetCol]
-                const conflict = findRoomConflict(b.roomNumber, b.startIndex, targetCol, b.id);
+                // Check for room collision across [b.startIndex, desiredCol]
+                const conflict = findRoomConflict(b.roomNumber, b.startIndex, desiredCol, b.id);
                 if (conflict) {
-                    toast.error(`Cannot extend Room ${b.roomNumber}: Occupied by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate}!`);
+                    toast.error(`Cannot extend Room ${b.roomNumber}: Already booked by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate}!`);
                     setExtendDrag(null);
                     return;
                 }
 
+                // If user dragged and returned to the exact original night, do nothing
+                if (extendDrag.hasMoved && desiredCol === b.endIndex) {
+                    setExtendDrag(null);
+                    return;
+                }
+
+                const targetCol = Math.max(minCol, extendDrag.hasMoved ? extendDrag.currentEndIndex : desiredCol);
                 const targetNights = Math.max(1, targetCol - b.startIndex + 1);
                 const arrivalDateStr = b.checkInDate || days[b.startIndex]?.date || '2026-07-04';
                 const depDateObj = new Date(arrivalDateStr);
@@ -1508,8 +1570,12 @@ export const StayView: React.FC = () => {
 
             // Handle Move Reservation Drag Release
             if (moveDrag) {
-                if (moveDrag.isDragging) {
-                    const b = moveDrag.booking;
+                const b = moveDrag.booking;
+                const actuallyMovedCell =
+                    moveDrag.isDragging &&
+                    (moveDrag.targetRoomNumber !== b.roomNumber || moveDrag.targetStartIndex !== b.startIndex);
+
+                if (actuallyMovedCell) {
                     if (b.isPast) {
                         showToast('🔒 Historical Reservation: cannot move.');
                         setMoveDrag(null);
@@ -1531,7 +1597,7 @@ export const StayView: React.FC = () => {
                         b.id
                     );
                     if (moveConflict) {
-                        toast.error(`Cannot move to Room ${moveDrag.targetRoomNumber}: Already occupied by ${moveConflict.guestName} (${moveConflict.reservationNumber}) on those dates!`);
+                        toast.error(`Cannot move to Room ${moveDrag.targetRoomNumber}: Already occupied by ${moveConflict.guestName} (${moveConflict.reservationNumber}) from ${moveConflict.checkInDate} to ${moveConflict.checkOutDate}!`);
                         setMoveDrag(null);
                         return;
                     }
@@ -1585,7 +1651,7 @@ export const StayView: React.FC = () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [dragState, extendDrag, moveDrag, days, findRoomConflict]);
+    }, [dragState, extendDrag, moveDrag, days, colWidth, daysWindow, bookingsByRoom, findRoomConflict]);
 
     const handleDateJump = (direction: 'prev' | 'next' | 'today') => {
         if (direction === 'today') {
@@ -2047,31 +2113,34 @@ export const StayView: React.FC = () => {
                                                                         }) : null);
                                                                     }
                                                                     // Extend OR Shorten Stay Drag (Clamped to prevent overlapping next booking in same room)
-                                                                    if (extendDrag && extendDrag.booking.roomNumber === room.roomNumber) {
+                                                                    if (extendDrag) {
                                                                         const minCol = extendDrag.booking.startIndex;
-                                                                        const roomBookings = bookingsByRoom.get(room.roomNumber) || [];
+                                                                        const roomBookings = bookingsByRoom.get(extendDrag.booking.roomNumber) || [];
                                                                         const nextBookings = roomBookings.filter(
                                                                             other => other.id !== extendDrag.booking.id && other.startIndex > extendDrag.booking.startIndex
                                                                         );
                                                                         const maxAllowedCol = nextBookings.length > 0
                                                                             ? Math.min(...nextBookings.map(nb => nb.startIndex - 1))
                                                                             : daysWindow - 1;
-                                                                        const clampedCol = Math.min(maxAllowedCol, Math.max(minCol, d.index));
+                                                                        const rawCol = Math.max(minCol, d.index);
+                                                                        const clampedCol = Math.min(maxAllowedCol, rawCol);
                                                                         setExtendDrag(prev => prev ? ({
                                                                             ...prev,
                                                                             currentEndIndex: clampedCol,
+                                                                            attemptedEndIndex: rawCol,
                                                                             hasMoved: true
                                                                         }) : null);
                                                                     }
                                                                     // Move Reservation Drag (Drag-and-Drop to any room or date)
-                                                                    if (moveDrag) {
+                                                                    if (moveDrag && moveDrag.isDragging) {
                                                                         const stayDuration = moveDrag.booking.endIndex - moveDrag.booking.startIndex;
+                                                                        const offset = moveDrag.grabOffsetCols || 0;
+                                                                        const newStart = Math.max(0, Math.min(daysWindow - 1 - stayDuration, d.index - offset));
                                                                         setMoveDrag(prev => prev ? ({
                                                                             ...prev,
-                                                                            isDragging: true,
                                                                             targetRoomNumber: room.roomNumber,
-                                                                            targetStartIndex: d.index,
-                                                                            targetEndIndex: d.index + stayDuration
+                                                                            targetStartIndex: newStart,
+                                                                            targetEndIndex: newStart + stayDuration
                                                                         }) : null);
                                                                     }
                                                                 }}
@@ -2118,8 +2187,13 @@ export const StayView: React.FC = () => {
                                                         {(bookingsByRoom.get(room.roomNumber) || [])
                                                             .map(booking => {
                                                                 const isBeingExtended = extendDrag && extendDrag.booking.id === booking.id;
+                                                                const isExtendBlocked = Boolean(
+                                                                    isBeingExtended &&
+                                                                    extendDrag.attemptedEndIndex !== undefined &&
+                                                                    extendDrag.attemptedEndIndex > extendDrag.currentEndIndex
+                                                                );
                                                                 const isBeingMoved = moveDrag && moveDrag.booking.id === booking.id && moveDrag.isDragging;
-                                                                const isAnyDragActive = Boolean(extendDrag || (moveDrag && moveDrag.isDragging));
+                                                                const isAnyDragActive = Boolean(dragState || extendDrag || (moveDrag && moveDrag.isDragging));
 
                                                                 const effectiveEnd = isBeingExtended
                                                                     ? extendDrag.currentEndIndex
@@ -2143,12 +2217,21 @@ export const StayView: React.FC = () => {
                                                                                 handleOpenDetailsDrawer(booking);
                                                                                 return;
                                                                             }
+                                                                            const barRect = e.currentTarget.getBoundingClientRect();
+                                                                            const grabOffset = Math.max(
+                                                                                0,
+                                                                                Math.min(
+                                                                                    booking.endIndex - booking.startIndex,
+                                                                                    Math.floor((e.clientX - barRect.left) / colWidth)
+                                                                                )
+                                                                            );
                                                                             setMoveDrag({
                                                                                 booking,
                                                                                 startX: e.clientX,
                                                                                 startY: e.clientY,
                                                                                 currentX: e.clientX,
                                                                                 currentY: e.clientY,
+                                                                                grabOffsetCols: grabOffset,
                                                                                 isDragging: false,
                                                                                 targetRoomNumber: booking.roomNumber,
                                                                                 targetStartIndex: booking.startIndex,
@@ -2157,13 +2240,13 @@ export const StayView: React.FC = () => {
                                                                         }}
                                                                         className={`absolute top-[6px] bottom-[4px] ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 overflow-visible transition-all select-none ${
                                                                             isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto cursor-grab hover:brightness-105'
-                                                                        } ${isBeingExtended ? 'ring-2 ring-white shadow-lg z-30' : ''} ${
+                                                                        } ${isBeingExtended ? (isExtendBlocked ? 'ring-2 ring-red-500 shadow-lg z-30' : 'ring-2 ring-white shadow-lg z-30') : ''} ${
                                                                             isBeingMoved ? 'opacity-40 ring-2 ring-dashed ring-amber-300' : ''
                                                                         } ${booking.isPast ? 'opacity-90 ring-1 ring-slate-400/60' : ''}`}
                                                                         title={`${booking.guestName} (${booking.reservationNumber})\nRoom ${booking.roomNumber} • ${booking.nights || 1} Night(s)\nTariff: ৳${(booking.totalAmount || 0).toLocaleString()} (${booking.taxApplicable === false ? 'Tax Exempt' : `Tax & VAT: ৳${(booking.totalTaxAmount || 0).toLocaleString()} [${booking.taxConfigCode || 'STD'}]`})${(booking.dueAmount || 0) > 0 ? ` • Due: ৳${(booking.dueAmount || 0).toLocaleString()}` : ' • Fully Paid'}\n${booking.isPast ? 'Historical Reservation (Audit Locked)' : 'Click to open details drawer • Drag edge to extend/shorten'}`}
                                                                     >
                                                                         {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] [EX Exempt] */}
-                                                                        <div className="flex items-center -space-x-1 absolute -top-2 left-1.5 z-20 pointer-events-auto">
+                                                                        <div className={`flex items-center -space-x-1 absolute -top-2 left-1.5 z-20 ${isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto'}`}>
                                                                             {booking.isPast && (
                                                                                 <span
                                                                                     className="w-4 h-4 rounded-full bg-slate-900/90 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
@@ -2231,22 +2314,35 @@ export const StayView: React.FC = () => {
                                                                                     e.preventDefault();
                                                                                     setExtendDrag({
                                                                                         booking,
+                                                                                        startX: e.clientX,
                                                                                         originalEndIndex: booking.endIndex,
                                                                                         currentEndIndex: booking.endIndex,
+                                                                                        attemptedEndIndex: booking.endIndex,
                                                                                         hasMoved: false
                                                                                     });
                                                                                 }}
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    handleOpenAmendModal(booking);
                                                                                 }}
-                                                                                className="absolute right-0 top-0 bottom-0 w-3.5 cursor-ew-resize flex items-center justify-center hover:bg-black/25 group/resize z-30 transition-colors pointer-events-auto"
-                                                                                title="Drag to extend or shorten stay"
+                                                                                className={`absolute right-0 top-0 bottom-0 w-3.5 cursor-ew-resize flex items-center justify-center hover:bg-black/25 group/resize z-30 transition-colors ${
+                                                                                    isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto'
+                                                                                }`}
+                                                                                title="Drag left/right to shorten or extend stay (or click to extend +1 night)"
                                                                             >
                                                                                 <div className="w-[3px] h-3.5 bg-white/70 rounded-full group-hover/resize:bg-white group-hover/resize:h-4.5 transition-all shadow-xs" />
-                                                                                <div className="hidden group-hover/resize:block absolute top-full right-0 mt-1.5 bg-white text-gray-900 border border-black shadow-lg rounded-xs px-2 py-0.5 text-[11px] font-sans font-medium whitespace-nowrap z-50 pointer-events-none select-none">
-                                                                                    Extend / Shorten stay
-                                                                                </div>
+                                                                                {isExtendBlocked ? (
+                                                                                    <div className="block absolute -top-6 right-0 bg-red-600 text-white border border-white shadow-lg rounded px-2 py-0.5 text-[10px] font-sans font-bold whitespace-nowrap z-50 pointer-events-none select-none">
+                                                                                        🚫 Already Booked
+                                                                                    </div>
+                                                                                ) : isBeingExtended ? (
+                                                                                    <div className="block absolute -top-6 right-0 bg-slate-900 text-white border border-white/40 shadow-lg rounded px-2 py-0.5 text-[10px] font-sans font-bold whitespace-nowrap z-50 pointer-events-none select-none">
+                                                                                        {Math.max(1, extendDrag.currentEndIndex - booking.startIndex + 1)} Night(s)
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="hidden group-hover/resize:block absolute top-full right-0 mt-1.5 bg-white text-gray-900 border border-black shadow-lg rounded-xs px-2 py-0.5 text-[11px] font-sans font-medium whitespace-nowrap z-50 pointer-events-none select-none">
+                                                                                        Extend / Shorten stay
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         )}
                                                                     </div>

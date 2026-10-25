@@ -392,46 +392,69 @@ export const bookingService = {
    */
   getBookingById: async (id: string | number, propertyId: string | number): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
-    const row = db.prepare(`
-      SELECT 
-        r.id,
-        r.property_id,
-        r.reservation_number,
-        r.source,
-        r.channel,
-        r.agent,
-        r.is_group,
-        r.status as db_status,
-        r.total_amount,
-        r.paid_amount,
-        r.due_amount,
-        r.special_requests,
-        r.created_at,
-        g.id as guest_id,
-        g.salutation,
-        g.first_name,
-        g.last_name,
-        g.email,
-        g.phone,
-        g.vip_status,
-        ca.company_name as corporate_name
-      FROM reservations r
-      JOIN guests g ON g.id = r.booker_guest_id
-      LEFT JOIN corporate_accounts ca ON ca.id = r.corporate_account_id
-      WHERE r.property_id = ? AND (r.id = ? OR r.reservation_number = ?)
-    `).get(propId, id, String(id)) as any;
-
-    if (!row) return null;
-
     const all = await bookingService.getAllBookings(propId);
-    return all.find(b => String(b.id) === String(row.id) || b.reservationNumber === row.reservation_number) || null;
+    return all.find(b => String(b.id) === String(id) || b.reservationNumber === String(id)) || null;
   },
 
   /**
-   * Create a new reservation directly inside SQLite relational tables
+   * Create a new reservation directly inside relational tables (with Zero-Overbooking SQL Guard)
    */
   createBooking: async (payload: any): Promise<BookingRecord> => {
     const propId = resolvePropertyId(payload.propertyId);
+
+    const checkIn = payload.checkIn || payload.arrivalDate || new Date().toISOString().slice(0, 10);
+    const checkOut = payload.checkOut || payload.departureDate || new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
+    const nights = Math.max(1, Number(payload.nights) || Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 3600 * 24)));
+
+    // Rooms list source
+    const rawRooms = payload.roomsList && payload.roomsList.length > 0 
+      ? payload.roomsList 
+      : payload.allocatedRooms && payload.allocatedRooms.length > 0 
+        ? payload.allocatedRooms.map((rNum: string) => ({ roomNumber: rNum }))
+        : [{ roomNumber: payload.roomNumber || payload.roomNo || '101' }];
+
+    // 0. Strict Pre-Commit Overlap & Duplicate Room Validation across all active bookings
+    const existingBookings = await bookingService.getAllBookings(propId);
+    const seenRoomsInPayload = new Set<string>();
+
+    for (const rm of rawRooms) {
+      const roomNum = String(rm.roomNumber || rm.number || '101').trim();
+      if (seenRoomsInPayload.has(roomNum)) {
+        throw new Error(`Duplicate room ${roomNum} in reservation request.`);
+      }
+      seenRoomsInPayload.add(roomNum);
+
+      const roomIn = String(rm.checkIn || rm.checkInDate || checkIn).slice(0, 10);
+      const roomOut = String(rm.checkOut || rm.checkOutDate || checkOut).slice(0, 10);
+
+      for (const b of existingBookings) {
+        const bStatus = String(b.status || '').toLowerCase();
+        if (bStatus === 'cancelled' || bStatus === 'voided' || bStatus === 'checked-out' || bStatus === 'completed') {
+          continue;
+        }
+        if (payload.reservationNumber && b.reservationNumber === payload.reservationNumber) {
+          continue;
+        }
+
+        if (b.roomsList && Array.isArray(b.roomsList) && b.roomsList.length > 0) {
+          for (const sub of b.roomsList) {
+            if (String(sub.roomNumber) === roomNum) {
+              const sIn = String(sub.checkInDate || sub.checkIn || b.checkIn).slice(0, 10);
+              const sOut = String(sub.checkOutDate || sub.checkOut || b.checkOut).slice(0, 10);
+              if (sIn < roomOut && sOut > roomIn) {
+                throw new Error(`Room ${roomNum} is already booked by ${b.guestName} (${b.reservationNumber}) from ${sIn} to ${sOut}!`);
+              }
+            }
+          }
+        } else if (String(b.roomNumber) === roomNum || (b.allocatedRooms && b.allocatedRooms.map(String).includes(roomNum))) {
+          const bIn = String(b.checkIn).slice(0, 10);
+          const bOut = String(b.checkOut).slice(0, 10);
+          if (bIn < roomOut && bOut > roomIn) {
+            throw new Error(`Room ${roomNum} is already booked by ${b.guestName} (${b.reservationNumber}) from ${bIn} to ${bOut}!`);
+          }
+        }
+      }
+    }
 
     // 1. Resolve or Create Guest in `guests` table
     const phone = payload.phone || payload.mobile || '+880 1711-000000';
@@ -485,17 +508,6 @@ export const bookingService = {
     const reservationId = Number(resInsert.lastInsertRowid);
 
     // 3. Allocate Rooms in `reservation_rooms` (1NF-4NF)
-    const checkIn = payload.checkIn || payload.arrivalDate || new Date().toISOString().slice(0, 10);
-    const checkOut = payload.checkOut || payload.departureDate || new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
-    const nights = Math.max(1, Number(payload.nights) || Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 3600 * 24)));
-
-    // Rooms list source
-    const rawRooms = payload.roomsList && payload.roomsList.length > 0 
-      ? payload.roomsList 
-      : payload.allocatedRooms && payload.allocatedRooms.length > 0 
-        ? payload.allocatedRooms.map((rNum: string) => ({ roomNumber: rNum }))
-        : [{ roomNumber: payload.roomNumber || payload.roomNo || '101' }];
-
     const roomRatePerRoom = rawRooms.length > 0 ? totalAmount / rawRooms.length : totalAmount;
 
     for (const rm of rawRooms) {
@@ -579,7 +591,82 @@ export const bookingService = {
       );
     }
 
-    const createdBooking = await bookingService.getBookingById(reservationId, propId);
+    // 6. Mirror new reservation into PostgreSQL if connected
+    if (isPostgresConnected()) {
+      try {
+        let pgGuestId: number;
+        const gRes = await pgPool.query('SELECT id FROM guests WHERE phone = $1 LIMIT 1', [phone]);
+        if (gRes.rows.length > 0) {
+          pgGuestId = gRes.rows[0].id;
+        } else {
+          const gIns = await pgPool.query(
+            `INSERT INTO guests (organization_id, salutation, first_name, last_name, email, phone, vip_status)
+             VALUES (1, $1, $2, $3, $4, $5, $6) RETURNING id`,
+            [salutation, firstName, lastName, email, phone, vipStatus === 'None' ? 'NONE' : vipStatus]
+          );
+          pgGuestId = gIns.rows[0].id;
+        }
+
+        const rIns = await pgPool.query(
+          `INSERT INTO reservations (
+             property_id, reservation_number, booker_guest_id, source, channel, agent,
+             is_group, status, total_amount, paid_amount, due_amount, special_requests
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+          [
+            propId,
+            reservationNumber,
+            pgGuestId,
+            payload.source || 'Direct',
+            payload.channel || 'Front Desk',
+            payload.agent || null,
+            isGroup,
+            statusDb,
+            totalAmount,
+            paidAmount,
+            dueAmount,
+            payload.specialRequests || payload.special_requests || null
+          ]
+        );
+        const pgResId = rIns.rows[0].id;
+
+        for (const rm of rawRooms) {
+          const roomNum = String(rm.roomNumber || rm.number || '101');
+          const rmLookup = await pgPool.query(
+            'SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1',
+            [propId, roomNum]
+          );
+          const pgRoomId = rmLookup.rows[0]?.id;
+          if (pgRoomId) {
+            const roomIn = rm.checkIn || rm.checkInDate || checkIn;
+            const roomOut = rm.checkOut || rm.checkOutDate || checkOut;
+            const roomNights = rm.nights || nights;
+            const roomRate = rm.rate || roomRatePerRoom;
+            await pgPool.query(
+              `INSERT INTO reservation_rooms (
+                 reservation_id, room_id, guest_id, check_in_date, check_out_date,
+                 nights, room_rate, adults, children, status
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                pgResId,
+                pgRoomId,
+                pgGuestId,
+                roomIn,
+                roomOut,
+                roomNights,
+                roomRate,
+                Number(payload.adults) || 1,
+                Number(payload.children) || 0,
+                statusDb === 'IN_HOUSE' ? 'CHECKED_IN' : 'ASSIGNED'
+              ]
+            );
+          }
+        }
+      } catch (pgErr: any) {
+        console.warn('Postgres createBooking sync notice:', pgErr.message);
+      }
+    }
+
+    const createdBooking = await bookingService.getBookingById(reservationNumber, propId);
     return createdBooking!;
   },
 
@@ -728,24 +815,34 @@ export const bookingService = {
     const canonicalDeparture = newDeparture && newDeparture > checkInDate ? newDeparture : derivedDepObj.toISOString().slice(0, 10);
     const canonicalNights = Math.max(1, Math.round((new Date(canonicalDeparture).getTime() - inDateObj.getTime()) / 86400000));
 
+    // Strict Overlap / Collision Check across all active bookings (Postgres + SQLite)
+    const activeBookings = await bookingService.getAllBookings(propId);
+    for (const b of activeBookings) {
+      if (String(b.id) === String(resId) || b.reservationNumber === existing.reservationNumber) continue;
+      const bStatus = String(b.status || '').toLowerCase();
+      if (bStatus === 'cancelled' || bStatus === 'voided' || bStatus === 'checked-out' || bStatus === 'completed') continue;
+
+      if (b.roomsList && Array.isArray(b.roomsList) && b.roomsList.length > 0) {
+        for (const sub of b.roomsList) {
+          if (String(sub.roomNumber) === targetRoomNo) {
+            const sIn = String(sub.checkInDate || sub.checkIn || b.checkIn).slice(0, 10);
+            const sOut = String(sub.checkOutDate || sub.checkOut || b.checkOut).slice(0, 10);
+            if (sIn < canonicalDeparture && sOut > checkInDate) {
+              throw new Error(`Room ${targetRoomNo} is already booked by ${b.guestName} (${b.reservationNumber}: ${sIn} to ${sOut})`);
+            }
+          }
+        }
+      } else if (String(b.roomNumber) === targetRoomNo) {
+        const bIn = String(b.checkIn).slice(0, 10);
+        const bOut = String(b.checkOut).slice(0, 10);
+        if (bIn < canonicalDeparture && bOut > checkInDate) {
+          throw new Error(`Room ${targetRoomNo} is already booked by ${b.guestName} (${b.reservationNumber}: ${bIn} to ${bOut})`);
+        }
+      }
+    }
+
     // Strict Overlap / Collision Check in SQLite before amending stay
     if (roomRow) {
-      const conflict = db.prepare(`
-        SELECT r.reservation_number, rr.check_in_date, rr.check_out_date
-        FROM reservation_rooms rr
-        JOIN reservations r ON r.id = rr.reservation_id
-        WHERE rr.room_id = ?
-          AND rr.reservation_id != ?
-          AND r.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
-          AND rr.check_in_date < ?
-          AND rr.check_out_date > ?
-        LIMIT 1
-      `).get(roomRow.id, resId, canonicalDeparture, checkInDate) as any;
-
-      if (conflict) {
-        throw new Error(`Room ${targetRoomNo} is already booked (${conflict.reservation_number}: ${conflict.check_in_date} to ${conflict.check_out_date})`);
-      }
-
       db.prepare(`
         UPDATE reservation_rooms
         SET check_out_date = ?, nights = ?
@@ -781,17 +878,13 @@ export const bookingService = {
     // Mirror to Postgres Cloud if connected
     if (isPostgresConnected()) {
       try {
-        if (roomRow) {
-          await pgPool.query(
-            `UPDATE reservation_rooms SET check_out_date = $1, nights = $2 WHERE reservation_id = $3 AND room_id = $4`,
-            [canonicalDeparture, canonicalNights, resId, roomRow.id]
-          );
-        } else {
-          await pgPool.query(
-            `UPDATE reservation_rooms SET check_out_date = $1, nights = $2 WHERE reservation_id = $3`,
-            [canonicalDeparture, canonicalNights, resId]
-          );
-        }
+        await pgPool.query(
+          `UPDATE reservation_rooms
+           SET check_out_date = $1, nights = $2
+           WHERE reservation_id = $3
+             AND room_id = COALESCE((SELECT id FROM rooms WHERE property_id = $4 AND room_number = $5 LIMIT 1), room_id)`,
+          [canonicalDeparture, canonicalNights, resId, propId, targetRoomNo]
+        );
         if (newTotalAmount !== undefined) {
           await pgPool.query(
             `UPDATE reservations SET total_amount = $1, due_amount = $2 WHERE id = $3`,
