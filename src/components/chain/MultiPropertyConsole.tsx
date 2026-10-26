@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
     Building2, 
     MapPin, 
@@ -7,7 +7,6 @@ import {
     Star, 
     RefreshCw, 
     CheckCircle2, 
-    ArrowRight,
     TrendingUp,
     Users,
     BedDouble,
@@ -16,7 +15,9 @@ import {
     Sparkles,
     ShieldCheck,
     Plus,
-    Database
+    Database,
+    Search,
+    ChevronRight
 } from 'lucide-react';
 import { useProperty, type Property } from '../../context/PropertyContext';
 import { useNavigation } from '../../context/NavigationContext';
@@ -26,6 +27,9 @@ import TenantIsolationHub from './TenantIsolationHub';
 
 export const MultiPropertyConsole: React.FC = () => {
     const [consoleView, setConsoleView] = useState<'portfolio' | 'isolation'>('portfolio');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [cityFilter, setCityFilter] = useState('ALL');
+
     const { 
         properties, 
         activeProperty, 
@@ -43,24 +47,24 @@ export const MultiPropertyConsole: React.FC = () => {
 
     const handleSwitchProperty = (property: Property) => {
         setActivePropertyId(property.id);
-        showToast(`Switched active hotel to ${property.name}`, {
+        showToast(`Active operational context switched to ${property.name}`, {
             type: 'success',
-            title: 'Active Hotel Switched'
+            title: 'Hotel Switched'
         });
     };
 
     const handleLaunchFrontDesk = (property: Property) => {
-        showToast(`Switching to Property PMS for ${property.name}`, {
+        showToast(`Launching Front Desk for ${property.name}`, {
             type: 'info',
-            title: 'Hotel Session Active'
+            title: 'Hotel PMS Session'
         });
         switchToPropertyPMS(property.id, 'front-desk');
     };
 
     const handleLaunchStayView = (property: Property) => {
-        showToast(`Opening StayView for ${property.name}`, {
+        showToast(`Opening StayView Rack for ${property.name}`, {
             type: 'info',
-            title: 'Hotel Session Active'
+            title: 'StayView Calendar'
         });
         switchToPropertyPMS(property.id, 'stay-view');
     };
@@ -68,366 +72,537 @@ export const MultiPropertyConsole: React.FC = () => {
     const totalRooms = properties.reduce((sum, p) => sum + (p.total_rooms || 0), 0);
     const totalStaff = properties.reduce((sum, p) => sum + (p.total_staff || 0), 0);
 
+    // Filter properties
+    const filteredProperties = useMemo(() => {
+        return properties.filter(p => {
+            const matchesSearch = (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (p.code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (p.city || '').toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesCity = cityFilter === 'ALL' || p.city === cityFilter;
+            return matchesSearch && matchesCity;
+        });
+    }, [properties, searchQuery, cityFilter]);
+
+    const cities = useMemo(() => {
+        const set = new Set<string>();
+        properties.forEach(p => { if (p.city) set.add(p.city); });
+        return Array.from(set);
+    }, [properties]);
+
     return (
-        <div className="p-6 bg-slate-50 min-h-screen text-slate-800">
+        <div className="min-h-screen bg-slate-50/70 text-slate-800 pb-16">
             {error && (
-                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
-                    {error}
+                <div className="mx-6 sm:mx-8 mt-4 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs flex items-center justify-between shadow-xs">
+                    <span>{error}</span>
+                    <button onClick={() => refreshProperties()} className="text-xs font-bold underline hover:text-rose-800 cursor-pointer">Retry</button>
                 </div>
             )}
 
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-200 gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-md">
-                        <Building2 size={24} />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-2xl text-slate-900 tracking-tight">
-                                Multi-Property Hotel Group Console
-                            </h1>
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                                Grand Hospitality Group (GHG)
-                            </span>
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                                <ShieldCheck size={12} /> Cloud PostgreSQL Active
-                            </span>
-                        </div>
-                        <p className="text-sm text-slate-500 mt-1">
-                            Centralized Portfolio Governance, Active Property Session Switching, and Consolidated Chain Analytics
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button 
-                        onClick={() => setActivePage('property-create')}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-xs transition cursor-pointer"
-                    >
-                        <Plus size={15} />
-                        Add Property
-                    </button>
-                    <button 
-                        onClick={() => refreshProperties()}
-                        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium shadow-xs transition cursor-pointer"
-                    >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Refresh Portfolio
-                    </button>
-                </div>
-            </div>
-
-            {/* View Switcher Navigation */}
-            <div className="flex items-center gap-2 mt-5 p-1.5 bg-slate-200/70 rounded-xl w-fit border border-slate-200">
-                <button
-                    type="button"
-                    onClick={() => setConsoleView('portfolio')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                        consoleView === 'portfolio'
-                            ? 'bg-white text-blue-600 shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                    <Building2 size={15} />
-                    Hotel Chain Portfolio
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                        {properties.length} Active
-                    </span>
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setConsoleView('isolation')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                        consoleView === 'isolation'
-                            ? 'bg-white text-blue-600 shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                    <Database size={15} />
-                    Database-per-Tenant Isolation Hub
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 flex items-center gap-1">
-                        <ShieldCheck size={11} /> Dedicated DB Architecture
-                    </span>
-                </button>
-            </div>
-
-            {consoleView === 'isolation' ? (
-                <div className="mt-6">
-                    <TenantIsolationHub />
-                </div>
-            ) : (
-                <>
-                    {/* Enterprise Chain KPIs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Group Portfolio</span>
-                        <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                            <Building2 size={16} />
-                        </div>
-                    </div>
-                    <div className="text-2xl text-slate-900 mt-2">{properties.length} Active Hotels</div>
-                    <div className="text-xs text-slate-500 mt-1">Dhaka City & Cox's Bazar Resort</div>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Chain Inventory</span>
-                        <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                            <BedDouble size={16} />
-                        </div>
-                    </div>
-                    <div className="text-2xl text-emerald-600 mt-2">{totalRooms} Physical Rooms</div>
-                    <div className="text-xs text-slate-500 mt-1">1NF–4NF Relational Inventory</div>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Consolidated Personnel</span>
-                        <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
-                            <Users size={16} />
-                        </div>
-                    </div>
-                    <div className="text-2xl text-slate-900 mt-2">{totalStaff} Hotel Staff</div>
-                    <div className="text-xs text-slate-500 mt-1">Cross-Property HR Rostering</div>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Consolidated Revenue</span>
-                        <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
-                            <TrendingUp size={16} />
-                        </div>
-                    </div>
-                    <div className="text-2xl text-slate-900 mt-2">
-                        ৳{chainOverview ? Number(chainOverview.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '248,500.00'}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">USALI General Ledger Inflow</div>
-                </div>
-            </div>
-
-            {/* Property Selector Cards */}
-            <div className="mt-8">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-lg text-slate-900">Hotel Properties in Chain</h2>
-                        <p className="text-xs text-slate-500">Click any hotel card to switch active operating context or launch operational views</p>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-500">
-                        Current Session: <strong className="text-blue-600">{activeProperty?.name}</strong>
-                    </span>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {properties.map(property => {
-                        const isSelected = property.id === activePropertyId;
-                        return (
-                            <div 
-                                key={property.id}
-                                className={`p-6 rounded-2xl border-2 transition relative bg-white shadow-xs hover:shadow-md flex flex-col justify-between ${
-                                    isSelected 
-                                        ? 'border-blue-600 ring-2 ring-blue-100/80 bg-linear-to-b from-blue-50/20 to-white' 
-                                        : 'border-slate-200 hover:border-slate-300'
-                                }`}
-                            >
-                                <div>
-                                    {/* Active Session Badge */}
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="font-mono text-xs text-blue-600 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-100">
-                                            CODE: {property.code}
-                                        </span>
-                                        {isSelected ? (
-                                            <span className="px-2.5 py-0.5 rounded-full text-xs bg-blue-600 text-white flex items-center gap-1 shadow-xs">
-                                                <CheckCircle2 size={12} /> Active Hotel in Session
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-slate-400 font-medium">Ready to switch</span>
-                                        )}
-                                    </div>
-
-                                    {/* Hotel Title & Rating */}
-                                    <div className="flex items-start gap-3">
-                                        <div className={`p-3 rounded-xl flex-shrink-0 ${isSelected ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                                            <Building2 size={24} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg text-slate-900 leading-snug">{property.name}</h3>
-                                            <div className="flex items-center gap-1 mt-1 text-amber-500">
-                                                {[...Array(property.star_rating || 5)].map((_, i) => (
-                                                    <Star key={i} size={14} fill="currentColor" />
-                                                ))}
-                                                <span className="text-xs text-slate-500 ml-1.5 font-medium">
-                                                    {property.star_rating} Star {property.city === 'Dhaka' ? 'Business Hotel' : 'Beach Resort'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Location & Contact Info */}
-                                    <div className="mt-5 pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-600">
-                                        <div className="flex items-center gap-2">
-                                            <MapPin size={14} className="text-slate-400 flex-shrink-0" />
-                                            <span>{property.address}, {property.city}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Phone size={14} className="text-slate-400 flex-shrink-0" />
-                                            <span className="font-mono">{property.phone}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Mail size={14} className="text-slate-400 flex-shrink-0" />
-                                            <span>{property.email}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Key Counts */}
-                                    <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-slate-100 text-center">
-                                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                                            <div className="text-[10px] text-slate-400 font-semibold uppercase">Physical Rooms</div>
-                                            <div className="text-base text-slate-900 mt-0.5">{property.total_rooms || 0}</div>
-                                        </div>
-                                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                                            <div className="text-[10px] text-slate-400 font-semibold uppercase">Buildings/Wings</div>
-                                            <div className="text-base text-slate-900 mt-0.5">{property.total_buildings || 0}</div>
-                                        </div>
-                                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                                            <div className="text-[10px] text-slate-400 font-semibold uppercase">Active Personnel</div>
-                                            <div className="text-base text-slate-900 mt-0.5">{property.total_staff || 0}</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Operational Action Buttons */}
-                                <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        {!isSelected && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSwitchProperty(property)}
-                                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                                            >
-                                                <CheckCircle2 size={13} />
-                                                Set as Active Hotel
-                                            </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleLaunchFrontDesk(property)}
-                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
-                                        >
-                                            <Sparkles size={13} className="text-blue-600" />
-                                            Front Desk
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleLaunchStayView(property)}
-                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
-                                        >
-                                            <Calendar size={13} className="text-emerald-600" />
-                                            StayView
-                                        </button>
-                                    </div>
-
-                                    <span className="text-xs font-mono font-medium text-slate-400">
-                                        Currency: <strong className="text-slate-700">{property.currency || 'BDT'}</strong>
+            {/* Top Luxury Executive Banner */}
+            <div className="bg-white border-b border-slate-200/80 shadow-2xs">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        
+                        {/* Title & Brand Identity */}
+                        <div className="flex items-start gap-4">
+                            <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 flex items-center justify-center text-white shadow-md shadow-blue-500/20 ring-4 ring-blue-50 shrink-0">
+                                <Building2 size={26} className="stroke-[2.2]" />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2.5 flex-wrap">
+                                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                                        Multi-Property Hotel Chain Console
+                                    </h1>
+                                    <span className="text-[11px] font-bold px-3 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+                                        Grand Hospitality Group (GHG)
+                                    </span>
+                                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1.5 shadow-2xs">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        TiDB Cloud PostgreSQL Active
                                     </span>
                                 </div>
+                                <p className="text-xs text-slate-500 max-w-2xl font-normal leading-relaxed">
+                                    Centralized Hotel Group Governance, Cross-Property Operations, High-Density Partitioning &amp; Enterprise Database Isolation.
+                                </p>
                             </div>
-                        );
-                    })}
+                        </div>
+
+                        {/* Top Action Buttons */}
+                        <div className="flex items-center gap-2.5 shrink-0">
+                            <button 
+                                type="button"
+                                onClick={() => setActivePage('property-create')}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-600/20 hover:shadow-md transition-all cursor-pointer active:scale-98"
+                            >
+                                <Plus size={16} className="stroke-[2.5]" />
+                                <span>Onboard New Hotel</span>
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => refreshProperties()}
+                                className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-slate-200/90 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer"
+                                title="Sync live database portfolio"
+                            >
+                                <RefreshCw size={14} className={loading ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+                                <span className="hidden sm:inline">Sync Portfolio</span>
+                            </button>
+                        </div>
+
+                    </div>
+
+                    {/* View Switcher Tabs Bar */}
+                    <div className="flex items-center gap-3 mt-6 pt-5 border-t border-slate-100">
+                        <div className="p-1 bg-slate-100/80 rounded-xl flex items-center gap-1 border border-slate-200/70">
+                            <button
+                                type="button"
+                                onClick={() => setConsoleView('portfolio')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    consoleView === 'portfolio'
+                                        ? 'bg-white text-blue-700 shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-900'
+                                }`}
+                            >
+                                <Building2 size={15} />
+                                <span>Hotel Chain Portfolio</span>
+                                <span className="px-2 py-0.2 rounded-full text-[10.5px] bg-blue-50 text-blue-700 font-extrabold border border-blue-200">
+                                    {properties.length}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setConsoleView('isolation')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    consoleView === 'isolation'
+                                        ? 'bg-white text-blue-700 shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-900'
+                                }`}
+                            >
+                                <Database size={15} />
+                                <span>Tenant Database Isolation Hub</span>
+                                <span className="px-2 py-0.2 rounded-full text-[10.5px] bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-200 flex items-center gap-1">
+                                    <ShieldCheck size={11} /> 10,000+ Scale
+                                </span>
+                            </button>
+                        </div>
+
+                        {consoleView === 'portfolio' && (
+                            <div className="ml-auto hidden md:flex items-center gap-2 text-xs text-slate-500">
+                                <span>Active Hotel Session:</span>
+                                <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 font-mono text-[11px]">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    {activeProperty?.name || 'Grand Palace Hotel (HQ)'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Side-by-Side Property Comparison Matrix */}
-            <div className="mt-10 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 className="text-base text-slate-900 flex items-center gap-2">
-                            <Landmark size={18} className="text-blue-600" />
-                            Chain Portfolio Comparison Matrix
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                            Cross-property operational metrics and rack rate comparison
-                        </p>
-                    </div>
-                </div>
+            {/* MAIN CONTENT AREA */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-slate-600">
-                        <thead className="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                            <tr>
-                                <th className="px-4 py-3">Property</th>
-                                <th className="px-4 py-3">Type & City</th>
-                                <th className="px-4 py-3">Rooms</th>
-                                <th className="px-4 py-3">Rack Rates Range</th>
-                                <th className="px-4 py-3">Staff Team</th>
-                                <th className="px-4 py-3">Database Isolation</th>
-                                <th className="px-4 py-3 text-right">Quick Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-medium">
-                            {properties.map(p => {
-                                const isCurrent = p.id === activePropertyId;
+                {consoleView === 'isolation' ? (
+                    <TenantIsolationHub />
+                ) : (
+                    <>
+                        {/* 4 HIGH-END EXECUTIVE METRIC CARDS */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            
+                            {/* Metric 1 */}
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Group Portfolio</span>
+                                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                        <Building2 size={18} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-baseline gap-2">
+                                    <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">{properties.length}</span>
+                                    <span className="text-xs font-semibold text-slate-500">Active Properties</span>
+                                </div>
+                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                                    <span className="text-emerald-600 font-bold flex items-center gap-0.5">
+                                        <TrendingUp size={12} /> 100%
+                                    </span>
+                                    <span>Operational Uptime</span>
+                                </div>
+                            </div>
+
+                            {/* Metric 2 */}
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Chain Room Inventory</span>
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                        <BedDouble size={18} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-baseline gap-2">
+                                    <span className="text-3xl font-black text-emerald-600 tracking-tight font-mono">{totalRooms}</span>
+                                    <span className="text-xs font-semibold text-slate-500">Total Rooms</span>
+                                </div>
+                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold font-mono text-[10.5px]">
+                                        1NF–4NF Scoped
+                                    </span>
+                                    <span>Relational Database</span>
+                                </div>
+                            </div>
+
+                            {/* Metric 3 */}
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Consolidated Staff</span>
+                                    <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                        <Users size={18} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-baseline gap-2">
+                                    <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">{totalStaff}</span>
+                                    <span className="text-xs font-semibold text-slate-500">Personnel</span>
+                                </div>
+                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                                    <span className="text-purple-600 font-bold">Cross-Property</span>
+                                    <span>HRM &amp; Shift Rosters</span>
+                                </div>
+                            </div>
+
+                            {/* Metric 4 */}
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Group Revenue Inflow</span>
+                                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                        <TrendingUp size={18} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-baseline gap-1">
+                                    <span className="text-xs font-bold text-amber-600">৳</span>
+                                    <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+                                        {chainOverview ? Number(chainOverview.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '248,500'}
+                                    </span>
+                                </div>
+                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                                    <span className="text-emerald-600 font-bold flex items-center gap-0.5">
+                                        <TrendingUp size={12} /> +14.8%
+                                    </span>
+                                    <span>USALI Ledger Inflow</span>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* SEARCH & FILTER BAR */}
+                        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="relative w-full sm:w-80">
+                                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Search hotel name, code or city..."
+                                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 focus:bg-white transition"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                <span className="text-xs text-slate-400 font-medium hidden sm:inline">Filter Region:</span>
+                                <div className="flex items-center gap-1 overflow-x-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => setCityFilter('ALL')}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                                            cityFilter === 'ALL'
+                                                ? 'bg-blue-600 text-white shadow-2xs'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        All ({properties.length})
+                                    </button>
+                                    {cities.map(city => (
+                                        <button
+                                            key={city}
+                                            type="button"
+                                            onClick={() => setCityFilter(city)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                                                cityFilter === city
+                                                    ? 'bg-blue-600 text-white shadow-2xs'
+                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                            }`}
+                                        >
+                                            {city}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* HOTEL PROPERTIES GRID */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            {filteredProperties.map(property => {
+                                const isSelected = property.id === activePropertyId;
+                                const starCount = property.star_rating || 5;
+
                                 return (
-                                    <tr key={p.id} className={isCurrent ? 'bg-blue-50/40' : 'hover:bg-slate-50/60'}>
-                                        <td className="px-4 py-3.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                                                    {p.code}
-                                                </span>
-                                                <span className="text-slate-900">{p.name}</span>
-                                                {isCurrent && (
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                                                        Active
+                                    <div 
+                                        key={property.id}
+                                        className={`rounded-2xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative ${
+                                            isSelected 
+                                                ? 'bg-white border-blue-600 shadow-md ring-2 ring-blue-500/10' 
+                                                : 'bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300'
+                                        }`}
+                                    >
+                                        {/* Top Accent Strip */}
+                                        <div className={`h-1.5 w-full ${
+                                            isSelected 
+                                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
+                                                : 'bg-slate-200'
+                                        }`} />
+
+                                        <div className="p-5 sm:p-6 space-y-5">
+                                            {/* Header Row: Code & Session State */}
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200">
+                                                        {property.code}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400 font-medium">
+                                                        ID #{property.id}
+                                                    </span>
+                                                </div>
+
+                                                {isSelected ? (
+                                                    <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-blue-600 text-white flex items-center gap-1.5 shadow-2xs">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                                        Active Hotel Session
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[11px] text-slate-400 font-medium bg-slate-50 px-2.5 py-0.5 rounded-md border border-slate-200">
+                                                        Standby Context
                                                     </span>
                                                 )}
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-3.5 text-slate-600">
-                                            {p.city === 'Dhaka' ? '5★ Corporate Tower (Dhaka)' : '5★ Beachfront Resort (Cox\'s Bazar)'}
-                                        </td>
-                                        <td className="px-4 py-3.5 text-slate-900">
-                                            {p.total_rooms || 0} Rooms ({p.total_buildings || 0} Wings)
-                                        </td>
-                                        <td className="px-4 py-3.5 font-mono text-slate-700">
-                                            {p.city === 'Dhaka' ? '৳2,200 – ৳18,000' : '৳5,500 – ৳22,000'}
-                                        </td>
-                                        <td className="px-4 py-3.5 text-slate-700">
-                                            {p.total_staff || 0} Active Personnel
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                                                <ShieldCheck size={11} /> 1NF–4NF Scoped
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3.5 text-right">
-                                            {isCurrent ? (
+
+                                            {/* Hotel Title, Star & Location */}
+                                            <div className="flex items-start gap-4">
+                                                <div className={`w-13 h-13 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 shadow-sm ${
+                                                    isSelected 
+                                                        ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white' 
+                                                        : 'bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700'
+                                                }`}>
+                                                    {property.name.slice(0, 2).toUpperCase()}
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <h3 className="text-lg font-bold text-slate-900 tracking-tight leading-snug">
+                                                        {property.name}
+                                                    </h3>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <div className="flex items-center gap-0.5 text-amber-500">
+                                                            {[...Array(starCount)].map((_, i) => (
+                                                                <Star key={i} size={13} fill="currentColor" />
+                                                            ))}
+                                                        </div>
+                                                        <span className="text-[11.5px] font-semibold text-slate-600">
+                                                            {starCount}-Star {property.city === 'Dhaka' ? 'Business Hotel' : 'Luxury Resort'}
+                                                        </span>
+                                                        <span className="text-slate-300">•</span>
+                                                        <span className="text-[11px] text-slate-500 font-mono">
+                                                            Currency: <strong>{property.currency || 'BDT'}</strong>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Address & Contact Chips */}
+                                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5 text-xs text-slate-600">
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <MapPin size={13} className="text-slate-400 shrink-0" />
+                                                    <span className="truncate">{property.address}, {property.city}, {property.country || 'Bangladesh'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-[11.5px]">
+                                                    <div className="flex items-center gap-1.5 font-mono text-slate-600">
+                                                        <Phone size={12} className="text-slate-400 shrink-0" />
+                                                        <span>{property.phone}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 truncate text-slate-600">
+                                                        <Mail size={12} className="text-slate-400 shrink-0" />
+                                                        <span className="truncate">{property.email}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* 3 Metric Mini-Cards */}
+                                            <div className="grid grid-cols-3 gap-2 text-center">
+                                                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Physical Rooms</span>
+                                                    <span className="text-lg font-black text-slate-900 font-mono mt-0.5 block">
+                                                        {property.total_rooms || 0}
+                                                    </span>
+                                                </div>
+                                                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Wings / Towers</span>
+                                                    <span className="text-lg font-black text-slate-900 font-mono mt-0.5 block">
+                                                        {property.total_buildings || 1}
+                                                    </span>
+                                                </div>
+                                                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Staff Roster</span>
+                                                    <span className="text-lg font-black text-slate-900 font-mono mt-0.5 block">
+                                                        {property.total_staff || 0}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Action Bar Footer */}
+                                        <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2.5">
+                                            <div className="flex items-center gap-2">
+                                                {!isSelected ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSwitchProperty(property)}
+                                                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs transition flex items-center gap-1.5 cursor-pointer active:scale-98"
+                                                    >
+                                                        <CheckCircle2 size={13} />
+                                                        <span>Switch Context</span>
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
+                                                        <CheckCircle2 size={14} className="text-blue-600" />
+                                                        <span>Operating</span>
+                                                    </span>
+                                                )}
+
                                                 <button
                                                     type="button"
-                                                    onClick={() => setActivePage('dashboard')}
-                                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] inline-flex items-center gap-1 cursor-pointer"
+                                                    onClick={() => handleLaunchFrontDesk(property)}
+                                                    className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
                                                 >
-                                                    Open Desk <ArrowRight size={11} />
+                                                    <Sparkles size={12} className="text-blue-600" />
+                                                    <span>Front Desk</span>
                                                 </button>
-                                            ) : (
+
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleSwitchProperty(p)}
-                                                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded text-[11px] cursor-pointer"
+                                                    onClick={() => handleLaunchStayView(property)}
+                                                    className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
                                                 >
-                                                    Switch Hotel
+                                                    <Calendar size={12} className="text-emerald-600" />
+                                                    <span>StayView</span>
                                                 </button>
-                                            )}
-                                        </td>
-                                    </tr>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleSwitchProperty(property);
+                                                    setConsoleView('isolation');
+                                                }}
+                                                className="text-[11.5px] font-semibold text-slate-500 hover:text-blue-700 flex items-center gap-1 cursor-pointer transition"
+                                                title="View Database Isolation Specs"
+                                            >
+                                                <Database size={12} />
+                                                <span>DB Isolation</span>
+                                                <ChevronRight size={13} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 );
                             })}
-                        </tbody>
-                    </table>
-                </div>
+                        </div>
+
+                        {/* CHAIN COMPARISON MATRIX TABLE */}
+                        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                        <Landmark size={17} className="text-blue-600" />
+                                        <span>Consolidated Hotel Chain Comparison Matrix</span>
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Standardized multi-property performance metrics, rack rate schedules, and database isolation scope
+                                    </p>
+                                </div>
+                                <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 w-fit">
+                                    {properties.length} Properties Analyzed
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs text-slate-600">
+                                    <thead className="bg-slate-50 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3">Property Name</th>
+                                            <th className="px-4 py-3">Category &amp; Location</th>
+                                            <th className="px-4 py-3">Physical Inventory</th>
+                                            <th className="px-4 py-3">Rack Rate Range</th>
+                                            <th className="px-4 py-3">HRM Personnel</th>
+                                            <th className="px-4 py-3">Database Architecture</th>
+                                            <th className="px-4 py-3 text-right">Operational Switch</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-medium">
+                                        {properties.map(p => {
+                                            const isCurrent = p.id === activePropertyId;
+                                            return (
+                                                <tr key={p.id} className={`transition ${isCurrent ? 'bg-blue-50/50' : 'hover:bg-slate-50/60'}`}>
+                                                    <td className="px-4 py-3.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                                                {p.code}
+                                                            </span>
+                                                            <span className="font-bold text-slate-900">{p.name}</span>
+                                                            {isCurrent && (
+                                                                <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-blue-600 text-white shadow-2xs">
+                                                                    Active
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-slate-600">
+                                                        {p.city === 'Dhaka' ? '5★ Corporate Tower (Dhaka)' : `${p.star_rating || 5}★ Luxury Resort (${p.city})`}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-slate-900 font-semibold font-mono">
+                                                        {p.total_rooms || 0} Rooms ({p.total_buildings || 1} Wing)
+                                                    </td>
+                                                    <td className="px-4 py-3.5 font-mono text-slate-700 font-bold">
+                                                        {p.city === 'Dhaka' ? '৳2,200 – ৳18,000' : '৳5,500 – ৳22,000'}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-slate-700 font-mono">
+                                                        {p.total_staff || 0} Staff
+                                                    </td>
+                                                    <td className="px-4 py-3.5">
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                                            <ShieldCheck size={11} /> 1NF–4NF Clustered
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right">
+                                                        {isCurrent ? (
+                                                            <span className="text-xs font-bold text-blue-600">Active</span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleSwitchProperty(p)}
+                                                                className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
+                                                            >
+                                                                Switch
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                )}
+
             </div>
-                </>
-            )}
         </div>
     );
 };
