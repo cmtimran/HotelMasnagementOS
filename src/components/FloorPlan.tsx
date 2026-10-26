@@ -53,19 +53,21 @@ const deriveArchitecturalRooms = (): ArchitecturalRoom[] => {
         floorRooms.forEach((r, idx) => {
             const activeRes = storedRes.find(res => {
                 const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
-                if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed') {
+                if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed' || rawStatus === 'no-show') {
                     return false;
                 }
-                const matchesRoom = String(res.roomNumber) === r.number ||
+                const matchingRoom = (Array.isArray(res.roomsList) && res.roomsList.find((rm: any) => String(rm.roomNumber) === r.number)) ||
+                                     (Array.isArray(res.groupRoomsList) && res.groupRoomsList.find((rm: any) => String(rm.roomNumber) === r.number));
+
+                const matchesRoom = matchingRoom ||
+                    String(res.roomNumber) === r.number ||
                     String(res.roomNo) === r.number ||
-                    (Array.isArray(res.allocatedRooms) && res.allocatedRooms.some((x: any) => String(x) === r.number)) ||
-                    (Array.isArray(res.roomsList) && res.roomsList.some((rm: any) => String(rm.roomNumber) === r.number)) ||
-                    (Array.isArray(res.groupRoomsList) && res.groupRoomsList.some((rm: any) => String(rm.roomNumber) === r.number));
+                    (Array.isArray(res.allocatedRooms) && res.allocatedRooms.some((x: any) => String(x) === r.number));
 
                 if (!matchesRoom) return false;
 
-                const checkIn = String(res.checkIn || res.arrivalDate || '');
-                const checkOut = String(res.checkOut || res.departureDate || '');
+                const checkIn = String(matchingRoom?.checkInDate || matchingRoom?.checkIn || res.checkIn || res.arrivalDate || '');
+                const checkOut = String(matchingRoom?.checkOutDate || matchingRoom?.checkOut || res.checkOut || res.departureDate || '');
                 return (checkIn <= opDate && checkOut > opDate) || (checkIn === opDate);
             });
 

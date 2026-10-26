@@ -484,13 +484,13 @@ router.post('/night-audit/run', async (req: Request, res: Response) => {
             LEFT JOIN guests g ON g.id = r.booker_guest_id
             WHERE r.property_id = ? 
               AND r.status IN ('CONFIRMED', 'confirmed') 
-              AND rr.check_in_date < ?
+              AND rr.check_in_date = ?
         `).all(propertyId, currentBusinessDate) as any[];
 
         let noShowsProcessed = 0;
         for (const ns of noShowRows) {
-            await db.prepare(`UPDATE reservations SET status = 'CANCELLED', special_requests = COALESCE(special_requests, '') || ' [Auto-cancelled: No-Show during Night Audit]' WHERE id = ?`).run(ns.id);
-            await db.prepare(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = ?`).run(ns.id);
+            await db.prepare(`UPDATE reservations SET status = 'NO_SHOW', special_requests = COALESCE(special_requests, '') || ' [Marked No-Show during Night Audit]' WHERE id = ?`).run(ns.id);
+            await db.prepare(`UPDATE reservation_rooms SET status = 'NO_SHOW' WHERE reservation_id = ?`).run(ns.id);
             noShowsProcessed++;
         }
         log(`Step 2: No-show processing complete. ${noShowsProcessed} expired reservation(s) penalized & unheld inventory released.`);

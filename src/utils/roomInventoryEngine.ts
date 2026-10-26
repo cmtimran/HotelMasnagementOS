@@ -883,7 +883,7 @@ export const getAllStoredReservations = (propertyId?: number): StoredReservation
         if (typeof window !== 'undefined') {
             const propId = propertyId || getActivePropertyId();
             const scopedKey = `hotel_reservations_prop_${propId}`;
-            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? (localStorage.getItem(STORAGE_KEY_RESERVATIONS) || localStorage.getItem('hotel_reservations_v3')) : null);
+            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? (localStorage.getItem(STORAGE_KEY_RESERVATIONS) || localStorage.getItem('hotel_reservations_v2') || localStorage.getItem('hotel_reservations_v3')) : null);
             if (saved !== null) {
                 const list = JSON.parse(saved);
                 if (Array.isArray(list)) {
@@ -1238,13 +1238,18 @@ export const validateAndCommitReservation = (
 export const syncReservationsFromDB = async (propertyId?: number | string): Promise<StoredReservation[]> => {
     if (typeof window === 'undefined') return getAllStoredReservations();
     try {
+        const propId = propertyId || getActivePropertyId();
         const API_BASE = getApiBaseUrl();
-        const url = propertyId ? `${API_BASE}/api/bookings?propertyId=${propertyId}` : `${API_BASE}/api/bookings`;
-        const res = await fetch(url);
+        const url = `${API_BASE}/api/bookings?propertyId=${propId}`;
+        const res = await fetch(url, {
+            headers: {
+                'x-property-id': String(propId)
+            }
+        });
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
             const dbList: StoredReservation[] = json.data;
-            saveStoredReservations(dbList);
+            saveStoredReservations(dbList, Number(propId));
             return dbList;
         }
     } catch (err) {

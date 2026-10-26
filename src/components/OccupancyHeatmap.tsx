@@ -81,7 +81,7 @@ export const OccupancyHeatmap: React.FC = () => {
 
             storedRes.forEach(res => {
                 const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
-                if (rawStatus === 'cancelled' || rawStatus === 'void') return;
+                if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'no-show') return;
 
                 const checkIn = String(res.checkIn || res.arrivalDate || '');
                 const checkOut = String(res.checkOut || res.departureDate || '');

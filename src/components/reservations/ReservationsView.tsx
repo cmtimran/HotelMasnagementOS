@@ -52,7 +52,7 @@ export interface ReservationItem {
     nights: number;
     adults: number;
     children: number;
-    status: 'confirmed' | 'arriving' | 'in-house' | 'departing' | 'checked-out' | 'hold';
+    status: 'confirmed' | 'arriving' | 'in-house' | 'departing' | 'checked-out' | 'hold' | 'cancelled' | 'no-show';
     totalAmount: number;
     paidAmount: number;
     dueAmount: number;
@@ -68,8 +68,8 @@ export interface ReservationItem {
 export const ReservationsView: React.FC = () => {
     const { setActivePage } = useNavigation();
     
-    // Active Tab: 'reservations' (Active Bookings), 'arrivals', 'departures', 'checked-out', 'in-house'
-    const [activeTab, setActiveTab] = useState<'reservations' | 'arrivals' | 'departures' | 'checked-out' | 'in-house'>('reservations');
+    // Active Tab: 'reservations' (Active Bookings), 'arrivals', 'departures', 'checked-out', 'in-house', 'cancelled'
+    const [activeTab, setActiveTab] = useState<'reservations' | 'arrivals' | 'departures' | 'checked-out' | 'in-house' | 'cancelled'>('reservations');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [guestFilter, setGuestFilter] = useState<'all' | 'single' | 'group'>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -159,6 +159,8 @@ export const ReservationsView: React.FC = () => {
 
     const resolveUiStatus = (rawStatus: string, checkIn: string, checkOut: string, opDate: string): ReservationItem['status'] => {
         const s = String(rawStatus || 'confirmed').toLowerCase().replace(/_/g, '-');
+        if (s === 'cancelled' || s === 'void' || s === 'voided') return 'cancelled';
+        if (s === 'no-show') return 'no-show';
         if (s === 'checked-out' || s === 'completed') return 'checked-out';
         if (s === 'hold' || s === 'tentative') return 'hold';
         if (s === 'in-house' || s === 'arrived' || s === 'stayover' || s === 'checked-in') {
@@ -295,7 +297,7 @@ export const ReservationsView: React.FC = () => {
 
     // Handle Tab Change:
     // UX FIX: Instantly clears previous selections and turns off grouping mode so no ghost selection leaks across tabs!
-    const handleTabChange = (nextTab: 'reservations' | 'arrivals' | 'departures' | 'checked-out' | 'in-house') => {
+    const handleTabChange = (nextTab: 'reservations' | 'arrivals' | 'departures' | 'checked-out' | 'in-house' | 'cancelled') => {
         setActiveTab(nextTab);
         setSelectedIds([]);
         setIsGroupingMode(false);
@@ -367,6 +369,8 @@ export const ReservationsView: React.FC = () => {
                 matchesTab = r.status === 'in-house' || r.status === 'departing';
             } else if (activeTab === 'checked-out') {
                 matchesTab = r.status === 'checked-out';
+            } else if (activeTab === 'cancelled') {
+                matchesTab = r.status === 'cancelled' || r.status === 'no-show';
             }
 
             // 2. Single vs Group Guest Filter
@@ -432,6 +436,7 @@ export const ReservationsView: React.FC = () => {
     const countDepartures = reservations.filter(r => r.status === 'departing').length;
     const countInHouse = reservations.filter(r => r.status === 'in-house' || r.status === 'departing').length;
     const countCheckOut = reservations.filter(r => r.status === 'checked-out').length;
+    const countCancelled = reservations.filter(r => r.status === 'cancelled' || r.status === 'no-show').length;
 
     // Quick Date Presets
     const setDatePreset = (preset: 'today' | 'week' | 'month' | 'clear') => {
@@ -529,7 +534,8 @@ export const ReservationsView: React.FC = () => {
                             { id: 'arrivals', label: 'Arrivals', count: countArrivals },
                             { id: 'in-house', label: 'In House', count: countInHouse },
                             { id: 'departures', label: 'Departures', count: countDepartures },
-                            { id: 'checked-out', label: 'Checked Out', count: countCheckOut }
+                            { id: 'checked-out', label: 'Checked Out', count: countCheckOut },
+                            { id: 'cancelled', label: 'Cancelled / No-Show', count: countCancelled }
                         ].map(t => {
                             const isActive = activeTab === t.id;
                             return (
@@ -1112,6 +1118,8 @@ export const ReservationsView: React.FC = () => {
                                                         ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                                         : r.status === 'checked-out'
                                                         ? 'bg-gray-100 text-gray-600'
+                                                        : r.status === 'cancelled' || r.status === 'no-show'
+                                                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                                         : 'bg-purple-50 text-purple-700 border border-purple-200'
                                                 }`}>
                                                     {r.status}
@@ -1275,6 +1283,8 @@ export const ReservationsView: React.FC = () => {
                                                 ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                                 : r.status === 'checked-out'
                                                 ? 'bg-gray-100 text-gray-600'
+                                                : r.status === 'cancelled' || r.status === 'no-show'
+                                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                                 : 'bg-purple-50 text-purple-700 border border-purple-200'
                                         }`}>
                                             {r.status}

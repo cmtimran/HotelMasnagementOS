@@ -528,7 +528,7 @@ export const StayView: React.FC = () => {
 
         for (const res of stored) {
             const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
-            if (rawStatus === 'cancelled' || rawStatus === 'voided') {
+            if (rawStatus === 'cancelled' || rawStatus === 'voided' || rawStatus === 'no-show') {
                 continue;
             }
 

@@ -1,5 +1,5 @@
 import type { Response, NextFunction } from 'express';
-import type { AuthenticatedRequest, UserContext } from '../types/index.js';
+import type { AuthenticatedRequest, UserContext, UserRole } from '../types/index.js';
 
 /**
  * Authentication Middleware
@@ -24,7 +24,7 @@ export const authMiddleware = (
           id: payload.sub || payload.id || 'usr_jwt',
           name: payload.name || payload.email?.split('@')[0] || 'Authenticated User',
           email: payload.email || 'user@hotelos.com',
-          role: payload.role || 'front_desk',
+          role: (payload.role as UserRole) || 'front_desk',
           propertyId: propertyHeader || payload.propertyId || '1',
           propertyName: payload.propertyName || 'Hotel Property',
           subscriptionTier: payload.tier || 'enterprise',
@@ -40,7 +40,7 @@ export const authMiddleware = (
   }
 
   // 2. Header-driven RBAC authentication context
-  const roleHeader = (req.headers['x-user-role'] as string) || 'general_manager';
+  const roleHeader = (req.headers['x-user-role'] as UserRole) || 'general_manager';
   const userEmail = (req.headers['x-user-email'] as string) || 'admin@hotelms.com';
   const userName = (req.headers['x-user-name'] as string) || 'Enterprise Admin';
 
