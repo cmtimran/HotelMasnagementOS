@@ -96,9 +96,14 @@ router.get('/chain/overview', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
     try {
         const propertyId = Number(req.params.id);
-        const property = await db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+        const property = await db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId) as any;
         if (!property) {
             return res.status(404).json({ success: false, error: 'Property not found' });
+        }
+        if (property.settings && typeof property.settings === 'string') {
+            try {
+                property.settings = JSON.parse(property.settings);
+            } catch {}
         }
 
         const buildings = await db.prepare('SELECT * FROM buildings WHERE property_id = ? ORDER BY sort_order').all(propertyId);
@@ -195,6 +200,7 @@ router.put('/:id', async (req: Request, res: Response) => {
         const body = req.body || {};
         const starRating = body.starRating ? Math.min(5, Math.max(1, Number(body.starRating))) : null;
         const currency = body.currency ? String(body.currency).slice(0, 3).toUpperCase() : null;
+        const settingsJson = body.settings !== undefined ? (typeof body.settings === 'string' ? body.settings : JSON.stringify(body.settings)) : null;
 
         await db.prepare(`
             UPDATE properties
@@ -210,6 +216,7 @@ router.put('/:id', async (req: Request, res: Response) => {
                 time_zone = COALESCE(?, time_zone),
                 check_in_time = COALESCE(?, check_in_time),
                 check_out_time = COALESCE(?, check_out_time),
+                settings = COALESCE(?, settings),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `).run(
@@ -225,6 +232,7 @@ router.put('/:id', async (req: Request, res: Response) => {
             body.timeZone || null,
             body.checkInTime || null,
             body.checkOutTime || null,
+            settingsJson,
             propertyId
         );
 
@@ -232,6 +240,19 @@ router.put('/:id', async (req: Request, res: Response) => {
         res.json({ success: true, data: updated, message: 'Property updated successfully' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to update property' });
+    }
+});
+
+// PUT /api/properties/:id/settings - Dedicated endpoint for property operational settings & configuration
+router.put('/:id/settings', async (req: Request, res: Response) => {
+    try {
+        const propertyId = Number(req.params.id);
+        const settings = req.body || {};
+        const settingsJson = JSON.stringify(settings);
+        await db.prepare('UPDATE properties SET settings = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(settingsJson, propertyId);
+        res.json({ success: true, message: 'Property configuration saved to database successfully', data: settings });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to save property settings' });
     }
 });
 

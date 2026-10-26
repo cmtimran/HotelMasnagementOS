@@ -26,6 +26,8 @@ export interface BankAccount {
     accountName: string;
     accountNum: string;
     swift: string;
+    branch?: string;
+    routingNo?: string;
 }
 
 export interface PosOutlet {
@@ -432,7 +434,16 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         currency: currencyCode,
                         timeZone: timeZoneClean,
                         checkInTime: settings.checkInTime,
-                        checkOutTime: settings.checkOutTime
+                        checkOutTime: settings.checkOutTime,
+                        settings: {
+                            ...settings,
+                            bankAccounts,
+                            posOutlets,
+                            contacts,
+                            emergencyLines,
+                            amenities,
+                            updatedAt: new Date().toISOString()
+                        }
                     })
                 });
 
