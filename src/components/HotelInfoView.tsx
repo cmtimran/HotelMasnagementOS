@@ -408,178 +408,195 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                 </div>
             )}
 
-            {/* 1. HERO PROPERTY BRAND HEADER */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                {/* Hero Banner Cover */}
-                <div className="h-28 sm:h-36 bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 relative px-6 py-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-white/90">
-                        <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-white/20 backdrop-blur-md border border-white/30 text-white tracking-wide uppercase">
-                                {targetProperty?.property_type || 'Luxury Resort & Hotel'}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/25 backdrop-blur-md text-emerald-300 border border-emerald-400/30">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                Live Operational
-                            </span>
-                        </div>
+            {/* 1. EXECUTIVE PROPERTY BRAND HERO CARD */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+                {/* Subtle Luxury Gradient Accent Line */}
+                <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-amber-500"></div>
 
-                        {/* Property Live Time Display */}
-                        <div className="flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 text-white text-xs font-mono">
-                            <Clock size={12} className="text-blue-300" />
-                            <span>{localTime}</span>
-                            <span className="text-[10px] text-white/70">({settings.timezone.split(' ')[0]})</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                        <div className="text-white">
-                            <p className="text-[11px] font-semibold text-white/75 tracking-wider uppercase">Enterprise Property Identity</p>
-                            <p className="text-xs text-white/90 font-mono mt-0.5">Property ID: #{propId} • Chain Node: {targetProperty?.organization_name || 'Central Chain HQ'}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Main Identity Ribbon */}
-                <div className="p-4 sm:p-5 pt-0 relative flex flex-col lg:flex-row lg:items-end justify-between gap-4 -mt-10 sm:-mt-12 border-b border-slate-100">
-                    <div className="flex items-end gap-3.5 sm:gap-4 min-w-0">
-                        {/* Logo Monogram */}
-                        <div className="size-20 sm:size-24 rounded-2xl bg-white p-1.5 shadow-md border border-slate-200 shrink-0">
-                            <div className="w-full h-full rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-2xl tracking-tight shadow-inner">
-                                {propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}
+                {/* Main Identity Area */}
+                <div className="p-5 sm:p-7">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                        {/* Left: Avatar + Identity */}
+                        <div className="flex items-start sm:items-center gap-4.5 min-w-0">
+                            {/* Modern Hotel Logo Monogram */}
+                            <div className="relative shrink-0">
+                                <div className="size-16 sm:size-20 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-2xl sm:text-3xl tracking-tight shadow-sm ring-4 ring-slate-100">
+                                    {propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}
+                                </div>
+                                <span className="absolute -bottom-1 -right-1 size-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Operating Property"></span>
                             </div>
-                        </div>
 
-                        <div className="min-w-0 pb-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+                            <div className="min-w-0 space-y-1.5">
+                                {/* Badge Row */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80">
+                                        <Star size={11} className="fill-amber-500 text-amber-500" />
+                                        <span>{propGrade}</span>
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold font-mono bg-slate-100 text-slate-700 border border-slate-200">
+                                        {propCode}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        Live Operational
+                                    </span>
+                                    <span className="text-xs text-slate-400 font-medium hidden sm:inline">•</span>
+                                    <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+                                        ID: #{propId} • {targetProperty?.organization_name || 'Grand Hospitality Group'}
+                                    </span>
+                                </div>
+
+                                {/* Hotel Name */}
+                                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
                                     {propName}
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                                    <Star size={12} fill="currentColor" />
-                                    <span>{propGrade}</span>
-                                </span>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0 font-mono">
-                                    {propCode}
-                                </span>
+
+                                {/* Contact & Location Strip */}
+                                <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500 pt-0.5 font-medium">
+                                    <span className="flex items-center gap-1.5">
+                                        <MapPin size={13.5} className="text-slate-400 shrink-0" />
+                                        <span className="truncate">{propAddress}, {propCity}, {propCountry}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Phone size={13.5} className="text-slate-400 shrink-0" />
+                                        <span>{propPhone}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Mail size={13.5} className="text-slate-400 shrink-0" />
+                                        <a href={`mailto:${propEmail}`} className="text-blue-600 hover:underline">{propEmail}</a>
+                                    </span>
+                                    {Boolean(settings.website) && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Globe size={13.5} className="text-slate-400 shrink-0" />
+                                            <a
+                                                href={settings.website.startsWith('http') ? settings.website : `https://${settings.website}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-slate-600 hover:text-blue-600 flex items-center gap-1"
+                                            >
+                                                <span>{settings.website}</span>
+                                                <ExternalLink size={10} />
+                                            </a>
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right: Live Clock & Actions */}
+                        <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end justify-between gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                            {/* Local Clock */}
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-mono shadow-2xs">
+                                <Clock size={13} className="text-blue-600" />
+                                <span className="font-bold text-slate-900">{localTime}</span>
+                                <span className="text-[10px] text-slate-400">({settings.timezone.split(' ')[0]})</span>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3.5 text-xs text-slate-500 mt-1.5 font-medium">
-                                <span className="flex items-center gap-1">
-                                    <MapPin size={13} className="text-slate-400" />
-                                    <span>{propAddress}, {propCity}, {propCountry}</span>
-                                </span>
-                                <span className="flex items-center gap-1">
-                                    <Phone size={13} className="text-slate-400" />
-                                    <span>{propPhone}</span>
-                                </span>
-                                <span className="flex items-center gap-1">
-                                    <Mail size={13} className="text-slate-400" />
-                                    <span className="text-blue-600">{propEmail}</span>
-                                </span>
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickEditOpen(true)}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                    title="Quick Edit Hotel Profile"
+                                >
+                                    <Edit2 size={13} />
+                                    <span>Quick Edit</span>
+                                </button>
+
+                                {onManageProperty && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onManageProperty(currentTabObj.manageTab)}
+                                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                        title="Open Multi-Step Setup Wizard"
+                                    >
+                                        <Building size={13} className="text-slate-500" />
+                                        <span>Advanced Setup</span>
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={handleCopyInfo}
+                                    className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    title="Copy Property Fact Sheet"
+                                >
+                                    {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} className="text-slate-400" />}
+                                    <span>{copied ? 'Copied' : 'Factsheet'}</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handlePrintFactSheet}
+                                    className="p-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                                    title="Print Property Sheet"
+                                >
+                                    <Printer size={14} className="text-slate-500" />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEmailModalOpen(true)}
+                                    className="p-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                                    title="Email Profile"
+                                >
+                                    <Mail size={14} className="text-slate-500" />
+                                </button>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap self-end">
-                        <button
-                            type="button"
-                            onClick={() => setIsQuickEditOpen(true)}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            title="Quick Edit Hotel Profile"
-                        >
-                            <Edit2 size={13} />
-                            <span>Quick Edit</span>
-                        </button>
-
-                        {onManageProperty && (
-                            <button
-                                type="button"
-                                onClick={() => onManageProperty(currentTabObj.manageTab)}
-                                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                                title="Open Multi-Step Setup Wizard"
-                            >
-                                <Building size={13} className="text-slate-400" />
-                                <span>Advanced Setup</span>
-                            </button>
-                        )}
-
-                        <button
-                            type="button"
-                            onClick={handleCopyInfo}
-                            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            title="Copy Formatted Property Fact Sheet"
-                        >
-                            {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} className="text-slate-400" />}
-                            <span>{copied ? 'Copied' : 'Factsheet'}</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={handlePrintFactSheet}
-                            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                            title="Print Property Sheet"
-                        >
-                            <Printer size={13} className="text-slate-400" />
-                            <span>Print</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setIsEmailModalOpen(true)}
-                            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                        >
-                            <Mail size={13} className="text-slate-400" />
-                            <span>Email</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Real Operational Stats Ribbon */}
-                <div className="bg-slate-50/70 px-4 py-2.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs border-b border-slate-200/80">
-                    <div className="flex items-center gap-2">
-                        <div className="size-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                            <BedDouble size={16} />
-                        </div>
-                        <div>
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Room Inventory</span>
-                            <span className="font-bold text-slate-900 font-mono">{propRooms} Physical Rooms</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <div className="size-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
-                            <Building2 size={16} />
-                        </div>
-                        <div>
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Premises Infrastructure</span>
-                            <span className="font-bold text-slate-900 font-mono">{propertyStats.totalBuildings} Wings • {propertyStats.totalFloors} Floors</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <div className="size-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                            <Clock size={16} />
-                        </div>
-                        <div>
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Standard Check-In / Out</span>
-                            <span className="font-bold text-slate-900 font-mono">{settings.checkInTime} In • {settings.checkOutTime} Out</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <div className="size-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                            <CreditCard size={16} />
-                        </div>
-                        <div>
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Currency & VAT</span>
-                            <span className="font-bold text-slate-900 font-mono">{propCurrency} (৳) • {settings.vatPercentage}% VAT</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Pill Tab Navigation Bar */}
-                <div className="px-4 bg-white border-t border-slate-100 flex items-center gap-1 overflow-x-auto scrollbar-none py-1.5">
+                {/* Modern Operational Stats Ribbon */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 bg-slate-50/50 border-t border-slate-100 text-xs">
+                    <div className="p-4 flex items-center gap-3.5">
+                        <div className="size-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                            <BedDouble size={18} />
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-medium text-slate-500">Physical Rooms</p>
+                            <p className="text-base font-bold text-slate-900 font-mono">{propRooms} Rooms</p>
+                            <p className="text-[10px] text-emerald-600 font-medium">100% Active in DB</p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 flex items-center gap-3.5">
+                        <div className="size-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
+                            <Building2 size={18} />
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-medium text-slate-500">Premises Layout</p>
+                            <p className="text-base font-bold text-slate-900 font-mono">{propertyStats.totalBuildings} Wings • {propertyStats.totalFloors} Floors</p>
+                            <p className="text-[10px] text-slate-500">Main Tower & Annex</p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 flex items-center gap-3.5">
+                        <div className="size-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                            <Clock size={18} />
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-medium text-slate-500">Check-In / Check-Out</p>
+                            <p className="text-base font-bold text-slate-900 font-mono">{settings.checkInTime} In • {settings.checkOutTime} Out</p>
+                            <p className="text-[10px] text-slate-500">Night Audit {settings.nightAuditTime}</p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 flex items-center gap-3.5">
+                        <div className="size-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                            <CreditCard size={18} />
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-medium text-slate-500">Tax & Currency</p>
+                            <p className="text-base font-bold text-slate-900 font-mono">{propCurrency} (৳) • {settings.vatPercentage}% VAT</p>
+                            <p className="text-[10px] text-slate-500">{settings.serviceChargePercentage}% Service Charge</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Pill Tab Navigation Bar - with hidden scrollbar and high-end styling */}
+                <div className="px-4 py-2 bg-white border-t border-slate-100 flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         const isSelected = activeTab === tab.id;
@@ -588,17 +605,17 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                 key={tab.id}
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+                                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
                                     isSelected
-                                        ? 'bg-blue-50 text-blue-700 shadow-2xs font-bold'
-                                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'
+                                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                                 }`}
                             >
-                                <Icon size={13} className={isSelected ? 'text-blue-600' : 'text-slate-400'} />
+                                <Icon size={14} className={isSelected ? 'text-white' : 'text-slate-400'} />
                                 <span>{tab.label}</span>
                                 {tab.badge !== undefined && tab.badge > 0 && (
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-                                        isSelected ? 'bg-blue-200 text-blue-900' : 'bg-slate-100 text-slate-600'
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                                        isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
                                     }`}>
                                         {tab.badge}
                                     </span>
@@ -609,43 +626,47 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                 </div>
             </div>
 
-            {/* 2. MAIN CONTENT TABS */}
-            <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/90 p-4 sm:p-5">
+            {/* 2. MAIN CONTENT TABS CONTAINER */}
+            <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-5 sm:p-7">
                 {/* 1. OVERVIEW TAB */}
                 {activeTab === 'overview' && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Left Column: Property & Regional Info */}
-                            <div className="space-y-4">
-                                <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80">
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/70">
-                                        <div className="flex items-center gap-2">
-                                            <div className="size-6 rounded bg-blue-100 text-blue-700 flex items-center justify-center">
-                                                <Building2 size={13} />
+                            <div className="space-y-5">
+                                <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-4">
+                                    <div className="flex items-center justify-between pb-3 border-b border-slate-200/60">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="size-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                                                <Building2 size={16} />
                                             </div>
-                                            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Corporate & Regional Identity</span>
+                                            <div>
+                                                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Corporate & Regional Identity</h3>
+                                                <p className="text-[11px] text-slate-400">Legal registration and geographical node</p>
+                                            </div>
                                         </div>
-                                        <span className="text-[11px] font-semibold text-blue-700">Est. {settings.establishedYear}</span>
+                                        <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60">Est. {settings.establishedYear}</span>
                                     </div>
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+
+                                    <div className="space-y-2.5 text-xs">
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                             <span className="text-slate-500 font-medium">Company / Legal Entity</span>
                                             <span className="font-semibold text-slate-900">{settings.legalEntity}</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                            <span className="text-slate-500 font-medium">Property Short Code</span>
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                            <span className="text-slate-500 font-medium">Property Code</span>
                                             <span className="font-mono font-bold text-blue-700 bg-white px-2 py-0.5 rounded border border-slate-200">{propCode}</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                             <span className="text-slate-500 font-medium">Street Address</span>
                                             <span className="font-semibold text-slate-900 text-right">{propAddress}</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                             <span className="text-slate-500 font-medium">City, Division & Country</span>
                                             <span className="font-semibold text-slate-900">{propCity}, {settings.stateProvince}, {propCountry}</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                            <span className="text-slate-500 font-medium">Time Zone & Formatting</span>
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                            <span className="text-slate-500 font-medium">Timezone & Format</span>
                                             <span className="font-semibold text-slate-900">{settings.timezone} • {settings.dateFormat}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-1">
@@ -656,39 +677,43 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                 </div>
 
                                 {/* Geographic Location & Transit Landmarks */}
-                                <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80">
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/70">
-                                        <div className="flex items-center gap-2">
-                                            <div className="size-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                                                <Compass size={13} />
+                                <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-4">
+                                    <div className="flex items-center justify-between pb-3 border-b border-slate-200/60">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="size-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                                                <Compass size={16} />
                                             </div>
-                                            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Location & Nearby Hubs</span>
+                                            <div>
+                                                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Location & Nearby Hubs</h3>
+                                                <p className="text-[11px] text-slate-400">Airport, railway station, and transit connectivity</p>
+                                            </div>
                                         </div>
                                         <a
                                             href={`https://www.google.com/maps/search/?api=1&query=${settings.latitude},${settings.longitude}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                                            className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs"
                                         >
-                                            <span>Open in Google Maps</span>
-                                            <ExternalLink size={10} />
+                                            <span>Open Maps</span>
+                                            <ExternalLink size={11} />
                                         </a>
                                     </div>
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+
+                                    <div className="space-y-2.5 text-xs">
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                             <span className="text-slate-500 font-medium">GPS Coordinates</span>
                                             <span className="font-mono font-semibold text-slate-800">{settings.latitude}° N, {settings.longitude}° E</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                            <span className="text-slate-500 font-medium">Nearest Airport</span>
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                            <span className="text-slate-500 font-medium">Nearest International Airport</span>
                                             <span className="font-semibold text-slate-800">{settings.airportProximity}</span>
                                         </div>
-                                        <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                            <span className="text-slate-500 font-medium">Railway Station / Hub</span>
+                                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                            <span className="text-slate-500 font-medium">Railway Station / Terminal</span>
                                             <span className="font-semibold text-slate-800">{settings.stationProximity}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-1">
-                                            <span className="text-slate-500 font-medium">Commercial / Diplomatic Zone</span>
+                                            <span className="text-slate-500 font-medium">Commercial & Diplomatic Zone</span>
                                             <span className="font-semibold text-emerald-700">{settings.diplomaticProximity}</span>
                                         </div>
                                     </div>
@@ -696,35 +721,38 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                             </div>
 
                             {/* Right Column: Web Booking Engine & Amenities */}
-                            <div className="space-y-4">
+                            <div className="space-y-5">
                                 {/* Direct Booking Engine Showcase */}
-                                <div className="bg-gradient-to-br from-blue-50/80 via-indigo-50/60 to-purple-50/60 rounded-xl p-4 border border-blue-200/70 flex items-center justify-between gap-3 shadow-2xs">
+                                <div className="bg-gradient-to-br from-blue-50/80 via-indigo-50/60 to-purple-50/60 rounded-xl p-5 border border-blue-200/70 flex items-center justify-between gap-4 shadow-2xs">
                                     <div className="space-y-1 min-w-0">
                                         <div className="flex items-center gap-2 text-blue-900 font-bold text-xs uppercase tracking-wider">
                                             <QrCode size={15} className="text-blue-600" />
                                             <span>Direct Booking Engine & Mobile Check-In</span>
                                         </div>
                                         <p className="text-xs text-blue-950 font-semibold truncate font-mono">{settings.bookingEngineUrl}</p>
-                                        <p className="text-[10.5px] text-blue-700">Guests can reserve rooms directly with zero OTA commission.</p>
+                                        <p className="text-[11px] text-blue-700">Guests can reserve rooms directly with zero OTA commission.</p>
                                     </div>
                                     <a
-                                        href={settings.bookingEngineUrl.startsWith('http') ? settings.bookingEngineUrl : `https://${settings.bookingEngineUrl}`}
+                                        href={(settings.bookingEngineUrl || '').startsWith('http') ? settings.bookingEngineUrl : `https://${settings.bookingEngineUrl || 'booking.hotel.com'}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-2xs shrink-0 flex items-center gap-1 transition-colors"
+                                        className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs shrink-0 flex items-center gap-1.5 transition-colors"
                                     >
                                         <span>Visit Portal</span>
-                                        <ExternalLink size={11} />
+                                        <ExternalLink size={12} />
                                     </a>
                                 </div>
 
                                 {/* Property Description */}
-                                <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80">
-                                    <div className="flex items-center gap-2 pb-2 mb-2 border-b border-slate-200/70">
-                                        <div className="size-6 rounded bg-purple-100 text-purple-700 flex items-center justify-center">
-                                            <Building2 size={13} />
+                                <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                    <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-200/60">
+                                        <div className="size-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
+                                            <Building2 size={16} />
                                         </div>
-                                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Property Overview & Concept</span>
+                                        <div>
+                                            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Property Overview & Concept</h3>
+                                            <p className="text-[11px] text-slate-400">Brand identity and guest experience positioning</p>
+                                        </div>
                                     </div>
                                     <p className="text-xs text-slate-600 leading-relaxed font-normal">
                                         {settings.description}
@@ -732,20 +760,29 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                 </div>
 
                                 {/* Active Hotel Amenities */}
-                                <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80">
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/70">
-                                        <div className="flex items-center gap-2">
-                                            <div className="size-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                                                <CheckCircle2 size={13} />
+                                <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="size-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                                                <CheckCircle2 size={16} />
                                             </div>
-                                            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Hotel Amenities & Guest Privileges</span>
+                                            <div>
+                                                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Hotel Amenities & Privileges</h3>
+                                                <p className="text-[11px] text-slate-400">{activeAmenitiesList.length} verified guest services active</p>
+                                            </div>
                                         </div>
-                                        <span className="text-[10.5px] text-slate-400 font-semibold">{activeAmenitiesList.length} Active</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsQuickEditOpen(true)}
+                                            className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
+                                        >
+                                            Manage
+                                        </button>
                                     </div>
-                                    <div className="flex flex-wrap gap-1.5">
+                                    <div className="flex flex-wrap gap-2">
                                         {activeAmenitiesList.map((feat) => (
-                                            <span key={feat} className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-medium text-slate-700 shadow-2xs flex items-center gap-1">
-                                                <Check size={11} className="text-emerald-600 stroke-[2.5]" />
+                                            <span key={feat} className="px-3 py-1.5 bg-white border border-slate-200/80 rounded-lg text-xs font-medium text-slate-700 shadow-2xs flex items-center gap-1.5">
+                                                <Check size={12} className="text-emerald-600 stroke-[2.5]" />
                                                 <span>{feat}</span>
                                             </span>
                                         ))}
@@ -758,68 +795,68 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 2. OPERATIONS TAB */}
                 {activeTab === 'operations' && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80">
+                    <div className="space-y-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70">
                                 <div className="flex items-center justify-between text-blue-600 mb-1">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Check-In Time</span>
-                                    <Clock size={14} />
+                                    <Clock size={15} />
                                 </div>
                                 <p className="text-2xl font-bold text-slate-900 font-mono leading-tight">{settings.checkInTime}</p>
-                                <p className="text-[10px] text-slate-400 mt-1">Standard Arrival Window</p>
+                                <p className="text-xs text-slate-500 mt-1">Standard Arrival Window</p>
                             </div>
 
-                            <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80">
+                            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70">
                                 <div className="flex items-center justify-between text-amber-600 mb-1">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Check-Out Time</span>
-                                    <Clock size={14} />
+                                    <Clock size={15} />
                                 </div>
                                 <p className="text-2xl font-bold text-slate-900 font-mono leading-tight">{settings.checkOutTime}</p>
-                                <p className="text-[10px] text-slate-400 mt-1">Standard Guest Departure</p>
+                                <p className="text-xs text-slate-500 mt-1">Standard Guest Departure</p>
                             </div>
 
-                            <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80">
+                            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70">
                                 <div className="flex items-center justify-between text-rose-600 mb-1">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hold Release Cutoff</span>
-                                    <Clock size={14} />
+                                    <Clock size={15} />
                                 </div>
                                 <p className="text-2xl font-bold text-slate-900 font-mono leading-tight">{settings.autoReleaseHour}</p>
-                                <p className="text-[10px] text-slate-400 mt-1">Non-Guaranteed Release</p>
+                                <p className="text-xs text-slate-500 mt-1">Non-Guaranteed Room Release</p>
                             </div>
 
-                            <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80">
+                            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70">
                                 <div className="flex items-center justify-between text-purple-600 mb-1">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Night Audit EOD</span>
-                                    <Moon size={14} />
+                                    <Moon size={15} />
                                 </div>
                                 <p className="text-2xl font-bold text-slate-900 font-mono leading-tight">{settings.nightAuditTime}</p>
-                                <p className="text-[10px] text-slate-400 mt-1">Daily Business Date Rollover</p>
+                                <p className="text-xs text-slate-500 mt-1">Daily Business Date Rollover</p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2 border-b border-slate-200/70">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2.5 border-b border-slate-200/60">
                                     Night Audit & Front Office Automation
                                 </span>
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                <div className="space-y-2.5 text-xs">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Auto-Post Room & Tax Charges</span>
                                         <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                                             {settings.autoPostRoomCharges ? 'Active (Automated)' : 'Manual Posting'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Auto-Advance Business Date</span>
                                         <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                                             {settings.autoAdvanceBusinessDate ? 'Enabled (+1 Day)' : 'Manual Rollover'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Weekend Tariff Schedule</span>
-                                        <div className="flex gap-1">
+                                        <div className="flex gap-1.5">
                                             {(settings.weekends || ['Friday', 'Saturday']).map((d: string) => (
-                                                <span key={d} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10.5px] font-semibold text-slate-700 shadow-2xs">
+                                                <span key={d} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-2xs">
                                                     {d}
                                                 </span>
                                             ))}
@@ -827,7 +864,7 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                     </div>
                                     <div className="flex items-center justify-between py-1">
                                         <span className="text-slate-500 font-medium">Electronic Door Lock System</span>
-                                        <span className="font-semibold text-blue-700 flex items-center gap-1 font-mono">
+                                        <span className="font-semibold text-blue-700 flex items-center gap-1.5 font-mono">
                                             <Lock size={12} />
                                             <span>{settings.keyCardSystem || 'VingCard / Assa Abloy Visionline'}</span>
                                         </span>
@@ -835,20 +872,20 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2 border-b border-slate-200/70">
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2.5 border-b border-slate-200/60">
                                     Guest House Rules & Policies
                                 </span>
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                <div className="space-y-2.5 text-xs">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Smoking Policy</span>
                                         <span className="font-semibold text-slate-800">{settings.smokingPolicyText}</span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Pet Policy</span>
                                         <span className="font-semibold text-slate-800">{settings.petPolicyText}</span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Visitor ID Requirement</span>
                                         <span className="font-semibold text-slate-800">{settings.visitorIdentityRule}</span>
                                     </div>
@@ -864,14 +901,14 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 3. POLICIES & GUARANTEES TAB */}
                 {activeTab === 'policies' && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <div className="flex items-center gap-1.5 text-rose-600 pb-1.5 border-b border-slate-200/70">
-                                    <Clock size={13} />
+                    <div className="space-y-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <div className="flex items-center gap-2 text-rose-600 pb-2 border-b border-slate-200/60">
+                                    <Clock size={15} />
                                     <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Cancellation & No-Show</span>
                                 </div>
-                                <div className="space-y-2 text-xs">
+                                <div className="space-y-2.5 text-xs">
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Standard Cancellation Rule</span>
                                         <p className="font-semibold text-slate-900 mt-0.5">{settings.cancellationRule}</p>
@@ -887,12 +924,12 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <div className="flex items-center gap-1.5 text-blue-600 pb-1.5 border-b border-slate-200/70">
-                                    <Briefcase size={13} />
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <div className="flex items-center gap-2 text-blue-600 pb-2 border-b border-slate-200/60">
+                                    <Briefcase size={15} />
                                     <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Corporate & Travel Agency Terms</span>
                                 </div>
-                                <div className="space-y-2 text-xs">
+                                <div className="space-y-2.5 text-xs">
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">City Ledger Credit Limit</span>
                                         <p className="font-semibold text-slate-900 mt-0.5">৳ {Number(settings.cityLedgerLimitBDT || 500000).toLocaleString()}</p>
@@ -908,12 +945,12 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <div className="flex items-center gap-1.5 text-amber-600 pb-1.5 border-b border-slate-200/70">
-                                    <Building2 size={13} />
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <div className="flex items-center gap-2 text-amber-600 pb-2 border-b border-slate-200/60">
+                                    <Building2 size={15} />
                                     <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Groups & Overbooking Policy</span>
                                 </div>
-                                <div className="space-y-2 text-xs">
+                                <div className="space-y-2.5 text-xs">
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Group Booking Threshold</span>
                                         <p className="font-semibold text-slate-900 mt-0.5">{settings.groupDefinitionRooms || 5}+ Rooms constitutes a group</p>
@@ -936,85 +973,103 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 4. FINANCE, TAX & BANKING TAB */}
                 {activeTab === 'finance' && (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {/* Statutory Licenses & Compliance */}
-                        <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2.5">
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
-                                <div className="flex items-center gap-2">
-                                    <div className="size-6 rounded bg-blue-100 text-blue-700 flex items-center justify-center">
-                                        <FileCheck size={13} />
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="size-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                                        <FileCheck size={16} />
                                     </div>
-                                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Statutory Tax & Regulatory Registration</span>
+                                    <div>
+                                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Statutory Tax & Regulatory Registration</h3>
+                                        <p className="text-[11px] text-slate-400">National Board of Revenue (NBR) & Municipal Licenses</p>
+                                    </div>
                                 </div>
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                     NBR COMPLIANT
                                 </span>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                                <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs">
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                                <div className="p-4 bg-slate-50/50 border border-slate-200/70 rounded-xl space-y-1">
                                     <span className="text-[10px] text-slate-400 uppercase font-bold block">VAT Registration (BIN)</span>
-                                    <span className="font-mono font-bold text-slate-900 text-sm">{settings.taxIdNumber || '001294819-0101'}</span>
-                                    <span className="text-[10px] text-emerald-600 block mt-1 font-semibold">Mushak-6.3 Electronic Billing</span>
+                                    <span className="font-mono font-bold text-slate-900 text-sm block">{settings.taxIdNumber || '001294819-0101'}</span>
+                                    <span className="text-xs text-emerald-600 block font-medium">Mushak-6.3 Electronic Billing</span>
                                 </div>
-                                <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs">
+                                <div className="p-4 bg-slate-50/50 border border-slate-200/70 rounded-xl space-y-1">
                                     <span className="text-[10px] text-slate-400 uppercase font-bold block">Municipal Trade License</span>
-                                    <span className="font-mono font-bold text-slate-900 text-sm">{settings.tradeLicenseNo || 'TL-DNCC-2026-9941'}</span>
-                                    <span className="text-[10px] text-blue-600 block mt-1 font-semibold">Valid till: {settings.tradeLicenseExpiry || '30 Jun 2027'}</span>
+                                    <span className="font-mono font-bold text-slate-900 text-sm block">{settings.tradeLicenseNo || 'TL-DNCC-2026-9941'}</span>
+                                    <span className="text-xs text-blue-600 block font-medium">Valid till: {settings.tradeLicenseExpiry || '30 Jun 2027'}</span>
                                 </div>
-                                <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs">
+                                <div className="p-4 bg-slate-50/50 border border-slate-200/70 rounded-xl space-y-1">
                                     <span className="text-[10px] text-slate-400 uppercase font-bold block">Civil Defense & Fire Safety</span>
-                                    <span className="font-mono font-bold text-slate-900 text-sm">{settings.fireSafetyCertNo || 'FS-DHK-2025-441'}</span>
-                                    <span className="text-[10px] text-emerald-600 block mt-1 font-semibold">Inspected & Certified</span>
+                                    <span className="font-mono font-bold text-slate-900 text-sm block">{settings.fireSafetyCertNo || 'FS-DHK-2025-441'}</span>
+                                    <span className="text-xs text-emerald-600 block font-medium">Inspected & Certified</span>
                                 </div>
-                                <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs">
+                                <div className="p-4 bg-slate-50/50 border border-slate-200/70 rounded-xl space-y-1">
                                     <span className="text-[10px] text-slate-400 uppercase font-bold block">Police Special Branch (C-Form)</span>
-                                    <span className="font-mono font-bold text-slate-900 text-sm">{settings.policeCFormId || 'SB-CF-GPD-881'}</span>
-                                    <span className="text-[10px] text-emerald-600 block mt-1 font-semibold">Foreign Guest Portal Active</span>
+                                    <span className="font-mono font-bold text-slate-900 text-sm block">{settings.policeCFormId || 'SB-CF-GPD-881'}</span>
+                                    <span className="text-xs text-emerald-600 block font-medium">Foreign Guest Portal Active</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Designated Bank Accounts with Add Action */}
-                        <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-3">
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
-                                <div className="flex items-center gap-2">
-                                    <div className="size-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                                        <Building2 size={13} />
+                        {/* Designated Bank Accounts */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="size-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                                        <CreditCard size={16} />
                                     </div>
-                                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Designated Bank Accounts & Settlement Lines</span>
+                                    <div>
+                                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Designated Bank Accounts & Settlement Lines</h3>
+                                        <p className="text-[11px] text-slate-400">Printed on guest folios, proforma bills, and corporate BTC invoices</p>
+                                    </div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setIsAddBankModalOpen(true)}
-                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                                 >
-                                    <Plus size={12} />
+                                    <Plus size={13} />
                                     <span>Add Bank Account</span>
                                 </button>
                             </div>
 
                             {bankAccounts.length === 0 ? (
-                                <div className="p-6 text-center bg-white rounded-xl border border-dashed border-slate-300">
-                                    <CreditCard size={28} className="mx-auto text-slate-300 mb-2" />
-                                    <p className="text-xs font-semibold text-slate-700">No bank accounts configured for this property yet</p>
-                                    <p className="text-[11px] text-slate-400 mt-0.5">Add designated bank lines to display on guest folios and B2B corporate invoices.</p>
+                                <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-300">
+                                    <CreditCard size={32} className="mx-auto text-slate-300 mb-2" />
+                                    <h4 className="text-xs font-bold text-slate-800">No Bank Accounts Configured</h4>
+                                    <p className="text-xs text-slate-400 mt-0.5 max-w-sm mx-auto">
+                                        Add designated settlement bank lines to display on invoices and guest folios.
+                                    </p>
                                     <button
                                         type="button"
                                         onClick={() => setIsAddBankModalOpen(true)}
-                                        className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                                        className="mt-3 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
                                     >
-                                        <Plus size={12} />
+                                        <Plus size={13} />
                                         <span>Add First Bank Account</span>
                                     </button>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {bankAccounts.map((acc) => (
-                                        <div key={acc.id} className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs flex justify-between items-center group">
-                                            <div className="min-w-0 pr-2">
-                                                <p className="font-bold text-slate-900 text-xs truncate leading-tight">{acc.bankName}</p>
-                                                <p className="text-[11px] text-slate-500 font-mono mt-0.5 truncate">{acc.accountNum}</p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5">{acc.accountName} {acc.swift ? `• SWIFT: ${acc.swift}` : ''}</p>
+                                        <div key={acc.id} className="p-4 bg-white border border-slate-200/90 rounded-xl shadow-2xs flex justify-between items-start hover:border-blue-300 transition-colors">
+                                            <div className="space-y-1 min-w-0 pr-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="size-6 rounded-md bg-blue-50 text-blue-700 text-xs font-bold flex items-center justify-center shrink-0">
+                                                        {acc.bankName.slice(0, 2).toUpperCase()}
+                                                    </span>
+                                                    <p className="font-bold text-slate-900 text-xs truncate leading-tight">{acc.bankName}</p>
+                                                </div>
+                                                <p className="text-xs text-slate-800 font-mono font-bold pt-1">{acc.accountNum}</p>
+                                                <p className="text-[11px] text-slate-500">{acc.accountName}</p>
+                                                <div className="flex flex-wrap gap-2 text-[10px] text-slate-400 font-mono pt-1">
+                                                    {acc.routingNo && <span>Routing: {acc.routingNo}</span>}
+                                                    {acc.swift && <span>SWIFT: {acc.swift}</span>}
+                                                </div>
                                             </div>
                                             <button
                                                 type="button"
@@ -1022,7 +1077,7 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                                 className="text-slate-300 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
                                                 title="Remove Account"
                                             >
-                                                <Trash2 size={13} />
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                     ))}
@@ -1031,32 +1086,35 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                         </div>
 
                         {/* Recent Folio Settlements Audit Trail */}
-                        <div>
-                            <div className="flex items-center justify-between pb-2 mb-1.5">
-                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Recent Operational Settlements Audit Trail</span>
-                                <span className="text-[11px] text-slate-400 font-mono">{transactions.length} Recorded Transactions</span>
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                                <div>
+                                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Recent Operational Settlements Audit Trail</h3>
+                                    <p className="text-[11px] text-slate-400">Live transaction settlements from front desk checkout folios</p>
+                                </div>
+                                <span className="text-xs text-slate-500 font-mono">{transactions.length} Transactions</span>
                             </div>
-                            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                            <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white shadow-2xs">
                                 <table className="w-full text-xs text-left">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-[10.5px] text-slate-500 font-bold uppercase tracking-wider">
+                                    <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[10.5px] text-slate-500 font-bold uppercase tracking-wider">
                                         <tr>
-                                            <th className="px-3.5 py-2.5">Voucher / ID</th>
-                                            <th className="px-3.5 py-2.5">Date</th>
-                                            <th className="px-3.5 py-2.5">Description</th>
-                                            <th className="px-3.5 py-2.5 text-right">Amount</th>
-                                            <th className="px-3.5 py-2.5 text-center">Status</th>
+                                            <th className="px-4 py-3">Voucher / ID</th>
+                                            <th className="px-4 py-3">Date</th>
+                                            <th className="px-4 py-3">Description</th>
+                                            <th className="px-4 py-3 text-right">Amount</th>
+                                            <th className="px-4 py-3 text-center">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {transactions.map(txn => (
                                             <tr key={txn.id} className="hover:bg-blue-50/30 transition-colors">
-                                                <td className="px-3.5 py-2 font-mono text-slate-500 text-[11px]">{txn.id}</td>
-                                                <td className="px-3.5 py-2 text-slate-800 text-[11px]">{txn.date}</td>
-                                                <td className="px-3.5 py-2 text-slate-900 font-medium text-xs">{txn.desc}</td>
-                                                <td className={`px-3.5 py-2 text-right font-bold font-mono text-xs ${txn.type === 'credit' ? 'text-emerald-600' : 'text-slate-800'}`}>
+                                                <td className="px-4 py-2.5 font-mono text-slate-500 text-[11px]">{txn.id}</td>
+                                                <td className="px-4 py-2.5 text-slate-700 text-[11px]">{txn.date}</td>
+                                                <td className="px-4 py-2.5 text-slate-900 font-medium text-xs">{txn.desc}</td>
+                                                <td className={`px-4 py-2.5 text-right font-bold font-mono text-xs ${txn.type === 'credit' ? 'text-emerald-600' : 'text-slate-800'}`}>
                                                     {txn.type === 'credit' ? '+' : ''}৳ {Math.abs(txn.amount).toLocaleString()}
                                                 </td>
-                                                <td className="px-3.5 py-2 text-center">
+                                                <td className="px-4 py-2.5 text-center">
                                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                                                         txn.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
                                                     }`}>
@@ -1074,16 +1132,16 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 5. OUTLETS & POS TAB */}
                 {activeTab === 'outlets' && (
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                             <div>
                                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Revenue Outlets & Point of Sale Terminals</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Dining rooms, banquet halls, rooftop lounges and wellness spa stations</p>
+                                <p className="text-[11px] text-slate-400">Dining rooms, banquet halls, rooftop lounges and wellness spa stations</p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsAddOutletModalOpen(true)}
-                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                             >
                                 <Plus size={13} />
                                 <span>Add New Outlet</span>
@@ -1094,22 +1152,22 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                             <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-300">
                                 <Utensils size={32} className="mx-auto text-slate-300 mb-2" />
                                 <h4 className="text-xs font-bold text-slate-800">No Food & Beverage Outlets Configured</h4>
-                                <p className="text-[11px] text-slate-400 mt-0.5 max-w-md mx-auto">
+                                <p className="text-xs text-slate-400 mt-0.5 max-w-md mx-auto">
                                     Configure restaurant dining rooms, rooftop cafes, or banquet halls for automatic KOT generation and room charge folio postings.
                                 </p>
                                 <button
                                     type="button"
                                     onClick={() => setIsAddOutletModalOpen(true)}
-                                    className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                                    className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
                                 >
-                                    <Plus size={12} />
+                                    <Plus size={13} />
                                     <span>Create First Outlet</span>
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {posOutlets.map((outlet) => (
-                                    <div key={outlet.id} className="p-3.5 bg-slate-50/60 rounded-xl border border-slate-200/80 space-y-2.5 hover:border-blue-300 transition-colors shadow-2xs">
+                                    <div key={outlet.id} className="p-4 bg-slate-50/50 rounded-xl border border-slate-200/80 space-y-3 hover:border-blue-300 transition-colors shadow-2xs">
                                         <div className="flex items-center justify-between">
                                             <div className="size-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
                                                 <Utensils size={15} />
@@ -1155,20 +1213,20 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 6. CHANNELS & GDS TAB */}
                 {activeTab === 'distribution' && (
-                    <div className="space-y-4">
-                        <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                            <div className="flex items-center gap-3">
+                    <div className="space-y-5">
+                        <div className="bg-slate-50/60 p-5 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+                            <div className="flex items-center gap-3.5">
                                 <div className="size-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
                                     <Activity size={20} className="animate-pulse" />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-slate-900 text-sm">{settings.channelManager || 'SiteMinder / RateGain 2-Way Channel Gateway'}</h3>
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                             LIVE 2-WAY SYNC
                                         </span>
                                     </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                    <p className="text-xs text-slate-500 mt-0.5">
                                         Real-time room inventory, ARI updates, and OTA reservation delivery connected.
                                     </p>
                                 </div>
@@ -1176,48 +1234,48 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                         </div>
 
                         {/* GDS Identity Codes */}
-                        <div className="bg-slate-50/60 p-3.5 rounded-xl border border-slate-200/80 space-y-2">
-                            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">Global Distribution System (GDS) Credentials</span>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Global Distribution System (GDS) Credentials</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 {[
                                     { name: 'Amadeus GDS', code: settings.gdsAmadeus || '1A-DHK-992' },
                                     { name: 'Sabre GDS', code: settings.gdsSabre || 'AA-GPD-441' },
                                     { name: 'Galileo / Travelport', code: settings.gdsGalileo || '1G-77491-01' },
                                     { name: 'Worldspan GDS', code: settings.gdsWorldspan || '1P-DH01-12' },
                                 ].map((gds) => (
-                                    <div key={gds.name} className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs">
-                                        <span className="text-[10px] text-slate-400 font-medium block">{gds.name}</span>
-                                        <span className="font-mono font-bold text-slate-900 text-xs mt-0.5 block">{gds.code}</span>
+                                    <div key={gds.name} className="p-4 bg-slate-50/50 border border-slate-200/70 rounded-xl">
+                                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">{gds.name}</span>
+                                        <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{gds.code}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
                         {/* Connected OTA Channels Table */}
-                        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-                            <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white shadow-2xs space-y-0">
+                            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex justify-between items-center">
                                 <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Online Travel Agencies (OTA Integration Status)</span>
-                                <span className="text-[11px] text-slate-400 font-mono">5 Active Feeds</span>
+                                <span className="text-xs text-slate-500 font-mono">5 Active Feeds</span>
                             </div>
                             <table className="w-full text-xs text-left">
                                 <thead className="bg-slate-50/50 border-b border-slate-100 text-[10px] text-slate-500 uppercase font-bold">
                                     <tr>
-                                        <th className="px-3.5 py-2.5">Channel Provider</th>
-                                        <th className="px-3.5 py-2.5">Hotel Account ID</th>
-                                        <th className="px-3.5 py-2.5">Sync Protocol</th>
-                                        <th className="px-3.5 py-2.5">Average Latency</th>
-                                        <th className="px-3.5 py-2.5 text-center">Status</th>
+                                        <th className="px-4 py-3">Channel Provider</th>
+                                        <th className="px-4 py-3">Hotel Account ID</th>
+                                        <th className="px-4 py-3">Sync Protocol</th>
+                                        <th className="px-4 py-3">Average Latency</th>
+                                        <th className="px-4 py-3 text-center">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {distributionChannels.map((ch) => (
                                         <tr key={ch.code} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-3.5 py-2.5 font-semibold text-slate-900">{ch.name}</td>
-                                            <td className="px-3.5 py-2.5 font-mono text-slate-500 text-[11px]">{ch.code}</td>
-                                            <td className="px-3.5 py-2.5 text-slate-600">{ch.syncStatus}</td>
-                                            <td className="px-3.5 py-2.5 font-mono text-slate-500 text-[11px]">{ch.ping}</td>
-                                            <td className="px-3.5 py-2.5 text-center">
-                                                <span className="px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <td className="px-4 py-3 font-semibold text-slate-900">{ch.name}</td>
+                                            <td className="px-4 py-3 font-mono text-slate-500 text-[11px]">{ch.code}</td>
+                                            <td className="px-4 py-3 text-slate-600">{ch.syncStatus}</td>
+                                            <td className="px-4 py-3 font-mono text-slate-500 text-[11px]">{ch.ping}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                     {ch.status}
                                                 </span>
                                             </td>
@@ -1231,31 +1289,35 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 7. MANAGEMENT & SAFETY TAB */}
                 {activeTab === 'team' && (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {/* 24/7 Emergency Hotlines */}
-                        <div className="bg-rose-50/40 rounded-xl p-3.5 border border-rose-200/70 space-y-2.5">
-                            <div className="flex items-center justify-between pb-2 border-b border-rose-200/60">
-                                <div className="flex items-center gap-2">
-                                    <div className="size-6 rounded bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
-                                        <ShieldAlert size={14} />
+                        <div className="bg-rose-50/40 rounded-xl p-5 border border-rose-200/70 space-y-3">
+                            <div className="flex items-center justify-between pb-2.5 border-b border-rose-200/60">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="size-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                                        <ShieldAlert size={16} />
                                     </div>
-                                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">24/7 Emergency & Safety Hotlines</span>
+                                    <div>
+                                        <h3 className="text-xs font-bold text-rose-950 uppercase tracking-wider">24/7 Rapid Emergency Response Directory</h3>
+                                        <p className="text-[11px] text-rose-700">Immediate access numbers for guest safety, police, and medical personnel</p>
+                                    </div>
                                 </div>
-                                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                                    PRIORITY ASSISTANCE
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                    HOTLINES ACTIVE
                                 </span>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                                 {[
                                     { label: 'House Doctor (24/7)', name: 'Medical Duty Officer', phone: '+880 1711 999111' },
                                     { label: 'Hospital Emergency ER', name: 'United Hospital ER', phone: '+880 2 8836000' },
                                     { label: 'Police Control Room', name: 'Gulshan Thana Duty', phone: '+880 2 9885566' },
                                     { label: 'National Fire & Rescue', name: 'Fire Service Dispatch (999)', phone: '999' }
                                 ].map((line, idx) => (
-                                    <div key={idx} className="p-3 bg-white border border-rose-100 rounded-xl shadow-2xs">
+                                    <div key={idx} className="p-3.5 bg-white border border-rose-100 rounded-xl shadow-2xs">
                                         <span className="text-[10px] text-slate-400 uppercase font-bold block">{line.label}</span>
                                         <span className="font-bold text-slate-900 text-xs block mt-0.5">{line.name}</span>
-                                        <span className="font-mono text-rose-600 font-bold text-[11.5px] mt-0.5 block">{line.phone}</span>
+                                        <span className="font-mono text-rose-600 font-bold text-xs mt-0.5 block">{line.phone}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1263,15 +1325,15 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                         {/* Key Department Heads */}
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Hotel Management Team (Department Heads)</h4>
-                                    <p className="text-[11px] text-slate-400 mt-0.5">Primary points of contact for corporate accounts, vendors, and VIP guests</p>
+                                    <p className="text-[11px] text-slate-400">Primary points of contact for corporate accounts, vendors, and VIP guests</p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setIsAddContactModalOpen(true)}
-                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                                 >
                                     <Plus size={13} />
                                     <span>Add Department Head</span>
@@ -1279,37 +1341,39 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                             </div>
 
                             {contacts.length === 0 ? (
-                                <div className="p-6 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-300">
-                                    <User size={28} className="mx-auto text-slate-300 mb-2" />
-                                    <p className="text-xs font-semibold text-slate-700">No department heads registered yet</p>
-                                    <p className="text-[11px] text-slate-400 mt-0.5">Register key personnel (General Manager, Front Office Manager, Housekeeper) for guest escalations.</p>
+                                <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-300">
+                                    <User size={32} className="mx-auto text-slate-300 mb-2" />
+                                    <h4 className="text-xs font-bold text-slate-800">No Department Heads Registered</h4>
+                                    <p className="text-xs text-slate-400 mt-0.5 max-w-sm mx-auto">
+                                        Register key personnel (General Manager, Front Office Manager, Housekeeper) for guest escalations.
+                                    </p>
                                     <button
                                         type="button"
                                         onClick={() => setIsAddContactModalOpen(true)}
-                                        className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                                        className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
                                     >
-                                        <Plus size={12} />
+                                        <Plus size={13} />
                                         <span>Add First Contact</span>
                                     </button>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {contacts.map((poc) => (
-                                        <div key={poc.id} className="p-3.5 border border-slate-200 rounded-xl flex items-center justify-between gap-3 bg-white shadow-2xs hover:border-blue-300 transition-colors">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="size-10 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs shrink-0">
+                                        <div key={poc.id} className="p-4 border border-slate-200/90 rounded-xl flex items-center justify-between gap-3 bg-white shadow-2xs hover:border-blue-300 transition-colors">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="size-11 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
                                                     {poc.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'HM'}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="font-bold text-slate-900 text-xs truncate leading-tight">{poc.name}</p>
                                                     <p className="text-blue-600 text-[10.5px] font-semibold uppercase tracking-wide leading-none mt-0.5">{poc.role}</p>
-                                                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 mt-1">
+                                                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                                                         <span className="flex items-center gap-1 font-mono">
-                                                            <Phone size={10} className="text-slate-400" />
+                                                            <Phone size={11} className="text-slate-400" />
                                                             <span>{poc.phone}</span>
                                                         </span>
                                                         <span className="flex items-center gap-1">
-                                                            <Mail size={10} className="text-slate-400" />
+                                                            <Mail size={11} className="text-slate-400" />
                                                             <span className="text-slate-600">{poc.email}</span>
                                                         </span>
                                                     </div>
@@ -1321,7 +1385,7 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                                 className="text-slate-300 hover:text-rose-600 p-1 transition-colors cursor-pointer"
                                                 title="Remove Contact"
                                             >
-                                                <Trash2 size={13} />
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                     ))}
@@ -1333,48 +1397,86 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 8. FOLIO & NUMBERING TAB */}
                 {activeTab === 'numbering' && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                            {[
-                                { label: 'Reservation Prefix', value: `${settings.reservationPrefix || 'RES-'}1001` },
-                                { label: 'Tax Invoice Prefix', value: `${settings.invoicePrefix || 'INV-'}1001` },
-                                { label: 'Guest Folio Prefix', value: `${settings.folioPrefix || 'FOL-'}1001` },
-                                { label: 'Restaurant KOT Prefix', value: `${settings.kotPrefix || 'KOT-'}5001` },
-                                { label: 'Money Receipt Prefix', value: `${settings.receiptPrefix || 'REC-'}2001` },
-                            ].map((doc) => (
-                                <div key={doc.label} className="bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{doc.label}</span>
-                                    <span className="font-mono font-bold text-blue-700 text-sm mt-1 block">{doc.value}</span>
+                    <div className="space-y-6">
+                        {/* Section Header */}
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="size-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                                    <Receipt size={16} />
                                 </div>
-                            ))}
+                                <div>
+                                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Document Numbering & Guest Folio Print Setup</h3>
+                                    <p className="text-[11px] text-slate-400">Prefix rules, continuous sequences, and guest invoice formatting</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsQuickEditOpen(true)}
+                                className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            >
+                                <Edit2 size={12} className="text-slate-400" />
+                                <span>Edit Numbering</span>
+                            </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2 border-b border-slate-200/70">
-                                    Document Numbering Preferences
+                        {/* Prefix Cards Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                            {[
+                                { label: 'Reservation Prefix', prefix: settings.reservationPrefix || 'RES-', example: 'RES-2026-1001', icon: Clock },
+                                { label: 'Tax Invoice Prefix', prefix: settings.invoicePrefix || 'INV-', example: 'INV-2026-1001', icon: Receipt },
+                                { label: 'Guest Folio Prefix', prefix: settings.folioPrefix || 'FOL-', example: 'FOL-1001', icon: FileCheck },
+                                { label: 'Restaurant KOT', prefix: settings.kotPrefix || 'KOT-', example: 'KOT-5001', icon: Utensils },
+                                { label: 'Money Receipt', prefix: settings.receiptPrefix || 'REC-', example: 'RCT-2001', icon: CreditCard },
+                            ].map((doc) => {
+                                const DocIcon = doc.icon;
+                                return (
+                                    <div key={doc.label} className="bg-slate-50/60 hover:bg-slate-50 p-4 rounded-xl border border-slate-200/70 space-y-2 transition-colors">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{doc.label}</span>
+                                            <DocIcon size={14} className="text-blue-600" />
+                                        </div>
+                                        <p className="font-mono font-extrabold text-blue-700 text-base">{doc.example}</p>
+                                        <p className="text-[10px] text-slate-400 font-mono">Format: {doc.prefix}####</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Preferences and Invoice Terms */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2.5 border-b border-slate-200/60">
+                                    Numbering & Print Preferences
                                 </span>
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                        <span className="text-slate-500 font-medium">Reset Sequence Annually</span>
+                                <div className="space-y-3 text-xs">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                        <span className="text-slate-500 font-medium">Reset Sequence Numbers Annually</span>
                                         <span className="font-semibold text-emerald-700">{settings.resetAnnually ? 'Enabled (Fiscal Year)' : 'Continuous Running Sequence'}</span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                        <span className="text-slate-500 font-medium">Mushak-6.3 Itemized VAT Print</span>
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                        <span className="text-slate-500 font-medium">Show Itemized VAT & Service Charge Breakdown</span>
                                         <span className="font-semibold text-emerald-700">Yes ({settings.vatPercentage}% VAT + {settings.serviceChargePercentage}% SC)</span>
                                     </div>
                                     <div className="flex items-center justify-between py-1">
-                                        <span className="text-slate-500 font-medium">Automatic Checkout e-Invoice Email</span>
-                                        <span className="font-semibold text-emerald-700">{settings.enableCheckoutFolioEmail ? 'Active' : 'Disabled'}</span>
+                                        <span className="text-slate-500 font-medium">Send Checkout Folio e-Invoice</span>
+                                        <span className="font-semibold text-emerald-700">{settings.enableCheckoutFolioEmail ? 'Enabled' : 'Disabled'}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2 border-b border-slate-200/70">
-                                    Invoice Terms & Legal Clause
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block pb-2.5 border-b border-slate-200/60">
+                                    Invoice Footer & Terms Clause
                                 </span>
-                                <p className="text-xs text-slate-600 leading-relaxed">{settings.invoiceNotes || 'Thank you for choosing Grand Palace Hotel. All bills are subject to 15% VAT and 10% Service Charge as per Bangladesh Government hospitality regulations.'}</p>
+                                <div className="p-3.5 bg-white border border-slate-200/80 rounded-xl space-y-2">
+                                    <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                                        {settings.invoiceNotes || 'All bills are payable upon presentation at checkout. Government VAT (15%) and Service Charge (10%) apply as per regulations.'}
+                                    </p>
+                                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                                        <span>Printed at reception checkout</span>
+                                        <span className="font-mono">Mushak-6.3 Compliant</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1382,52 +1484,52 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* 9. SECURITY & BACKUP TAB */}
                 {activeTab === 'automation' && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200/70">
-                                    <div className="size-6 rounded bg-blue-100 text-blue-700 flex items-center justify-center">
-                                        <Mail size={13} />
+                    <div className="space-y-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-200/60">
+                                    <div className="size-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                                        <Mail size={16} />
                                     </div>
-                                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Email (SMTP) & SMS Delivery Gateway</span>
+                                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Email (SMTP) & Delivery Gateway</span>
                                 </div>
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                        <span className="text-slate-500 font-medium">SMTP Server</span>
+                                <div className="space-y-2.5 text-xs">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                        <span className="text-slate-500 font-medium">SMTP Server Host</span>
                                         <span className="font-mono font-semibold text-slate-800">{settings.smtpHost || 'smtp.sendgrid.net'}:{settings.smtpPort || '587'}</span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Sender Display Name</span>
                                         <span className="font-semibold text-slate-800">{settings.senderName || propName}</span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                        <span className="text-slate-500 font-medium">SMS Gateway Provider</span>
-                                        <span className="font-semibold text-slate-800">{settings.smsGatewayProvider || 'Banglalink / Robi Enterprise SMS'}</span>
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                        <span className="text-slate-500 font-medium">Outbound Security</span>
+                                        <span className="font-semibold text-emerald-700">STARTTLS Encrypted (TLS 1.3)</span>
                                     </div>
                                     <div className="flex items-center justify-between py-1">
-                                        <span className="text-slate-500 font-medium">Automated Messaging</span>
-                                        <span className="font-semibold text-emerald-700">Welcome SMS, WhatsApp Concierge, Checkout Folio</span>
+                                        <span className="text-slate-500 font-medium">SMS Confirmation Gateway</span>
+                                        <span className="font-semibold text-blue-700">Twilio / Infobip SMS Active</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50/60 rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200/70">
-                                    <div className="size-6 rounded bg-purple-100 text-purple-700 flex items-center justify-center">
-                                        <Database size={13} />
+                            <div className="bg-slate-50/40 rounded-xl p-5 border border-slate-200/70 space-y-3">
+                                <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-200/60">
+                                    <div className="size-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
+                                        <Database size={16} />
                                     </div>
                                     <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Database Security & Cloud Replication</span>
                                 </div>
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                                        <span className="text-slate-500 font-medium">Cloud PostgreSQL High Availability</span>
+                                <div className="space-y-2.5 text-xs">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                                        <span className="text-slate-500 font-medium">Cloud High Availability</span>
                                         <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">TiDB Cloud Active (3-Zone Sync)</span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Automatic Snapshot Frequency</span>
                                         <span className="font-semibold text-slate-800">Every 6 Hours (Continuous WAL)</span>
                                     </div>
-                                    <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
+                                    <div className="flex items-center justify-between py-1 border-b border-slate-100">
                                         <span className="text-slate-500 font-medium">Data Retention Policy</span>
                                         <span className="font-semibold text-slate-800">7 Years (NBR Tax Audit Compliant)</span>
                                     </div>
