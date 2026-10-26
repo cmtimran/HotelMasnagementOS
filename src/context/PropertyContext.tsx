@@ -129,13 +129,18 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setActivePropertyIdState(id);
         if (typeof window !== 'undefined') {
             localStorage.setItem('hotel_active_property_id', String(id));
-            window.dispatchEvent(new CustomEvent('hotel_property_switched', { detail: { propertyId: id } }));
+            const targetProp = properties.find(p => p.id === id);
+            const tenantSlug = targetProp?.code?.toLowerCase() === 'gor' || (targetProp?.name && targetProp.name.toLowerCase().includes('cox'))
+                ? 'cox-bazar-sea-resort'
+                : 'grand-palace';
+            localStorage.setItem('hotel_active_tenant_slug', tenantSlug);
+            window.dispatchEvent(new CustomEvent('hotel_property_switched', { detail: { propertyId: id, tenantSlug } }));
         }
         // Automatically sync room inventory and room types for the active hotel
         syncRoomTypesAndRoomsFromDB(id).catch(err => {
             console.warn('Could not sync rooms for switched property:', err);
         });
-    }, []);
+    }, [properties]);
 
     const activeProperty = properties.find(p => p.id === activePropertyId) || properties[0] || DEFAULT_PROPERTIES[0];
 

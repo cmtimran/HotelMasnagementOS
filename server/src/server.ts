@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRouter from './routes/index.js';
 import { authMiddleware } from './middleware/authMiddleware.js';
+import { tenantMiddleware } from './middleware/tenantMiddleware.js';
 import { initDatabase } from './database/db.js';
 import { initPostgres } from './database/postgres.js';
 import { initRedis } from './services/redis.service.js';
@@ -47,6 +48,9 @@ app.use(express.json());
 
 // Enterprise Auth Middleware
 app.use(authMiddleware);
+
+// Multi-Tenant Isolation Middleware (Routes queries to dedicated tenant databases)
+app.use(tenantMiddleware);
 
 // API Routes (Mounted on both /api and / to support direct and rewritten proxy requests)
 app.use('/api', apiRouter);

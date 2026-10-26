@@ -43,3 +43,56 @@ export const getApiBaseUrl = (): string => {
 };
 
 export const API_BASE_URL = getApiBaseUrl();
+
+/**
+ * Resolves the currently active tenant slug from localStorage or fallback
+ */
+export const getActiveTenantSlug = (): string => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('hotel_active_tenant_slug') || 'grand-palace';
+  }
+  return 'grand-palace';
+};
+
+/**
+ * Generates HTTP headers for Multi-Tenant database routing
+ */
+export const getTenantHeaders = (): Record<string, string> => {
+  const tenantSlug = getActiveTenantSlug();
+  return tenantSlug ? { 'X-Tenant-Id': tenantSlug } : {};
+};
+
+/**
+ * Global Automatic Fetch Enhancer for Multi-Tenant Header Injection
+ * Injects 'X-Tenant-Id' header for all backend API calls so every component
+ * automatically routes to the active property's dedicated database.
+ */
+if (typeof window !== 'undefined' && !(window as any).__hotelTenantFetchInstalled) {
+  (window as any).__hotelTenantFetchInstalled = true;
+  const originalFetch = window.fetch;
+  window.fetch = function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const urlStr = typeof input === 'string' 
+      ? input 
+      : input instanceof URL 
+        ? input.toString() 
+        : (input as Request).url;
+
+    // Only inject for API routes targeting backend (excluding external CDNs/assets)
+    if (urlStr && (urlStr.includes('/api/') || urlStr.startsWith('/api'))) {
+      const tenantSlug = localStorage.getItem('hotel_active_tenant_slug') || 'grand-palace';
+      const modifiedInit: RequestInit = { ...(init || {}) };
+      const headers = new Headers(
+        modifiedInit.headers || 
+        (typeof input === 'object' && input && 'headers' in input ? (input as Request).headers : undefined) || 
+        {}
+      );
+
+      if (!headers.has('X-Tenant-Id')) {
+        headers.set('X-Tenant-Id', tenantSlug);
+      }
+      modifiedInit.headers = headers;
+      return originalFetch.call(this, input, modifiedInit);
+    }
+    return originalFetch.call(this, input, init);
+  };
+}

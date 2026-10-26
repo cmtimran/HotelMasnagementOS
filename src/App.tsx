@@ -64,6 +64,7 @@ import RelationalDatabaseExplorer from './components/database/RelationalDatabase
 import AdvanceAccountingDashboard from './components/accounting/AdvanceAccountingDashboard';
 import HRMManagementDashboard from './components/hrm/HRMManagementDashboard';
 import MultiPropertyConsole from './components/chain/MultiPropertyConsole';
+import TenantIsolationHub from './components/chain/TenantIsolationHub';
 import { initNetworkSync } from './utils/pmsNetworkSync';
 import { syncReservationsFromDB } from './utils/roomInventoryEngine';
 
@@ -735,6 +736,9 @@ function App() {
       case 'chain':
       case 'multi-property':
         return <MultiPropertyConsole />;
+      case 'tenant-isolation':
+      case 'tenant-hub':
+        return <TenantIsolationHub />;
       case 'schema-explorer':
         return <RelationalDatabaseExplorer />;
       default:

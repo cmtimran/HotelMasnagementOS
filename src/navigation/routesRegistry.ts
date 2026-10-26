@@ -865,6 +865,17 @@ export const MAIN_PANEL_ROUTES: RouteDefinition[] = [
     propertyScoped: false,
   },
   {
+    id: 'tenant-isolation',
+    slug: '/tenant-isolation',
+    title: 'Database Isolation Hub',
+    panel: 'main',
+    category: 'Portfolio',
+    permission: 'property.manage',
+    allowedRoles: ['super_admin', 'hotel_admin'],
+    minSubscriptionTier: 'enterprise',
+    propertyScoped: false,
+  },
+  {
     id: 'property-create',
     slug: '/property-create',
     title: 'Add Property',

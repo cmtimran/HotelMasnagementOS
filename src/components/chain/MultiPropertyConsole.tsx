@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
     Building2, 
     MapPin, 
@@ -15,14 +15,17 @@ import {
     Calendar,
     Sparkles,
     ShieldCheck,
-    Plus
+    Plus,
+    Database
 } from 'lucide-react';
 import { useProperty, type Property } from '../../context/PropertyContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { useToast } from '../../context/ToastContext';
 import { usePortal } from '../../context/PortalContext';
+import TenantIsolationHub from './TenantIsolationHub';
 
 export const MultiPropertyConsole: React.FC = () => {
+    const [consoleView, setConsoleView] = useState<'portfolio' | 'isolation'>('portfolio');
     const { 
         properties, 
         activeProperty, 
@@ -115,8 +118,48 @@ export const MultiPropertyConsole: React.FC = () => {
                 </div>
             </div>
 
-            {/* Enterprise Chain KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            {/* View Switcher Navigation */}
+            <div className="flex items-center gap-2 mt-5 p-1.5 bg-slate-200/70 rounded-xl w-fit border border-slate-200">
+                <button
+                    type="button"
+                    onClick={() => setConsoleView('portfolio')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        consoleView === 'portfolio'
+                            ? 'bg-white text-blue-600 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                    <Building2 size={15} />
+                    Hotel Chain Portfolio
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                        {properties.length} Active
+                    </span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setConsoleView('isolation')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        consoleView === 'isolation'
+                            ? 'bg-white text-blue-600 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                    <Database size={15} />
+                    Database-per-Tenant Isolation Hub
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 flex items-center gap-1">
+                        <ShieldCheck size={11} /> Dedicated DB Architecture
+                    </span>
+                </button>
+            </div>
+
+            {consoleView === 'isolation' ? (
+                <div className="mt-6">
+                    <TenantIsolationHub />
+                </div>
+            ) : (
+                <>
+                    {/* Enterprise Chain KPIs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Group Portfolio</span>
@@ -383,6 +426,8 @@ export const MultiPropertyConsole: React.FC = () => {
                     </table>
                 </div>
             </div>
+                </>
+            )}
         </div>
     );
 };

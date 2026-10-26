@@ -1,13 +1,17 @@
 import { pgPool, initPostgres, isPostgresConnected } from './postgres.js';
+import { getActiveTenantPool } from './tenantContext.js';
+import { ensureCentralSchema } from './centralSchema.js';
 
 export { pgPool, isPostgresConnected };
 
 /**
- * Initialize Relational Database via Cloud PostgreSQL Engine
+ * Initialize Relational Database via Cloud PostgreSQL Engine and Central Control Plane
  */
 export const initDatabase = async (): Promise<void> => {
     console.log('🐘 Initializing Sole Database Engine: Cloud PostgreSQL 17...');
     await initPostgres();
+    // Initialize Central Multi-Tenant Registry & Schema
+    await ensureCentralSchema(pgPool);
 };
 
 /**
@@ -38,8 +42,9 @@ export function convertSql(sql: string): string {
  */
 export async function getNextDailySequence(seqType: string, dateStr?: string): Promise<number> {
     const today = dateStr || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const pool = getActiveTenantPool(pgPool);
     try {
-        const res = await pgPool.query(`
+        const res = await pool.query(`
             INSERT INTO daily_sequences (seq_date, seq_type, current_val)
             VALUES ($1, $2, 1)
             ON CONFLICT (seq_date, seq_type)
@@ -66,27 +71,31 @@ export async function generateGroupCode(dateStr?: string): Promise<string> {
 }
 
 /**
- * Unified Database Client operating exclusively on Cloud PostgreSQL
+ * Unified Database Client operating with Dynamic Multi-Tenant Database Routing
  */
 export const db = {
     query: async (sql: string, params: any[] = []): Promise<any> => {
+        const pool = getActiveTenantPool(pgPool);
         const converted = convertSql(sql);
-        return await pgPool.query(converted, params);
+        return await pool.query(converted, params);
     },
 
     all: async (sql: string, params: any[] = []): Promise<any[]> => {
+        const pool = getActiveTenantPool(pgPool);
         const converted = convertSql(sql);
-        const res = await pgPool.query(converted, params);
+        const res = await pool.query(converted, params);
         return res.rows;
     },
 
     get: async (sql: string, params: any[] = []): Promise<any> => {
+        const pool = getActiveTenantPool(pgPool);
         const converted = convertSql(sql);
-        const res = await pgPool.query(converted, params);
+        const res = await pool.query(converted, params);
         return res.rows[0] || null;
     },
 
     run: async (sql: string, params: any[] = []): Promise<{ lastInsertRowid?: number | string; rowCount: number; rows: any[] }> => {
+        const pool = getActiveTenantPool(pgPool);
         let converted = convertSql(sql);
         const isInsert = /^\s*INSERT\s+INTO/i.test(converted);
         const hasReturning = /RETURNING/i.test(converted);
@@ -94,7 +103,7 @@ export const db = {
             converted += ' RETURNING id';
         }
         try {
-            const res = await pgPool.query(converted, params);
+            const res = await pool.query(converted, params);
             const lastInsertRowid = res.rows[0]?.id;
             return {
                 lastInsertRowid,
@@ -105,7 +114,7 @@ export const db = {
             // If RETURNING id failed because table has no id column, retry without RETURNING
             if (isInsert && !hasReturning && e?.code === '42703') { // undefined_column
                 const retrySql = convertSql(sql);
-                const retryRes = await pgPool.query(retrySql, params);
+                const retryRes = await pool.query(retrySql, params);
                 return {
                     rowCount: retryRes.rowCount || 0,
                     rows: retryRes.rows
@@ -116,7 +125,8 @@ export const db = {
     },
 
     exec: async (sql: string): Promise<void> => {
-        await pgPool.query(sql);
+        const pool = getActiveTenantPool(pgPool);
+        await pool.query(sql);
     },
 
     prepare: (sql: string) => {
