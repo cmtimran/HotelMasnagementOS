@@ -83,27 +83,49 @@ export const OccupancyHeatmap: React.FC = () => {
                 const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
                 if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'no-show') return;
 
-                const checkIn = String(res.checkIn || res.arrivalDate || '');
-                const checkOut = String(res.checkOut || res.departureDate || '');
+                const subRooms = (Array.isArray(res.roomsList) && res.roomsList.length > 0)
+                    ? res.roomsList
+                    : (Array.isArray(res.groupRoomsList) && res.groupRoomsList.length > 0)
+                        ? res.groupRoomsList
+                        : null;
 
-                if (checkIn === dateStr) arrivalsCount++;
-                if (checkOut === dateStr) departuresCount++;
+                if (subRooms && subRooms.length > 0) {
+                    subRooms.forEach((rm: any) => {
+                        const rmStatus = String(rm.status || res.status || '').toLowerCase().replace(/_/g, '-');
+                        if (rmStatus === 'cancelled' || rmStatus === 'void' || rmStatus === 'no-show') return;
 
-                // Active stay overlapping today
-                if (checkIn <= dateStr && checkOut > dateStr) {
-                    const rooms: string[] = [];
-                    if (Array.isArray(res.roomsList) && res.roomsList.length > 0) {
-                        res.roomsList.forEach((rm: any) => rooms.push(String(rm.roomNumber)));
-                    } else if (Array.isArray(res.allocatedRooms) && res.allocatedRooms.length > 0) {
-                        res.allocatedRooms.forEach((rm: any) => rooms.push(String(rm)));
-                    } else if (res.roomNumber || res.roomNo) {
-                        rooms.push(String(res.roomNumber || res.roomNo));
+                        const rIn = String(rm.checkInDate || rm.checkIn || res.checkIn || res.arrivalDate || '');
+                        const rOut = String(rm.checkOutDate || rm.checkOut || res.checkOut || res.departureDate || '');
+                        const roomNum = String(rm.roomNumber || rm.roomNo || '');
+                        const rmNights = Math.max(1, Number(rm.nights || res.nights || 1));
+
+                        if (rIn === dateStr) arrivalsCount++;
+                        if (rOut === dateStr) departuresCount++;
+
+                        if (rIn <= dateStr && rOut > dateStr) {
+                            if (roomNum) bookedRoomsToday.add(roomNum);
+                            const rmRate = Number(rm.rate || rm.tariff || rm.totalAmount || (Number(res.rateAmount || res.totalAmount || 3500) / subRooms.length)) / rmNights;
+                            dailyRevenue += rmRate;
+                        }
+                    });
+                } else {
+                    const checkIn = String(res.checkIn || res.arrivalDate || '');
+                    const checkOut = String(res.checkOut || res.departureDate || '');
+                    const roomNum = String(res.roomNumber || res.roomNo || '');
+                    const nights = Math.max(1, Number(res.nights) || 1);
+
+                    if (checkIn === dateStr) arrivalsCount++;
+                    if (checkOut === dateStr) departuresCount++;
+
+                    if (checkIn <= dateStr && checkOut > dateStr) {
+                        if (roomNum) {
+                            bookedRoomsToday.add(roomNum);
+                        } else if (Array.isArray(res.allocatedRooms)) {
+                            res.allocatedRooms.forEach((r: any) => bookedRoomsToday.add(String(r)));
+                        }
+                        const dailyRate = (Number(res.rateAmount) || Number(res.totalAmount) || 3500) / nights;
+                        dailyRevenue += dailyRate;
                     }
-
-                    rooms.forEach(rm => bookedRoomsToday.add(rm));
-
-                    const dailyRate = (Number(res.rateAmount) || Number(res.totalAmount) || 3500) / Math.max(1, Number(res.nights) || 1);
-                    dailyRevenue += dailyRate;
                 }
             });
 
@@ -126,19 +148,86 @@ export const OccupancyHeatmap: React.FC = () => {
         });
     }, [year, month, daysInMonth, refreshTrigger]);
 
-    // Active reservations overlapping the selected day
+    // Active reservations overlapping the selected day (expanded room-by-room)
     const selectedDayReservations = useMemo(() => {
         if (!selectedDayData) return [];
         const allRes = getAllStoredReservations();
         const dStr = selectedDayData.dateStr;
-        return allRes.filter(res => {
+        const list: Array<{
+            id: string | number;
+            guestName: string;
+            roomNumber: string;
+            roomType: string;
+            rate: number;
+            status: string;
+            isArrival: boolean;
+            isDeparture: boolean;
+        }> = [];
+
+        allRes.forEach(res => {
             const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
-            if (rawStatus === 'cancelled' || rawStatus === 'void') return false;
-            const checkIn = String(res.checkIn || res.arrivalDate || '');
-            const checkOut = String(res.checkOut || res.departureDate || '');
-            return (checkIn <= dStr && checkOut >= dStr);
+            if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'no-show') return;
+
+            const subRooms = (Array.isArray(res.roomsList) && res.roomsList.length > 0)
+                ? res.roomsList
+                : (Array.isArray(res.groupRoomsList) && res.groupRoomsList.length > 0)
+                    ? res.groupRoomsList
+                    : null;
+
+            if (subRooms && subRooms.length > 0) {
+                subRooms.forEach((rm: any, subIdx: number) => {
+                    const rmStatus = String(rm.status || res.status || '').toLowerCase().replace(/_/g, '-');
+                    if (rmStatus === 'cancelled' || rmStatus === 'void' || rmStatus === 'no-show') return;
+
+                    const rIn = String(rm.checkInDate || rm.checkIn || res.checkIn || res.arrivalDate || '');
+                    const rOut = String(rm.checkOutDate || rm.checkOut || res.checkOut || res.departureDate || '');
+                    const roomNum = String(rm.roomNumber || rm.roomNo || 'Auto');
+
+                    if (rIn <= dStr && rOut >= dStr) {
+                        list.push({
+                            id: `${res.id || res.reservationNumber}-${subIdx}-${roomNum}`,
+                            guestName: rm.guestName || res.guestName || 'Valued Guest',
+                            roomNumber: roomNum,
+                            roomType: rm.roomType || res.roomType || 'Standard Room',
+                            rate: Number(rm.rate || (Number(res.rateAmount || res.totalAmount || 3500) / subRooms.length)),
+                            status: rmStatus,
+                            isArrival: rIn === dStr,
+                            isDeparture: rOut === dStr
+                        });
+                    }
+                });
+            } else {
+                const checkIn = String(res.checkIn || res.arrivalDate || '');
+                const checkOut = String(res.checkOut || res.departureDate || '');
+                if (checkIn <= dStr && checkOut >= dStr) {
+                    list.push({
+                        id: res.id || res.reservationNumber,
+                        guestName: res.guestName || 'Valued Guest',
+                        roomNumber: String(res.roomNumber || (Array.isArray(res.allocatedRooms) && res.allocatedRooms[0]) || 'Auto'),
+                        roomType: res.roomType || 'Standard Room',
+                        rate: Number(res.rateAmount || res.totalAmount || 3500) / Math.max(1, Number(res.nights) || 1),
+                        status: rawStatus,
+                        isArrival: checkIn === dStr,
+                        isDeparture: checkOut === dStr
+                    });
+                }
+            }
         });
+
+        return list;
     }, [selectedDayData, refreshTrigger]);
+
+    // Auto-select operating date on mount or data refresh
+    useEffect(() => {
+        if (monthDaysData.length > 0) {
+            setSelectedDayData(prev => {
+                if (!prev) {
+                    return monthDaysData.find(d => d.dateStr === opDate) || monthDaysData[0];
+                }
+                return monthDaysData.find(d => d.dateStr === prev.dateStr) || prev;
+            });
+        }
+    }, [monthDaysData, opDate]);
 
     const prevMonth = () => {
         setCurrentDate(new Date(year, month - 1, 1));
@@ -150,14 +239,25 @@ export const OccupancyHeatmap: React.FC = () => {
         setSelectedDayData(null);
     };
 
-    const avgOccupancy = Math.round(
-        monthDaysData.reduce((acc, d) => acc + d.occupancyPct, 0) / monthDaysData.length
-    );
+    const totalOccupiedRoomNights = monthDaysData.reduce((acc, d) => acc + d.occupiedRooms, 0);
+    const totalAvailableRoomNights = monthDaysData.reduce((acc, d) => acc + d.totalRooms, 0);
+    const preciseAvgOccupancy = totalAvailableRoomNights > 0
+        ? (totalOccupiedRoomNights / totalAvailableRoomNights) * 100
+        : 0;
+    const displayAvgOccupancy = preciseAvgOccupancy === 0
+        ? '0%'
+        : preciseAvgOccupancy < 1
+            ? `${preciseAvgOccupancy.toFixed(1)}%`
+            : `${Math.round(preciseAvgOccupancy)}%`;
+
     const totalMonthRevenue = monthDaysData.reduce((acc, d) => acc + d.revenueBDT, 0);
-    const avgADR = Math.round(
-        monthDaysData.reduce((acc, d) => acc + d.adrBDT, 0) / monthDaysData.length
-    );
-    const revPAR = Math.round((avgOccupancy / 100) * avgADR);
+    const occupiedDays = monthDaysData.filter(d => d.occupiedRooms > 0);
+    const avgADR = occupiedDays.length > 0
+        ? Math.round(occupiedDays.reduce((acc, d) => acc + d.adrBDT, 0) / occupiedDays.length)
+        : 3500;
+    const revPAR = totalAvailableRoomNights > 0
+        ? Math.round(totalMonthRevenue / totalAvailableRoomNights)
+        : 0;
 
     const getOccupancyHeatColor = (pct: number) => {
         if (pct >= 90) return 'bg-rose-50 border-rose-300 text-rose-900';
@@ -223,10 +323,10 @@ export const OccupancyHeatmap: React.FC = () => {
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider">Avg Occupancy</span>
-                        <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{avgOccupancy}%</p>
+                        <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{displayAvgOccupancy}</p>
                     </div>
                     <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        +4.2% vs May
+                        {preciseAvgOccupancy > 0 ? '+4.2% vs May' : 'Pacing Track'}
                     </span>
                 </div>
 
@@ -248,12 +348,14 @@ export const OccupancyHeatmap: React.FC = () => {
                     <span className="text-[10px] text-slate-400 uppercase font-semibold">Per Room</span>
                 </div>
 
-                <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
+                <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] text-gray-400 uppercase">RevPAR</span>
-                        <p className="text-base text-emerald-700 font-mono mt-0.5">৳ {revPAR.toLocaleString()}</p>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">RevPAR</span>
+                        <p className="text-lg font-black text-emerald-700 font-mono mt-0.5">৳ {revPAR.toLocaleString()}</p>
                     </div>
-                    <span className="text-[9.5px] text-emerald-600">Optimal Yield</span>
+                    <span className="text-[10.5px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Optimal Yield
+                    </span>
                 </div>
             </div>
 
@@ -309,6 +411,7 @@ export const OccupancyHeatmap: React.FC = () => {
                         {/* Actual Day Cells */}
                         {monthDaysData.map(day => {
                             const isSelected = selectedDayData?.dayNumber === day.dayNumber;
+                            const isToday = day.dateStr === opDate;
                             const heatStyle = getOccupancyHeatColor(day.occupancyPct);
                             const badgeStyle = getBadgeStyle(day.occupancyPct);
 
@@ -321,9 +424,16 @@ export const OccupancyHeatmap: React.FC = () => {
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <span className="text-gray-900 text-xs">
-                                            {day.dayNumber}
-                                        </span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-gray-900 text-xs font-semibold">
+                                                {day.dayNumber}
+                                            </span>
+                                            {isToday && (
+                                                <span className="text-[7.5px] font-bold px-1 py-0.2 rounded bg-blue-600 text-white uppercase tracking-tight">
+                                                    Today
+                                                </span>
+                                            )}
+                                        </div>
                                         <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono ${badgeStyle}`}>
                                             {day.occupancyPct}%
                                         </span>
@@ -332,11 +442,11 @@ export const OccupancyHeatmap: React.FC = () => {
                                     <div className="space-y-0.5">
                                         <div className="flex justify-between items-center text-[10px] text-gray-600">
                                             <span>Rooms:</span>
-                                            <span className="font-mono text-gray-800">{day.occupiedRooms}/{day.totalRooms}</span>
+                                            <span className="font-mono text-gray-800 font-semibold">{day.occupiedRooms}/{day.totalRooms}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-[10px] text-gray-600">
                                             <span>Revenue:</span>
-                                            <span className="font-mono text-gray-900">৳{(day.revenueBDT / 1000).toFixed(0)}k</span>
+                                            <span className="font-mono text-gray-900 font-semibold">৳ {day.revenueBDT > 0 ? `${(day.revenueBDT / 1000).toFixed(0)}k` : '0'}</span>
                                         </div>
                                     </div>
                                 </button>
@@ -409,20 +519,20 @@ export const OccupancyHeatmap: React.FC = () => {
                                 {selectedDayReservations.length > 0 ? (
                                     <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
                                         {selectedDayReservations.map((res: any, idx: number) => {
-                                            const isArrival = (res.checkIn || res.arrivalDate) === selectedDayData.dateStr;
-                                            const isDeparture = (res.checkOut || res.departureDate) === selectedDayData.dateStr;
+                                            const isArr = res.isArrival;
+                                            const isDep = res.isDeparture;
                                             return (
                                                 <div key={res.id || idx} className="p-1.5 bg-slate-50 border border-slate-200/80 rounded text-[11px] flex items-center justify-between">
                                                     <div className="min-w-0 pr-1">
                                                         <div className="font-semibold text-slate-800 truncate">{res.guestName || 'Valued Guest'}</div>
                                                         <div className="text-[9.5px] text-slate-500 font-mono truncate">
-                                                            Room {res.roomNumber || (res.allocatedRooms && res.allocatedRooms[0]) || 'Auto'} • {res.roomType}
+                                                            Room {res.roomNumber} • {res.roomType}
                                                         </div>
                                                     </div>
                                                     <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase shrink-0 ${
-                                                        isArrival ? 'bg-blue-100 text-blue-700' : isDeparture ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                                                        isArr ? 'bg-blue-100 text-blue-700' : isDep ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                                                     }`}>
-                                                        {isArrival ? 'Arrival' : isDeparture ? 'Departure' : 'In-House'}
+                                                        {isArr ? 'Arrival' : isDep ? 'Departure' : 'In-House'}
                                                     </span>
                                                 </div>
                                             );
