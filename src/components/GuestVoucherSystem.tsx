@@ -209,7 +209,7 @@ export const GuestVoucherSystem: React.FC = () => {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+                            <h1 className="text-base text-slate-900 tracking-tight">
                                 Digital Guest Service Vouchers & Passes
                             </h1>
                             <span className="badge-status-active">
@@ -244,7 +244,7 @@ export const GuestVoucherSystem: React.FC = () => {
             <div className="bg-white border-b border-slate-200 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Valid Vouchers</span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Active Valid Vouchers</span>
                         <p className="text-lg font-black text-emerald-700 mt-0.5 font-mono">{activeCount} <span className="text-xs font-normal text-slate-400">Passes</span></p>
                     </div>
                     <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
@@ -254,7 +254,7 @@ export const GuestVoucherSystem: React.FC = () => {
 
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Redeemed Today</span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Redeemed Today</span>
                         <p className="text-lg font-black text-slate-900 mt-0.5 font-mono">{redeemedCount} <span className="text-xs font-normal text-slate-400">Used</span></p>
                     </div>
                     <div className="size-9 rounded-xl bg-blue-50 text-primary border border-blue-100 flex items-center justify-center">
@@ -264,8 +264,8 @@ export const GuestVoucherSystem: React.FC = () => {
 
                 <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Total Issued</span>
-                        <p className="text-base font-bold text-gray-900 mt-0.5">{vouchers.length} <span className="text-[10px] text-gray-400 font-normal">Passes</span></p>
+                        <span className="text-[9.5px] text-gray-400 uppercase">Total Issued</span>
+                        <p className="text-base text-gray-900 mt-0.5">{vouchers.length} <span className="text-[10px] text-gray-400 font-normal">Passes</span></p>
                     </div>
                     <div className="w-7 h-7 rounded bg-purple-50 text-purple-600 flex items-center justify-center">
                         <QrCode size={14} />
@@ -274,8 +274,8 @@ export const GuestVoucherSystem: React.FC = () => {
 
                 <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">Redemption Rate</span>
-                        <p className="text-base font-bold text-blue-700 mt-0.5">
+                        <span className="text-[9.5px] text-gray-400 uppercase">Redemption Rate</span>
+                        <p className="text-base text-blue-700 mt-0.5">
                             {Math.round((redeemedCount / (vouchers.length || 1)) * 100)}%
                         </p>
                     </div>
@@ -346,12 +346,12 @@ export const GuestVoucherSystem: React.FC = () => {
                                             {getCategoryIcon(v.serviceCategory)}
                                         </div>
                                         <div>
-                                            <span className="font-mono font-bold text-gray-900 text-xs">{v.voucherCode}</span>
+                                            <span className="font-mono text-gray-900 text-xs">{v.voucherCode}</span>
                                             <span className="text-[10px] text-gray-400 block -mt-0.5">{v.serviceCategory}</span>
                                         </div>
                                     </div>
 
-                                    <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold ${
+                                    <span className={`px-2 py-0.5 rounded text-[9.5px] ${
                                         isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'
                                     }`}>
                                         {v.status}
@@ -360,17 +360,17 @@ export const GuestVoucherSystem: React.FC = () => {
 
                                 {/* Pass Body */}
                                 <div className="p-3 space-y-2">
-                                    <h4 className="font-bold text-gray-900 text-xs leading-snug">{v.serviceName}</h4>
+                                    <h4 className="text-gray-900 text-xs leading-snug">{v.serviceName}</h4>
                                     <p className="text-[11px] text-gray-500 leading-normal">{v.benefitDetails}</p>
 
                                     <div className="bg-gray-50 p-2 rounded-lg border border-gray-100 flex justify-between items-center text-[10.5px]">
                                         <div>
-                                            <span className="text-gray-400 text-[9px] uppercase font-bold block">Assigned Guest</span>
-                                            <span className="font-bold text-gray-900">{v.guestName}</span>
+                                            <span className="text-gray-400 text-[9px] uppercase block">Assigned Guest</span>
+                                            <span className="text-gray-900">{v.guestName}</span>
                                         </div>
                                         <div className="text-right">
-                                            <span className="text-gray-400 text-[9px] uppercase font-bold block">Room & Pax</span>
-                                            <span className="font-mono font-bold text-gray-900">Rm {v.roomNumber} ({v.paxCount} Pax)</span>
+                                            <span className="text-gray-400 text-[9px] uppercase block">Room & Pax</span>
+                                            <span className="font-mono text-gray-900">Rm {v.roomNumber} ({v.paxCount} Pax)</span>
                                         </div>
                                     </div>
 
@@ -399,7 +399,7 @@ export const GuestVoucherSystem: React.FC = () => {
                                     {isActive ? (
                                         <button
                                             onClick={() => handleRedeem(v.id)}
-                                            className="h-6 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10.5px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer transition-colors"
+                                            className="h-6 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10.5px] flex items-center gap-1 shadow-2xs cursor-pointer transition-colors"
                                         >
                                             <CheckCircle2 size={11} />
                                             <span>Redeem Pass</span>
@@ -421,7 +421,7 @@ export const GuestVoucherSystem: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full p-4 space-y-3">
                         <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                            <h3 className="text-sm font-bold text-gray-900">Issue Digital Guest Voucher</h3>
+                            <h3 className="text-sm text-gray-900">Issue Digital Guest Voucher</h3>
                             <button onClick={() => setShowIssueModal(false)} className="text-gray-400 hover:text-gray-700">✕</button>
                         </div>
 
@@ -534,26 +534,26 @@ export const GuestVoucherSystem: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-sm w-full p-5 space-y-4">
                         <div className="text-center border-b border-gray-200 pb-3">
-                            <h3 className="text-sm font-bold text-gray-900 uppercase">Grand Hotel Hospitality</h3>
+                            <h3 className="text-sm text-gray-900 uppercase">Grand Hotel Hospitality</h3>
                             <p className="text-[10px] text-gray-500">Official Guest Service Privilege Pass</p>
-                            <span className="font-mono font-bold text-xs text-emerald-700 mt-1 block">
+                            <span className="font-mono text-xs text-emerald-700 mt-1 block">
                                 {printVoucher.voucherCode}
                             </span>
                         </div>
 
                         <div className="space-y-2 text-xs">
                             <div className="bg-gray-50 p-2.5 rounded border border-gray-200">
-                                <p className="font-bold text-gray-900">{printVoucher.serviceName}</p>
+                                <p className="text-gray-900">{printVoucher.serviceName}</p>
                                 <p className="text-[10.5px] text-gray-600 mt-0.5">{printVoucher.benefitDetails}</p>
                             </div>
 
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-gray-500">Guest Name:</span>
-                                <span className="font-bold text-gray-900">{printVoucher.guestName}</span>
+                                <span className="text-gray-900">{printVoucher.guestName}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-gray-500">Room Number:</span>
-                                <span className="font-bold font-mono text-gray-900">Room {printVoucher.roomNumber}</span>
+                                <span className="font-mono text-gray-900">Room {printVoucher.roomNumber}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-gray-500">Valid Until:</span>

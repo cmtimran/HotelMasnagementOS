@@ -231,19 +231,19 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                 {/* Header */}
                 <div className="bg-slate-50/95 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+                        <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
                             <Sparkles size={18} />
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight m-0">
+                                <h2 className="text-sm sm:text-base text-slate-800 tracking-tight m-0">
                                     Hotel Room Add-On Services
                                 </h2>
-                                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-100/70 text-blue-800 border border-blue-200">
+                                <span className="px-2 py-0.5 rounded-md text-[11px] bg-blue-100/70 text-blue-800 border border-blue-200">
                                     Room #{roomNumber || 'Auto'} • {roomType}
                                 </span>
                                 {activeTabsCount > 0 && (
-                                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
                                         {activeTabsCount} Active
                                     </span>
                                 )}
@@ -273,7 +273,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-slate-700">Target Room:</span>
+                            <span className="text-[11px] text-slate-700">Target Room:</span>
                             <select
                                 value={targetRoomScope}
                                 onChange={e => setTargetRoomScope(e.target.value)}
@@ -293,7 +293,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('pickup')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                             activeTab === 'pickup'
                                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -307,7 +307,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('extrabed')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                             activeTab === 'extrabed'
                                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -321,7 +321,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('mealplan')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                             activeTab === 'mealplan'
                                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -335,7 +335,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('celebration')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                             activeTab === 'celebration'
                                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -349,7 +349,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('spa')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                             activeTab === 'spa'
                                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -363,7 +363,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('timing')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                             activeTab === 'timing'
                                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -377,7 +377,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('custom')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                             activeTab === 'custom'
                                 ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -386,7 +386,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                         <Plus size={13} className={activeTab === 'custom' ? 'text-blue-600' : 'text-slate-400'} />
                         <span>Custom Add-Ons</span>
                         {customAddons.length > 0 && (
-                            <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
+                            <span className="px-1 py-0.2 rounded text-[9px] bg-blue-100 text-blue-800">
                                 {customAddons.length}
                             </span>
                         )}
@@ -403,7 +403,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setPickup(prev => ({ ...prev, enabled: false, dropEnabled: false }))}
-                                    className={`flex-1 min-w-[90px] py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                                    className={`flex-1 min-w-[90px] py-1.5 px-2 rounded-lg text-xs transition-all ${
                                         !pickup.enabled && !pickup.dropEnabled
                                             ? 'bg-white text-slate-800 shadow-xs border border-slate-200'
                                             : 'text-slate-500 hover:text-slate-800'
@@ -414,7 +414,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setPickup(prev => ({ ...prev, enabled: true, dropEnabled: false }))}
-                                    className={`flex-1 min-w-[130px] py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                    className={`flex-1 min-w-[130px] py-1.5 px-2.5 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 ${
                                         pickup.enabled && !pickup.dropEnabled
                                             ? 'bg-blue-600 text-white shadow-xs'
                                             : 'text-slate-700 hover:text-blue-700 hover:bg-white/60'
@@ -426,7 +426,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setPickup(prev => ({ ...prev, enabled: false, dropEnabled: true }))}
-                                    className={`flex-1 min-w-[130px] py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                    className={`flex-1 min-w-[130px] py-1.5 px-2.5 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 ${
                                         !pickup.enabled && pickup.dropEnabled
                                             ? 'bg-sky-600 text-white shadow-xs'
                                             : 'text-slate-700 hover:text-sky-700 hover:bg-white/60'
@@ -438,7 +438,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setPickup(prev => ({ ...prev, enabled: true, dropEnabled: true }))}
-                                    className={`flex-1 min-w-[150px] py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                    className={`flex-1 min-w-[150px] py-1.5 px-2.5 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 ${
                                         pickup.enabled && pickup.dropEnabled
                                             ? 'bg-emerald-600 text-white shadow-xs'
                                             : 'text-slate-700 hover:text-emerald-700 hover:bg-white/60'
@@ -455,16 +455,16 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             }`}>
                                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80">
                                     <div className="flex items-center gap-2.5">
-                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                                             pickup.enabled ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
                                         }`}>
                                             <Car size={14} />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                            <label className="text-xs text-slate-800 flex items-center gap-2 cursor-pointer">
                                                 <span>1. Inbound Airport / Station Pickup (Arrival Transfer)</span>
                                                 {pickup.enabled && (
-                                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-blue-100 text-blue-800">
+                                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-blue-100 text-blue-800">
                                                         Active
                                                     </span>
                                                 )}
@@ -488,7 +488,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 {pickup.enabled && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5 flex items-center gap-1">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5 flex items-center gap-1">
                                                 <Plane size={11} className="text-blue-600" />
                                                 <span>Arrival Flight / Train #</span>
                                             </label>
@@ -497,12 +497,12 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 placeholder="e.g. BG-084"
                                                 value={pickup.flightNumber || ''}
                                                 onChange={e => setPickup(prev => ({ ...prev, flightNumber: e.target.value }))}
-                                                className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-800 font-mono font-bold uppercase"
+                                                className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-800 font-mono uppercase"
                                             />
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5">
                                                 Airline / Transport Carrier
                                             </label>
                                             <input
@@ -515,7 +515,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5 flex items-center gap-1">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5 flex items-center gap-1">
                                                 <Clock size={11} className="text-blue-600" />
                                                 <span>Estimated Arrival Date &amp; Time</span>
                                             </label>
@@ -528,7 +528,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5 flex items-center gap-1">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5 flex items-center gap-1">
                                                 <MapPin size={11} className="text-blue-600" />
                                                 <span>Pickup Terminal / Point</span>
                                             </label>
@@ -546,7 +546,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5">
                                                 Vehicle Type
                                             </label>
                                             <select
@@ -563,7 +563,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
 
                                         <div>
                                             <div className="flex items-center justify-between mb-0.5">
-                                                <label className="text-[11px] font-bold text-slate-700">Pickup Charge (BDT)</label>
+                                                <label className="text-[11px] text-slate-700">Pickup Charge (BDT)</label>
                                                 <label className="flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 cursor-pointer">
                                                     <input
                                                         type="checkbox"
@@ -579,14 +579,14 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 disabled={pickup.isComplimentary}
                                                 value={pickup.isComplimentary ? 0 : pickup.chargeAmount}
                                                 onChange={e => setPickup(prev => ({ ...prev, chargeAmount: parseFloat(e.target.value) || 0 }))}
-                                                className={`w-full h-8 px-2.5 rounded-lg border text-xs font-bold font-mono text-right ${
+                                                className={`w-full h-8 px-2.5 rounded-lg border text-xs font-mono text-right ${
                                                     pickup.isComplimentary ? 'bg-slate-100 text-slate-400' : 'bg-white text-blue-700'
                                                 }`}
                                             />
                                         </div>
 
                                         <div className="sm:col-span-2 lg:col-span-3">
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5">
                                                 Arrival Chauffeur Instructions / Placard Name
                                             </label>
                                             <input
@@ -607,16 +607,16 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             }`}>
                                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80">
                                     <div className="flex items-center gap-2.5">
-                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                                             pickup.dropEnabled ? 'bg-sky-600 text-white' : 'bg-slate-200 text-slate-500'
                                         }`}>
                                             <Plane size={14} />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                            <label className="text-xs text-slate-800 flex items-center gap-2 cursor-pointer">
                                                 <span>2. Outbound Airport / Station Drop (Departure Transfer)</span>
                                                 {pickup.dropEnabled && (
-                                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-sky-100 text-sky-800">
+                                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-sky-100 text-sky-800">
                                                         Active
                                                     </span>
                                                 )}
@@ -640,7 +640,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 {pickup.dropEnabled && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5 flex items-center gap-1">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5 flex items-center gap-1">
                                                 <Plane size={11} className="text-sky-600" />
                                                 <span>Departure Flight / Train #</span>
                                             </label>
@@ -649,12 +649,12 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 placeholder="e.g. EK-582"
                                                 value={pickup.dropFlightNumber || ''}
                                                 onChange={e => setPickup(prev => ({ ...prev, dropFlightNumber: e.target.value }))}
-                                                className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-800 font-mono font-bold uppercase"
+                                                className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-800 font-mono uppercase"
                                             />
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5">
                                                 Outbound Airline / Carrier
                                             </label>
                                             <input
@@ -667,7 +667,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5 flex items-center gap-1">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5 flex items-center gap-1">
                                                 <Clock size={11} className="text-sky-600" />
                                                 <span>Hotel Lobby Departure Time</span>
                                             </label>
@@ -680,7 +680,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5 flex items-center gap-1">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5 flex items-center gap-1">
                                                 <MapPin size={11} className="text-sky-600" />
                                                 <span>Destination Drop Terminal</span>
                                             </label>
@@ -698,7 +698,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5">
                                                 Vehicle Type
                                             </label>
                                             <select
@@ -715,7 +715,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
 
                                         <div>
                                             <div className="flex items-center justify-between mb-0.5">
-                                                <label className="text-[11px] font-bold text-slate-700">Drop Charge (BDT)</label>
+                                                <label className="text-[11px] text-slate-700">Drop Charge (BDT)</label>
                                                 <label className="flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 cursor-pointer">
                                                     <input
                                                         type="checkbox"
@@ -731,14 +731,14 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 disabled={pickup.dropIsComplimentary}
                                                 value={pickup.dropIsComplimentary ? 0 : (pickup.dropChargeAmount || 0)}
                                                 onChange={e => setPickup(prev => ({ ...prev, dropChargeAmount: parseFloat(e.target.value) || 0 }))}
-                                                className={`w-full h-8 px-2.5 rounded-lg border text-xs font-bold font-mono text-right ${
+                                                className={`w-full h-8 px-2.5 rounded-lg border text-xs font-mono text-right ${
                                                     pickup.dropIsComplimentary ? 'bg-slate-100 text-slate-400' : 'bg-white text-sky-700'
                                                 }`}
                                             />
                                         </div>
 
                                         <div className="sm:col-span-2 lg:col-span-3">
-                                            <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                                            <label className="block text-[11px] text-slate-700 mb-0.5">
                                                 Departure Chauffeur Instructions / Notes
                                             </label>
                                             <input
@@ -773,7 +773,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                             )}
                                         </span>
                                     </div>
-                                    <div className="font-bold text-slate-900 font-mono text-sm">
+                                    <div className="text-slate-900 font-mono text-sm">
                                         = ৳{pickupSubtotal.toLocaleString()}
                                     </div>
                                 </div>
@@ -789,16 +789,16 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             }`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                                             extraBed.enabled ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
                                         }`}>
                                             <BedDouble size={16} />
                                         </div>
                                         <div>
-                                            <label className="text-sm font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                            <label className="text-sm text-slate-800 flex items-center gap-2 cursor-pointer">
                                                 <span>Enable Extra Bed / Baby Cot</span>
                                                 {extraBed.enabled && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800">
                                                         Active
                                                     </span>
                                                 )}
@@ -824,7 +824,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <div className="space-y-3.5 pt-1">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Bed Configuration / Type
                                             </label>
                                             <select
@@ -848,7 +848,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Quantity (Max 2 per room)
                                             </label>
                                             <select
@@ -863,7 +863,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
 
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
-                                                <label className="text-xs font-bold text-slate-700">
+                                                <label className="text-xs text-slate-700">
                                                     Rate Per Night (BDT)
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 cursor-pointer select-none">
@@ -881,7 +881,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 disabled={extraBed.isComplimentary}
                                                 value={extraBed.isComplimentary ? 0 : extraBed.chargePerNight}
                                                 onChange={e => setExtraBed(prev => ({ ...prev, chargePerNight: parseFloat(e.target.value) || 0 }))}
-                                                className={`w-full h-9 px-3 rounded-lg border text-xs font-bold font-mono text-right ${
+                                                className={`w-full h-9 px-3 rounded-lg border text-xs font-mono text-right ${
                                                     extraBed.isComplimentary
                                                         ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                                                         : 'bg-white border-slate-300 text-blue-700 focus:ring-2 focus:ring-blue-500'
@@ -890,7 +890,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Meal &amp; Amenity Inclusions
                                             </label>
                                             <div className="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between">
@@ -916,13 +916,13 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 <strong>{extraBed.isComplimentary ? '৳0 (Free)' : `৳${extraBed.chargePerNight}/Night`}</strong>
                                             </span>
                                         </div>
-                                        <div className="font-bold text-slate-900 font-mono">
+                                        <div className="text-slate-900 font-mono">
                                             = ৳{extraBedSubtotal.toLocaleString()}
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                        <label className="block text-xs text-slate-700 mb-1 flex items-center gap-1.5">
                                             <FileText size={13} className="text-slate-500" />
                                             <span>Housekeeping &amp; Setup Instructions</span>
                                         </label>
@@ -947,16 +947,16 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             }`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                                             mealPlan.enabled ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-500'
                                         }`}>
                                             <Utensils size={16} />
                                         </div>
                                         <div>
-                                            <label className="text-sm font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                            <label className="text-sm text-slate-800 flex items-center gap-2 cursor-pointer">
                                                 <span>Meal Plan &amp; Dining Upgrade</span>
                                                 {mealPlan.enabled && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800">
                                                         Active
                                                     </span>
                                                 )}
@@ -982,7 +982,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <div className="space-y-3.5 pt-1">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Meal Plan Package
                                             </label>
                                             <select
@@ -1009,7 +1009,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Cover / Guest Count
                                             </label>
                                             <input
@@ -1024,7 +1024,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
 
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
-                                                <label className="text-xs font-bold text-slate-700">
+                                                <label className="text-xs text-slate-700">
                                                     Rate Per Person / Event (BDT)
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 cursor-pointer select-none">
@@ -1042,12 +1042,12 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 disabled={mealPlan.isComplimentary}
                                                 value={mealPlan.isComplimentary ? 0 : mealPlan.ratePerGuestPerNight}
                                                 onChange={e => setMealPlan(prev => ({ ...prev, ratePerGuestPerNight: parseFloat(e.target.value) || 0 }))}
-                                                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs font-bold font-mono text-right text-slate-800"
+                                                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs font-mono text-right text-slate-800"
                                             />
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Dietary Preferences &amp; Allergies
                                             </label>
                                             <input
@@ -1068,7 +1068,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 <strong>{mealPlan.planType === 'Romantic Candlelight Dinner Setup' ? '1 Event' : `${nights} Night(s)`}</strong>
                                             </span>
                                         </div>
-                                        <div className="font-bold text-amber-950 font-mono text-sm">
+                                        <div className="text-amber-950 font-mono text-sm">
                                             = ৳{mealPlanSubtotal.toLocaleString()}
                                         </div>
                                     </div>
@@ -1085,16 +1085,16 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             }`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                                             celebration.enabled ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-500'
                                         }`}>
                                             <Gift size={16} />
                                         </div>
                                         <div>
-                                            <label className="text-sm font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                            <label className="text-sm text-slate-800 flex items-center gap-2 cursor-pointer">
                                                 <span>Celebration &amp; Romance Room Decor</span>
                                                 {celebration.enabled && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800">
                                                         Active
                                                     </span>
                                                 )}
@@ -1120,7 +1120,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <div className="space-y-3.5 pt-1">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Celebration Package
                                             </label>
                                             <select
@@ -1147,7 +1147,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Execution Timing
                                             </label>
                                             <select
@@ -1162,7 +1162,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                                            <label className="block text-xs text-slate-700 mb-1 flex items-center gap-1">
                                                 <Cake size={13} className="text-rose-600" />
                                                 <span>Cake Flavor / Preference</span>
                                             </label>
@@ -1177,7 +1177,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
 
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
-                                                <label className="text-xs font-bold text-slate-700">
+                                                <label className="text-xs text-slate-700">
                                                     Package Charge (BDT)
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 cursor-pointer select-none">
@@ -1195,13 +1195,13 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 disabled={celebration.isComplimentary}
                                                 value={celebration.isComplimentary ? 0 : celebration.chargeAmount}
                                                 onChange={e => setCelebration(prev => ({ ...prev, chargeAmount: parseFloat(e.target.value) || 0 }))}
-                                                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs font-bold font-mono text-right text-rose-700"
+                                                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs font-mono text-right text-rose-700"
                                             />
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                                        <label className="block text-xs text-slate-700 mb-1 flex items-center gap-1">
                                             <Heart size={13} className="text-rose-500" />
                                             <span>Card Inscription / Cake Text Message</span>
                                         </label>
@@ -1226,16 +1226,16 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             }`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                                             spaWellness.enabled ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-500'
                                         }`}>
                                             <Sparkles size={16} />
                                         </div>
                                         <div>
-                                            <label className="text-sm font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                            <label className="text-sm text-slate-800 flex items-center gap-2 cursor-pointer">
                                                 <span>Hotel Wellness &amp; Spa Experience</span>
                                                 {spaWellness.enabled && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800">
                                                         Active
                                                     </span>
                                                 )}
@@ -1261,7 +1261,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <div className="space-y-3.5 pt-1">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Treatment / Spa Service
                                             </label>
                                             <select
@@ -1288,7 +1288,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Number of Persons
                                             </label>
                                             <select
@@ -1303,7 +1303,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            <label className="block text-xs text-slate-700 mb-1">
                                                 Preferred Appointment Time
                                             </label>
                                             <input
@@ -1316,7 +1316,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
 
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
-                                                <label className="text-xs font-bold text-slate-700">
+                                                <label className="text-xs text-slate-700">
                                                     Total Spa Charge (BDT)
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 cursor-pointer select-none">
@@ -1334,7 +1334,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 disabled={spaWellness.isComplimentary}
                                                 value={spaWellness.isComplimentary ? 0 : spaWellness.chargeAmount}
                                                 onChange={e => setSpaWellness(prev => ({ ...prev, chargeAmount: parseFloat(e.target.value) || 0 }))}
-                                                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs font-bold font-mono text-right text-teal-700"
+                                                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs font-mono text-right text-teal-700"
                                             />
                                         </div>
                                     </div>
@@ -1349,7 +1349,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-sm font-bold text-slate-800 m-0">
+                                        <h3 className="text-sm text-slate-800 m-0">
                                             Guaranteed Early Check-In &amp; Late Check-Out (Time-Flex)
                                         </h3>
                                         <p className="text-xs text-slate-500 m-0">
@@ -1373,7 +1373,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         timingFlex.earlyCheckIn ? 'bg-blue-50/60 border-blue-200' : 'bg-white border-slate-200'
                                     }`}>
                                         <div className="flex items-center justify-between mb-2">
-                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                                            <label className="flex items-center gap-2 text-xs text-slate-800 cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     checked={timingFlex.earlyCheckIn}
@@ -1382,7 +1382,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 />
                                                 <span>Guaranteed Early Check-In</span>
                                             </label>
-                                            <span className="text-[10px] font-bold text-blue-700 font-mono">
+                                            <span className="text-[10px] text-blue-700 font-mono">
                                                 {timingFlex.isComplimentary ? 'Free' : `৳${timingFlex.earlyCheckInCharge}`}
                                             </span>
                                         </div>
@@ -1412,7 +1412,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                         disabled={timingFlex.isComplimentary}
                                                         value={timingFlex.isComplimentary ? 0 : timingFlex.earlyCheckInCharge}
                                                         onChange={e => setTimingFlex(prev => ({ ...prev, earlyCheckInCharge: parseFloat(e.target.value) || 0 }))}
-                                                        className="w-full h-8 px-2 rounded-lg border border-slate-300 text-xs font-mono font-bold text-right"
+                                                        className="w-full h-8 px-2 rounded-lg border border-slate-300 text-xs font-mono text-right"
                                                     />
                                                 </div>
                                             </div>
@@ -1424,7 +1424,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                         timingFlex.lateCheckOut ? 'bg-blue-50/60 border-blue-200' : 'bg-white border-slate-200'
                                     }`}>
                                         <div className="flex items-center justify-between mb-2">
-                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                                            <label className="flex items-center gap-2 text-xs text-slate-800 cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     checked={timingFlex.lateCheckOut}
@@ -1433,7 +1433,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                 />
                                                 <span>Guaranteed Late Check-Out</span>
                                             </label>
-                                            <span className="text-[10px] font-bold text-blue-700 font-mono">
+                                            <span className="text-[10px] text-blue-700 font-mono">
                                                 {timingFlex.isComplimentary ? 'Free' : `৳${timingFlex.lateCheckOutCharge}`}
                                             </span>
                                         </div>
@@ -1463,7 +1463,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                         disabled={timingFlex.isComplimentary}
                                                         value={timingFlex.isComplimentary ? 0 : timingFlex.lateCheckOutCharge}
                                                         onChange={e => setTimingFlex(prev => ({ ...prev, lateCheckOutCharge: parseFloat(e.target.value) || 0 }))}
-                                                        className="w-full h-8 px-2 rounded-lg border border-slate-300 text-xs font-mono font-bold text-right"
+                                                        className="w-full h-8 px-2 rounded-lg border border-slate-300 text-xs font-mono text-right"
                                                     />
                                                 </div>
                                             </div>
@@ -1479,7 +1479,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                         <div className="space-y-4 animate-in fade-in duration-100">
                             <div className="flex items-center justify-between bg-slate-50/70 p-3 rounded-xl border border-slate-200">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-800 m-0">Custom Add-on Services</h3>
+                                    <h3 className="text-sm text-slate-800 m-0">Custom Add-on Services</h3>
                                     <p className="text-xs text-slate-500 m-0">
                                         Add arbitrary hotel amenities, laundry packages, city tours, or meeting room rentals
                                     </p>
@@ -1487,7 +1487,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={handleAddCustomItem}
-                                    className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                                    className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                                 >
                                     <Plus size={13} className="stroke-[2.5]" />
                                     <span>Add Custom Service</span>
@@ -1498,7 +1498,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                 <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                                 <th className="py-2 px-3">Service Title / Description</th>
                                                 <th className="py-2 px-2 text-center w-28">Billing Mode</th>
                                                 <th className="py-2 px-2 text-center w-16">Qty</th>
@@ -1558,7 +1558,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                                                                 className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                                                             />
                                                         </td>
-                                                        <td className="py-2 px-2 text-right font-mono font-bold text-slate-900">
+                                                        <td className="py-2 px-2 text-right font-mono text-slate-900">
                                                             ৳{line.toLocaleString()}
                                                         </td>
                                                         <td className="py-2 px-2 text-center">
@@ -1580,14 +1580,14 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                             ) : (
                                 <div className="p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-slate-500">
                                     <Sparkles size={28} className="mx-auto text-slate-300 mb-1.5" />
-                                    <p className="text-xs font-bold text-slate-700 m-0">No Custom Add-On Items Added</p>
+                                    <p className="text-xs text-slate-700 m-0">No Custom Add-On Items Added</p>
                                     <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto mb-3">
                                         Click the button above to add tailor-made amenities like laundry packages, excursions, or meeting room hours.
                                     </p>
                                     <button
                                         type="button"
                                         onClick={handleAddCustomItem}
-                                        className="h-8 px-3.5 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                                        className="h-8 px-3.5 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 text-xs rounded-lg cursor-pointer transition-colors shadow-2xs"
                                     >
                                         + Add First Custom Service
                                     </button>
@@ -1601,20 +1601,20 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                 <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-3 text-xs">
                         <div className="flex flex-col">
-                            <span className="text-[9.5px] uppercase font-bold text-slate-400">Room Base</span>
+                            <span className="text-[9.5px] uppercase text-slate-400">Room Base</span>
                             <span className="font-semibold text-slate-700 font-mono">৳{roomStayTotal.toLocaleString()}</span>
                         </div>
                         <span className="text-slate-300 font-bold">+</span>
                         <div className="flex flex-col">
-                            <span className="text-[9.5px] uppercase font-bold text-slate-400">All Add-Ons</span>
+                            <span className="text-[9.5px] uppercase text-slate-400">All Add-Ons</span>
                             <span className={`font-semibold font-mono ${totalAddonsCharge > 0 ? 'text-blue-700' : 'text-slate-500'}`}>
                                 ৳{totalAddonsCharge.toLocaleString()}
                             </span>
                         </div>
                         <span className="text-slate-300 font-bold">=</span>
                         <div className="flex flex-col bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                            <span className="text-[9.5px] uppercase font-bold text-blue-600">Total Room Charge</span>
-                            <span className="font-bold text-slate-900 font-mono text-sm">৳{grandRowTotal.toLocaleString()}</span>
+                            <span className="text-[9.5px] uppercase text-blue-600">Total Room Charge</span>
+                            <span className="text-slate-900 font-mono text-sm">৳{grandRowTotal.toLocaleString()}</span>
                         </div>
                     </div>
 
@@ -1637,7 +1637,7 @@ export const RoomAddonServicesModal: React.FC<RoomAddonServicesModalProps> = ({
                         <button
                             type="button"
                             onClick={handleSave}
-                            className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                            className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                         >
                             <Check size={14} className="stroke-[2.5]" />
                             <span>Apply All Services</span>

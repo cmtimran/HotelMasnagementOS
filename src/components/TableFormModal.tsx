@@ -14,7 +14,7 @@ const TableFormModal = ({ isOpen, onClose }: TableFormModalProps) => {
                 {/* Header */}
                 <div className="bg-white border-b px-6 py-4 flex justify-between items-center rounded-t-xl">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-800">Add New Table</h2>
+                        <h2 className="text-xl text-gray-800">Add New Table</h2>
                         <p className="text-sm text-gray-500">Configure table settings, location, and capacity</p>
                     </div>
                     <button onClick={onClose} className="hover:bg-gray-100 p-2 rounded-full transition-colors text-gray-500">
@@ -28,7 +28,7 @@ const TableFormModal = ({ isOpen, onClose }: TableFormModalProps) => {
 
                         {/* Section 1: Location & Identity */}
                         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
+                            <h3 className="text-sm text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
                                 Location & Identity
                             </h3>
@@ -64,7 +64,7 @@ const TableFormModal = ({ isOpen, onClose }: TableFormModalProps) => {
 
                         {/* Section 2: Table Details */}
                         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
+                            <h3 className="text-sm text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">2</span>
                                 Table Details
                             </h3>
@@ -98,7 +98,7 @@ const TableFormModal = ({ isOpen, onClose }: TableFormModalProps) => {
 
                         {/* Section 3: Capacity & Features */}
                         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
+                            <h3 className="text-sm text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
                                 Seating Capacity & Features
                             </h3>
@@ -125,7 +125,7 @@ const TableFormModal = ({ isOpen, onClose }: TableFormModalProps) => {
 
                         {/* Section 4: Operations */}
                         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
+                            <h3 className="text-sm text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">4</span>
                                 Operations & Additional
                             </h3>
@@ -135,7 +135,7 @@ const TableFormModal = ({ isOpen, onClose }: TableFormModalProps) => {
                                         <label className="text-sm font-medium text-gray-700">QR Code String</label>
                                         <div className="relative">
                                             <input type="text" placeholder="Scanning Code (Auto-generated usually)" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" />
-                                            <button className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-600 font-bold hover:underline">GENERATE</button>
+                                            <button className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-600 hover:underline">GENERATE</button>
                                         </div>
                                     </div>
                                     <div className="space-y-1">

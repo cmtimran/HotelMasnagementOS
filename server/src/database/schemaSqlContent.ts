@@ -1,9 +1,9 @@
-﻿// Auto-generated DDL schema content for Serverless/Vercel zero-filesystem fallback
+// Auto-generated DDL schema content for Serverless/Vercel zero-filesystem fallback
 export const schemaSql = `-- ============================================================================
 -- HOTEL MANAGEMENT OS (PMS CORE) - RELATIONAL DATABASE SCHEMA (1NF - 4NF)
 -- Supports: Multi-Property Hotel Chains, Room Inventory, Group Reservations,
 --           USALI Double-Entry Accounting, Human Resources Management (HRM).
--- Engine: SQLite / PostgreSQL ANSI SQL Compatible
+-- Engine: PostgreSQL ANSI SQL Compatible
 -- ============================================================================
 
 PRAGMA foreign_keys = ON;

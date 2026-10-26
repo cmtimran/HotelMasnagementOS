@@ -8,12 +8,13 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { useNavigation } from '../context/NavigationContext';
-import { 
-    getCanonicalRooms, 
-    getAllStoredReservations, 
-    syncRoomTypesAndRoomsFromDB, 
+import {
+    getCanonicalRooms,
+    getAllStoredReservations,
+    syncRoomTypesAndRoomsFromDB,
     syncReservationsFromDB,
-    subscribeToPMSEvents
+    subscribeToPMSEvents,
+    getOperatingSystemDate
 } from '../utils/roomInventoryEngine';
 
 const Dashboard: React.FC = () => {
@@ -38,10 +39,17 @@ const Dashboard: React.FC = () => {
         return () => unsub();
     }, []);
 
-    // Operating System Date
-    const todayStr = useMemo(() => {
-        const sys = localStorage.getItem('hotel_system_date');
-        return sys ? new Date(sys).toISOString().split('T')[0] : '2026-07-01';
+    // Operating System Date (realtime synchronized)
+    const [todayStr, setTodayStr] = useState<string>(() => getOperatingSystemDate());
+
+    useEffect(() => {
+        const handleSync = (e: any) => {
+            if (e?.detail?.type === 'SYSTEM_DATE_CHANGED' && e?.detail?.systemDate) {
+                setTodayStr(e.detail.systemDate);
+            }
+        };
+        window.addEventListener('hotel_pms_sync_event', handleSync);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
     }, []);
 
     // Dynamic Calculations based on Central DB
@@ -64,7 +72,7 @@ const Dashboard: React.FC = () => {
 
         const adr = occupiedCount > 0 ? Math.round(totalRevenue / (activeReservations.reduce((sum, r) => sum + (Number(r.nights) || 1), 0) || 1)) : 4500;
         const revPar = totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 3150;
-        const avgNights = activeReservations.length > 0 
+        const avgNights = activeReservations.length > 0
             ? (activeReservations.reduce((sum, r) => sum + (Number(r.nights) || 1), 0) / activeReservations.length).toFixed(1)
             : '2.5';
 
@@ -133,15 +141,9 @@ const Dashboard: React.FC = () => {
         <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5 font-sans">
             {/* Standardized Thesis Page Header */}
             <PageHeader
-                title="HMS Executive Overview"
+                title="Executive Overview"
                 subtitle="Real-time property operations, guest arrival flows, live occupancy, and revenue pacing"
                 icon={<TrendingUp size={22} />}
-                badge={
-                    <span className="badge-status-active">
-                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Live Desk Active
-                    </span>
-                }
                 actions={
                     <>
                         <div className="btn-secondary text-xs">
@@ -165,22 +167,22 @@ const Dashboard: React.FC = () => {
                 {/* Occupancy Rate - Radial Gauge */}
                 <div className="card-container p-4 flex flex-col items-center justify-between">
                     <div className="flex items-center justify-between w-full mb-1">
-                        <span className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Occupancy</span>
+                        <span className="text-slate-500 text-[11px] uppercase tracking-wider">Occupancy</span>
                         <span className="badge-status-active">Live</span>
                     </div>
                     <div className="relative size-24 flex items-center justify-center my-2">
                         <svg className="w-full h-full transform -rotate-90">
                             <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                            <circle 
-                                cx="48" 
-                                cy="48" 
-                                r="40" 
-                                stroke="currentColor" 
-                                strokeWidth="8" 
-                                fill="transparent" 
-                                strokeDasharray={251.32} 
-                                strokeDashoffset={251.32 * (1 - Math.min(1, metrics.occupancyRate / 100))} 
-                                className="text-primary transition-all duration-500" 
+                            <circle
+                                cx="48"
+                                cy="48"
+                                r="40"
+                                stroke="currentColor"
+                                strokeWidth="8"
+                                fill="transparent"
+                                strokeDasharray={251.32}
+                                strokeDashoffset={251.32 * (1 - Math.min(1, metrics.occupancyRate / 100))}
+                                className="text-primary transition-all duration-500"
                             />
                         </svg>
                         <div className="absolute flex flex-col items-center">
@@ -193,21 +195,21 @@ const Dashboard: React.FC = () => {
 
                 {/* Front Desk Activity */}
                 <div className="card-container p-4 flex flex-col justify-between">
-                    <span className="text-slate-500 text-[11px] font-bold uppercase tracking-wider mb-2">Front Desk Activity</span>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider mb-2">Front Desk Activity</span>
                     <div className="grid grid-cols-3 gap-2 flex-1">
                         <div className="flex flex-col items-center justify-center p-2 bg-emerald-50/70 rounded-xl border border-emerald-100">
                             <LogIn size={16} className="text-emerald-600 mb-1" />
-                            <span className="text-base font-bold text-slate-900 leading-tight">{metrics.arrivalsCount}</span>
+                            <span className="text-base text-slate-900 leading-tight">{metrics.arrivalsCount}</span>
                             <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Arrivals</span>
                         </div>
                         <div className="flex flex-col items-center justify-center p-2 bg-amber-50/70 rounded-xl border border-amber-100">
                             <LogOut size={16} className="text-amber-600 mb-1" />
-                            <span className="text-base font-bold text-slate-900 leading-tight">{metrics.departsCount}</span>
+                            <span className="text-base text-slate-900 leading-tight">{metrics.departsCount}</span>
                             <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Departs</span>
                         </div>
                         <div className="flex flex-col items-center justify-center p-2 bg-blue-50/70 rounded-xl border border-blue-100">
                             <BedDouble size={16} className="text-primary mb-1" />
-                            <span className="text-base font-bold text-slate-900 leading-tight">{metrics.inHouseCount}</span>
+                            <span className="text-base text-slate-900 leading-tight">{metrics.inHouseCount}</span>
                             <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">In-House</span>
                         </div>
                     </div>
@@ -218,8 +220,8 @@ const Dashboard: React.FC = () => {
                 <div className="grid grid-rows-3 gap-2">
                     <div className="card-container px-3.5 py-2.5 flex items-center justify-between">
                         <div>
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">ADR</p>
-                            <h4 className="text-xs font-bold text-slate-900 leading-tight">৳ {metrics.adr.toLocaleString()}</h4>
+                            <p className="text-slate-400 text-[10px] uppercase tracking-wider">ADR</p>
+                            <h4 className="text-xs text-slate-900 leading-tight">৳ {metrics.adr.toLocaleString()}</h4>
                         </div>
                         <span className="text-[10.5px] text-emerald-600 font-semibold flex items-center bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
                             <TrendingUp size={10} className="mr-0.5" /> Live
@@ -227,8 +229,8 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="card-container px-3.5 py-2.5 flex items-center justify-between">
                         <div>
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">RevPAR</p>
-                            <h4 className="text-xs font-bold text-slate-900 leading-tight">৳ {metrics.revPar.toLocaleString()}</h4>
+                            <p className="text-slate-400 text-[10px] uppercase tracking-wider">RevPAR</p>
+                            <h4 className="text-xs text-slate-900 leading-tight">৳ {metrics.revPar.toLocaleString()}</h4>
                         </div>
                         <span className="text-[10.5px] text-emerald-600 font-semibold flex items-center bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
                             <TrendingUp size={10} className="mr-0.5" /> Live
@@ -236,8 +238,8 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="card-container px-3.5 py-2.5 flex items-center justify-between">
                         <div>
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">ALOS</p>
-                            <h4 className="text-xs font-bold text-slate-900 leading-tight">{metrics.avgNights} Nights</h4>
+                            <p className="text-slate-400 text-[10px] uppercase tracking-wider">ALOS</p>
+                            <h4 className="text-xs text-slate-900 leading-tight">{metrics.avgNights} Nights</h4>
                         </div>
                         <span className="text-[10px] text-slate-400 font-medium">Avg Stay</span>
                     </div>
@@ -261,21 +263,21 @@ const Dashboard: React.FC = () => {
                 {/* Revenue Breakdown */}
                 <div className="card-container p-4">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-slate-900 font-bold text-xs tracking-tight">Financial Portfolio Summary</h3>
+                        <h3 className="text-slate-900 text-xs tracking-tight">Financial Portfolio Summary</h3>
                         <span className="text-[10.5px] text-slate-400 font-medium">Live Ledger</span>
                     </div>
                     <div className="space-y-3 mt-3">
                         <div className="flex justify-between items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                             <span className="text-xs text-slate-600 font-medium">Total Billed Revenue</span>
-                            <span className="text-xs font-bold text-slate-900 font-mono">৳ {metrics.totalRevenue.toLocaleString()}</span>
+                            <span className="text-xs text-slate-900 font-mono">৳ {metrics.totalRevenue.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
                             <span className="text-xs text-emerald-800 font-medium">Settled Collections</span>
-                            <span className="text-xs font-bold text-emerald-700 font-mono">৳ {metrics.totalPaid.toLocaleString()}</span>
+                            <span className="text-xs text-emerald-700 font-mono">৳ {metrics.totalPaid.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center p-2.5 bg-amber-50/60 rounded-xl border border-amber-100">
                             <span className="text-xs text-amber-800 font-medium">Outstanding Ledger</span>
-                            <span className="text-xs font-bold text-amber-700 font-mono">৳ {metrics.totalDue.toLocaleString()}</span>
+                            <span className="text-xs text-amber-700 font-mono">৳ {metrics.totalDue.toLocaleString()}</span>
                         </div>
                     </div>
                 </div>
@@ -283,8 +285,8 @@ const Dashboard: React.FC = () => {
                 {/* Real Today Collections */}
                 <div className="card-container p-4">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-slate-900 font-bold text-xs tracking-tight">Settled Receipts</h3>
-                        <span className="font-mono font-bold text-sm text-slate-900">৳ {metrics.totalPaid.toLocaleString()}</span>
+                        <h3 className="text-slate-900 text-xs tracking-tight">Settled Receipts</h3>
+                        <span className="font-mono text-sm text-slate-900">৳ {metrics.totalPaid.toLocaleString()}</span>
                     </div>
                     <div className="space-y-2.5 mt-3">
                         <div>
@@ -292,7 +294,7 @@ const Dashboard: React.FC = () => {
                                 <span className="flex items-center gap-1.5 font-medium text-slate-700">
                                     <Banknote size={13} className="text-emerald-600" /> Settled Cash & MFS
                                 </span>
-                                <span className="font-bold text-slate-900 font-mono">৳ {Math.round(metrics.totalPaid * 0.6).toLocaleString()} (60%)</span>
+                                <span className="text-slate-900 font-mono">৳ {Math.round(metrics.totalPaid * 0.6).toLocaleString()} (60%)</span>
                             </div>
                             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                 <div className="bg-emerald-500 h-1.5 rounded-full w-[60%]"></div>
@@ -303,7 +305,7 @@ const Dashboard: React.FC = () => {
                                 <span className="flex items-center gap-1.5 font-medium text-slate-700">
                                     <CreditCard size={13} className="text-primary" /> Card & Corporate POS
                                 </span>
-                                <span className="font-bold text-slate-900 font-mono">৳ {Math.round(metrics.totalPaid * 0.4).toLocaleString()} (40%)</span>
+                                <span className="text-slate-900 font-mono">৳ {Math.round(metrics.totalPaid * 0.4).toLocaleString()} (40%)</span>
                             </div>
                             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                 <div className="bg-primary h-1.5 rounded-full w-[40%]"></div>
@@ -314,7 +316,7 @@ const Dashboard: React.FC = () => {
 
                 {/* Housekeeping Live Overview */}
                 <div className="card-container p-4 flex flex-col justify-between">
-                    <span className="text-slate-500 text-[11px] font-bold uppercase tracking-wider mb-2">Housekeeping Status</span>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider mb-2">Housekeeping Status</span>
                     <div className="flex h-3 w-full rounded-full overflow-hidden mb-2 bg-slate-100">
                         <div style={{ width: `${metrics.totalRooms > 0 ? Math.round((metrics.housekeeping.clean / metrics.totalRooms) * 100) : 50}%` }} className="bg-emerald-500" title="Clean"></div>
                         <div style={{ width: `${metrics.totalRooms > 0 ? Math.round((metrics.housekeeping.dirty / metrics.totalRooms) * 100) : 25}%` }} className="bg-amber-500" title="Dirty"></div>
@@ -336,7 +338,7 @@ const Dashboard: React.FC = () => {
                 <div className="lg:col-span-2 card-container p-4">
                     <div className="flex justify-between items-center mb-3">
                         <div>
-                            <h3 className="text-slate-900 font-bold text-xs tracking-tight">Real-Time Room Status Matrix ({metrics.totalRooms} Rooms)</h3>
+                            <h3 className="text-slate-900 text-xs tracking-tight">Real-Time Room Status Matrix ({metrics.totalRooms} Rooms)</h3>
                             <p className="text-[11px] text-slate-500">Live operational state per physical room asset</p>
                         </div>
                         <button
@@ -351,7 +353,7 @@ const Dashboard: React.FC = () => {
                     <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
                         {metrics.roomStatusList.map((room) => (
                             <div key={room.number}
-                                className={`${getStatusColor(room.status)} h-8 rounded-lg flex items-center justify-center text-[11px] font-bold cursor-pointer hover:opacity-90 transition-opacity relative shadow-2xs`}
+                                className={`${getStatusColor(room.status)} h-8 rounded-lg flex items-center justify-center text-[11px] cursor-pointer hover:opacity-90 transition-opacity relative shadow-2xs`}
                                 title={`Room ${room.number}: ${room.status}`}
                                 onClick={() => setActivePage('room-rack')}
                             >
@@ -372,9 +374,9 @@ const Dashboard: React.FC = () => {
                 {/* Real Upcoming Arrivals & In-House Stays */}
                 <div className="card-container p-4 space-y-3">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <h3 className="text-slate-900 font-bold text-xs tracking-tight">Active Guests & Arrivals</h3>
-                        <button 
-                            type="button" 
+                        <h3 className="text-slate-900 text-xs tracking-tight">Active Guests & Arrivals</h3>
+                        <button
+                            type="button"
                             onClick={() => setActivePage('reservations')}
                             className="text-[11px] text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
                         >
@@ -389,16 +391,15 @@ const Dashboard: React.FC = () => {
                                     <User size={13} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="text-xs font-bold text-slate-900 truncate">{res.guestName}</h4>
+                                    <h4 className="text-xs text-slate-900 truncate">{res.guestName}</h4>
                                     <p className="text-[10px] text-slate-400 font-medium">Room {res.roomNumber} • {res.roomType}</p>
                                 </div>
-                                <span className={`text-[10px] font-semibold px-2 py-0.5 border rounded-full capitalize shadow-2xs ${
-                                    res.status === 'in-house' || res.status === 'arrived' 
-                                        ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                                        : res.status === 'hold'
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 border rounded-full capitalize shadow-2xs ${res.status === 'in-house' || res.status === 'arrived'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : res.status === 'hold'
                                         ? 'bg-amber-50 text-amber-700 border-amber-200'
                                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                }`}>
+                                    }`}>
                                     {res.status}
                                 </span>
                             </div>

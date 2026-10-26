@@ -416,7 +416,7 @@ export default function UserStaffManagement() {
                 <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Monthly Payroll</span>
-                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold font-mono text-xs">
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-mono text-xs">
                             ৳
                         </div>
                     </div>
@@ -534,12 +534,12 @@ export default function UserStaffManagement() {
                                             <td className="py-3 px-4">
                                                 <div className="flex items-center gap-3">
                                                     <div
-                                                        className={`size-9 rounded-xl ${user.avatarColor} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs`}
+                                                        className={`size-9 rounded-xl ${user.avatarColor} text-white text-xs flex items-center justify-center shrink-0 shadow-2xs`}
                                                     >
                                                         {initials}
                                                     </div>
                                                     <div>
-                                                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                                        <div className="text-slate-900 flex items-center gap-1.5">
                                                             <span>{user.name}</span>
                                                             <span className="text-[10px] text-slate-400 font-normal">
                                                                 (@{user.username})
@@ -590,7 +590,7 @@ export default function UserStaffManagement() {
                                                 <button
                                                     type="button"
                                                     onClick={() => toggleRevealPin(user.id)}
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 font-mono text-xs font-bold text-slate-800 border border-slate-200 hover:bg-slate-200 transition"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 font-mono text-xs text-slate-800 border border-slate-200 hover:bg-slate-200 transition"
                                                     title="Click to show/hide 4-digit POS PIN"
                                                 >
                                                     <span>{isRevealed ? user.posPin : '••••'}</span>
@@ -603,14 +603,14 @@ export default function UserStaffManagement() {
                                             </td>
 
                                             {/* Salary */}
-                                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                                            <td className="py-3 px-4 text-right font-mono text-slate-900">
                                                 ৳{user.salary.toLocaleString()}
                                             </td>
 
                                             {/* Status */}
                                             <td className="py-3 px-4 text-center">
                                                 <span
-                                                    className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                    className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] border ${
                                                         user.status === 'active'
                                                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                             : user.status === 'locked'
@@ -677,7 +677,7 @@ export default function UserStaffManagement() {
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <User className="size-5 text-sky-600" />
-                                <h3 className="font-bold text-slate-900 text-base">
+                                <h3 className="text-slate-900 text-base">
                                     Staff Account Profile
                                 </h3>
                             </div>
@@ -693,7 +693,7 @@ export default function UserStaffManagement() {
                         <div className="p-6 space-y-4">
                             <div className="flex items-center gap-4">
                                 <div
-                                    className={`size-16 rounded-2xl ${viewingUser.avatarColor} text-white font-bold text-xl flex items-center justify-center shadow-lg`}
+                                    className={`size-16 rounded-2xl ${viewingUser.avatarColor} text-white text-xl flex items-center justify-center shadow-lg`}
                                 >
                                     {viewingUser.name
                                         .split(' ')
@@ -703,7 +703,7 @@ export default function UserStaffManagement() {
                                         .slice(0, 2)}
                                 </div>
                                 <div>
-                                    <h4 className="text-lg font-bold text-slate-900">
+                                    <h4 className="text-lg text-slate-900">
                                         {viewingUser.name}
                                     </h4>
                                     <div className="text-xs text-slate-500 font-mono">@{viewingUser.username}</div>
@@ -716,13 +716,13 @@ export default function UserStaffManagement() {
                             <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-100">
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">EMPLOYEE CODE:</span>
-                                    <span className="font-mono font-bold text-slate-800">
+                                    <span className="font-mono text-slate-800">
                                         {viewingUser.code}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">SECURITY PIN:</span>
-                                    <span className="font-mono font-bold text-slate-800">
+                                    <span className="font-mono text-slate-800">
                                         {viewingUser.posPin}
                                     </span>
                                 </div>
@@ -746,7 +746,7 @@ export default function UserStaffManagement() {
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[10px]">BASE SALARY:</span>
-                                    <span className="font-mono font-bold text-emerald-600">
+                                    <span className="font-mono text-emerald-600">
                                         ৳{viewingUser.salary.toLocaleString()} / mo
                                     </span>
                                 </div>
@@ -764,7 +764,7 @@ export default function UserStaffManagement() {
                                     <button
                                         type="button"
                                         onClick={() => handleUnlockUser(viewingUser.id, viewingUser.name)}
-                                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shrink-0"
+                                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs transition shrink-0"
                                     >
                                         Unlock Now
                                     </button>
@@ -792,7 +792,7 @@ export default function UserStaffManagement() {
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <Users className="size-5 text-sky-600" />
-                                <h2 className="text-base font-bold text-slate-900">
+                                <h2 className="text-base text-slate-900">
                                     {editingUserId ? 'Edit Staff Account' : 'Register New Staff Member'}
                                 </h2>
                             </div>
@@ -969,7 +969,7 @@ export default function UserStaffManagement() {
                                         placeholder="4-digit PIN"
                                         value={formPosPin}
                                         onChange={e => setFormPosPin(e.target.value.replace(/\D/g, ''))}
-                                        className="w-full px-3 py-2 text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg text-slate-900"
+                                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-200 rounded-lg text-slate-900"
                                     />
                                 </div>
                             </div>

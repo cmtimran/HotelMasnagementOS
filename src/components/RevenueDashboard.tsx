@@ -161,9 +161,9 @@ const RevenueDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="card-container flex items-center justify-between">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Daily Revenue</p>
-                        <p className="text-2xl font-bold text-slate-900 mt-1">৳{stats.todayRevenue.toLocaleString()}</p>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-1">
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Active Daily Revenue</p>
+                        <p className="text-2xl text-slate-900 mt-1">৳{stats.todayRevenue.toLocaleString()}</p>
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 mt-1">
                             {stats.todayGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                             {Math.abs(stats.todayGrowth)}% vs previous period
                         </span>
@@ -175,9 +175,9 @@ const RevenueDashboard = () => {
 
                 <div className="card-container flex items-center justify-between">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Current Month Revenue</p>
-                        <p className="text-2xl font-bold text-slate-900 mt-1">৳{stats.monthRevenue.toLocaleString()}</p>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-1">
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Current Month Revenue</p>
+                        <p className="text-2xl text-slate-900 mt-1">৳{stats.monthRevenue.toLocaleString()}</p>
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 mt-1">
                             {stats.monthGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                             {Math.abs(stats.monthGrowth)}% monthly pacing
                         </span>
@@ -189,9 +189,9 @@ const RevenueDashboard = () => {
 
                 <div className="card-container flex items-center justify-between">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cumulative Folio Revenue</p>
-                        <p className="text-2xl font-bold text-slate-900 mt-1">৳{stats.yearRevenue.toLocaleString()}</p>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 mt-1">
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Cumulative Folio Revenue</p>
+                        <p className="text-2xl text-slate-900 mt-1">৳{stats.yearRevenue.toLocaleString()}</p>
+                        <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 mt-1">
                             {stats.yearGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                             {Math.abs(stats.yearGrowth)}% annual growth
                         </span>
@@ -211,7 +211,7 @@ const RevenueDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[11px] text-slate-500 font-semibold uppercase">Occupancy Rate</p>
-                            <p className="text-xl font-bold text-slate-900">{stats.occupancyRate}%</p>
+                            <p className="text-xl text-slate-900">{stats.occupancyRate}%</p>
                         </div>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2">
@@ -226,7 +226,7 @@ const RevenueDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[11px] text-slate-500 font-semibold uppercase">ADR (Avg Daily Rate)</p>
-                            <p className="text-xl font-bold text-slate-900">৳{stats.adr.toLocaleString()}</p>
+                            <p className="text-xl text-slate-900">৳{stats.adr.toLocaleString()}</p>
                         </div>
                     </div>
                     <p className="text-[11px] text-slate-400">Average realized rate per occupied room</p>
@@ -239,7 +239,7 @@ const RevenueDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[11px] text-slate-500 font-semibold uppercase">RevPAR</p>
-                            <p className="text-xl font-bold text-slate-900">৳{stats.revpar.toLocaleString()}</p>
+                            <p className="text-xl text-slate-900">৳{stats.revpar.toLocaleString()}</p>
                         </div>
                     </div>
                     <p className="text-[11px] text-slate-400">Revenue per available physical room</p>
@@ -249,13 +249,13 @@ const RevenueDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Revenue by Department */}
                 <div className="card-container">
-                    <h3 className="text-sm font-bold text-slate-900 mb-4">Revenue Breakdown</h3>
+                    <h3 className="text-sm text-slate-900 mb-4">Revenue Breakdown</h3>
                     <div className="space-y-3.5">
                         {revenueByDepartment.map((dept, idx) => (
                             <div key={idx}>
                                 <div className="flex items-center justify-between mb-1.5 text-xs">
                                     <span className="font-semibold text-slate-700">{dept.name}</span>
-                                    <span className="font-bold text-slate-900">৳{dept.amount.toLocaleString()} ({dept.percentage}%)</span>
+                                    <span className="text-slate-900">৳{dept.amount.toLocaleString()} ({dept.percentage}%)</span>
                                 </div>
                                 <div className="w-full bg-slate-100 rounded-full h-2">
                                     <div className={`bg-gradient-to-r ${dept.color} h-2 rounded-full transition-all`} style={{ width: `${dept.percentage}%` }} />
@@ -267,7 +267,7 @@ const RevenueDashboard = () => {
 
                 {/* Monthly Trend */}
                 <div className="card-container">
-                    <h3 className="text-sm font-bold text-slate-900 mb-4">Monthly Booking Revenue Trend</h3>
+                    <h3 className="text-sm text-slate-900 mb-4">Monthly Booking Revenue Trend</h3>
                     <div className="flex items-end justify-between gap-2 h-40">
                         {monthlyTrend.map((month, idx) => (
                             <div key={idx} className="flex-1 flex flex-col items-center gap-1.5">
@@ -287,7 +287,7 @@ const RevenueDashboard = () => {
             {/* Top Performing Room Types */}
             <div className="table-container">
                 <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/60">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Room Category Performance</h3>
+                    <h3 className="text-xs uppercase tracking-wider text-slate-700">Room Category Performance</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full">
@@ -303,8 +303,8 @@ const RevenueDashboard = () => {
                         <tbody>
                             {topRoomTypes.map((room, idx) => (
                                 <tr key={idx} className="hover:bg-primary-subtle/30 transition-colors">
-                                    <td className="font-bold text-slate-900">{room.type}</td>
-                                    <td className="font-bold text-emerald-600">৳{room.revenue.toLocaleString()}</td>
+                                    <td className="text-slate-900">{room.type}</td>
+                                    <td className="text-emerald-600">৳{room.revenue.toLocaleString()}</td>
                                     <td className="font-semibold text-slate-700">{room.bookings}</td>
                                     <td className="font-semibold text-slate-700">৳{room.avgRate.toLocaleString()}</td>
                                     <td className="w-40">

@@ -148,8 +148,8 @@ const TableLayout = () => {
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Tables</p>
-                        <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{stats.total}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Tables</p>
+                        <p className="text-xl sm:text-2xl text-slate-900 mt-1">{stats.total}</p>
                     </div>
                     <div className="size-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
                         <UtensilsCrossed size={17} />
@@ -157,8 +157,8 @@ const TableLayout = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Available</p>
-                        <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{stats.available}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Available</p>
+                        <p className="text-xl sm:text-2xl text-emerald-600 mt-1">{stats.available}</p>
                     </div>
                     <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                         <CheckCircle2 size={17} />
@@ -166,8 +166,8 @@ const TableLayout = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Occupied</p>
-                        <p className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{stats.occupied}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Occupied</p>
+                        <p className="text-xl sm:text-2xl text-rose-600 mt-1">{stats.occupied}</p>
                     </div>
                     <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
                         <Users size={17} />
@@ -175,8 +175,8 @@ const TableLayout = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Reserved</p>
-                        <p className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{stats.reserved}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Reserved</p>
+                        <p className="text-xl sm:text-2xl text-amber-600 mt-1">{stats.reserved}</p>
                     </div>
                     <div className="size-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                         <AlertCircle size={17} />
@@ -184,8 +184,8 @@ const TableLayout = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Revenue</p>
-                        <p className="text-xl sm:text-2xl font-bold text-primary mt-1">৳{stats.totalRevenue.toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Active Revenue</p>
+                        <p className="text-xl sm:text-2xl text-primary mt-1">৳{stats.totalRevenue.toLocaleString()}</p>
                     </div>
                     <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
                         <DollarSign size={17} />
@@ -233,7 +233,7 @@ const TableLayout = () => {
                     <div className="w-80">
                         {selectedTable ? (
                             <div className={`bg-gradient-to-br ${getStatusBg(selectedTable.status)} rounded-2xl p-6 text-white shadow-xl`}>
-                                <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                                <h3 className="text-2xl mb-4 flex items-center gap-2">
                                     <UtensilsCrossed size={24} />
                                     Table {selectedTable.number}
                                 </h3>
@@ -276,22 +276,22 @@ const TableLayout = () => {
                                 </div>
                                 <div className="mt-6 space-y-2">
                                     {selectedTable.status === 'available' && (
-                                        <button className="w-full py-3 bg-white text-gray-900 rounded-xl font-bold hover:bg-gray-100 transition-all shadow-lg">
+                                        <button className="w-full py-3 bg-white text-gray-900 rounded-xl hover:bg-gray-100 transition-all shadow-lg">
                                             Reserve Table
                                         </button>
                                     )}
                                     {selectedTable.status === 'occupied' && (
                                         <>
-                                            <button className="w-full py-3 bg-white text-gray-900 rounded-xl font-bold hover:bg-gray-100 transition-all shadow-lg">
+                                            <button className="w-full py-3 bg-white text-gray-900 rounded-xl hover:bg-gray-100 transition-all shadow-lg">
                                                 View Order
                                             </button>
-                                            <button className="w-full py-3 bg-white/20 backdrop-blur-sm border-2 border-white text-white rounded-xl font-bold hover:bg-white/30 transition-all">
+                                            <button className="w-full py-3 bg-white/20 backdrop-blur-sm border-2 border-white text-white rounded-xl hover:bg-white/30 transition-all">
                                                 Generate Bill
                                             </button>
                                         </>
                                     )}
                                     {selectedTable.status === 'reserved' && (
-                                        <button className="w-full py-3 bg-white text-gray-900 rounded-xl font-bold hover:bg-gray-100 transition-all shadow-lg">
+                                        <button className="w-full py-3 bg-white text-gray-900 rounded-xl hover:bg-gray-100 transition-all shadow-lg">
                                             Check-in Guests
                                         </button>
                                     )}

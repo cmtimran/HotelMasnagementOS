@@ -242,7 +242,7 @@ export const ShiftManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Active Hotel Shifts</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{shifts.length} Rotations</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{shifts.length} Rotations</div>
                         <span className="text-[10px] text-purple-600 font-semibold flex items-center gap-1 mt-0.5">
                             <Check size={11} /> 100% 24/7 Continuous
                         </span>
@@ -255,7 +255,7 @@ export const ShiftManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Total Roster Capacity</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{totalStaffAssigned} Staff</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{totalStaffAssigned} Staff</div>
                         <span className="text-[10px] text-blue-600 font-semibold mt-0.5 block">
                             Scheduled on Rotations
                         </span>
@@ -268,7 +268,7 @@ export const ShiftManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Cash Handover Enforced</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{cashHandoverShifts} Shifts</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{cashHandoverShifts} Shifts</div>
                         <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">
                             Mandatory Drawer Drop
                         </span>
@@ -281,7 +281,7 @@ export const ShiftManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Night Audit EOD Trigger</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{nightAuditShifts} Authorized</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{nightAuditShifts} Authorized</div>
                         <span className="text-[10px] text-amber-600 font-semibold mt-0.5 block">
                             Graveyard Shift Security
                         </span>
@@ -295,7 +295,7 @@ export const ShiftManagement: React.FC = () => {
             {/* Visual 24-Hour Timeline Bar */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs p-4 text-xs space-y-3">
                 <div className="flex items-center justify-between">
-                    <h2 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <h2 className="text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Clock size={14} className="text-purple-600" />
                         <span>24-Hour Continuous Shift Timeline & Overlap Map</span>
                     </h2>
@@ -306,7 +306,7 @@ export const ShiftManagement: React.FC = () => {
 
                 <div className="relative pt-6 pb-2">
                     {/* Time ticks 00:00 to 24:00 */}
-                    <div className="flex justify-between text-[10px] font-mono font-bold text-gray-400 border-b border-gray-200 pb-1">
+                    <div className="flex justify-between text-[10px] font-mono text-gray-400 border-b border-gray-200 pb-1">
                         <span>00:00</span>
                         <span>04:00</span>
                         <span>08:00</span>
@@ -325,7 +325,7 @@ export const ShiftManagement: React.FC = () => {
                                 </span>
                                 <div className="flex-1 bg-gray-100 h-6 rounded-md relative overflow-hidden flex items-center px-2">
                                     <div
-                                        className={`absolute h-5 rounded flex items-center px-2 font-mono text-[10px] font-bold shadow-2xs ${shift.code.includes('MOR') ? 'bg-amber-400 text-amber-950 left-[29%] w-[35%]' : shift.code.includes('EVE') ? 'bg-blue-400 text-blue-950 left-[62%] w-[35%]' : shift.code.includes('NGT') ? 'bg-purple-400 text-purple-950 left-[0%] w-[31%]' : 'bg-emerald-400 text-emerald-950 left-[37.5%] w-[37.5%]'}`}
+                                        className={`absolute h-5 rounded flex items-center px-2 font-mono text-[10px] shadow-2xs ${shift.code.includes('MOR') ? 'bg-amber-400 text-amber-950 left-[29%] w-[35%]' : shift.code.includes('EVE') ? 'bg-blue-400 text-blue-950 left-[62%] w-[35%]' : shift.code.includes('NGT') ? 'bg-purple-400 text-purple-950 left-[0%] w-[31%]' : 'bg-emerald-400 text-emerald-950 left-[37.5%] w-[37.5%]'}`}
                                     >
                                         <span>{shift.startTime} - {shift.endTime}</span>
                                     </div>
@@ -361,7 +361,7 @@ export const ShiftManagement: React.FC = () => {
                         className={`p-4 rounded-xl border-2 transition-all flex flex-col justify-between space-y-3 relative group bg-white shadow-2xs ${s.color.split(' ')[0]}`}
                     >
                         <div className="flex items-center justify-between">
-                            <span className="font-mono text-[10px] font-bold uppercase bg-white/90 px-2 py-0.5 rounded shadow-2xs border border-gray-200 text-gray-800">
+                            <span className="font-mono text-[10px] uppercase bg-white/90 px-2 py-0.5 rounded shadow-2xs border border-gray-200 text-gray-800">
                                 {s.code}
                             </span>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -387,9 +387,9 @@ export const ShiftManagement: React.FC = () => {
                         <div>
                             <div className="flex items-center gap-1.5">
                                 {getShiftIcon(s.code)}
-                                <h3 className="font-bold text-gray-900 text-sm">{s.name}</h3>
+                                <h3 className="text-gray-900 text-sm">{s.name}</h3>
                             </div>
-                            <div className="font-mono text-sm font-bold text-gray-900 mt-1">
+                            <div className="font-mono text-sm text-gray-900 mt-1">
                                 {s.startTime} - {s.endTime}
                             </div>
                             <div className="text-[10.5px] text-gray-500 mt-0.5 flex items-center gap-1">
@@ -401,19 +401,19 @@ export const ShiftManagement: React.FC = () => {
                         <div className="pt-2.5 border-t border-gray-100 text-[11px] space-y-1.5">
                             <div className="flex items-center justify-between">
                                 <span className="text-gray-500">Cash Handover:</span>
-                                <span className={`font-bold px-1.5 py-0.2 rounded text-[10px] ${s.mandatoryCashHandover ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                <span className={`px-1.5 py-0.2 rounded text-[10px] ${s.mandatoryCashHandover ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
                                     {s.mandatoryCashHandover ? 'Mandatory' : 'Optional'}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-gray-500">Night Audit Trigger:</span>
-                                <span className={`font-bold px-1.5 py-0.2 rounded text-[10px] ${s.canTriggerNightAudit ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-gray-100 text-gray-400'}`}>
+                                <span className={`px-1.5 py-0.2 rounded text-[10px] ${s.canTriggerNightAudit ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-gray-100 text-gray-400'}`}>
                                     {s.canTriggerNightAudit ? 'Authorized (EOD)' : 'Restricted'}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between pt-1 border-t border-gray-100">
                                 <span className="text-gray-500">Staff Assigned:</span>
-                                <span className="font-bold text-gray-900">{s.assignedStaffCount} Personnel</span>
+                                <span className="text-gray-900">{s.assignedStaffCount} Personnel</span>
                             </div>
                         </div>
 
@@ -422,7 +422,7 @@ export const ShiftManagement: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => handleToggleStatus(s.id)}
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${s.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
+                                className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${s.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                             >
                                 {s.status}
                             </button>
@@ -436,7 +436,7 @@ export const ShiftManagement: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-2">
                                 <Clock size={15} className="text-purple-600" />
                                 <span>{editingShift ? 'Edit Work Shift Parameters' : 'Create New Work Shift'}</span>
                             </h3>
@@ -513,7 +513,7 @@ export const ShiftManagement: React.FC = () => {
                                         min={1}
                                         value={formData.assignedStaffCount}
                                         onChange={e => setFormData({ ...formData, assignedStaffCount: Number(e.target.value) })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-bold text-gray-900"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-gray-900"
                                     />
                                 </div>
                                 <div className="space-y-1">

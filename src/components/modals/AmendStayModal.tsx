@@ -29,10 +29,18 @@ import { getStandardDailyRateForRoom } from '../../utils/roomInventoryEngine';
 export interface AmendBookingData {
     id: string;
     reservationNumber: string;
+    groupCode?: string;
+    subBookingNumber?: string;
+    registrationNumber?: string;
+    registeredAt?: string;
+    folioNumber?: string;
     guestName: string;
     roomNumber: string;
     roomType?: string;
     ratePlan?: string;
+    allocatedRooms?: string[];
+    roomsList?: any[];
+    groupRoomsList?: any[];
     arrivalDate: string;
     departureDate: string;
     nights: number;
@@ -57,6 +65,9 @@ export interface AmendBookingData {
     email?: string;
     vip?: string;
     source?: string;
+    adults?: number;
+    children?: number;
+    childrenAges?: number[];
 }
 
 interface AmendStayModalProps {
@@ -174,7 +185,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                         >
                             <X size={17} />
                         </button>
-                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center font-bold flex-shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center flex-shrink-0">
                             <Users size={14} />
                         </div>
                         <span className="font-extrabold text-gray-900 text-sm tracking-wide uppercase truncate font-sans">
@@ -192,7 +203,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                             onClick={() => {
                                 if (onEdit) onEdit(booking);
                             }}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                         >
                             <Edit3 size={11} className="text-[#0e3592]" />
                             <span>Edit</span>
@@ -202,7 +213,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsOptionsOpen(!isOptionsOpen)}
-                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                             >
                                 <Settings size={11} className="text-[#0e3592]" />
                                 <span>Options</span>
@@ -231,7 +242,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                             setIsOptionsOpen(false);
                                             if (onAmendStay) onAmendStay(booking);
                                         }}
-                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors font-bold text-blue-700 bg-blue-50/50"
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors text-blue-700 bg-blue-50/50"
                                     >
                                         <Calendar size={14} className="text-blue-600 flex-shrink-0" />
                                         <span>Amend Stay</span>
@@ -340,14 +351,14 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                         {/* Row 1: Reservation # & Status */}
                         <div className="grid grid-cols-2 gap-2">
                             <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
-                                <div className="w-6 h-6 rounded bg-blue-500/30 text-blue-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                <div className="w-6 h-6 rounded bg-blue-500/30 text-blue-200 flex items-center justify-center text-xs flex-shrink-0">
                                     #
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Reservation #
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate font-mono">
+                                    <div className="text-xs text-white truncate font-mono">
                                         {booking.reservationNumber}
                                     </div>
                                 </div>
@@ -358,7 +369,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <Layers size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Status
                                     </div>
                                     <div className="mt-0.5">
@@ -377,14 +388,14 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <Calendar size={12} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[8.5px] uppercase font-bold text-blue-200">ARRIVAL</div>
-                                    <div className="text-[11.5px] font-bold text-white truncate">{booking.arrivalDate}</div>
+                                    <div className="text-[8.5px] uppercase text-blue-200">ARRIVAL</div>
+                                    <div className="text-[11.5px] text-white truncate">{booking.arrivalDate}</div>
                                     <div className="text-[8.5px] text-blue-200">🕒 16:00:00</div>
                                 </div>
                             </div>
 
                             <div className="col-span-2 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-1.5 flex flex-col items-center justify-center text-center shadow-2xs">
-                                <div className="text-[8px] uppercase font-bold text-blue-200">NIGHTS</div>
+                                <div className="text-[8px] uppercase text-blue-200">NIGHTS</div>
                                 <div className="text-base font-black text-white font-mono leading-none">{nights}</div>
                             </div>
 
@@ -393,8 +404,8 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <Calendar size={12} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[8.5px] uppercase font-bold text-blue-200">DEPARTURE</div>
-                                    <div className="text-[11.5px] font-bold text-white truncate">{departureDate}</div>
+                                    <div className="text-[8.5px] uppercase text-blue-200">DEPARTURE</div>
+                                    <div className="text-[11.5px] text-white truncate">{departureDate}</div>
                                     <div className="text-[8.5px] text-blue-200">🕒 12:00:00</div>
                                 </div>
                             </div>
@@ -407,10 +418,10 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <Home size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Room Details
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate">
+                                    <div className="text-xs text-white truncate">
                                         {booking.roomNumber} ({booking.roomType || 'Winter Rate Plan'})
                                     </div>
                                 </div>
@@ -421,10 +432,10 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <Printer size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Rate Plan
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate">
+                                    <div className="text-xs text-white truncate">
                                         {booking.ratePlan || 'Summer Vacation'}
                                     </div>
                                 </div>
@@ -438,11 +449,11 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <Users size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Guests (Pax)
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate">
-                                        2 Adults, 1 Child
+                                    <div className="text-xs text-white truncate">
+                                        {booking?.adults ?? 2} Adult{(booking?.adults ?? 2) > 1 ? 's' : ''}{(booking?.children ?? 0) > 0 ? `, ${booking?.children} Child${(booking?.children ?? 0) > 1 ? 'ren' : ''}` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -452,10 +463,10 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <DollarSign size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Avg Daily Rate (Base)
                                     </div>
-                                    <div className="text-xs font-bold text-white font-mono">
+                                    <div className="text-xs text-white font-mono">
                                         ৳ {dailyBaseRate.toLocaleString()}
                                     </div>
                                 </div>
@@ -471,7 +482,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     </div>
                                     <span>Room Base Tariff ({nights}N)</span>
                                 </div>
-                                <span className="font-mono font-bold text-white">৳ {currentBaseAmount.toLocaleString()}</span>
+                                <span className="font-mono text-white">৳ {currentBaseAmount.toLocaleString()}</span>
                             </div>
 
                             <div className="flex items-center justify-between text-blue-100 text-[11px]">
@@ -481,7 +492,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     </div>
                                     <span>Statutory Taxes [{activeTaxCalc.configCode}]</span>
                                 </div>
-                                <span className="font-mono font-bold text-cyan-300">+৳ {activeTaxCalc.totalTaxAmount.toLocaleString()}</span>
+                                <span className="font-mono text-cyan-300">+৳ {activeTaxCalc.totalTaxAmount.toLocaleString()}</span>
                             </div>
 
                             <div className="flex items-center justify-between text-blue-100 text-[11px] pt-1 border-t border-blue-400/20">
@@ -489,7 +500,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     <div className="w-5 h-5 rounded bg-amber-500/30 flex items-center justify-center text-amber-200">
                                         <Calculator size={11} />
                                     </div>
-                                    <span className="font-bold text-white">Total Amount</span>
+                                    <span className="text-white">Total Amount</span>
                                 </div>
                                 <span className="font-mono font-black text-amber-300">৳ {totalAmount.toLocaleString()}</span>
                             </div>
@@ -501,12 +512,12 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     </div>
                                     <span>Room Paid Amount</span>
                                 </div>
-                                <span className="font-mono font-bold text-emerald-300">৳ {paidAmount.toLocaleString()}</span>
+                                <span className="font-mono text-emerald-300">৳ {paidAmount.toLocaleString()}</span>
                             </div>
                         </div>
 
                         {/* Separate Room Net Balance Card */}
-                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center justify-between font-bold shadow-2xs">
+                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center justify-between shadow-2xs">
                             <div className="flex items-center gap-2 text-white">
                                 <div className="w-5 h-5 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400">
                                     <Wallet size={12} />
@@ -523,7 +534,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                     <div className="col-span-5 h-full flex flex-col min-h-0 bg-[#0e3592]">
                         {/* Header Row */}
                         <div className="px-4 py-2.5 flex items-center justify-between border-b border-blue-400/20 flex-shrink-0">
-                            <h2 className="text-sm font-bold text-white tracking-wide">Amend Stay</h2>
+                            <h2 className="text-sm text-white tracking-wide">Amend Stay</h2>
                             <button
                                 type="button"
                                 onClick={onClose}
@@ -556,7 +567,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                         onChange={e => setRoomSelected(e.target.checked)}
                                         className="w-3.5 h-3.5 rounded text-blue-600 bg-white cursor-pointer accent-blue-500"
                                     />
-                                    <span className="text-xs font-bold text-white font-mono truncate">
+                                    <span className="text-xs text-white font-mono truncate">
                                         {booking.roomNumber} - {booking.reservationNumber}
                                     </span>
                                 </div>
@@ -580,7 +591,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                         type="date"
                                         value={departureDate}
                                         onChange={e => handleDepartureChange(e.target.value)}
-                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                                        className="w-full h-8 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
                                     />
                                 </div>
                             </div>
@@ -593,7 +604,7 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                                     min={1}
                                     value={nights}
                                     onChange={e => handleNightsChange(Number(e.target.value))}
-                                    className="w-full h-8 px-2 border border-blue-300 rounded text-xs bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="w-full h-8 px-2 border border-blue-300 rounded text-xs bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400"
                                 />
                             </div>
                         </div>
@@ -603,14 +614,14 @@ export const AmendStayModal: React.FC<AmendStayModalProps> = ({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="h-9 px-5 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-md text-xs cursor-pointer shadow-xs transition-all active:scale-[0.98]"
+                                className="h-9 px-5 bg-white hover:bg-gray-100 text-gray-800 rounded-md text-xs cursor-pointer shadow-xs transition-all active:scale-[0.98]"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={handleSave}
-                                className="h-9 px-5 bg-[#1a73e8] hover:bg-blue-600 text-white font-bold rounded-md text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.98]"
+                                className="h-9 px-5 bg-[#1a73e8] hover:bg-blue-600 text-white rounded-md text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.98]"
                             >
                                 <Edit3 size={13} />
                                 <span>Save Changes</span>

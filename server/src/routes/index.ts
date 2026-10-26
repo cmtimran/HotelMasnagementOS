@@ -8,6 +8,8 @@ import propertyRoutes from './property.routes.js';
 import accountingRoutes from './accounting.routes.js';
 import hrmRoutes from './hrm.routes.js';
 import schemaRoutes from './schema.routes.js';
+import ratesRoutes from './rates.routes.js';
+import connectingRoutes from './connecting.routes.js';
 
 const apiRouter = Router();
 
@@ -42,5 +44,7 @@ apiRouter.use('/properties', propertyRoutes);
 apiRouter.use('/accounting', accountingRoutes);
 apiRouter.use('/hrm', hrmRoutes);
 apiRouter.use('/schema', schemaRoutes);
+apiRouter.use('/rates', ratesRoutes);
+apiRouter.use('/connecting-rooms', connectingRoutes);
 
 export default apiRouter;

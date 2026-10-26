@@ -81,7 +81,7 @@ export const MultiPropertyConsole: React.FC = () => {
                     </div>
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                            <h1 className="text-2xl text-slate-900 tracking-tight">
                                 Multi-Property Hotel Group Console
                             </h1>
                             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
@@ -124,7 +124,7 @@ export const MultiPropertyConsole: React.FC = () => {
                             <Building2 size={16} />
                         </div>
                     </div>
-                    <div className="text-2xl font-bold text-slate-900 mt-2">{properties.length} Active Hotels</div>
+                    <div className="text-2xl text-slate-900 mt-2">{properties.length} Active Hotels</div>
                     <div className="text-xs text-slate-500 mt-1">Dhaka City & Cox's Bazar Resort</div>
                 </div>
 
@@ -135,7 +135,7 @@ export const MultiPropertyConsole: React.FC = () => {
                             <BedDouble size={16} />
                         </div>
                     </div>
-                    <div className="text-2xl font-bold text-emerald-600 mt-2">{totalRooms} Physical Rooms</div>
+                    <div className="text-2xl text-emerald-600 mt-2">{totalRooms} Physical Rooms</div>
                     <div className="text-xs text-slate-500 mt-1">1NF–4NF Relational Inventory</div>
                 </div>
 
@@ -146,7 +146,7 @@ export const MultiPropertyConsole: React.FC = () => {
                             <Users size={16} />
                         </div>
                     </div>
-                    <div className="text-2xl font-bold text-slate-900 mt-2">{totalStaff} Hotel Staff</div>
+                    <div className="text-2xl text-slate-900 mt-2">{totalStaff} Hotel Staff</div>
                     <div className="text-xs text-slate-500 mt-1">Cross-Property HR Rostering</div>
                 </div>
 
@@ -157,7 +157,7 @@ export const MultiPropertyConsole: React.FC = () => {
                             <TrendingUp size={16} />
                         </div>
                     </div>
-                    <div className="text-2xl font-bold text-slate-900 mt-2">
+                    <div className="text-2xl text-slate-900 mt-2">
                         ৳{chainOverview ? Number(chainOverview.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '248,500.00'}
                     </div>
                     <div className="text-xs text-slate-500 mt-1">USALI General Ledger Inflow</div>
@@ -168,7 +168,7 @@ export const MultiPropertyConsole: React.FC = () => {
             <div className="mt-8">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h2 className="text-lg font-bold text-slate-900">Hotel Properties in Chain</h2>
+                        <h2 className="text-lg text-slate-900">Hotel Properties in Chain</h2>
                         <p className="text-xs text-slate-500">Click any hotel card to switch active operating context or launch operational views</p>
                     </div>
                     <span className="text-xs font-semibold text-slate-500">
@@ -191,11 +191,11 @@ export const MultiPropertyConsole: React.FC = () => {
                                 <div>
                                     {/* Active Session Badge */}
                                     <div className="flex items-center justify-between mb-3">
-                                        <span className="font-mono text-xs font-bold text-blue-600 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-100">
+                                        <span className="font-mono text-xs text-blue-600 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-100">
                                             CODE: {property.code}
                                         </span>
                                         {isSelected ? (
-                                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white flex items-center gap-1 shadow-xs">
+                                            <span className="px-2.5 py-0.5 rounded-full text-xs bg-blue-600 text-white flex items-center gap-1 shadow-xs">
                                                 <CheckCircle2 size={12} /> Active Hotel in Session
                                             </span>
                                         ) : (
@@ -209,7 +209,7 @@ export const MultiPropertyConsole: React.FC = () => {
                                             <Building2 size={24} />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-slate-900 leading-snug">{property.name}</h3>
+                                            <h3 className="text-lg text-slate-900 leading-snug">{property.name}</h3>
                                             <div className="flex items-center gap-1 mt-1 text-amber-500">
                                                 {[...Array(property.star_rating || 5)].map((_, i) => (
                                                     <Star key={i} size={14} fill="currentColor" />
@@ -241,15 +241,15 @@ export const MultiPropertyConsole: React.FC = () => {
                                     <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-slate-100 text-center">
                                         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                                             <div className="text-[10px] text-slate-400 font-semibold uppercase">Physical Rooms</div>
-                                            <div className="text-base font-bold text-slate-900 mt-0.5">{property.total_rooms || 0}</div>
+                                            <div className="text-base text-slate-900 mt-0.5">{property.total_rooms || 0}</div>
                                         </div>
                                         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                                             <div className="text-[10px] text-slate-400 font-semibold uppercase">Buildings/Wings</div>
-                                            <div className="text-base font-bold text-slate-900 mt-0.5">{property.total_buildings || 0}</div>
+                                            <div className="text-base text-slate-900 mt-0.5">{property.total_buildings || 0}</div>
                                         </div>
                                         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                                             <div className="text-[10px] text-slate-400 font-semibold uppercase">Active Personnel</div>
-                                            <div className="text-base font-bold text-slate-900 mt-0.5">{property.total_staff || 0}</div>
+                                            <div className="text-base text-slate-900 mt-0.5">{property.total_staff || 0}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -299,7 +299,7 @@ export const MultiPropertyConsole: React.FC = () => {
             <div className="mt-10 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <h3 className="text-base text-slate-900 flex items-center gap-2">
                             <Landmark size={18} className="text-blue-600" />
                             Chain Portfolio Comparison Matrix
                         </h3>
@@ -311,7 +311,7 @@ export const MultiPropertyConsole: React.FC = () => {
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs text-slate-600">
-                        <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <thead className="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
                             <tr>
                                 <th className="px-4 py-3">Property</th>
                                 <th className="px-4 py-3">Type & City</th>
@@ -329,12 +329,12 @@ export const MultiPropertyConsole: React.FC = () => {
                                     <tr key={p.id} className={isCurrent ? 'bg-blue-50/40' : 'hover:bg-slate-50/60'}>
                                         <td className="px-4 py-3.5">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
                                                     {p.code}
                                                 </span>
-                                                <span className="font-bold text-slate-900">{p.name}</span>
+                                                <span className="text-slate-900">{p.name}</span>
                                                 {isCurrent && (
-                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
                                                         Active
                                                     </span>
                                                 )}
@@ -343,7 +343,7 @@ export const MultiPropertyConsole: React.FC = () => {
                                         <td className="px-4 py-3.5 text-slate-600">
                                             {p.city === 'Dhaka' ? '5★ Corporate Tower (Dhaka)' : '5★ Beachfront Resort (Cox\'s Bazar)'}
                                         </td>
-                                        <td className="px-4 py-3.5 font-bold text-slate-900">
+                                        <td className="px-4 py-3.5 text-slate-900">
                                             {p.total_rooms || 0} Rooms ({p.total_buildings || 0} Wings)
                                         </td>
                                         <td className="px-4 py-3.5 font-mono text-slate-700">
@@ -362,7 +362,7 @@ export const MultiPropertyConsole: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => setActivePage('dashboard')}
-                                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] inline-flex items-center gap-1 cursor-pointer"
                                                 >
                                                     Open Desk <ArrowRight size={11} />
                                                 </button>
@@ -370,7 +370,7 @@ export const MultiPropertyConsole: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSwitchProperty(p)}
-                                                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded text-[11px] font-bold cursor-pointer"
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded text-[11px] cursor-pointer"
                                                 >
                                                     Switch Hotel
                                                 </button>

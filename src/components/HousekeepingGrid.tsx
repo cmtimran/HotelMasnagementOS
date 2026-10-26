@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Sparkles, BedDouble, AlertCircle, Users, CheckCircle2, XCircle, Clock, RefreshCw } from 'lucide-react';
-import { getCanonicalRooms, broadcastPMSEvent, subscribeToPMSEvents } from '../utils/roomInventoryEngine';
+import { Search, Sparkles, BedDouble, AlertCircle, Users, CheckCircle2, XCircle, Clock, RefreshCw, X, Edit3 } from 'lucide-react';
+import { getCanonicalRooms, broadcastPMSEvent, subscribeToPMSEvents, updateRoomHousekeepingInDB } from '../utils/roomInventoryEngine';
 import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
 import { getApiBaseUrl } from '../utils/apiUrl';
 import PageHeader from './common/PageHeader';
@@ -27,6 +27,64 @@ const HousekeepingGrid = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [rooms, setRooms] = useState<HousekeepingRoom[]>([]);
 
+    // Inspection & Staff Assignment Modal State
+    const [selectedRoomForModal, setSelectedRoomForModal] = useState<HousekeepingRoom | null>(null);
+    const [modalStatus, setModalStatus] = useState<HousekeepingRoom['status']>('clean');
+    const [modalAssignedTo, setModalAssignedTo] = useState<string>('Fatima Begum');
+    const [modalPriority, setModalPriority] = useState<HousekeepingRoom['priority']>('normal');
+    const [modalNotes, setModalNotes] = useState<string>('');
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3500);
+    };
+
+    const openInspectionModal = (room: HousekeepingRoom) => {
+        setSelectedRoomForModal(room);
+        setModalStatus(room.status);
+        setModalAssignedTo(room.assignedTo || 'Fatima Begum');
+        setModalPriority(room.priority || 'normal');
+        setModalNotes(room.notes || '');
+    };
+
+    const handleSaveModal = async () => {
+        if (!selectedRoomForModal) return;
+        const roomNumber = selectedRoomForModal.roomNumber;
+
+        setRooms(prev => prev.map(r => {
+            if (r.roomNumber === roomNumber) {
+                return {
+                    ...r,
+                    status: modalStatus,
+                    assignedTo: modalAssignedTo,
+                    priority: modalPriority,
+                    notes: modalNotes,
+                    lastCleaned: (modalStatus === 'clean' || modalStatus === 'inspected') ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : r.lastCleaned
+                };
+            }
+            return r;
+        }));
+
+        try {
+            const titleCase = modalStatus === 'dirty' ? 'Dirty' : modalStatus === 'inspected' ? 'Inspected' : modalStatus === 'out-of-order' ? 'Dirty' : 'Clean';
+            await updateRoomHousekeepingInDB(roomNumber, titleCase);
+
+            const broadcastPayload = {
+                type: 'ROOM_STATUS_CHANGED' as any,
+                roomNo: roomNumber,
+                hkStatus: modalStatus
+            };
+            broadcastPMSEvent(broadcastPayload);
+            dispatchPMSNetworkEvent(broadcastPayload);
+        } catch (e) {
+            console.warn('Failed to sync housekeeping modal changes:', e);
+        }
+
+        showToast(`Room ${roomNumber} updated & synced to database.`);
+        setSelectedRoomForModal(null);
+    };
+
     const mapStatus = (status: string): HousekeepingRoom['status'] => {
         const s = (status || '').toLowerCase();
         if (s === 'ooo' || s === 'out-of-order' || s === 'out_of_order') return 'out-of-order';
@@ -45,14 +103,14 @@ const HousekeepingGrid = () => {
             if (json.success && Array.isArray(json.data) && json.data.length > 0) {
                 const mapped: HousekeepingRoom[] = json.data.map((r: any) => ({
                     id: r.id,
-                    roomNumber: String(r.roomNo),
+                    roomNumber: String(r.roomNo || r.room_number || r.number),
                     floor: Number(r.floor) || 1,
                     roomType: r.roomType || 'Standard Room',
                     status: mapStatus(r.hkStatus),
                     assignedTo: r.floor === 1 ? 'Fatima' : r.floor === 2 ? 'Rahima' : r.floor === 3 ? 'Salma' : 'Akhtar',
                     priority: r.hkStatus === 'dirty' ? 'high' : 'normal',
                     lastCleaned: r.hkStatus === 'clean' ? '10:30 AM' : undefined,
-                    notes: r.foStatus === 'occupied' ? 'In-House Guest' : r.foStatus === 'due_out' ? 'Departure Today' : undefined
+                    notes: r.foStatus === 'occupied' ? 'In-House Guest' : r.foStatus === 'due_out' ? 'Departure Today' : r.foStatus === 'reserved' ? 'Reserved' : undefined
                 }));
                 setRooms(mapped);
                 setIsSyncing(false);
@@ -137,13 +195,10 @@ const HousekeepingGrid = () => {
             return room;
         }));
 
-        // Persist directly to SQLite Relational DB
+        // Persist directly to PostgreSQL Relational DB and Local Canonical cache
         try {
-            await fetch(`${API_BASE}/api/rooms/${roomNumber}/housekeeping`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'x-property-id': '1' },
-                body: JSON.stringify({ status: newStatus })
-            });
+            const titleCase = newStatus === 'dirty' ? 'Dirty' : newStatus === 'inspected' ? 'Inspected' : 'Clean';
+            await updateRoomHousekeepingInDB(roomNumber, titleCase);
 
             // Disseminate to all other PC terminals over SSE network
             const broadcastPayload = {
@@ -183,7 +238,7 @@ const HousekeepingGrid = () => {
                 subtitle="Live room cleanliness states, supervisor inspections & real-time front-desk sync"
                 icon={<Sparkles size={20} />}
                 badge={
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700 border border-rose-200">
                         {stats.dirty} Pending Cleaning
                     </span>
                 }
@@ -204,8 +259,8 @@ const HousekeepingGrid = () => {
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Inventory</p>
-                        <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{stats.total} Rooms</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Inventory</p>
+                        <p className="text-xl sm:text-2xl text-slate-900 mt-1">{stats.total} Rooms</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">Physical keys</p>
                     </div>
                     <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
@@ -214,8 +269,8 @@ const HousekeepingGrid = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dirty (Turnover)</p>
-                        <p className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{stats.dirty}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Dirty (Turnover)</p>
+                        <p className="text-xl sm:text-2xl text-rose-600 mt-1">{stats.dirty}</p>
                         <p className="text-[11px] text-rose-600 font-medium mt-0.5">Needs housekeeping</p>
                     </div>
                     <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
@@ -224,8 +279,8 @@ const HousekeepingGrid = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Clean & Ready</p>
-                        <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{stats.clean}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Clean & Ready</p>
+                        <p className="text-xl sm:text-2xl text-emerald-600 mt-1">{stats.clean}</p>
                         <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Ready for check-in</p>
                     </div>
                     <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -234,8 +289,8 @@ const HousekeepingGrid = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inspected</p>
-                        <p className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{stats.inspected}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Inspected</p>
+                        <p className="text-xl sm:text-2xl text-amber-600 mt-1">{stats.inspected}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">Supervisor verified</p>
                     </div>
                     <div className="size-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
@@ -244,8 +299,8 @@ const HousekeepingGrid = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Out of Order</p>
-                        <p className="text-xl sm:text-2xl font-bold text-slate-700 mt-1">{stats.outOfOrder}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Out of Order</p>
+                        <p className="text-xl sm:text-2xl text-slate-700 mt-1">{stats.outOfOrder}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">Maintenance block</p>
                     </div>
                     <div className="size-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
@@ -309,18 +364,22 @@ const HousekeepingGrid = () => {
                         </thead>
                         <tbody>
                             {filteredRooms.map(room => (
-                                <tr key={room.id} className="hover:bg-slate-50/70 transition-colors">
-                                    <td className="font-bold text-slate-900">
+                                <tr 
+                                    key={room.id} 
+                                    onClick={() => openInspectionModal(room)}
+                                    className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                                >
+                                    <td className="text-slate-900 font-bold font-mono">
                                         {room.roomNumber}
                                     </td>
                                     <td className="text-slate-600 font-medium">
                                         {room.roomType}
                                     </td>
-                                    <td>
+                                    <td onClick={e => e.stopPropagation()}>
                                         <button
                                             type="button"
                                             onClick={() => cycleStatus(room.roomNumber)}
-                                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all hover:shadow-2xs cursor-pointer ${getStatusStyle(room.status)}`}
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] border transition-all hover:shadow-2xs cursor-pointer ${getStatusStyle(room.status)}`}
                                             title="Click to cycle status in database"
                                         >
                                             {getStatusIcon(room.status)}
@@ -338,13 +397,13 @@ const HousekeepingGrid = () => {
                                         )}
                                     </td>
                                     <td>
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${room.priority === 'high' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase ${room.priority === 'high' ? 'bg-rose-50 text-rose-700 border border-rose-200 font-bold' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
                                             {room.priority}
                                         </span>
                                     </td>
                                     <td className="text-slate-500 text-xs">
                                         {room.lastCleaned ? (
-                                            <span className="flex items-center gap-1">
+                                            <span className="flex items-center gap-1 font-mono">
                                                 <Clock size={12} className="text-slate-400" /> {room.lastCleaned}
                                             </span>
                                         ) : '-'}
@@ -357,14 +416,26 @@ const HousekeepingGrid = () => {
                                             </span>
                                         ) : '-'}
                                     </td>
-                                    <td className="text-right">
-                                        <button
-                                            type="button"
-                                            onClick={() => cycleStatus(room.roomNumber)}
-                                            className="btn-secondary !py-1 !px-2.5 !text-[11px]"
-                                        >
-                                            Cycle Status
-                                        </button>
+                                    <td className="text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => openInspectionModal(room)}
+                                                className="btn-secondary !py-1 !px-2 !text-[11px] flex items-center gap-1"
+                                                title="Inspect & Assign Room"
+                                            >
+                                                <Edit3 size={11} />
+                                                <span>Inspect</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => cycleStatus(room.roomNumber)}
+                                                className="btn-secondary !py-1 !px-2.5 !text-[11px]"
+                                                title="Quick Cycle Status"
+                                            >
+                                                Cycle
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -372,6 +443,147 @@ const HousekeepingGrid = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            {toastMessage && (
+                <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white px-3.5 py-2 rounded-lg shadow-lg border border-slate-700 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-400" />
+                    <span>{toastMessage}</span>
+                </div>
+            )}
+
+            {/* Housekeeping Inspection & Staff Assignment Modal */}
+            {selectedRoomForModal && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[520px] w-full overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
+                        {/* Header */}
+                        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center font-mono font-bold text-base shadow-sm ring-2 ring-blue-100">
+                                    {selectedRoomForModal.roomNumber}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-bold text-slate-900">Room {selectedRoomForModal.roomNumber} Inspection &amp; Turnover</h3>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${getStatusStyle(modalStatus)}`}>
+                                            {modalStatus}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        Floor {selectedRoomForModal.floor} • {selectedRoomForModal.roomType}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoomForModal(null)}
+                                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-4">
+                            {/* Status Selector */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                    Housekeeping Status (Direct Relational DB Sync)
+                                </label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[
+                                        { id: 'clean', label: 'Clean', icon: <Sparkles size={13} />, activeStyle: 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold ring-2 ring-emerald-200', inactiveStyle: 'bg-emerald-50/70 text-emerald-800 border-emerald-200 hover:bg-emerald-100/80 font-medium' },
+                                        { id: 'inspected', label: 'Inspected', icon: <CheckCircle2 size={13} />, activeStyle: 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold ring-2 ring-blue-200', inactiveStyle: 'bg-blue-50/70 text-blue-800 border-blue-200 hover:bg-blue-100/80 font-medium' },
+                                        { id: 'dirty', label: 'Dirty', icon: <BedDouble size={13} />, activeStyle: 'bg-rose-600 text-white border-rose-600 shadow-sm font-bold ring-2 ring-rose-200', inactiveStyle: 'bg-rose-50/70 text-rose-800 border-rose-200 hover:bg-rose-100/80 font-medium' },
+                                        { id: 'out-of-order', label: 'Out of Order', icon: <XCircle size={13} />, activeStyle: 'bg-slate-700 text-white border-slate-700 shadow-sm font-bold ring-2 ring-slate-300', inactiveStyle: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/80 font-medium' }
+                                    ].map(st => (
+                                        <button
+                                            key={st.id}
+                                            type="button"
+                                            onClick={() => setModalStatus(st.id as any)}
+                                            className={`py-2 rounded-xl text-xs border flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                                                modalStatus === st.id ? st.activeStyle : st.inactiveStyle
+                                            }`}
+                                        >
+                                            {st.icon}
+                                            <span>{st.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Housekeeper Assignment & Priority */}
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                        Assign Housekeeper
+                                    </label>
+                                    <select
+                                        value={modalAssignedTo}
+                                        onChange={e => setModalAssignedTo(e.target.value)}
+                                        className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none cursor-pointer focus:border-blue-500 shadow-2xs"
+                                    >
+                                        <option value="Fatima Begum">Fatima Begum (Floor 1)</option>
+                                        <option value="Rahima Khatun">Rahima Khatun (Floor 2)</option>
+                                        <option value="Salma Akter">Salma Akter (Floor 3)</option>
+                                        <option value="Akhtar Hossain">Akhtar Hossain (General)</option>
+                                        <option value="Duty Housekeeping Team">Duty Housekeeping Team</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                        Turnover Priority
+                                    </label>
+                                    <select
+                                        value={modalPriority}
+                                        onChange={e => setModalPriority(e.target.value as any)}
+                                        className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none cursor-pointer focus:border-blue-500 shadow-2xs"
+                                    >
+                                        <option value="high">High (Rush VIP Arrival)</option>
+                                        <option value="normal">Normal Routine</option>
+                                        <option value="low">Low Priority</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Notes / Special Requests */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                    Turnover &amp; Maintenance Notes
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    value={modalNotes}
+                                    onChange={e => setModalNotes(e.target.value)}
+                                    placeholder="e.g. VIP guest arriving at 2 PM, bathroom amenities restocked, extra towels..."
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 resize-none shadow-2xs placeholder:text-slate-400"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoomForModal(null)}
+                                className="h-9 px-4 border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleSaveModal}
+                                className="h-9 px-4.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+                            >
+                                <CheckCircle2 size={14} />
+                                <span>Save &amp; Sync Room Status</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

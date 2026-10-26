@@ -37,7 +37,7 @@ const SendEmailModal = ({ isOpen, onClose, defaultSubject = '' }: SendEmailModal
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <h3 className="text-gray-800 flex items-center gap-2">
                         <Mail size={18} className="text-blue-600" />
                         Send Information
                     </h3>
@@ -51,7 +51,7 @@ const SendEmailModal = ({ isOpen, onClose, defaultSubject = '' }: SendEmailModal
                         <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Send size={32} />
                         </div>
-                        <h4 className="text-xl font-bold text-gray-900">Email Sent!</h4>
+                        <h4 className="text-xl text-gray-900">Email Sent!</h4>
                         <p className="text-gray-500 mt-2">The verified information has been sent successfully.</p>
                     </div>
                 ) : (
@@ -94,7 +94,7 @@ const SendEmailModal = ({ isOpen, onClose, defaultSubject = '' }: SendEmailModal
                             <button
                                 type="submit"
                                 disabled={isSending}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                             >
                                 {isSending ? (
                                     <>

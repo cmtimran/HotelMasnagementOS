@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Utensils,
     DollarSign, Clock, FileText, Search, RefreshCw, AlertTriangle, CheckCircle2,
     Coffee, Pizza
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
 interface MealPlan {
@@ -82,264 +84,25 @@ export default function MealPlanManagement() {
         } catch {
             // fallback
         }
-        return [
-        {
-            id: 1,
-            name: 'Continental Plan (CP)',
-            marketingName: 'Buffet Breakfast',
-            shortCode: 'CP',
-            description: 'Includes daily buffet breakfast at The Cove Restaurant',
-            status: 'Active',
-            hasBreakfast: true,
-            breakfastMenu: 'Continental Menu A',
-            breakfastStyle: 'Buffet',
-            breakfastVenue: 'Main Restaurant',
-            breakfastCuisine: 'Continental',
-            hasLunch: false,
-            lunchMenu: '',
-            lunchStyle: 'Buffet',
-            lunchVenue: '',
-            lunchCuisine: '',
-            hasDinner: false,
-            dinnerMenu: '',
-            dinnerStyle: 'Buffet',
-            dinnerVenue: '',
-            dinnerCuisine: '',
-            hasBrunch: false,
-            brunchMenu: '',
-            brunchStyle: 'Buffet',
-            brunchVenue: '',
-            brunchCuisine: '',
-            hasCupole: false,
-            cupoleMenu: '',
-            cupoleStyle: 'Buffet',
-            cupoleVenue: '',
-            cupoleCuisine: '',
-            hasSnacks: false,
-            snacksMenu: '',
-            snacksStyle: 'Buffet',
-            snacksVenue: '',
-            snacksCuisine: '',
-            servingType: 'Buffet',
-            internalCost: 250,
-            sellingPriceAdult: 850,
-            sellingPriceChild: 450,
-            infantMealsFree: true,
-            maxInfantAge: 4,
-            postingFrequency: 'Daily',
-            revenueCode: 'REV-FB-BRK',
-            taxInclusive: false,
-            startTime: '07:00',
-            endTime: '10:30',
-            venue: 'Main Restaurant'
-        },
-        {
-            id: 2,
-            name: 'Modified American Plan (MAP)',
-            marketingName: 'Breakfast + Lunch/Dinner',
-            shortCode: 'MAP',
-            description: 'Breakfast and your choice of Buffet Lunch or Buffet Dinner',
-            status: 'Active',
-            hasBreakfast: true,
-            breakfastMenu: 'International Buffet',
-            breakfastStyle: 'Buffet',
-            breakfastVenue: 'Main Restaurant',
-            breakfastCuisine: 'Continental',
-            hasLunch: true,
-            lunchMenu: 'Business Set Menu',
-            lunchStyle: 'Set Menu',
-            lunchVenue: 'The Atrium Cafe',
-            lunchCuisine: 'Multi-cuisine',
-            hasDinner: true,
-            dinnerMenu: 'Chef Special Buffet',
-            dinnerStyle: 'Buffet',
-            dinnerVenue: 'Main Restaurant',
-            dinnerCuisine: 'Continental',
-            hasBrunch: false,
-            brunchMenu: '',
-            brunchStyle: 'Buffet',
-            brunchVenue: '',
-            brunchCuisine: '',
-            hasCupole: false,
-            cupoleMenu: '',
-            cupoleStyle: 'Buffet',
-            cupoleVenue: '',
-            cupoleCuisine: '',
-            hasSnacks: false,
-            snacksMenu: '',
-            snacksStyle: 'Buffet',
-            snacksVenue: '',
-            snacksCuisine: '',
-            servingType: 'Buffet',
-            internalCost: 750,
-            sellingPriceAdult: 2200,
-            sellingPriceChild: 1100,
-            infantMealsFree: true,
-            maxInfantAge: 4,
-            postingFrequency: 'Daily',
-            revenueCode: 'REV-FB-MAP',
-            taxInclusive: true,
-            startTime: '07:00',
-            endTime: '22:30',
-            venue: 'Main Restaurant'
-        },
-        {
-            id: 3,
-            name: 'American Plan (AP) - Full Board',
-            marketingName: 'All Incl. Meals',
-            shortCode: 'AP',
-            description: 'Includes Breakfast, Lunch, and Dinner (Full Board)',
-            status: 'Active',
-            hasBreakfast: true,
-            breakfastMenu: 'Full American Breakfast',
-            breakfastStyle: 'Buffet',
-            breakfastVenue: 'Executive Lounge',
-            breakfastCuisine: 'Continental',
-            hasLunch: true,
-            lunchMenu: 'Multicuisine Lunch',
-            lunchStyle: 'Buffet',
-            lunchVenue: 'Main Restaurant',
-            lunchCuisine: 'Pan-Asian',
-            hasDinner: true,
-            dinnerMenu: 'Gala Theme Dinner',
-            dinnerStyle: 'Buffet',
-            dinnerVenue: 'Main Restaurant',
-            dinnerCuisine: 'Multi-cuisine',
-            hasBrunch: false,
-            brunchMenu: '',
-            brunchStyle: 'Buffet',
-            brunchVenue: '',
-            brunchCuisine: '',
-            hasCupole: false,
-            cupoleMenu: '',
-            cupoleStyle: 'Buffet',
-            cupoleVenue: '',
-            cupoleCuisine: '',
-            hasSnacks: true,
-            snacksMenu: 'Afternoon High Tea',
-            snacksStyle: 'Set Menu',
-            snacksVenue: 'The Atrium Cafe',
-            snacksCuisine: 'Continental',
-            servingType: 'Buffet',
-            internalCost: 1200,
-            sellingPriceAdult: 3500,
-            sellingPriceChild: 1800,
-            infantMealsFree: true,
-            maxInfantAge: 5,
-            postingFrequency: 'Daily',
-            revenueCode: 'REV-FB-AP',
-            taxInclusive: true,
-            startTime: '07:00',
-            endTime: '23:00',
-            venue: 'Multiple Outlets'
-        },
-        {
-            id: 4,
-            name: 'Corporate Executive Lunch',
-            marketingName: 'Express Business Lunch',
-            shortCode: 'CORP-LUNCH',
-            description: 'Quick set-menu lunch specifically designed for corporate timings',
-            status: 'Active',
-            hasBreakfast: false,
-            breakfastMenu: '',
-            breakfastStyle: 'Buffet',
-            breakfastVenue: '',
-            breakfastCuisine: '',
-            hasLunch: true,
-            lunchMenu: 'Executive Box Menu',
-            lunchStyle: 'Set Menu',
-            lunchVenue: 'The Atrium Cafe',
-            lunchCuisine: 'Continental',
-            hasDinner: false,
-            dinnerMenu: '',
-            dinnerStyle: 'Buffet',
-            dinnerVenue: '',
-            dinnerCuisine: '',
-            hasBrunch: false,
-            brunchMenu: '',
-            brunchStyle: 'Buffet',
-            brunchVenue: '',
-            brunchCuisine: '',
-            hasCupole: false,
-            cupoleMenu: '',
-            cupoleStyle: 'Buffet',
-            cupoleVenue: '',
-            cupoleCuisine: '',
-            hasSnacks: false,
-            snacksMenu: '',
-            snacksStyle: 'Buffet',
-            snacksVenue: '',
-            snacksCuisine: '',
-            servingType: 'Set Menu',
-            internalCost: 350,
-            sellingPriceAdult: 1200,
-            sellingPriceChild: 600,
-            infantMealsFree: false,
-            maxInfantAge: 0,
-            postingFrequency: 'One-time',
-            revenueCode: 'REV-FB-LUN',
-            taxInclusive: true,
-            startTime: '12:30',
-            endTime: '15:30',
-            venue: 'The Atrium Cafe'
-        },
-        {
-            id: 5,
-            name: 'European Plan (EP)',
-            marketingName: 'Room Only',
-            shortCode: 'EP',
-            description: 'Accommodation only, no meals included. Best for travelers who prefer dining out.',
-            status: 'Active',
-            hasBreakfast: false,
-            breakfastMenu: '',
-            breakfastStyle: 'Buffet',
-            breakfastVenue: '',
-            breakfastCuisine: '',
-            hasLunch: false,
-            lunchMenu: '',
-            lunchStyle: 'Buffet',
-            lunchVenue: '',
-            lunchCuisine: '',
-            hasDinner: false,
-            dinnerMenu: '',
-            dinnerStyle: 'Buffet',
-            dinnerVenue: '',
-            dinnerCuisine: '',
-            hasBrunch: false,
-            brunchMenu: '',
-            brunchStyle: 'Buffet',
-            brunchVenue: '',
-            brunchCuisine: '',
-            hasCupole: false,
-            cupoleMenu: '',
-            cupoleStyle: 'Buffet',
-            cupoleVenue: '',
-            cupoleCuisine: '',
-            hasSnacks: false,
-            snacksMenu: '',
-            snacksStyle: 'Buffet',
-            snacksVenue: '',
-            snacksCuisine: '',
-            servingType: 'À la carte',
-            internalCost: 0,
-            sellingPriceAdult: 0,
-            sellingPriceChild: 0,
-            infantMealsFree: true,
-            maxInfantAge: 5,
-            postingFrequency: 'Daily',
-            revenueCode: 'REV-ROOM-ONLY',
-            taxInclusive: true,
-            startTime: '00:00',
-            endTime: '00:00',
-            venue: 'N/A'
-        }
-        ];
+        return [];
     });
     const [formData, setFormData] = useState<Partial<MealPlan>>({});
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('identity');
     const [editingPlan, setEditingPlan] = useState<MealPlan | null>(null);
     const [isCodeManual, setIsCodeManual] = useState(false);
+
+    useEffect(() => {
+        fetch(`${getApiBaseUrl()}/api/rates/meal-plans?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setMealPlans(json.data);
+                    localStorage.setItem(MEAL_STORAGE_KEY, JSON.stringify(json.data));
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     const existingCodes = useMemo(() => mealPlans.map(p => p.shortCode), [mealPlans]);
 
@@ -412,7 +175,7 @@ export default function MealPlanManagement() {
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData.name || !formData.shortCode) {
             alert('Please provide Plan Name and Short Code.');
             return;
@@ -424,24 +187,57 @@ export default function MealPlanManagement() {
             return;
         }
 
+        const API_BASE = getApiBaseUrl();
+        let finalPlan: MealPlan;
+
+        if (editingPlan) {
+            finalPlan = { ...formData, id: editingPlan.id } as MealPlan;
+            try {
+                await fetch(`${API_BASE}/api/rates/meal-plans/${editingPlan.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(finalPlan)
+                });
+            } catch {}
+        } else {
+            finalPlan = { ...formData, id: Date.now() } as MealPlan;
+            try {
+                const res = await fetch(`${API_BASE}/api/rates/meal-plans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(finalPlan)
+                });
+                const json = await res.json();
+                if (json.success && json.data?.id) finalPlan.id = json.data.id;
+            } catch {}
+        }
+
         let updated: MealPlan[];
         if (editingPlan) {
-            updated = mealPlans.map(p => p.id === editingPlan.id ? { ...formData, id: editingPlan.id } as MealPlan : p);
+            updated = mealPlans.map(p => p.id === editingPlan.id ? finalPlan : p);
         } else {
-            const newPlan = { ...formData, id: Date.now() } as MealPlan;
-            updated = [...mealPlans, newPlan];
+            updated = [...mealPlans, finalPlan];
         }
         persistMealPlans(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         setView('list');
         setFormData({});
         setEditingPlan(null);
         setActiveTab('identity');
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this meal plan configuration?')) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/rates/meal-plans/${id}`, { method: 'DELETE' });
+            } catch {}
             const updated = mealPlans.filter(p => p.id !== id);
             persistMealPlans(updated);
+            try {
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            } catch {}
         }
     };
 
@@ -569,7 +365,7 @@ export default function MealPlanManagement() {
                                 <tr key={plan.id} className="hover:bg-slate-50/70 transition">
                                     <td className="py-3.5 px-4">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-900 text-sm">{plan.name}</span>
+                                            <span className="text-slate-900 text-sm">{plan.name}</span>
                                             <span className="badge-code">{plan.shortCode}</span>
                                         </div>
                                         {plan.marketingName && (
@@ -612,7 +408,7 @@ export default function MealPlanManagement() {
                                         </div>
                                     </td>
                                     <td className="py-3.5 px-4 text-right">
-                                        <div className="font-bold font-mono text-slate-900 text-sm">৳{plan.sellingPriceAdult} <span className="text-slate-400 text-xs font-normal">/ ৳{plan.sellingPriceChild}</span></div>
+                                        <div className="font-mono text-slate-900 text-sm">৳{plan.sellingPriceAdult} <span className="text-slate-400 text-xs font-normal">/ ৳{plan.sellingPriceChild}</span></div>
                                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">{plan.revenueCode}</div>
                                     </td>
                                     <td className="py-3.5 px-4 text-center">
@@ -657,7 +453,7 @@ export default function MealPlanManagement() {
                             <X className="size-4 text-slate-600" />
                         </button>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-900">
+                            <h1 className="text-xl text-slate-900">
                                 {formData.id ? 'Edit Meal Plan' : 'Create New Meal Plan'}
                             </h1>
                             <p className="text-xs text-slate-500">Configure catering inclusions, meal periods, and revenue ledger codes</p>
@@ -708,7 +504,7 @@ export default function MealPlanManagement() {
                     <div className="card-container p-6 space-y-6">
                         <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                             <FileText className="size-5 text-primary" />
-                            <h3 className="text-sm font-bold text-slate-900">Plan Identity & Codes</h3>
+                            <h3 className="text-sm text-slate-900">Plan Identity & Codes</h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="space-y-1.5">
@@ -752,7 +548,7 @@ export default function MealPlanManagement() {
                                 <div className="relative">
                                     <input
                                         type="text"
-                                        className={`input-standard font-mono font-bold uppercase pr-8 ${
+                                        className={`input-standard font-mono uppercase pr-8 ${
                                             isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode)
                                                 ? 'border-rose-400 bg-rose-50/50 text-rose-700'
                                                 : ''
@@ -808,7 +604,7 @@ export default function MealPlanManagement() {
                         <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                             <Utensils className="size-5 text-primary" />
                             <div>
-                                <h3 className="text-sm font-bold text-slate-900">Meal Courses & Outlets</h3>
+                                <h3 className="text-sm text-slate-900">Meal Courses & Outlets</h3>
                                 <p className="text-xs text-slate-500">Enable courses and select designated restaurant venues</p>
                             </div>
                         </div>
@@ -834,7 +630,7 @@ export default function MealPlanManagement() {
                                             checked={!!formData[item.key as keyof MealPlan]}
                                             onChange={() => toggleInclusion(item.key as keyof MealPlan)}
                                         />
-                                        <span className={`text-xs font-bold flex items-center gap-1.5 ${
+                                        <span className={`text-xs flex items-center gap-1.5 ${
                                             formData[item.key as keyof MealPlan] ? 'text-primary' : 'text-slate-700'
                                         }`}>
                                             <span>{item.icon}</span> {item.label}
@@ -845,7 +641,7 @@ export default function MealPlanManagement() {
                                         <div className="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3 text-xs">
                                             <div className="grid grid-cols-2 gap-2.5">
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Venue</label>
+                                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider">Venue</label>
                                                     <select
                                                         className="select-standard text-xs py-1.5"
                                                         value={formData[item.venueKey as keyof MealPlan] as string || ''}
@@ -859,7 +655,7 @@ export default function MealPlanManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cuisine</label>
+                                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider">Cuisine</label>
                                                     <select
                                                         className="select-standard text-xs py-1.5"
                                                         value={formData[item.cuisineKey as keyof MealPlan] as string || ''}
@@ -874,7 +670,7 @@ export default function MealPlanManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Menu</label>
+                                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider">Menu</label>
                                                     <select
                                                         className="select-standard text-xs py-1.5"
                                                         value={formData[item.menuKey as keyof MealPlan] as string || ''}
@@ -888,7 +684,7 @@ export default function MealPlanManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Serving</label>
+                                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider">Serving</label>
                                                     <select
                                                         className="select-standard text-xs py-1.5"
                                                         value={formData[item.styleKey as keyof MealPlan] as string || 'Buffet'}
@@ -916,7 +712,7 @@ export default function MealPlanManagement() {
                             <div className="flex items-center gap-2.5">
                                 <DollarSign className="size-5 text-primary" />
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900">Pricing & Accounting Ledger</h3>
+                                    <h3 className="text-sm text-slate-900">Pricing & Accounting Ledger</h3>
                                     <p className="text-xs text-slate-500">Configure adult/child rates and automated posting ledger</p>
                                 </div>
                             </div>
@@ -1018,7 +814,7 @@ export default function MealPlanManagement() {
                                     onChange={e => setFormData({ ...formData, taxInclusive: e.target.checked })}
                                 />
                                 <div className="text-xs">
-                                    <span className="font-bold text-amber-900 block">Selling Price is Tax Inclusive</span>
+                                    <span className="text-amber-900 block">Selling Price is Tax Inclusive</span>
                                     <span className="text-amber-800">If checked, taxes and service charges are included in the tariff. If unchecked, the guest folio will be assessed supplemental VAT/SC.</span>
                                 </div>
                             </div>
@@ -1032,7 +828,7 @@ export default function MealPlanManagement() {
                         <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                             <Clock className="size-5 text-primary" />
                             <div>
-                                <h3 className="text-sm font-bold text-slate-900">Service Hours & POS/KDS Sync</h3>
+                                <h3 className="text-sm text-slate-900">Service Hours & POS/KDS Sync</h3>
                                 <p className="text-xs text-slate-500">Operational service schedule and kitchen display system routing</p>
                             </div>
                         </div>
@@ -1076,7 +872,7 @@ export default function MealPlanManagement() {
                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90">
                                     <div className="flex items-center gap-2 mb-1.5">
                                         <div className="size-2 rounded-full bg-emerald-500" />
-                                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider font-mono">Kitchen Display System (KDS)</span>
+                                        <span className="text-[11px] text-slate-800 uppercase tracking-wider font-mono">Kitchen Display System (KDS)</span>
                                     </div>
                                     <p className="text-xs text-slate-500">This plan will be broadcasted to kitchen dispatch screens during active meal service hours.</p>
                                 </div>

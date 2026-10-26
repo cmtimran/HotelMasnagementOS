@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, BedDouble, Sparkles, User, Calendar, 
     MapPin, Plus, RefreshCw, LayoutGrid, List, CheckCircle2, 
-    Wrench, ArrowRight, X, ExternalLink
+    Wrench, ArrowRight, X, ExternalLink, Phone
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
@@ -12,6 +12,9 @@ import {
     syncRoomTypesAndRoomsFromDB, 
     syncReservationsFromDB,
     updateRoomHousekeepingInDB,
+    updateReservationStatusInDB,
+    getDynamicRoomTypes,
+    getOperatingSystemDate,
     subscribeToPMSEvents
 } from '../utils/roomInventoryEngine';
 
@@ -19,35 +22,55 @@ export interface RoomRackItem {
     id: number;
     roomNumber: string;
     floor: number;
-    roomType: 'Deluxe Double' | 'Superior King' | 'Executive Suite' | 'Presidential Suite' | 'Standard Single';
-    status: 'clean' | 'dirty' | 'inspected' | 'occupied' | 'ooo';
+    roomType: string;
+    status: 'clean' | 'dirty' | 'inspected' | 'occupied' | 'ooo' | 'reserved' | string;
     guestName?: string;
     phone?: string;
     checkIn?: string;
     checkoutDate?: string;
     rate: number;
-    bedType: 'King' | 'Queen' | 'Twin' | 'Single';
+    bedType: string;
     features: string[];
     housekeeper?: string;
     maintenanceReason?: string;
+    reservationId?: number | string;
+    reservationNumber?: string;
 }
 
 const deriveRoomsFromInventory = (): RoomRackItem[] => {
     const canonical = getCanonicalRooms();
     const storedRes = getAllStoredReservations();
+    const opDate = getOperatingSystemDate();
 
     return canonical.map(r => {
         const floorNum = parseInt(r.floorId, 10) || parseInt(r.number[0], 10) || 1;
-        const activeRes = storedRes.find(res => 
-            (res.roomNumber === r.number || (res.allocatedRooms && res.allocatedRooms.includes(r.number))) &&
-            (res.status === 'in-house' || res.status === 'arrived')
-        );
+        
+        // Match active reservations covering today or arriving today
+        const activeRes = storedRes.find(res => {
+            const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+            if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed') {
+                return false;
+            }
+            const matchesRoom = String(res.roomNumber) === r.number ||
+                String(res.roomNo) === r.number ||
+                (Array.isArray(res.allocatedRooms) && res.allocatedRooms.some((x: any) => String(x) === r.number)) ||
+                (Array.isArray(res.roomsList) && res.roomsList.some((rm: any) => String(rm.roomNumber) === r.number)) ||
+                (Array.isArray(res.groupRoomsList) && res.groupRoomsList.some((rm: any) => String(rm.roomNumber) === r.number));
 
-        let status: 'clean' | 'dirty' | 'inspected' | 'occupied' | 'ooo' = 'clean';
+            if (!matchesRoom) return false;
+
+            const checkIn = String(res.checkIn || res.arrivalDate || '');
+            const checkOut = String(res.checkOut || res.departureDate || '');
+            return (checkIn <= opDate && checkOut > opDate) || (checkIn === opDate);
+        });
+
+        let status: RoomRackItem['status'] = 'clean';
         if (r.status === 'Out of Order' || r.status === 'Maintenance') {
             status = 'ooo';
         } else if (activeRes) {
-            status = 'occupied';
+            const rawStatus = String(activeRes.status || '').toLowerCase().replace(/_/g, '-');
+            const isInHouse = rawStatus === 'in-house' || rawStatus === 'arrived' || rawStatus === 'checked-in';
+            status = isInHouse ? 'occupied' : 'reserved';
         } else {
             const hk = (r.housekeepingStatus || 'Clean').toLowerCase();
             status = hk === 'dirty' ? 'dirty' : hk === 'inspected' ? 'inspected' : 'clean';
@@ -67,13 +90,15 @@ const deriveRoomsFromInventory = (): RoomRackItem[] => {
             status,
             guestName: activeRes ? activeRes.guestName : undefined,
             phone: activeRes ? activeRes.phone : undefined,
-            checkIn: activeRes ? activeRes.checkIn : undefined,
-            checkoutDate: activeRes ? activeRes.checkOut : undefined,
+            checkIn: activeRes ? (activeRes.checkIn || activeRes.arrivalDate) : undefined,
+            checkoutDate: activeRes ? (activeRes.checkOut || activeRes.departureDate) : undefined,
             rate: r.baseRate || 3500,
             bedType: (r.bedConfiguration as any) || 'King',
             features,
             housekeeper: r.housekeepingStatus === 'Clean' ? 'Housekeeping Assigned' : 'Duty Staff',
-            maintenanceReason: r.status === 'Out of Order' ? (r.remarks || 'Under Maintenance') : undefined
+            maintenanceReason: r.status === 'Out of Order' ? (r.remarks || 'Under Maintenance') : undefined,
+            reservationId: activeRes?.id,
+            reservationNumber: activeRes?.reservationNumber
         };
     });
 };
@@ -120,14 +145,27 @@ export const RoomRack: React.FC = () => {
     const stats = useMemo(() => {
         const total = rooms.length;
         const occupied = rooms.filter(r => r.status === 'occupied').length;
+        const reserved = rooms.filter(r => r.status === 'reserved').length;
         const clean = rooms.filter(r => r.status === 'clean').length;
         const dirty = rooms.filter(r => r.status === 'dirty').length;
         const inspected = rooms.filter(r => r.status === 'inspected').length;
         const ooo = rooms.filter(r => r.status === 'ooo').length;
         const available = clean + inspected;
-        const occupancyRate = Math.round((occupied / total) * 100);
+        const occupancyRate = total > 0 ? Math.round(((occupied + reserved) / total) * 100) : 0;
 
-        return { total, occupied, clean, dirty, inspected, ooo, available, occupancyRate };
+        return { total, occupied, reserved, clean, dirty, inspected, ooo, available, occupancyRate };
+    }, [rooms]);
+
+    // Dynamic Floors and Room Types (derived dynamically from database & rooms)
+    const availableFloors = useMemo(() => {
+        const list = Array.from(new Set(rooms.map(r => r.floor))).sort((a, b) => a - b);
+        return list.length > 0 ? list : [1, 2, 3, 4, 5];
+    }, [rooms]);
+
+    const availableRoomTypes = useMemo(() => {
+        const fromRooms = Array.from(new Set(rooms.map(r => r.roomType).filter(Boolean)));
+        const fromEngine = getDynamicRoomTypes().map(t => t.name);
+        return Array.from(new Set([...fromRooms, ...fromEngine])).filter(Boolean);
     }, [rooms]);
 
     // Filter Logic
@@ -188,6 +226,15 @@ export const RoomRack: React.FC = () => {
                     label: 'Occupied',
                     icon: <User size={11} />
                 };
+            case 'reserved':
+                return {
+                    badge: 'bg-amber-50 text-amber-700 border-amber-200',
+                    dot: 'bg-amber-500',
+                    bar: 'bg-amber-500',
+                    border: 'hover:border-amber-400',
+                    label: 'Reserved (Arriving)',
+                    icon: <Calendar size={11} />
+                };
             case 'dirty':
                 return {
                     badge: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -206,15 +253,28 @@ export const RoomRack: React.FC = () => {
                     label: 'Out of Order',
                     icon: <Wrench size={11} />
                 };
+            default:
+                return {
+                    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    dot: 'bg-emerald-500',
+                    bar: 'bg-emerald-500',
+                    border: 'hover:border-emerald-400',
+                    label: 'Vacant Clean',
+                    icon: <Sparkles size={11} />
+                };
         }
     };
 
     // Quick status updater for selected room with direct Database & PMS Sync
     const handleUpdateRoomStatus = (roomId: number, newStatus: RoomRackItem['status']) => {
         const targetRoom = rooms.find(r => r.id === roomId);
-        if (targetRoom && (newStatus === 'clean' || newStatus === 'dirty' || newStatus === 'inspected')) {
-            const titleCase = newStatus === 'clean' ? 'Clean' : newStatus === 'dirty' ? 'Dirty' : 'Inspected';
-            updateRoomHousekeepingInDB(targetRoom.roomNumber, titleCase);
+        if (targetRoom) {
+            if (newStatus === 'clean' || newStatus === 'dirty' || newStatus === 'inspected') {
+                const titleCase = newStatus === 'clean' ? 'Clean' : newStatus === 'dirty' ? 'Dirty' : 'Inspected';
+                updateRoomHousekeepingInDB(targetRoom.roomNumber, titleCase);
+            } else if (newStatus === 'ooo') {
+                updateRoomHousekeepingInDB(targetRoom.roomNumber, 'Dirty');
+            }
         }
 
         const updated = rooms.map(r => {
@@ -244,7 +304,7 @@ export const RoomRack: React.FC = () => {
             {/* Top Operational Header */}
             <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center shadow-xs flex-shrink-0">
                         <BedDouble size={20} />
                     </div>
                     <div>
@@ -252,7 +312,7 @@ export const RoomRack: React.FC = () => {
                             <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
                                 Interactive Room Rack Grid
                             </h1>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
                                 {stats.occupancyRate}% Occupied
                             </span>
                         </div>
@@ -269,7 +329,7 @@ export const RoomRack: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setViewMode('grid')}
-                            className={`p-1.5 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                            className={`p-1.5 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all ${
                                 viewMode === 'grid' ? 'bg-white text-blue-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
                             }`}
                             title="Floor Grid View"
@@ -280,7 +340,7 @@ export const RoomRack: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setViewMode('dense')}
-                            className={`p-1.5 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                            className={`p-1.5 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all ${
                                 viewMode === 'dense' ? 'bg-white text-blue-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
                             }`}
                             title="Dense Matrix View"
@@ -293,7 +353,7 @@ export const RoomRack: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setActivePage('front-desk')}
-                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
                     >
                         <span>Front Desk Hub</span>
                         <ArrowRight size={13} />
@@ -305,7 +365,7 @@ export const RoomRack: React.FC = () => {
                             setPrefilledRoomNumber('');
                             setIsQuickReserveOpen(true);
                         }}
-                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
                     >
                         <Plus size={14} className="stroke-[2.5]" />
                         <span>Walk-In / Booking</span>
@@ -322,7 +382,7 @@ export const RoomRack: React.FC = () => {
                     }`}
                 >
                     <div className="flex items-center justify-between text-slate-500">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Total Rooms</span>
+                        <span className="text-[10px] uppercase tracking-wider">Total Rooms</span>
                         <BedDouble size={13} className="text-slate-600" />
                     </div>
                     <div className="text-lg font-black text-slate-900 font-mono mt-0.5">{stats.total}</div>
@@ -336,7 +396,7 @@ export const RoomRack: React.FC = () => {
                     }`}
                 >
                     <div className="flex items-center justify-between text-indigo-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Occupied</span>
+                        <span className="text-[10px] uppercase tracking-wider">Occupied</span>
                         <User size={13} className="text-indigo-600" />
                     </div>
                     <div className="text-lg font-black text-indigo-900 font-mono mt-0.5">{stats.occupied}</div>
@@ -350,7 +410,7 @@ export const RoomRack: React.FC = () => {
                     }`}
                 >
                     <div className="flex items-center justify-between text-emerald-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Vacant Clean</span>
+                        <span className="text-[10px] uppercase tracking-wider">Vacant Clean</span>
                         <Sparkles size={13} className="text-emerald-600" />
                     </div>
                     <div className="text-lg font-black text-emerald-900 font-mono mt-0.5">{stats.clean}</div>
@@ -364,7 +424,7 @@ export const RoomRack: React.FC = () => {
                     }`}
                 >
                     <div className="flex items-center justify-between text-blue-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Inspected</span>
+                        <span className="text-[10px] uppercase tracking-wider">Inspected</span>
                         <CheckCircle2 size={13} className="text-blue-600" />
                     </div>
                     <div className="text-lg font-black text-blue-900 font-mono mt-0.5">{stats.inspected}</div>
@@ -378,7 +438,7 @@ export const RoomRack: React.FC = () => {
                     }`}
                 >
                     <div className="flex items-center justify-between text-rose-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Turnover Dirty</span>
+                        <span className="text-[10px] uppercase tracking-wider">Turnover Dirty</span>
                         <BedDouble size={13} className="text-rose-600" />
                     </div>
                     <div className="text-lg font-black text-rose-900 font-mono mt-0.5">{stats.dirty}</div>
@@ -392,7 +452,7 @@ export const RoomRack: React.FC = () => {
                     }`}
                 >
                     <div className="flex items-center justify-between text-slate-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Out of Order</span>
+                        <span className="text-[10px] uppercase tracking-wider">Out of Order</span>
                         <Wrench size={13} className="text-slate-600" />
                     </div>
                     <div className="text-lg font-black text-slate-900 font-mono mt-0.5">{stats.ooo}</div>
@@ -415,39 +475,35 @@ export const RoomRack: React.FC = () => {
 
                 <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Floor:</span>
+                        <span className="text-[10px] text-slate-400 uppercase">Floor:</span>
                         <select
                             value={filterFloor}
                             onChange={e => setFilterFloor(e.target.value)}
                             className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:border-blue-500"
                         >
-                            <option value="all">All Floors (1 - 5)</option>
-                            <option value="1">Floor 1 (Lobby &amp; Deluxe)</option>
-                            <option value="2">Floor 2 (Superior)</option>
-                            <option value="3">Floor 3 (Executive)</option>
-                            <option value="4">Floor 4 (Business Wing)</option>
-                            <option value="5">Floor 5 (Penthouse &amp; VIP)</option>
+                            <option value="all">All Floors</option>
+                            {availableFloors.map(fl => (
+                                <option key={fl} value={fl.toString()}>Floor {fl}</option>
+                            ))}
                         </select>
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Type:</span>
+                        <span className="text-[10px] text-slate-400 uppercase">Type:</span>
                         <select
                             value={filterType}
                             onChange={e => setFilterType(e.target.value)}
                             className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:border-blue-500"
                         >
                             <option value="all">All Room Types</option>
-                            <option value="Deluxe Double">Deluxe Double</option>
-                            <option value="Superior King">Superior King</option>
-                            <option value="Executive Suite">Executive Suite</option>
-                            <option value="Presidential Suite">Presidential Suite</option>
-                            <option value="Standard Single">Standard Single</option>
+                            {availableRoomTypes.map(t => (
+                                <option key={t} value={t}>{t}</option>
+                            ))}
                         </select>
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status:</span>
+                        <span className="text-[10px] text-slate-400 uppercase">Status:</span>
                         <select
                             value={filterStatus}
                             onChange={e => setFilterStatus(e.target.value)}
@@ -530,7 +586,7 @@ export const RoomRack: React.FC = () => {
                                                         </h3>
                                                     </div>
 
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${theme.badge}`}>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] border flex items-center gap-1 ${theme.badge}`}>
                                                         {theme.icon}
                                                         <span>{theme.label}</span>
                                                     </span>
@@ -539,7 +595,7 @@ export const RoomRack: React.FC = () => {
                                                 {/* Room Type & Bed */}
                                                 <div>
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-[10.5px] font-bold text-slate-800">
+                                                        <span className="text-[10.5px] text-slate-800">
                                                             {room.roomType}
                                                         </span>
                                                         <span className="text-[9.5px] font-medium text-slate-500">
@@ -560,7 +616,7 @@ export const RoomRack: React.FC = () => {
                                                 {/* Middle State: Guest Info if Occupied vs Available Note */}
                                                 {room.status === 'occupied' && room.guestName ? (
                                                     <div className="bg-indigo-50/70 border border-indigo-100 p-2 rounded-lg text-xs">
-                                                        <p className="font-bold text-indigo-950 truncate flex items-center gap-1">
+                                                        <p className="text-indigo-950 truncate flex items-center gap-1">
                                                             <User size={11} className="text-indigo-600 flex-shrink-0" />
                                                             <span>{room.guestName}</span>
                                                         </p>
@@ -578,7 +634,7 @@ export const RoomRack: React.FC = () => {
                                                         <span>Housekeeper: {room.housekeeper || 'Unassigned'}</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="bg-emerald-50/70 p-1.5 rounded-lg text-[10px] text-emerald-800 font-bold flex items-center justify-between">
+                                                    <div className="bg-emerald-50/70 p-1.5 rounded-lg text-[10px] text-emerald-800 flex items-center justify-between">
                                                         <span>Ready for Check-In</span>
                                                         <Sparkles size={11} className="text-emerald-600" />
                                                     </div>
@@ -587,7 +643,7 @@ export const RoomRack: React.FC = () => {
                                                 {/* Card Footer: Rate & Action Button */}
                                                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                                                     <div>
-                                                        <span className="text-[8px] font-bold text-slate-400 uppercase leading-none block">Tariff</span>
+                                                        <span className="text-[8px] text-slate-400 uppercase leading-none block">Tariff</span>
                                                         <span className="text-xs font-black text-slate-900 font-mono">
                                                             ৳{room.rate.toLocaleString()}
                                                         </span>
@@ -601,7 +657,7 @@ export const RoomRack: React.FC = () => {
                                                                     e.stopPropagation();
                                                                     handleBookRoom(room);
                                                                 }}
-                                                                className="h-6.5 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                                                className="h-6.5 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-md text-[10px] cursor-pointer transition-colors shadow-2xs"
                                                             >
                                                                 Assign
                                                             </button>
@@ -643,8 +699,8 @@ export const RoomRack: React.FC = () => {
                                                 {room.status === 'occupied' ? (room.guestName || 'Occupied') : room.roomType}
                                             </p>
                                             <div className="flex items-center justify-between text-[9px] mt-1 pt-1 border-t border-slate-100">
-                                                <span className="font-bold text-slate-700">৳{room.rate}</span>
-                                                <span className={`px-1 rounded text-[8px] font-bold ${theme.badge}`}>
+                                                <span className="text-slate-700">৳{room.rate}</span>
+                                                <span className={`px-1 rounded text-[8px] ${theme.badge}`}>
                                                     {theme.label.split(' ')[0]}
                                                 </span>
                                             </div>
@@ -658,29 +714,29 @@ export const RoomRack: React.FC = () => {
             ) : (
                 <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
                     <BedDouble size={28} className="text-slate-300 mx-auto mb-2" />
-                    <p className="text-xs font-bold text-slate-700">No rooms match filter criteria</p>
+                    <p className="text-xs text-slate-700">No rooms match filter criteria</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">Try clearing the search query or selecting All Floors</p>
                 </div>
             )}
 
             {/* Room Details & Housekeeping Action Drawer / Modal */}
             {selectedRoom && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[500px] w-full p-4.5 space-y-4 animate-in zoom-in-95 duration-150">
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[540px] w-full overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
                         {/* Header */}
-                        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-10 h-10 rounded-xl bg-[#1e3a8a] text-white flex items-center justify-center font-mono font-bold text-base shadow-xs">
+                        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center font-mono font-bold text-base shadow-sm ring-2 ring-blue-100">
                                     {selectedRoom.roomNumber}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-sm font-bold text-slate-900">Room {selectedRoom.roomNumber} Operations</h3>
-                                        <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold border ${getStatusTheme(selectedRoom.status).badge}`}>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${getStatusTheme(selectedRoom.status).badge}`}>
                                             {getStatusTheme(selectedRoom.status).label}
                                         </span>
                                     </div>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
                                         Floor {selectedRoom.floor} • {selectedRoom.roomType} ({selectedRoom.bedType} Bed)
                                     </p>
                                 </div>
@@ -688,135 +744,250 @@ export const RoomRack: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setSelectedRoom(null)}
-                                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer transition-colors"
+                                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center cursor-pointer transition-colors"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        {/* Room Specifications Table */}
-                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200/80 grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Tariff (Rate Plan)</span>
-                                <p className="font-mono font-bold text-slate-900 text-sm">৳{selectedRoom.rate.toLocaleString()} / night</p>
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-4">
+                            {/* Room Specifications Table */}
+                            <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/80 grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Tariff (Rate Plan)</span>
+                                    <div className="flex items-baseline gap-1 mt-1">
+                                        <span className="font-mono text-slate-900 text-base font-bold">৳{selectedRoom.rate.toLocaleString()}</span>
+                                        <span className="text-[11px] text-slate-500 font-medium">/ night</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Housekeeper In-Charge</span>
+                                    <select
+                                        value={selectedRoom.housekeeper || 'Fatima Begum (Floor 1)'}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSelectedRoom({ ...selectedRoom, housekeeper: val });
+                                            const updated = rooms.map(r => r.id === selectedRoom.id ? { ...r, housekeeper: val } : r);
+                                            persistRooms(updated);
+                                        }}
+                                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none cursor-pointer focus:border-blue-500 shadow-2xs"
+                                    >
+                                        <option value="Fatima Begum (Floor 1)">Fatima Begum (Floor 1)</option>
+                                        <option value="Rahima Khatun (Floor 2)">Rahima Khatun (Floor 2)</option>
+                                        <option value="Salma Akter (Floor 3)">Salma Akter (Floor 3)</option>
+                                        <option value="Akhtar Hossain (Floor 4/5)">Akhtar Hossain (Floor 4/5)</option>
+                                        <option value="Duty Housekeeping Team">Duty Housekeeping Team</option>
+                                    </select>
+                                </div>
+                                <div className="col-span-2 pt-2 border-t border-slate-200/60">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Room Amenities</span>
+                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                        {selectedRoom.features.map((feat, i) => (
+                                            <span key={i} className="px-2.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] text-slate-700 font-medium shadow-2xs">
+                                                {feat}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Housekeeper In-Charge</span>
-                                <p className="font-semibold text-slate-800">{selectedRoom.housekeeper || 'General Housekeeping'}</p>
-                            </div>
-                            <div className="col-span-2 pt-1 border-t border-slate-200/60">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Room Amenities</span>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                    {selectedRoom.features.map((feat, i) => (
-                                        <span key={i} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] text-slate-700 font-medium">
-                                            {feat}
+
+                            {/* Occupant Information - If in-house occupied */}
+                            {selectedRoom.status === 'occupied' && selectedRoom.guestName && (
+                                <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-xl p-3.5 space-y-2 text-xs text-indigo-950 shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] text-indigo-800 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                            <User size={13} className="text-indigo-700" />
+                                            <span>In-House Resident</span>
                                         </span>
+                                        <span className="px-2 py-0.5 bg-indigo-200/60 text-indigo-900 rounded-full text-[10px] font-bold">
+                                            Occupied
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-200 text-indigo-800 flex items-center justify-center font-bold text-xs">
+                                                {selectedRoom.guestName ? selectedRoom.guestName.slice(0, 2).toUpperCase() : 'GS'}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-900 text-sm leading-tight">{selectedRoom.guestName}</div>
+                                                <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                                                    <Phone size={11} className="text-slate-400" />
+                                                    <span>{selectedRoom.phone || '+880 1711-000000'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="pt-2 border-t border-indigo-200/60 flex items-center justify-between text-[11px] text-indigo-900 font-medium">
+                                        <span>Stay Period:</span>
+                                        <span className="font-mono font-bold text-slate-800">{selectedRoom.checkIn} → {selectedRoom.checkoutDate}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Occupant Information - If reserved (arriving today) */}
+                            {selectedRoom.status === 'reserved' && (
+                                <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3.5 space-y-2.5 text-xs text-amber-950 shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                            <Calendar size={13} className="text-amber-700" />
+                                            <span>Incoming Reserved Guest</span>
+                                        </span>
+                                        <span className="px-2 py-0.5 bg-amber-200/70 text-amber-900 rounded-full text-[10px] font-bold">
+                                            Arriving Today
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-0.5">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center font-bold text-xs">
+                                                {selectedRoom.guestName ? selectedRoom.guestName.slice(0, 2).toUpperCase() : 'GU'}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-900 text-sm leading-tight">{selectedRoom.guestName || 'Valued Guest'}</div>
+                                                <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                                                    <Phone size={11} className="text-slate-400" />
+                                                    <span>{selectedRoom.phone || '+880 1711-000000'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {selectedRoom.reservationNumber && (
+                                            <div className="text-right">
+                                                <span className="text-[10px] text-slate-500 block uppercase font-medium">Booking Ref</span>
+                                                <span className="font-mono font-bold text-blue-700 text-xs bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-block">
+                                                    {selectedRoom.reservationNumber}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px] text-amber-900 font-medium">
+                                        <span>Expected Stay:</span>
+                                        <span className="font-mono font-bold text-slate-800">{selectedRoom.checkIn} → {selectedRoom.checkoutDate}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Turnover Notice - If dirty */}
+                            {selectedRoom.status === 'dirty' && (
+                                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-800 flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+                                        <BedDouble size={14} />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-rose-900">Turnover Cleaning Pending</p>
+                                        <p className="text-[11px] text-rose-700 mt-0.5">Room must be sanitized and inspected before admitting incoming arrivals.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Maintenance Notice - If OOO */}
+                            {selectedRoom.status === 'ooo' && (
+                                <div className="bg-slate-100 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center flex-shrink-0">
+                                        <Wrench size={14} />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900">Out of Order Maintenance</p>
+                                        <p className="text-[11px] text-slate-600 mt-0.5">{selectedRoom.maintenanceReason || 'Under technical maintenance overhaul'}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Fast Status Change Actions */}
+                            <div className="space-y-1.5 pt-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                    Quick Housekeeping Status Override
+                                </label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[
+                                        { id: 'clean', label: 'Clean', icon: <Sparkles size={13} />, activeClass: 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold ring-2 ring-emerald-200', inactiveClass: 'bg-emerald-50/70 text-emerald-800 border-emerald-200 hover:bg-emerald-100/80 font-medium' },
+                                        { id: 'inspected', label: 'Inspected', icon: <CheckCircle2 size={13} />, activeClass: 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold ring-2 ring-blue-200', inactiveClass: 'bg-blue-50/70 text-blue-800 border-blue-200 hover:bg-blue-100/80 font-medium' },
+                                        { id: 'dirty', label: 'Dirty', icon: <BedDouble size={13} />, activeClass: 'bg-rose-600 text-white border-rose-600 shadow-sm font-bold ring-2 ring-rose-200', inactiveClass: 'bg-rose-50/70 text-rose-800 border-rose-200 hover:bg-rose-100/80 font-medium' },
+                                        { id: 'ooo', label: 'OOO', icon: <Wrench size={13} />, activeClass: 'bg-slate-700 text-white border-slate-700 shadow-sm font-bold ring-2 ring-slate-300', inactiveClass: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/80 font-medium' }
+                                    ].map((btn) => (
+                                        <button
+                                            key={btn.id}
+                                            type="button"
+                                            onClick={() => handleUpdateRoomStatus(selectedRoom.id, btn.id as any)}
+                                            className={`py-2 rounded-xl text-xs border flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                                                selectedRoom.status === btn.id ? btn.activeClass : btn.inactiveClass
+                                            }`}
+                                        >
+                                            {btn.icon}
+                                            <span>{btn.label}</span>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Occupant Information (If occupied) */}
-                        {selectedRoom.status === 'occupied' && selectedRoom.guestName && (
-                            <div className="bg-indigo-50/70 border border-indigo-200 rounded-lg p-3 space-y-1.5 text-xs text-indigo-950">
-                                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">In-House Guest Details</span>
-                                <div className="flex justify-between">
-                                    <span className="text-indigo-800">Guest Name:</span>
-                                    <strong className="font-bold">{selectedRoom.guestName}</strong>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-indigo-800">Phone:</span>
-                                    <span className="font-medium">{selectedRoom.phone || '+880 1711-000000'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-indigo-800">Stay Period:</span>
-                                    <span className="font-medium">{selectedRoom.checkIn} to {selectedRoom.checkoutDate}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Fast Status Change Actions */}
-                        <div className="space-y-1.5">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                                Quick Housekeeping Status Override
-                            </span>
-                            <div className="grid grid-cols-4 gap-1.5">
-                                <button
-                                    type="button"
-                                    onClick={() => handleUpdateRoomStatus(selectedRoom.id, 'clean')}
-                                    className={`py-1.5 rounded-lg text-xs font-bold border flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
-                                        selectedRoom.status === 'clean'
-                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                            : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                                    }`}
-                                >
-                                    <Sparkles size={12} />
-                                    <span>Clean</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => handleUpdateRoomStatus(selectedRoom.id, 'inspected')}
-                                    className={`py-1.5 rounded-lg text-xs font-bold border flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
-                                        selectedRoom.status === 'inspected'
-                                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                                            : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
-                                    }`}
-                                >
-                                    <CheckCircle2 size={12} />
-                                    <span>Inspected</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => handleUpdateRoomStatus(selectedRoom.id, 'dirty')}
-                                    className={`py-1.5 rounded-lg text-xs font-bold border flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
-                                        selectedRoom.status === 'dirty'
-                                            ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                                            : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
-                                    }`}
-                                >
-                                    <BedDouble size={12} />
-                                    <span>Dirty</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => handleUpdateRoomStatus(selectedRoom.id, 'ooo')}
-                                    className={`py-1.5 rounded-lg text-xs font-bold border flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
-                                        selectedRoom.status === 'ooo'
-                                            ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
-                                            : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                                    }`}
-                                >
-                                    <Wrench size={12} />
-                                    <span>OOO</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Primary Action Buttons */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
                             <button
                                 type="button"
                                 onClick={() => setSelectedRoom(null)}
-                                className="h-8 px-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                className="h-9 px-4 border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
                             >
                                 Close
                             </button>
 
                             <div className="flex items-center gap-2">
-                                {selectedRoom.status === 'occupied' ? (
+                                {selectedRoom.status === 'reserved' ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (selectedRoom.reservationId) {
+                                                    updateReservationStatusInDB(selectedRoom.reservationId, 'in-house');
+                                                }
+                                                handleUpdateRoomStatus(selectedRoom.id, 'occupied');
+                                                setSelectedRoom(null);
+                                            }}
+                                            className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-bold transition-all"
+                                        >
+                                            <CheckCircle2 size={14} />
+                                            <span>Check In Guest</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedRoom(null);
+                                                setActivePage('front-desk');
+                                            }}
+                                            className="h-9 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-semibold transition-all"
+                                        >
+                                            <span>Front Desk Hub</span>
+                                            <ExternalLink size={12} />
+                                        </button>
+                                    </>
+                                ) : selectedRoom.status === 'occupied' ? (
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setSelectedRoom(null);
                                             setActivePage('front-desk');
                                         }}
-                                        className="h-8 px-3.5 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                        className="h-9 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-semibold transition-all"
                                     >
-                                        <span>View in Front Desk</span>
+                                        <span>Front Desk / Guest Folio</span>
                                         <ExternalLink size={12} />
+                                    </button>
+                                ) : selectedRoom.status === 'dirty' ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleUpdateRoomStatus(selectedRoom.id, 'clean')}
+                                        className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-semibold transition-all"
+                                    >
+                                        <Sparkles size={13} />
+                                        <span>Mark Clean & Ready</span>
+                                    </button>
+                                ) : selectedRoom.status === 'ooo' ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleUpdateRoomStatus(selectedRoom.id, 'inspected')}
+                                        className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-semibold transition-all"
+                                    >
+                                        <CheckCircle2 size={13} />
+                                        <span>Release to Service</span>
                                     </button>
                                 ) : (
                                     <button
@@ -826,9 +997,9 @@ export const RoomRack: React.FC = () => {
                                             setSelectedRoom(null);
                                             handleBookRoom(rm);
                                         }}
-                                        className="h-8 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                        className="h-9 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-semibold transition-all"
                                     >
-                                        <Plus size={13} className="stroke-[2.5]" />
+                                        <Plus size={14} className="stroke-[2.5]" />
                                         <span>Walk-In Book Room {selectedRoom.roomNumber}</span>
                                     </button>
                                 )}

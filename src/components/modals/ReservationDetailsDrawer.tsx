@@ -87,7 +87,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                         >
                             <X size={17} />
                         </button>
-                        <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-900 flex items-center justify-center font-bold flex-shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-900 flex items-center justify-center flex-shrink-0">
                             <Users size={14} />
                         </div>
                         <span className="font-extrabold text-gray-900 text-sm tracking-wide uppercase truncate font-sans">
@@ -104,7 +104,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 if (onEdit) onEdit(booking);
                                 else if (onAmendStay) onAmendStay(booking);
                             }}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                         >
                             <Edit3 size={11} className="text-[#0e3592]" />
                             <span>Edit</span>
@@ -115,7 +115,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                             <button
                                 type="button"
                                 onClick={() => setIsOptionsOpen(!isOptionsOpen)}
-                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                             >
                                 <Settings size={11} className="text-[#0e3592]" />
                                 <span>Options</span>
@@ -124,7 +124,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
 
                             {/* Options Dropdown Menu (Exact 9 options matching media_1792542819332_c56d27e8.png) */}
                             {isOptionsOpen && (
-                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-md shadow-2xl border border-gray-200 py-1 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100">
+                                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-md shadow-2xl border border-gray-200 py-1 z-[100002] text-gray-800 animate-in fade-in zoom-in-95 duration-100">
                                     {/* 1. Add Payment */}
                                     <button
                                         type="button"
@@ -132,7 +132,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                             setIsOptionsOpen(false);
                                             if (onAddPayment) onAddPayment(booking);
                                         }}
-                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                                        className="w-full px-3.5 py-1.5 text-left font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                                     >
                                         <CreditCard size={14} className="text-gray-700 flex-shrink-0" />
                                         <span>Add Payment</span>
@@ -252,14 +252,14 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                     {/* Row 1: Reservation # and Status */}
                     <div className="grid grid-cols-2 gap-2">
                         <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2.5 shadow-2xs">
-                            <div className="w-7 h-7 rounded-lg bg-blue-500/30 text-blue-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                            <div className="w-7 h-7 rounded-lg bg-blue-500/30 text-blue-200 flex items-center justify-center text-xs flex-shrink-0">
                                 #
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                     Reservation #
                                 </div>
-                                <div className="text-xs font-bold text-white truncate font-mono">
+                                <div className="text-xs text-white truncate font-mono">
                                     {booking.reservationNumber}
                                 </div>
                             </div>
@@ -270,7 +270,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <Layers size={13} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                     Status
                                 </div>
                                 <div className="mt-0.5">
@@ -290,8 +290,8 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <Calendar size={12} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[8.5px] uppercase font-bold text-blue-200">ARRIVAL</div>
-                                <div className="text-[11.5px] font-bold text-white truncate">{booking.arrivalDate}</div>
+                                <div className="text-[8.5px] uppercase text-blue-200">ARRIVAL</div>
+                                <div className="text-[11.5px] text-white truncate">{booking.arrivalDate}</div>
                                 <div className="text-[8.5px] text-blue-200 flex items-center gap-1">
                                     <span>🕒 16:00:00</span>
                                 </div>
@@ -300,7 +300,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
 
                         {/* Nights */}
                         <div className="col-span-2 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-1.5 flex flex-col items-center justify-center text-center shadow-2xs">
-                            <div className="text-[8px] uppercase font-bold text-blue-200">NIGHTS</div>
+                            <div className="text-[8px] uppercase text-blue-200">NIGHTS</div>
                             <div className="text-base font-black text-white font-mono leading-none mt-0.5">
                                 {booking.nights}
                             </div>
@@ -312,8 +312,8 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <Calendar size={12} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[8.5px] uppercase font-bold text-blue-200">DEPARTURE</div>
-                                <div className="text-[11.5px] font-bold text-white truncate">{booking.departureDate}</div>
+                                <div className="text-[8.5px] uppercase text-blue-200">DEPARTURE</div>
+                                <div className="text-[11.5px] text-white truncate">{booking.departureDate}</div>
                                 <div className="text-[8.5px] text-blue-200 flex items-center gap-1">
                                     <span>🕒 12:00:00</span>
                                 </div>
@@ -328,10 +328,10 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <Home size={13} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                     Room Details
                                 </div>
-                                <div className="text-xs font-bold text-white truncate">
+                                <div className="text-xs text-white truncate">
                                     {booking.roomNumber} ({booking.roomType || 'Winter Rate Plan'})
                                 </div>
                             </div>
@@ -342,10 +342,10 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <Printer size={13} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                     Rate Plan
                                 </div>
-                                <div className="text-xs font-bold text-white truncate">
+                                <div className="text-xs text-white truncate">
                                     {booking.ratePlan || 'Summer Vacation'}
                                 </div>
                             </div>
@@ -359,11 +359,11 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <Users size={13} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                     Guests (Pax)
                                 </div>
-                                <div className="text-xs font-bold text-white truncate">
-                                    2 Adults, 1 Child
+                                <div className="text-xs text-white truncate">
+                                    {booking?.adults ?? 2} Adult{(booking?.adults ?? 2) > 1 ? 's' : ''}{(booking?.children ?? 0) > 0 ? `, ${booking?.children} Child${(booking?.children ?? 0) > 1 ? 'ren' : ''}` : ''}
                                 </div>
                             </div>
                         </div>
@@ -373,10 +373,10 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 <DollarSign size={13} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                     Avg Daily Rate
                                 </div>
-                                <div className="text-xs font-bold text-white font-mono">
+                                <div className="text-xs text-white font-mono">
                                     {dailyRate.toFixed(2)}
                                 </div>
                             </div>
@@ -392,7 +392,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 </div>
                                 <span>Room Total Amount</span>
                             </div>
-                            <span className="font-mono font-bold text-white text-xs">{totalAmount.toFixed(2)}</span>
+                            <span className="font-mono text-white text-xs">{totalAmount.toFixed(2)}</span>
                         </div>
 
                         <div className="flex items-center justify-between text-blue-100 text-xs">
@@ -402,7 +402,7 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 </div>
                                 <span>Room Discount</span>
                             </div>
-                            <span className="font-mono font-bold text-rose-300 text-xs">0.00</span>
+                            <span className="font-mono text-rose-300 text-xs">0.00</span>
                         </div>
 
                         <div className="flex items-center justify-between text-blue-100 text-xs">
@@ -412,17 +412,17 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                                 </div>
                                 <span>Room Paid Amount</span>
                             </div>
-                            <span className="font-mono font-bold text-emerald-300 text-xs">0.00</span>
+                            <span className="font-mono text-emerald-300 text-xs">0.00</span>
                         </div>
                     </div>
 
                     {/* Separate Room Net Balance Highlight Card */}
-                    <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-3 flex items-center justify-between font-bold shadow-2xs">
+                    <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-3 flex items-center justify-between shadow-2xs">
                         <div className="flex items-center gap-2.5 text-white">
                             <div className="w-6 h-6 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
                                 <Wallet size={13} />
                             </div>
-                            <span className="text-xs font-bold tracking-tight">Room Net Balance</span>
+                            <span className="text-xs tracking-tight">Room Net Balance</span>
                         </div>
                         <span className="font-mono font-black text-emerald-400 text-base">
                             {totalAmount.toFixed(2)}

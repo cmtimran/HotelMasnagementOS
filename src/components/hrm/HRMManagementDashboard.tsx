@@ -220,7 +220,7 @@ export const HRMManagementDashboard: React.FC = () => {
                         <Users size={24} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        <h1 className="text-2xl text-slate-900 tracking-tight flex items-center gap-2">
                             HRM & 24/7 Workforce Suite
                             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-300">
                                 24/7 Shift Rostering & Payroll GL
@@ -261,20 +261,20 @@ export const HRMManagementDashboard: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-6">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Active Staff</div>
-                    <div className="text-2xl font-bold text-slate-900 mt-1">{employees.length} Personnel</div>
+                    <div className="text-2xl text-slate-900 mt-1">{employees.length} Personnel</div>
                     <div className="text-[11px] text-slate-400 mt-0.5">Across {departments.length} Cost Center Departments</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Monthly Base Payroll</div>
-                    <div className="text-2xl font-bold text-purple-600 mt-1">৳ {totalMonthlyPayrollExpense.toLocaleString()}</div>
+                    <div className="text-2xl text-purple-600 mt-1">৳ {totalMonthlyPayrollExpense.toLocaleString()}</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Operational Shifts</div>
-                    <div className="text-2xl font-bold text-slate-900 mt-1">4 Rotations (24/7)</div>
+                    <div className="text-2xl text-slate-900 mt-1">4 Rotations (24/7)</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Today's Attendance</div>
-                    <div className="text-base font-bold text-emerald-600 mt-1 flex items-center gap-1.5">
+                    <div className="text-base text-emerald-600 mt-1 flex items-center gap-1.5">
                         <CheckCircle2 size={16} /> {attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length} Staff Clocked In
                     </div>
                 </div>
@@ -352,12 +352,12 @@ export const HRMManagementDashboard: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {filteredEmployees.map(emp => (
                                     <tr key={emp.id} className="hover:bg-slate-50 transition">
-                                        <td className="p-3 font-mono font-bold text-purple-700">{emp.employee_code}</td>
+                                        <td className="p-3 font-mono text-purple-700">{emp.employee_code}</td>
                                         <td className="p-3 font-semibold text-slate-900">{emp.first_name} {emp.last_name}</td>
                                         <td className="p-3 text-slate-700">{emp.department_name}</td>
                                         <td className="p-3 text-slate-800 font-medium">{emp.designation_title}</td>
                                         <td className="p-3 font-mono text-[11px] text-slate-600">{emp.pay_grade}</td>
-                                        <td className="p-3 text-right font-mono font-bold text-slate-900">
+                                        <td className="p-3 text-right font-mono text-slate-900">
                                             ৳ {Number(emp.basic_salary).toLocaleString()}
                                         </td>
                                         <td className="p-3 text-slate-500 text-[11px]">
@@ -386,7 +386,7 @@ export const HRMManagementDashboard: React.FC = () => {
                             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
                                 <Clock className="text-purple-600" size={20} />
                                 <div>
-                                    <h2 className="text-sm font-bold text-slate-900">Front Desk Staff Punch Clock</h2>
+                                    <h2 className="text-sm text-slate-900">Front Desk Staff Punch Clock</h2>
                                     <p className="text-[11px] text-slate-400">Record Shift Clock-In / Clock-Out</p>
                                 </div>
                             </div>
@@ -428,14 +428,14 @@ export const HRMManagementDashboard: React.FC = () => {
                             <button
                                 onClick={() => handleClockPunch('CLOCK_IN')}
                                 disabled={clockActionLoading}
-                                className="flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition"
+                                className="flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs shadow transition"
                             >
                                 <LogIn size={15} /> Clock IN
                             </button>
                             <button
                                 onClick={() => handleClockPunch('CLOCK_OUT')}
                                 disabled={clockActionLoading}
-                                className="flex items-center justify-center gap-2 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow transition"
+                                className="flex items-center justify-center gap-2 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs shadow transition"
                             >
                                 <LogOut size={15} /> Clock OUT
                             </button>
@@ -446,7 +446,7 @@ export const HRMManagementDashboard: React.FC = () => {
                     <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                             <div>
-                                <h2 className="text-sm font-bold text-slate-900">Today's Shift Attendance Logs</h2>
+                                <h2 className="text-sm text-slate-900">Today's Shift Attendance Logs</h2>
                                 <p className="text-xs text-slate-500">Date: 2026-07-01 (Grand Palace Dhaka)</p>
                             </div>
                         </div>
@@ -467,7 +467,7 @@ export const HRMManagementDashboard: React.FC = () => {
                                 <tbody className="divide-y divide-slate-100">
                                     {attendance.map(a => (
                                         <tr key={a.id} className="hover:bg-slate-50 transition">
-                                            <td className="p-3 font-mono font-bold text-purple-700">{a.employee_code}</td>
+                                            <td className="p-3 font-mono text-purple-700">{a.employee_code}</td>
                                             <td className="p-3">
                                                 <div className="font-semibold text-slate-900">{a.employee_name}</div>
                                                 <div className="text-[10px] text-slate-400">{a.department_name} • {a.designation_title}</div>
@@ -479,7 +479,7 @@ export const HRMManagementDashboard: React.FC = () => {
                                             <td className="p-3 font-mono text-[11px] text-rose-700 font-medium">
                                                 {a.clock_out ? a.clock_out.slice(11, 16) : '-'}
                                             </td>
-                                            <td className="p-3 text-right font-mono font-bold text-slate-900">
+                                            <td className="p-3 text-right font-mono text-slate-900">
                                                 {a.work_hours ? `${a.work_hours}h` : '-'}
                                             </td>
                                             <td className="p-3">
@@ -507,13 +507,13 @@ export const HRMManagementDashboard: React.FC = () => {
                         <div key={shift.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                                    <span className="font-bold text-sm text-slate-900">{shift.name}</span>
+                                    <span className="text-sm text-slate-900">{shift.name}</span>
                                     <Clock size={16} className="text-purple-600" />
                                 </div>
                                 <div className="mt-4 space-y-2">
                                     <div className="flex items-center justify-between text-xs">
                                         <span className="text-slate-400">Timings:</span>
-                                        <span className="font-mono font-bold text-slate-800 text-sm">
+                                        <span className="font-mono text-slate-800 text-sm">
                                             {shift.start_time} - {shift.end_time}
                                         </span>
                                     </div>
@@ -541,7 +541,7 @@ export const HRMManagementDashboard: React.FC = () => {
                         <div key={run.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                             <div className="flex flex-wrap items-center justify-between pb-3 border-b border-slate-100 gap-2">
                                 <div className="flex items-center gap-3">
-                                    <span className="font-bold text-sm text-slate-900">
+                                    <span className="text-sm text-slate-900">
                                         Month: {run.period_month}/{run.period_year} (Payroll Run #{run.id})
                                     </span>
                                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
@@ -556,19 +556,19 @@ export const HRMManagementDashboard: React.FC = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                                 <div className="p-3 bg-slate-50 rounded-xl">
                                     <div className="text-[11px] text-slate-400 uppercase font-semibold">Total Gross Salaries</div>
-                                    <div className="text-base font-bold font-mono text-slate-900 mt-0.5">
+                                    <div className="text-base font-mono text-slate-900 mt-0.5">
                                         ৳ {Number(run.total_gross).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </div>
                                 </div>
                                 <div className="p-3 bg-slate-50 rounded-xl">
                                     <div className="text-[11px] text-slate-400 uppercase font-semibold">Tax & PF Deductions</div>
-                                    <div className="text-base font-bold font-mono text-rose-600 mt-0.5">
+                                    <div className="text-base font-mono text-rose-600 mt-0.5">
                                         ৳ {Number(run.total_deductions).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </div>
                                 </div>
                                 <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                                     <div className="text-[11px] text-emerald-800 uppercase font-semibold">Net Bank Disbursement</div>
-                                    <div className="text-base font-bold font-mono text-emerald-700 mt-0.5">
+                                    <div className="text-base font-mono text-emerald-700 mt-0.5">
                                         ৳ {Number(run.total_net).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </div>
                                 </div>
@@ -584,12 +584,12 @@ export const HRMManagementDashboard: React.FC = () => {
                     <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
                         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <div>
-                                <h3 className="text-base font-bold text-slate-900">Run Monthly Payroll Automation</h3>
+                                <h3 className="text-base text-slate-900">Run Monthly Payroll Automation</h3>
                                 <p className="text-xs text-slate-500">Computes payslips and creates balanced JV in General Ledger</p>
                             </div>
                             <button 
                                 onClick={() => setIsPayrollModalOpen(false)}
-                                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1"
+                                className="text-slate-400 hover:text-slate-600 text-sm p-1"
                             >
                                 ✕
                             </button>
@@ -623,7 +623,7 @@ export const HRMManagementDashboard: React.FC = () => {
                             </div>
 
                             <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 text-xs space-y-1.5 text-purple-900">
-                                <div className="font-bold flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5">
                                     <CheckCircle2 size={14} /> Automated USALI Accounting Journal Entry:
                                 </div>
                                 <div>• <strong>Debit:</strong> Account 5010 (Salaries & Staff Wages Expense)</div>

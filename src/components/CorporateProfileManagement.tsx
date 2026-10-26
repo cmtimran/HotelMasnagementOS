@@ -208,8 +208,8 @@ const CorporateProfileManagement = () => {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Accounts</p>
-                        <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{profiles.length}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Accounts</p>
+                        <p className="text-xl sm:text-2xl text-slate-900 mt-1">{profiles.length}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">Contracted companies</p>
                     </div>
                     <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
@@ -218,8 +218,8 @@ const CorporateProfileManagement = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Accounts</p>
-                        <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{profiles.filter(p => !p.isBlacklisted).length}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Active Accounts</p>
+                        <p className="text-xl sm:text-2xl text-emerald-600 mt-1">{profiles.filter(p => !p.isBlacklisted).length}</p>
                         <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Approved for credit</p>
                     </div>
                     <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -228,8 +228,8 @@ const CorporateProfileManagement = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Blacklisted</p>
-                        <p className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{profiles.filter(p => p.isBlacklisted).length}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Blacklisted</p>
+                        <p className="text-xl sm:text-2xl text-rose-600 mt-1">{profiles.filter(p => p.isBlacklisted).length}</p>
                         <p className="text-[11px] text-rose-600 font-medium mt-0.5">Credit suspended</p>
                     </div>
                     <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
@@ -238,8 +238,8 @@ const CorporateProfileManagement = () => {
                 </div>
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Outstanding</p>
-                        <p className="text-xl sm:text-2xl font-bold text-primary mt-1">৳{profiles.reduce((sum, p) => sum + p.currentBalance, 0).toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Outstanding</p>
+                        <p className="text-xl sm:text-2xl text-primary mt-1">৳{profiles.reduce((sum, p) => sum + p.currentBalance, 0).toLocaleString()}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">Receivable AR balance</p>
                     </div>
                     <div className="size-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -297,7 +297,7 @@ const CorporateProfileManagement = () => {
                                     <tr key={profile.id} className="hover:bg-slate-50 transition-colors">
                                         <td>
                                             <div>
-                                                <p className="text-xs font-bold text-slate-900">{profile.companyName}</p>
+                                                <p className="text-xs text-slate-900">{profile.companyName}</p>
                                                 <p className="text-[11px] text-slate-500">Rate: <span className="font-mono font-semibold">{profile.linkedRateCode}</span></p>
                                             </div>
                                         </td>
@@ -313,11 +313,11 @@ const CorporateProfileManagement = () => {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className="text-xs font-bold font-mono text-slate-900">৳{profile.creditLimit.toLocaleString()}</span>
+                                            <span className="text-xs font-mono text-slate-900">৳{profile.creditLimit.toLocaleString()}</span>
                                         </td>
                                         <td>
                                             <div className="min-w-[120px]">
-                                                <p className="text-xs font-bold font-mono text-slate-900">৳{profile.currentBalance.toLocaleString()}</p>
+                                                <p className="text-xs font-mono text-slate-900">৳{profile.currentBalance.toLocaleString()}</p>
                                                 <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
                                                     <div
                                                         className={`${status.color} h-1.5 rounded-full transition-all`}
@@ -330,7 +330,7 @@ const CorporateProfileManagement = () => {
                                             <span className="text-xs font-semibold text-slate-700">{profile.paymentTerm}</span>
                                         </td>
                                         <td>
-                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${status.textColor} bg-slate-100 border border-slate-200`}>
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] ${status.textColor} bg-slate-100 border border-slate-200`}>
                                                 {status.text}
                                             </span>
                                         </td>

@@ -40,7 +40,7 @@ const SimpleFormModal: React.FC<SimpleFormModalProps> = ({
             <div className="bg-white w-full max-w-md rounded-xl shadow-2xl flex flex-col animate-scaleIn">
                 {/* Header */}
                 <div className="bg-white border-b px-6 py-4 flex justify-between items-center rounded-t-xl">
-                    <h2 className="text-lg font-bold text-gray-800">{title}</h2>
+                    <h2 className="text-lg text-gray-800">{title}</h2>
                     <button onClick={onClose} className="hover:bg-gray-100 p-2 rounded-full transition-colors text-gray-500">
                         <X size={20} />
                     </button>

@@ -619,7 +619,7 @@ export default function HolidayManagement() {
             <div className="table-container">
                 <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 font-bold uppercase tracking-wider">
+                        <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 uppercase tracking-wider">
                             <th className="py-3.5 px-4">Holiday / Event</th>
                             <th className="py-3.5 px-4">Code</th>
                             <th className="py-3.5 px-4">Date Range & Duration</th>
@@ -646,7 +646,7 @@ export default function HolidayManagement() {
                                         className="hover:bg-slate-50/70 transition group"
                                     >
                                         <td className="py-3.5 px-4">
-                                            <div className="font-bold text-slate-900">
+                                            <div className="text-slate-900">
                                                 {item.name}
                                             </div>
                                             {item.description && (
@@ -754,7 +754,7 @@ export default function HolidayManagement() {
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/90 bg-slate-50/70">
                             <div className="flex items-center gap-2">
                                 <CalendarDays className="size-5 text-primary" />
-                                <h2 className="text-base font-bold text-slate-900">
+                                <h2 className="text-base text-slate-900">
                                     {editingItem ? 'Edit Holiday / Peak Rule' : 'Add New Holiday / Peak Season'}
                                 </h2>
                             </div>
@@ -807,7 +807,7 @@ export default function HolidayManagement() {
                                             setFormCode(e.target.value.toUpperCase());
                                             setCodeError('');
                                         }}
-                                        className={`input-standard font-mono uppercase font-bold ${
+                                        className={`input-standard font-mono uppercase ${
                                             codeError ? 'border-rose-500 ring-1 ring-rose-500' : ''
                                         }`}
                                     />
@@ -892,7 +892,7 @@ export default function HolidayManagement() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <TrendingUp className="size-4 text-amber-600" />
-                                        <span className="text-xs font-bold text-amber-900">
+                                        <span className="text-xs text-amber-900">
                                             Yield & Surge Pricing Rules
                                         </span>
                                     </div>
@@ -946,7 +946,7 @@ export default function HolidayManagement() {
                             <div className="p-3.5 bg-blue-50/70 border border-blue-200/90 rounded-xl space-y-3">
                                 <div className="flex items-center gap-2">
                                     <Users className="size-4 text-primary" />
-                                    <span className="text-xs font-bold text-slate-900">
+                                    <span className="text-xs text-slate-900">
                                         Staff Overtime & Statutory Rules
                                     </span>
                                 </div>

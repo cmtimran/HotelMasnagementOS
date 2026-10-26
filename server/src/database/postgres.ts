@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { ensureRatesAndExtendedTablesPostgres } from './ratesModules.js';
 
 // Ensure environment variables are loaded immediately regardless of ESM import hoisting
 const __filename = fileURLToPath(import.meta.url);
@@ -37,6 +38,33 @@ let postgresConnected = false;
 export const isPostgresConnected = () => postgresConnected;
 
 /**
+ * Synchronize auto-increment sequence counters with existing IDs across all tables
+ */
+async function syncAllSequences(client: any): Promise<void> {
+    const tables = [
+        'organizations', 'properties', 'buildings', 'floors', 'room_types', 'rooms',
+        'amenities', 'guests', 'corporate_accounts', 'reservations', 'reservation_rooms',
+        'addon_services', 'reservation_addons', 'room_stay_splits', 'chart_of_accounts',
+        'folios', 'folio_charges', 'payments', 'journal_entries', 'journal_lines',
+        'departments', 'designations', 'employees', 'shifts', 'employee_shift_rosters',
+        'attendance_records', 'leave_types', 'leave_requests', 'payroll_runs',
+        'payroll_items', 'housekeeping_tasks', 'maintenance_orders', 'connecting_rooms',
+        'rate_plans', 'meal_plans', 'hotel_packages', 'rate_calendar_overrides'
+    ];
+    for (const table of tables) {
+        try {
+            await client.query(`
+                SELECT setval(
+                    pg_get_serial_sequence($1, 'id'),
+                    COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1,
+                    false
+                );
+            `, [table]);
+        } catch {}
+    }
+}
+
+/**
  * Initialize PostgreSQL / Cloud Cluster schema and verify live connection
  */
 export async function initPostgres(): Promise<boolean> {
@@ -45,7 +73,7 @@ export async function initPostgres(): Promise<boolean> {
         try {
             const res = await client.query('SELECT NOW() as current_time, version()');
             postgresConnected = true;
-            console.log(`🐘 [Cloud PostgreSQL] Connected successfully! Engine: ${res.rows[0].version?.split('\n')[0]?.slice(0, 70)}...`);
+            console.log(`🐘 [Sole Database Engine: Cloud PostgreSQL] Connected successfully! Engine: ${res.rows[0].version?.split('\n')[0]?.slice(0, 70)}...`);
 
             // 1. Verify / Apply DDL Schema
             const schemaPath = path.join(__dirname, 'schema.postgres.sql');
@@ -55,7 +83,39 @@ export async function initPostgres(): Promise<boolean> {
                 console.log('✅ [Cloud PostgreSQL] Enterprise schema (1NF-4NF, RLS, Indexes) verified and active!');
             }
 
-            // 2. Check if data seeded; if empty, automatically seed
+            // Ensure group_code, registration and folio columns exist in PostgreSQL
+            try {
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS group_code VARCHAR(64);');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS registration_number VARCHAR(64);');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS registration_date TIMESTAMP;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS folio_number VARCHAR(64);');
+
+                await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS sub_booking_number VARCHAR(64);');
+                await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS registration_number VARCHAR(64);');
+                await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS registration_date TIMESTAMP;');
+                await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS folio_number VARCHAR(64);');
+
+                await client.query(`
+                    CREATE TABLE IF NOT EXISTS daily_sequences (
+                        seq_date VARCHAR(16) NOT NULL,
+                        seq_type VARCHAR(32) NOT NULL,
+                        current_val INT NOT NULL DEFAULT 0,
+                        PRIMARY KEY (seq_date, seq_type)
+                    );
+                `);
+            } catch (colErr: any) {
+                console.warn('PostgreSQL column check warning:', colErr?.message);
+            }
+
+            // 2. Ensure rate plans, meal plans, packages, connecting rooms and extended columns exist in PostgreSQL
+            try {
+                await ensureRatesAndExtendedTablesPostgres(pgPool);
+                console.log('✅ [Cloud PostgreSQL] Rate plans, meal plans, packages and connecting rooms active!');
+            } catch (ratesErr: any) {
+                console.warn('Rates tables warning in PostgreSQL:', ratesErr?.message);
+            }
+
+            // 3. Check if data seeded; if empty, automatically seed
             const countRes = await client.query('SELECT COUNT(*) as c FROM rooms;');
             const roomCount = parseInt(countRes.rows[0]?.c || '0', 10);
             if (roomCount < 34) {
@@ -66,34 +126,8 @@ export async function initPostgres(): Promise<boolean> {
                 console.log(`🏨 [Cloud PostgreSQL] Database active with ${roomCount} canonical rooms and hotel assets.`);
             }
 
-            // 3. Ensure Room 104 allocation for reservation 105 (Mr Rashidul Hasan) and sync past stays
-            try {
-                await client.query(`
-                    UPDATE reservation_rooms 
-                    SET room_id = (SELECT id FROM rooms WHERE room_number = '104' LIMIT 1) 
-                    WHERE reservation_id = 105 AND room_id = (SELECT id FROM rooms WHERE room_number = '102' LIMIT 1);
-
-                    INSERT INTO guests (id, organization_id, salutation, first_name, last_name, email, phone, nationality, id_type, id_number, vip_status) VALUES
-                    (17, 1, 'Mr', 'Zubair', 'Ahmed', 'zubair@gmail.com', '+880 1711-112233', 'Bangladeshi', 'National ID (NID)', '199001928312', 'NONE'),
-                    (18, 1, 'Mr', 'S.', 'Chowdhury', 'schowdhury@gmail.com', '+880 1712-223344', 'Bangladeshi', 'National ID (NID)', '198801928322', 'NONE'),
-                    (19, 1, 'Mr', 'Nasir', 'Hossain', 'nasir@gmail.com', '+880 1713-334455', 'Bangladeshi', 'National ID (NID)', '198701928333', 'NONE')
-                    ON CONFLICT (id) DO NOTHING;
-
-                    INSERT INTO reservations (id, property_id, reservation_number, booker_guest_id, source, channel, is_group, status, total_amount, paid_amount, due_amount) VALUES
-                    (109, 1, 'RES-108901', 17, 'Direct Walk-In', 'Front Desk', false, 'COMPLETED', 9000.00, 9000.00, 0.00),
-                    (110, 1, 'RES-108902', 19, 'Direct Web', 'Website', false, 'COMPLETED', 15000.00, 15000.00, 0.00),
-                    (111, 1, 'RES-109282', 18, 'Corporate Contract', 'Corporate Desk', true, 'IN_HOUSE', 9000.00, 9000.00, 0.00)
-                    ON CONFLICT (id) DO NOTHING;
-
-                    INSERT INTO reservation_rooms (id, reservation_id, room_id, guest_id, check_in_date, check_out_date, nights, room_rate, adults, children, status) VALUES
-                    (109, 109, (SELECT id FROM rooms WHERE room_number = '102' LIMIT 1), 17, '2026-06-25', '2026-06-28', 3, 3000.00, 1, 0, 'CHECKED_OUT'),
-                    (110, 110, (SELECT id FROM rooms WHERE room_number = '508' LIMIT 1), 19, '2026-06-26', '2026-06-28', 2, 7500.00, 1, 0, 'CHECKED_OUT'),
-                    (111, 111, (SELECT id FROM rooms WHERE room_number = '103' LIMIT 1), 18, '2026-07-01', '2026-07-03', 2, 4500.00, 2, 0, 'CHECKED_IN')
-                    ON CONFLICT (id) DO NOTHING;
-                `);
-            } catch (syncErr: any) {
-                console.warn('Notice: TiDB canonical reservation synchronization update:', syncErr.message);
-            }
+            // 4. Synchronize all table sequence values to prevent duplicate key errors
+            await syncAllSequences(client);
 
             return true;
         } finally {
@@ -101,8 +135,7 @@ export async function initPostgres(): Promise<boolean> {
         }
     } catch (err: any) {
         postgresConnected = false;
-        console.warn(`ℹ️ [PostgreSQL] Connection skipped or offline (${err.message}).`);
-        console.warn('   Running with high-speed embedded SQLite (WAL Mode) engine for fallback zero-dependency operation.');
-        return false;
+        console.error(`🚨 [Cloud PostgreSQL] Failed to connect to database: ${err.message}`);
+        throw err;
     }
 }

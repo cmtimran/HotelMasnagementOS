@@ -22,39 +22,39 @@ const resolvePropertyId = (propertyId: string | number | undefined): number => {
 
 export const roomService = {
   /**
-   * Fetch all 34 rooms for property directly from relational SQLite DB
+   * Fetch all 34 rooms for property directly from relational Cloud PostgreSQL DB
    */
   getAllRooms: async (propertyId: string | number, filter?: { hkStatus?: string; foStatus?: string }): Promise<RoomRecord[]> => {
     const propId = resolvePropertyId(propertyId);
 
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT 
         r.id,
-        r.room_number as roomNo,
+        r.room_number as "roomNo",
         r.status as room_status,
         r.housekeeping_status as db_hk,
         b.name as building,
         f.floor_number as floor,
-        rt.name as roomType,
-        rt.base_rate as baseRate,
+        rt.name as "roomType",
+        rt.base_rate as "baseRate",
         (
           SELECT rr.status 
           FROM reservation_rooms rr 
           JOIN reservations res ON res.id = rr.reservation_id 
           WHERE rr.room_id = r.id 
             AND res.property_id = ?
-            AND res.status IN ('CONFIRMED', 'IN_HOUSE')
-            AND date('now') >= date(rr.check_in_date)
-            AND date('now') < date(rr.check_out_date)
+            AND res.status IN ('CONFIRMED', 'IN_HOUSE', 'confirmed', 'in-house', 'arrived')
+            AND CURRENT_DATE >= (rr.check_in_date)::date
+            AND CURRENT_DATE < (rr.check_out_date)::date
           ORDER BY rr.id DESC LIMIT 1
         ) as active_stay_status,
         (
-          SELECT CASE WHEN date(rr.check_out_date) = date('now') THEN 1 ELSE 0 END
+          SELECT CASE WHEN (rr.check_out_date)::date = CURRENT_DATE THEN 1 ELSE 0 END
           FROM reservation_rooms rr 
           JOIN reservations res ON res.id = rr.reservation_id 
           WHERE rr.room_id = r.id 
             AND res.property_id = ?
-            AND res.status = 'IN_HOUSE'
+            AND res.status IN ('IN_HOUSE', 'in-house', 'arrived')
           ORDER BY rr.id DESC LIMIT 1
         ) as is_due_out
       FROM rooms r
@@ -80,11 +80,12 @@ export const roomService = {
 
       // 2. Front Office status mapping
       let foStatus: RoomRecord['foStatus'] = 'vacant';
-      if (row.room_status === 'OUT_OF_ORDER') {
+      const stayStat = String(row.active_stay_status || '').toUpperCase();
+      if (row.room_status === 'OUT_OF_ORDER' || row.room_status === 'MAINTENANCE') {
         foStatus = 'vacant';
-      } else if (row.active_stay_status === 'CHECKED_IN') {
+      } else if (stayStat === 'CHECKED_IN' || stayStat === 'IN_HOUSE' || stayStat === 'IN-HOUSE') {
         foStatus = row.is_due_out === 1 ? 'due_out' : 'occupied';
-      } else if (row.active_stay_status === 'ASSIGNED') {
+      } else if (stayStat === 'ASSIGNED' || stayStat === 'CONFIRMED' || stayStat === 'ARRIVING') {
         foStatus = 'reserved';
       } else {
         foStatus = 'vacant';
@@ -92,13 +93,13 @@ export const roomService = {
 
       return {
         id: row.id,
-        roomNo: String(row.roomNo),
-        roomType: row.roomType || 'Standard Room',
+        roomNo: String(row.roomNo || row.roomno || row.room_number),
+        roomType: row.roomType || row.roomtype || 'Standard Room',
         floor: Number(row.floor) || 1,
         building: row.building || 'Main Tower',
         hkStatus,
         foStatus,
-        baseRate: Number(row.baseRate) || 3000,
+        baseRate: Number(row.baseRate || row.baserate) || 3000,
         propertyId: propId
       };
     });
@@ -123,7 +124,7 @@ export const roomService = {
   },
 
   /**
-   * Update housekeeping cleanliness status and persist to SQLite DB + SSE Realtime Broadcast
+   * Update housekeeping cleanliness status and persist to PostgreSQL DB + SSE Realtime Broadcast
    */
   updateHousekeepingStatus: async (roomNo: string, propertyId: string | number, status: string): Promise<RoomRecord | null> => {
     const propId = resolvePropertyId(propertyId);
@@ -146,7 +147,7 @@ export const roomService = {
       dbStatus = 'ACTIVE';
     }
 
-    const info = db.prepare(`
+    const info = await db.prepare(`
       UPDATE rooms
       SET housekeeping_status = ?,
           status = ?,
@@ -154,7 +155,7 @@ export const roomService = {
       WHERE property_id = ? AND room_number = ?
     `).run(dbHk, dbStatus, propId, String(roomNo));
 
-    if (info.changes === 0) {
+    if (info.rowCount === 0) {
       return null;
     }
 

@@ -315,8 +315,8 @@ const BusinessOriginManagement = () => {
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="kpi-card">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Sources</p>
-                                <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{sources.length}</p>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Sources</p>
+                                <p className="text-xl sm:text-2xl text-slate-900 mt-1">{sources.length}</p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">Configured channels</p>
                             </div>
                             <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
@@ -325,8 +325,8 @@ const BusinessOriginManagement = () => {
                         </div>
                         <div className="kpi-card">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Channels</p>
-                                <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{sources.filter(s => s.active).length}</p>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Active Channels</p>
+                                <p className="text-xl sm:text-2xl text-emerald-600 mt-1">{sources.filter(s => s.active).length}</p>
                                 <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Accepting bookings</p>
                             </div>
                             <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -335,8 +335,8 @@ const BusinessOriginManagement = () => {
                         </div>
                         <div className="kpi-card">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</p>
-                                <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">৳{totalRevenue.toLocaleString()}</p>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Revenue</p>
+                                <p className="text-xl sm:text-2xl text-slate-900 mt-1">৳{totalRevenue.toLocaleString()}</p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">Tracked reservation yield</p>
                             </div>
                             <div className="size-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -345,8 +345,8 @@ const BusinessOriginManagement = () => {
                         </div>
                         <div className="kpi-card">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">OTA Commissions</p>
-                                <p className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">৳{Math.round(sourceStats.reduce((sum, s) => sum + s.commission, 0)).toLocaleString()}</p>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">OTA Commissions</p>
+                                <p className="text-xl sm:text-2xl text-rose-600 mt-1">৳{Math.round(sourceStats.reduce((sum, s) => sum + s.commission, 0)).toLocaleString()}</p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">Estimated agency fee</p>
                             </div>
                             <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
@@ -398,7 +398,7 @@ const BusinessOriginManagement = () => {
                                     {filteredSources.map((source) => (
                                         <tr key={source.id} className="hover:bg-slate-50 transition-colors">
                                             <td>
-                                                <p className="text-xs font-bold text-slate-900">{source.sourceName}</p>
+                                                <p className="text-xs text-slate-900">{source.sourceName}</p>
                                                 {source.contractNumber && (
                                                     <p className="text-[11px] text-slate-500">Contract: {source.contractNumber}</p>
                                                 )}
@@ -409,7 +409,7 @@ const BusinessOriginManagement = () => {
                                                 </span>
                                             </td>
                                             <td>
-                                                <p className="text-xs font-bold text-slate-900">
+                                                <p className="text-xs text-slate-900">
                                                     {source.commissionType === 'Percentage'
                                                         ? `${source.commissionValue}%`
                                                         : `৳${source.commissionValue}`
@@ -464,8 +464,8 @@ const BusinessOriginManagement = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="kpi-card">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Segments</p>
-                                <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{segments.length}</p>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Segments</p>
+                                <p className="text-xl sm:text-2xl text-slate-900 mt-1">{segments.length}</p>
                             </div>
                             <div className="size-9 rounded-xl bg-primary-subtle text-primary flex items-center justify-center shrink-0">
                                 <Target size={17} />
@@ -473,8 +473,8 @@ const BusinessOriginManagement = () => {
                         </div>
                         <div className="kpi-card">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Transient</p>
-                                <p className="text-xl sm:text-2xl font-bold text-primary mt-1">{segments.filter(s => s.reportCategory === 'Transient').length}</p>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Transient</p>
+                                <p className="text-xl sm:text-2xl text-primary mt-1">{segments.filter(s => s.reportCategory === 'Transient').length}</p>
                             </div>
                             <div className="size-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                                 <CheckCircle2 size={17} />
@@ -482,8 +482,8 @@ const BusinessOriginManagement = () => {
                         </div>
                         <div className="kpi-card">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Group</p>
-                                <p className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{segments.filter(s => s.reportCategory === 'Group').length}</p>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Group</p>
+                                <p className="text-xl sm:text-2xl text-amber-600 mt-1">{segments.filter(s => s.reportCategory === 'Group').length}</p>
                             </div>
                             <div className="size-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                                 <Target size={17} />
@@ -526,7 +526,7 @@ const BusinessOriginManagement = () => {
                                                 <span className="text-sm font-bold" style={{ color: segment.color }}>{segment.marketCode.substring(0, 3)}</span>
                                             </div>
                                             <div>
-                                                <h3 className="text-sm font-bold text-slate-900">{segment.marketCode}</h3>
+                                                <h3 className="text-sm text-slate-900">{segment.marketCode}</h3>
                                                 <p className="text-[11px] text-slate-500">{segment.reportCategory}</p>
                                             </div>
                                         </div>

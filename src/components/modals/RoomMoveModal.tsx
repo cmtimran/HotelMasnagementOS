@@ -130,7 +130,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                         >
                             <X size={17} />
                         </button>
-                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center font-bold flex-shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center flex-shrink-0">
                             <Users size={14} />
                         </div>
                         <span className="font-extrabold text-gray-900 text-sm tracking-wide uppercase truncate font-sans">
@@ -148,7 +148,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                             onClick={() => {
                                 if (onEdit) onEdit(booking);
                             }}
-                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                         >
                             <Edit3 size={11} className="text-[#0e3592]" />
                             <span>Edit</span>
@@ -158,7 +158,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsOptionsOpen(!isOptionsOpen)}
-                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                className="h-7 px-2.5 bg-white hover:bg-gray-50 text-[#0e3592] border border-blue-300/80 rounded text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                             >
                                 <Settings size={11} className="text-[#0e3592]" />
                                 <span>Options</span>
@@ -201,7 +201,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                             setIsOptionsOpen(false);
                                             if (onRoomMove) onRoomMove(booking);
                                         }}
-                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors font-bold text-blue-700 bg-blue-50/50"
+                                        className="w-full px-3.5 py-1.5 text-left text-xs font-medium hover:bg-gray-100 text-gray-800 flex items-center gap-2.5 cursor-pointer transition-colors text-blue-700 bg-blue-50/50"
                                     >
                                         <DoorOpen size={14} className="text-blue-600 flex-shrink-0" />
                                         <span>Room Move</span>
@@ -297,14 +297,14 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                         {/* Row 1: Reservation # & Status */}
                         <div className="grid grid-cols-2 gap-2">
                             <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center gap-2 shadow-2xs">
-                                <div className="w-6 h-6 rounded bg-blue-500/30 text-blue-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                <div className="w-6 h-6 rounded bg-blue-500/30 text-blue-200 flex items-center justify-center text-xs flex-shrink-0">
                                     #
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Reservation #
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate font-mono">
+                                    <div className="text-xs text-white truncate font-mono">
                                         {booking.reservationNumber}
                                     </div>
                                 </div>
@@ -315,7 +315,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <Layers size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Status
                                     </div>
                                     <div className="mt-0.5">
@@ -334,14 +334,14 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <Calendar size={12} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[8.5px] uppercase font-bold text-blue-200">ARRIVAL</div>
-                                    <div className="text-[11.5px] font-bold text-white truncate">{booking.arrivalDate}</div>
+                                    <div className="text-[8.5px] uppercase text-blue-200">ARRIVAL</div>
+                                    <div className="text-[11.5px] text-white truncate">{booking.arrivalDate}</div>
                                     <div className="text-[8.5px] text-blue-200">🕒 16:00:00</div>
                                 </div>
                             </div>
 
                             <div className="col-span-2 bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-1.5 flex flex-col items-center justify-center text-center shadow-2xs">
-                                <div className="text-[8px] uppercase font-bold text-blue-200">NIGHTS</div>
+                                <div className="text-[8px] uppercase text-blue-200">NIGHTS</div>
                                 <div className="text-base font-black text-white font-mono leading-none">{booking.nights}</div>
                             </div>
 
@@ -350,8 +350,8 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <Calendar size={12} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[8.5px] uppercase font-bold text-blue-200">DEPARTURE</div>
-                                    <div className="text-[11.5px] font-bold text-white truncate">{booking.departureDate}</div>
+                                    <div className="text-[8.5px] uppercase text-blue-200">DEPARTURE</div>
+                                    <div className="text-[11.5px] text-white truncate">{booking.departureDate}</div>
                                     <div className="text-[8.5px] text-blue-200">🕒 12:00:00</div>
                                 </div>
                             </div>
@@ -364,10 +364,10 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <Home size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Room Details
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate">
+                                    <div className="text-xs text-white truncate">
                                         {booking.roomNumber} ({booking.roomType || 'Winter Rate Plan'})
                                     </div>
                                 </div>
@@ -378,10 +378,10 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <Printer size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Rate Plan
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate">
+                                    <div className="text-xs text-white truncate">
                                         {booking.ratePlan || 'Summer Vacation'}
                                     </div>
                                 </div>
@@ -395,11 +395,11 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <Users size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Guests (Pax)
                                     </div>
-                                    <div className="text-xs font-bold text-white truncate">
-                                        2 Adults, 1 Child
+                                    <div className="text-xs text-white truncate">
+                                        {booking?.adults ?? 2} Adult{(booking?.adults ?? 2) > 1 ? 's' : ''}{(booking?.children ?? 0) > 0 ? `, ${booking?.children} Child${(booking?.children ?? 0) > 1 ? 'ren' : ''}` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -409,10 +409,10 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <DollarSign size={13} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[9px] uppercase font-bold text-blue-200 tracking-wider">
+                                    <div className="text-[9px] uppercase text-blue-200 tracking-wider">
                                         Avg Daily Rate
                                     </div>
-                                    <div className="text-xs font-bold text-white font-mono">
+                                    <div className="text-xs text-white font-mono">
                                         {dailyRate.toFixed(2)}
                                     </div>
                                 </div>
@@ -428,7 +428,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     </div>
                                     <span>Room Total Amount</span>
                                 </div>
-                                <span className="font-mono font-bold text-white">{totalAmount.toFixed(2)}</span>
+                                <span className="font-mono text-white">{totalAmount.toFixed(2)}</span>
                             </div>
 
                             <div className="flex items-center justify-between text-blue-100 text-[11px]">
@@ -438,7 +438,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     </div>
                                     <span>Room Discount</span>
                                 </div>
-                                <span className="font-mono font-bold text-rose-300">0.00</span>
+                                <span className="font-mono text-rose-300">0.00</span>
                             </div>
 
                             <div className="flex items-center justify-between text-blue-100 text-[11px]">
@@ -448,12 +448,12 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     </div>
                                     <span>Room Paid Amount</span>
                                 </div>
-                                <span className="font-mono font-bold text-emerald-300">0.00</span>
+                                <span className="font-mono text-emerald-300">0.00</span>
                             </div>
                         </div>
 
                         {/* Separate Room Net Balance Card */}
-                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center justify-between font-bold shadow-2xs">
+                        <div className="bg-[#1942aa]/80 border border-blue-400/20 rounded-xl p-2.5 flex items-center justify-between shadow-2xs">
                             <div className="flex items-center gap-2 text-white">
                                 <div className="w-5 h-5 rounded bg-emerald-500/30 flex items-center justify-center text-emerald-400">
                                     <Wallet size={12} />
@@ -471,7 +471,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                         <div className="space-y-2.5">
                             {/* Header Row */}
                             <div className="flex items-center justify-between border-b border-blue-400/20 pb-2">
-                                <h2 className="text-base font-bold text-white">Room Move</h2>
+                                <h2 className="text-base text-white">Room Move</h2>
                                 <button
                                     type="button"
                                     onClick={onClose}
@@ -482,7 +482,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                 </button>
                             </div>
 
-                            <div className="text-xs font-bold text-white">
+                            <div className="text-xs text-white">
                                 New Room Assignment:
                             </div>
 
@@ -494,7 +494,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                         <select
                                             value={booking.roomNumber}
                                             disabled
-                                            className="w-full h-7 px-2 border border-blue-300/40 rounded text-xs bg-white text-gray-900 font-bold outline-none cursor-not-allowed appearance-none pr-6"
+                                            className="w-full h-7 px-2 border border-blue-300/40 rounded text-xs bg-white text-gray-900 outline-none cursor-not-allowed appearance-none pr-6"
                                         >
                                             <option value={booking.roomNumber}>{booking.roomNumber}</option>
                                         </select>
@@ -508,7 +508,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                         <select
                                             value={booking.guestName}
                                             disabled
-                                            className="w-full h-7 px-2 border border-blue-300/40 rounded text-xs bg-white text-gray-900 font-bold outline-none cursor-not-allowed appearance-none pr-6 truncate"
+                                            className="w-full h-7 px-2 border border-blue-300/40 rounded text-xs bg-white text-gray-900 outline-none cursor-not-allowed appearance-none pr-6 truncate"
                                         >
                                             <option value={booking.guestName}>{booking.guestName}</option>
                                         </select>
@@ -525,7 +525,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                         type="date"
                                         value={fromDate}
                                         onChange={e => setFromDate(e.target.value)}
-                                        className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                                        className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
                                     />
                                 </div>
 
@@ -535,7 +535,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                         type="date"
                                         value={toDate}
                                         onChange={e => setToDate(e.target.value)}
-                                        className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                                        className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
                                     />
                                 </div>
                             </div>
@@ -548,7 +548,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                         <select
                                             value={roomType}
                                             onChange={e => setRoomType(e.target.value)}
-                                            className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
+                                            className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
                                         >
                                             <option value="Winter Rate Plan">Winter Rate Plan</option>
                                             <option value="Deluxe Double">Deluxe Double</option>
@@ -565,7 +565,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                         <select
                                             value={rateType}
                                             onChange={e => setRateType(e.target.value)}
-                                            className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
+                                            className="w-full h-7 px-2 border border-blue-300 rounded text-[11px] bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
                                         >
                                             <option value="Summer Vacation">Summer Vacation</option>
                                             <option value="Standard EP Rate">Standard EP Rate</option>
@@ -584,7 +584,7 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                                     <select
                                         value={selectedRoom}
                                         onChange={e => setSelectedRoom(e.target.value)}
-                                        className="w-full h-7 px-2.5 border border-blue-300 rounded text-xs bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
+                                        className="w-full h-7 px-2.5 border border-blue-300 rounded text-xs bg-white text-gray-900 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none pr-6"
                                     >
                                         {allRooms.map(r => (
                                             <option key={r.id || r.roomNumber} value={r.roomNumber}>
@@ -602,14 +602,14 @@ export const RoomMoveModal: React.FC<RoomMoveModalProps> = ({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="h-7.5 px-4 border border-white/60 bg-[#153b9a] hover:bg-[#1e4ac5] text-white font-bold rounded text-xs cursor-pointer transition-colors shadow-2xs"
+                                className="h-7.5 px-4 border border-white/60 bg-[#153b9a] hover:bg-[#1e4ac5] text-white rounded text-xs cursor-pointer transition-colors shadow-2xs"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={handleSave}
-                                className="h-7.5 px-4 bg-[#0052cc] hover:bg-blue-600 text-white font-bold rounded text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-md"
+                                className="h-7.5 px-4 bg-[#0052cc] hover:bg-blue-600 text-white rounded text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-md"
                             >
                                 <Home size={12} />
                                 <span>Save Room Move</span>

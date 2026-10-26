@@ -342,6 +342,35 @@ export const bookingController = {
     }
   },
 
+  linkGroup: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const targetResNo = req.body.targetReservationNumber || req.params.id;
+      const toLinkResNo = req.body.reservationToLink || req.body.reservationToLinkNumber;
+      if (!targetResNo || !toLinkResNo) {
+        return res.status(400).json({ success: false, error: 'Both targetReservationNumber and reservationToLink are required.' });
+      }
+      const result = await bookingService.linkBookingsToGroup(targetResNo, toLinkResNo, propertyId);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  unlinkGroup: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      const resNo = req.body.reservationNumber || req.params.id;
+      if (!resNo) {
+        return res.status(400).json({ success: false, error: 'reservationNumber is required.' });
+      }
+      const updated = await bookingService.unlinkBookingFromGroup(resNo, propertyId);
+      res.json({ success: true, data: updated, message: 'Reservation unlinked from group successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
   changeOwner: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const propertyId = req.propertyId || 'prop_grand_palace';
@@ -373,6 +402,24 @@ export const bookingController = {
       res.json({ success: true, message: 'Reservation cancelled successfully' });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  resetInventory: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = req.propertyId || 'prop_grand_palace';
+      await bookingService.resetAllBookingsAndInventory(propertyId);
+      try {
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast inventory reset event', err);
+      }
+      res.json({ success: true, message: 'All reservations and inventory cleared successfully' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
     }
   },
 };

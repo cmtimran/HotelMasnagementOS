@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
     Calendar, TrendingUp, Save, RotateCcw, ChevronLeft, ChevronRight, X, Check,
     BedDouble, DollarSign, Flame
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
 
 interface DayRate {
     date: string;
@@ -16,12 +18,14 @@ interface DayRate {
 
 const STORAGE_KEY = 'hotel_rate_calendar_v2';
 
-const ROOM_TYPE_DEFAULTS: Record<string, { weekday: number; weekend: number }> = {
-    'Deluxe Double': { weekday: 3000, weekend: 3800 },
-    'Superior King': { weekday: 4500, weekend: 5500 },
-    'Executive Suite': { weekday: 6500, weekend: 8000 },
-    'Standard Single': { weekday: 2200, weekend: 2700 },
-    'Presidential Suite': { weekday: 18000, weekend: 22000 },
+const getDynamicRoomTypeRate = (typeName: string) => {
+    const types = getDynamicRoomTypes();
+    const match = types.find(t => t.name.toLowerCase() === typeName.toLowerCase() || t.code.toLowerCase() === typeName.toLowerCase());
+    const base = match ? Number(match.baseRate) : 3000;
+    return {
+        weekday: base,
+        weekend: Math.round(base * 1.25)
+    };
 };
 
 const formatDate = (date: Date): string => {
@@ -39,7 +43,11 @@ const parseDateString = (dateStr: string): Date => {
 export default function RateCalendar() {
     // Hotel operational date is July 2026
     const [currentMonth, setCurrentMonth] = useState(() => new Date(2026, 6, 1));
-    const [selectedRoomType, setSelectedRoomType] = useState('Deluxe Double');
+    const dynamicTypes = useMemo(() => getDynamicRoomTypes(), []);
+    const availableRoomTypes = useMemo(() => {
+        return dynamicTypes.length > 0 ? dynamicTypes.map(t => t.name) : ['Deluxe Double'];
+    }, [dynamicTypes]);
+    const [selectedRoomType, setSelectedRoomType] = useState(() => availableRoomTypes[0] || 'Deluxe Double');
     const [editingDate, setEditingDate] = useState<string | null>(null);
     const [tempRate, setTempRate] = useState('');
 
@@ -58,17 +66,28 @@ export default function RateCalendar() {
         } catch {
             // fallback
         }
-        return {
-            'Deluxe Double': {
-                '2026-07-01': { date: '2026-07-01', rate: 3000, occupancy: 85, isWeekend: false, isHoliday: false },
-                '2026-07-03': { date: '2026-07-03', rate: 3800, occupancy: 95, isWeekend: true, isHoliday: false },
-                '2026-07-04': { date: '2026-07-04', rate: 3800, occupancy: 92, isWeekend: true, isHoliday: false },
-                '2026-07-15': { date: '2026-07-15', rate: 4200, occupancy: 100, isWeekend: false, isHoliday: true, eventName: 'Summer Fest' },
-            }
-        };
+        return {};
     });
 
     const currentRates = ratesByRoomType[selectedRoomType] || {};
+
+    useEffect(() => {
+        fetch(`${getApiBaseUrl()}/api/rates/calendar?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && json.data) {
+                    setRatesByRoomType(prev => {
+                        const merged = { ...prev };
+                        for (const [rt, days] of Object.entries(json.data as Record<string, Record<string, DayRate>>)) {
+                            merged[rt] = { ...(merged[rt] || {}), ...days };
+                        }
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+                        return merged;
+                    });
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     const persistRates = (updated: Record<string, Record<string, DayRate>>) => {
         setRatesByRoomType(updated);
@@ -103,7 +122,7 @@ export default function RateCalendar() {
     const getDefaultRate = (date: Date) => {
         const dayOfWeek = date.getDay();
         const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday/Saturday weekend in BD
-        const defaults = ROOM_TYPE_DEFAULTS[selectedRoomType] || { weekday: 3000, weekend: 3800 };
+        const defaults = getDynamicRoomTypeRate(selectedRoomType);
         return isWeekend ? defaults.weekend : defaults.weekday;
     };
 
@@ -143,7 +162,7 @@ export default function RateCalendar() {
         setTempRate(currentRate.rate.toString());
     };
 
-    const handleSaveRate = () => {
+    const handleSaveRate = async () => {
         if (editingDate && tempRate) {
             const newRate = parseInt(tempRate, 10);
             if (isNaN(newRate)) return;
@@ -167,12 +186,30 @@ export default function RateCalendar() {
                 [selectedRoomType]: updatedRoomRates,
             });
 
+            try {
+                await fetch(`${getApiBaseUrl()}/api/rates/calendar/override`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        propertyId: 1,
+                        roomType: selectedRoomType,
+                        date: editingDate,
+                        rate: newRate,
+                        occupancy: currentRates[editingDate]?.occupancy || 0,
+                        isWeekend: dayOfWeek === 5 || dayOfWeek === 6,
+                        isHoliday: currentRates[editingDate]?.isHoliday || false,
+                        eventName: currentRates[editingDate]?.eventName || null
+                    })
+                });
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            } catch {}
+
             setEditingDate(null);
             setTempRate('');
         }
     };
 
-    const handleBulkApply = () => {
+    const handleBulkApply = async () => {
         const rateVal = parseInt(bulkRate, 10);
         if (isNaN(rateVal) || rateVal <= 0) {
             alert('Please enter a valid rate in BDT.');
@@ -216,6 +253,22 @@ export default function RateCalendar() {
             ...ratesByRoomType,
             [selectedRoomType]: newRates,
         });
+
+        try {
+            await fetch(`${getApiBaseUrl()}/api/rates/calendar/bulk-override`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    propertyId: 1,
+                    roomType: selectedRoomType,
+                    startDate: bulkStartDate,
+                    endDate: bulkEndDate,
+                    rate: rateVal,
+                    dayFilter: bulkDayFilter
+                })
+            });
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
 
         setIsBulkOpen(false);
     };
@@ -277,9 +330,9 @@ export default function RateCalendar() {
                             <BedDouble className="size-4" />
                         </div>
                     </div>
-                    <div className="text-base font-bold text-slate-900 truncate tracking-tight">{selectedRoomType}</div>
+                    <div className="text-base text-slate-900 truncate tracking-tight">{selectedRoomType}</div>
                     <div className="text-[11px] text-slate-500 font-medium mt-1">
-                        WD: ৳{ROOM_TYPE_DEFAULTS[selectedRoomType]?.weekday} | WE: ৳{ROOM_TYPE_DEFAULTS[selectedRoomType]?.weekend}
+                        WD: ৳{getDynamicRoomTypeRate(selectedRoomType).weekday.toLocaleString()} | WE: ৳{getDynamicRoomTypeRate(selectedRoomType).weekend.toLocaleString()}
                     </div>
                 </div>
 
@@ -327,7 +380,7 @@ export default function RateCalendar() {
                             onChange={(e) => setSelectedRoomType(e.target.value)}
                             className="select-standard text-xs py-1.5 px-3 min-w-[180px]"
                         >
-                            {Object.keys(ROOM_TYPE_DEFAULTS).map(rt => (
+                            {availableRoomTypes.map(rt => (
                                 <option key={rt} value={rt}>{rt}</option>
                             ))}
                         </select>
@@ -344,7 +397,7 @@ export default function RateCalendar() {
                         >
                             <ChevronLeft className="size-4" />
                         </button>
-                        <span className="text-xs font-bold text-slate-800 px-3 min-w-[130px] text-center">{monthName}</span>
+                        <span className="text-xs text-slate-800 px-3 min-w-[130px] text-center">{monthName}</span>
                         <button
                             onClick={nextMonth}
                             className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
@@ -359,7 +412,7 @@ export default function RateCalendar() {
             {/* Compact Legend Bar */}
             <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
                 <div className="flex flex-wrap items-center gap-4">
-                    <span className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">Tariff Legend:</span>
+                    <span className="text-slate-700 text-[10px] uppercase tracking-wider">Tariff Legend:</span>
                     <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-purple-600"></span> Suite / VIP (৳10k+)</span>
                     <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-primary"></span> Premium (৳5k-10k)</span>
                     <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-emerald-600"></span> Standard (৳3k-5k)</span>
@@ -402,7 +455,7 @@ export default function RateCalendar() {
                                     >
                                         <div className="h-full flex flex-col justify-between">
                                             <div className="flex items-center justify-between leading-none">
-                                                <span className={`text-xs font-bold ${isToday ? 'text-primary' : 'text-slate-800'}`}>
+                                                <span className={`text-xs ${isToday ? 'text-primary' : 'text-slate-800'}`}>
                                                     {day.getDate()}
                                                 </span>
                                                 {dayRate.occupancy > 0 && (
@@ -421,7 +474,7 @@ export default function RateCalendar() {
                                                             type="number"
                                                             value={tempRate}
                                                             onChange={(e) => setTempRate(e.target.value)}
-                                                            className="w-full pl-5 pr-1 py-1 border border-primary rounded-lg text-xs font-bold outline-none"
+                                                            className="w-full pl-5 pr-1 py-1 border border-primary rounded-lg text-xs outline-none"
                                                             autoFocus
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') handleSaveRate();
@@ -432,13 +485,13 @@ export default function RateCalendar() {
                                                     <div className="flex gap-1">
                                                         <button
                                                             onClick={handleSaveRate}
-                                                            className="flex-1 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition"
+                                                            className="flex-1 py-1 bg-emerald-600 text-white rounded-lg text-[10px] hover:bg-emerald-700 transition"
                                                         >
                                                             <Save className="size-3 mx-auto" />
                                                         </button>
                                                         <button
                                                             onClick={() => setEditingDate(null)}
-                                                            className="flex-1 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-200 transition"
+                                                            className="flex-1 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] hover:bg-slate-200 transition"
                                                         >
                                                             <RotateCcw className="size-3 mx-auto" />
                                                         </button>
@@ -447,7 +500,7 @@ export default function RateCalendar() {
                                             ) : (
                                                 <div className="space-y-1">
                                                     <div className={`px-2 py-1 ${getRateColor(dayRate.rate)} rounded-lg text-center shadow-2xs`}>
-                                                        <p className="text-xs font-bold leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
+                                                        <p className="text-xs leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
                                                     </div>
                                                     {dayRate.eventName && (
                                                         <p className="text-[10px] text-rose-600 font-semibold truncate leading-none mt-1">{dayRate.eventName}</p>
@@ -473,7 +526,7 @@ export default function RateCalendar() {
                                     <Calendar className="size-5" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-slate-900">Bulk Rate Adjustment</h3>
+                                    <h3 className="text-base text-slate-900">Bulk Rate Adjustment</h3>
                                     <p className="text-xs text-slate-500">Apply uniform rates for {selectedRoomType}</p>
                                 </div>
                             </div>
@@ -510,7 +563,7 @@ export default function RateCalendar() {
                             <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-700">Target Rate (BDT)</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">৳</span>
+                                    <span className="absolute left-3 top-2 text-slate-400 text-xs">৳</span>
                                     <input
                                         type="number"
                                         value={bulkRate}

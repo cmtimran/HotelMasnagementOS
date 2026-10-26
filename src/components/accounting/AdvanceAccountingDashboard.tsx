@@ -211,7 +211,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                         <Landmark size={24} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        <h1 className="text-2xl text-slate-900 tracking-tight flex items-center gap-2">
                             USALI Enterprise Accounting & General Ledger
                             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 Double-Entry Enforced
@@ -254,19 +254,19 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Debits</div>
-                        <div className="text-2xl font-bold text-slate-900 mt-1">
+                        <div className="text-2xl text-slate-900 mt-1">
                             ৳ {trialBalance.summary.grandDebit?.toLocaleString()}
                         </div>
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Credits</div>
-                        <div className="text-2xl font-bold text-slate-900 mt-1">
+                        <div className="text-2xl text-slate-900 mt-1">
                             ৳ {trialBalance.summary.grandCredit?.toLocaleString()}
                         </div>
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ledger Balance Status</div>
-                        <div className="text-base font-bold text-emerald-600 mt-1 flex items-center gap-1.5">
+                        <div className="text-base text-emerald-600 mt-1 flex items-center gap-1.5">
                             {trialBalance.summary.isBalanced ? (
                                 <>
                                     <CheckCircle2 size={18} /> Perfectly Balanced (0.00 Diff)
@@ -280,7 +280,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active USALI Accounts</div>
-                        <div className="text-2xl font-bold text-indigo-600 mt-1">
+                        <div className="text-2xl text-indigo-600 mt-1">
                             {accounts.length} Accounts
                         </div>
                     </div>
@@ -328,7 +328,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                     <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                         <div>
-                            <h2 className="text-base font-bold text-slate-900">General Ledger Trial Balance</h2>
+                            <h2 className="text-base text-slate-900">General Ledger Trial Balance</h2>
                             <p className="text-xs text-slate-500">Live aggregated debit and credit positions across all USALI departments</p>
                         </div>
                     </div>
@@ -347,7 +347,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {trialBalance?.items.map(acc => (
                                     <tr key={acc.account_id} className="hover:bg-slate-50 transition">
-                                        <td className="p-3 font-mono font-bold text-slate-800">{acc.account_code}</td>
+                                        <td className="p-3 font-mono text-slate-800">{acc.account_code}</td>
                                         <td className="p-3 font-medium text-slate-800">{acc.account_name}</td>
                                         <td className="p-3">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
@@ -370,7 +370,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                                 ))}
                             </tbody>
                             <tfoot>
-                                <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-300">
+                                <tr className="bg-slate-50 text-slate-900 border-t-2 border-slate-300">
                                     <td colSpan={3} className="p-3 uppercase tracking-wider text-xs">Grand Total Balanced Check</td>
                                     <td className="p-3 text-right font-mono text-emerald-700 text-sm">
                                         ৳ {trialBalance?.summary.grandDebit?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -392,7 +392,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                         <div key={jv.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-hidden">
                             <div className="flex flex-wrap items-center justify-between pb-3 border-b border-slate-100 gap-2">
                                 <div className="flex items-center gap-3">
-                                    <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                                    <span className="font-mono text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
                                         {jv.entry_number}
                                     </span>
                                     <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
@@ -402,7 +402,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                                         REF: {jv.reference_type}
                                     </span>
                                 </div>
-                                <div className="text-xs font-bold text-slate-800">
+                                <div className="text-xs text-slate-800">
                                     Total: ৳ {jv.total_amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </div>
                             </div>
@@ -423,7 +423,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                                         {jv.lines?.map(l => (
                                             <tr key={l.id} className="hover:bg-slate-50">
                                                 <td className="p-2">
-                                                    <span className="font-bold text-slate-800">{l.account_code}</span> - {l.account_name}
+                                                    <span className="text-slate-800">{l.account_code}</span> - {l.account_name}
                                                 </td>
                                                 <td className="p-2 text-slate-500 font-sans">{l.memo || '-'}</td>
                                                 <td className="p-2 text-right font-semibold text-slate-800">
@@ -446,7 +446,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
             {activeTab === 'coa' && (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                     <div className="p-4 border-b border-slate-100">
-                        <h2 className="text-base font-bold text-slate-900">USALI 11th Edition Chart of Accounts</h2>
+                        <h2 className="text-base text-slate-900">USALI 11th Edition Chart of Accounts</h2>
                         <p className="text-xs text-slate-500">Uniform standardized accounts mapped directly to hospitality operating departments</p>
                     </div>
                     <div className="overflow-x-auto">
@@ -463,7 +463,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {accounts.map(acc => (
                                     <tr key={acc.id} className="hover:bg-slate-50 transition">
-                                        <td className="p-3 font-mono font-bold text-emerald-800">{acc.account_code}</td>
+                                        <td className="p-3 font-mono text-emerald-800">{acc.account_code}</td>
                                         <td className="p-3 font-semibold text-slate-800">{acc.account_name}</td>
                                         <td className="p-3">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
@@ -497,10 +497,10 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                         <div key={folio.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
                             <div className="flex flex-wrap items-center justify-between pb-3 border-b border-slate-100 gap-2">
                                 <div className="flex items-center gap-3">
-                                    <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">
+                                    <span className="font-mono text-xs text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">
                                         {folio.folio_number}
                                     </span>
-                                    <span className="text-xs font-bold text-slate-800">
+                                    <span className="text-xs text-slate-800">
                                         {folio.guest_name}
                                     </span>
                                     <span className="text-xs text-slate-500 font-mono">
@@ -509,7 +509,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-slate-400">Balance Due:</span>
-                                    <span className={`text-sm font-bold font-mono ${folio.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                    <span className={`text-sm font-mono ${folio.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                                         ৳ {folio.balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </span>
                                 </div>
@@ -518,7 +518,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                                 {/* Charges list */}
                                 <div>
-                                    <div className="text-xs font-bold text-slate-600 mb-1.5 flex items-center justify-between">
+                                    <div className="text-xs text-slate-600 mb-1.5 flex items-center justify-between">
                                         <span>Itemized Charges ({folio.charges?.length || 0})</span>
                                     </div>
                                     <div className="border border-slate-100 rounded-lg overflow-hidden divide-y divide-slate-100 text-xs">
@@ -533,7 +533,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
 
                                 {/* Payments list */}
                                 <div>
-                                    <div className="text-xs font-bold text-slate-600 mb-1.5 flex items-center justify-between">
+                                    <div className="text-xs text-slate-600 mb-1.5 flex items-center justify-between">
                                         <span>Recorded Payments ({folio.payments?.length || 0})</span>
                                     </div>
                                     <div className="border border-slate-100 rounded-lg overflow-hidden divide-y divide-slate-100 text-xs">
@@ -542,7 +542,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                                                 <div className="flex items-center gap-1.5 text-emerald-800 font-medium">
                                                     <CreditCard size={12} /> {p.payment_method} ({p.payment_number})
                                                 </div>
-                                                <span className="font-mono font-bold text-emerald-700">৳ {Number(p.amount).toFixed(2)}</span>
+                                                <span className="font-mono text-emerald-700">৳ {Number(p.amount).toFixed(2)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -559,12 +559,12 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                     <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-8">
                         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <div>
-                                <h3 className="text-base font-bold text-slate-900">Post Double-Entry Journal Voucher</h3>
+                                <h3 className="text-base text-slate-900">Post Double-Entry Journal Voucher</h3>
                                 <p className="text-xs text-slate-500">Total Debits must strictly equal Total Credits</p>
                             </div>
                             <button 
                                 onClick={() => setIsCreateModalOpen(false)}
-                                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1"
+                                className="text-slate-400 hover:text-slate-600 text-sm p-1"
                             >
                                 ✕
                             </button>

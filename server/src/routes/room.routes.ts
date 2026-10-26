@@ -12,7 +12,7 @@ router.get('/', requirePermission('frontdesk.access'), roomController.getAllRoom
 router.patch('/:roomNo/housekeeping', requirePermission('frontdesk.access'), roomController.updateHousekeeping);
 
 // POST /api/rooms - Create a new room
-router.post('/', requirePermission('frontdesk.access'), (req: Request, res: Response) => {
+router.post('/', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
         const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
@@ -30,10 +30,29 @@ router.post('/', requirePermission('frontdesk.access'), (req: Request, res: Resp
             return res.status(400).json({ success: false, error: 'room number is required' });
         }
 
-        const result = db.prepare(`
-            INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status, remarks)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(propertyId, buildingId, floorId, roomTypeId, String(roomNumber), name, status, hkStatus, body.remarks || null);
+        const result = await db.prepare(`
+            INSERT INTO rooms (
+                property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status, remarks,
+                phone_ext, lock_id, is_connecting, connected_to, smoking_status, near_elevator
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            propertyId,
+            buildingId,
+            floorId,
+            roomTypeId,
+            String(roomNumber),
+            name,
+            status,
+            hkStatus,
+            body.remarks || null,
+            body.phoneExt || body.phone_ext || null,
+            body.lockId || body.lock_id || null,
+            Boolean(body.isConnecting),
+            body.connectedTo || body.connected_to || null,
+            body.smokingStatus || body.smoking_status || 'Non-Smoking',
+            Boolean(body.nearElevator)
+        );
 
         res.status(201).json({
             success: true,
@@ -46,7 +65,7 @@ router.post('/', requirePermission('frontdesk.access'), (req: Request, res: Resp
 });
 
 // PUT /api/rooms/:roomNo/details - Update room details
-router.put('/:roomNo/details', requirePermission('frontdesk.access'), (req: Request, res: Response) => {
+router.put('/:roomNo/details', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const roomNo = String(req.params.roomNo || '');
         const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
@@ -62,7 +81,7 @@ router.put('/:roomNo/details', requirePermission('frontdesk.access'), (req: Requ
         const rawHk = body.housekeepingStatus || '';
         const hkStatus = rawHk.toUpperCase() === 'DIRTY' ? 'DIRTY' : rawHk.toUpperCase() === 'INSPECTED' ? 'INSPECTED' : rawHk ? 'CLEAN' : null;
 
-        db.prepare(`
+        await db.prepare(`
             UPDATE rooms
             SET name = COALESCE(?, name),
                 building_id = COALESCE(?, building_id),
@@ -71,9 +90,31 @@ router.put('/:roomNo/details', requirePermission('frontdesk.access'), (req: Requ
                 status = COALESCE(?, status),
                 housekeeping_status = COALESCE(?, housekeeping_status),
                 remarks = COALESCE(?, remarks),
+                phone_ext = COALESCE(?, phone_ext),
+                lock_id = COALESCE(?, lock_id),
+                is_connecting = COALESCE(?, is_connecting),
+                connected_to = COALESCE(?, connected_to),
+                smoking_status = COALESCE(?, smoking_status),
+                near_elevator = COALESCE(?, near_elevator),
                 updated_at = CURRENT_TIMESTAMP
             WHERE property_id = ? AND room_number = ?
-        `).run(name, buildingId, floorId, roomTypeId, status, hkStatus, body.remarks || null, propertyId, roomNo);
+        `).run(
+            name,
+            buildingId,
+            floorId,
+            roomTypeId,
+            status,
+            hkStatus,
+            body.remarks || null,
+            body.phoneExt || body.phone_ext || null,
+            body.lockId || body.lock_id || null,
+            body.isConnecting !== undefined ? Boolean(body.isConnecting) : null,
+            body.connectedTo || body.connected_to || null,
+            body.smokingStatus || body.smoking_status || null,
+            body.nearElevator !== undefined ? Boolean(body.nearElevator) : null,
+            propertyId,
+            roomNo
+        );
 
         res.json({ success: true, message: `Room ${roomNo} updated successfully` });
     } catch (e: any) {
@@ -82,12 +123,12 @@ router.put('/:roomNo/details', requirePermission('frontdesk.access'), (req: Requ
 });
 
 // DELETE /api/rooms/:roomNo - Delete a room from inventory
-router.delete('/:roomNo', requirePermission('frontdesk.access'), (req: Request, res: Response) => {
+router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const roomNo = String(req.params.roomNo || '');
         const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
-        const info = db.prepare('DELETE FROM rooms WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo);
-        if (info.changes === 0) {
+        const info = await db.prepare('DELETE FROM rooms WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo);
+        if (info.rowCount === 0) {
             return res.status(404).json({ success: false, error: `Room ${roomNo} not found` });
         }
         res.json({ success: true, message: `Room ${roomNo} removed from inventory` });

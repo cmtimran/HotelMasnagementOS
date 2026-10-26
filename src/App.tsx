@@ -96,7 +96,7 @@ function App() {
 
   const [viewingProperty, setViewingProperty] = useState<any>(null);
 
-  // Global Event-Driven Realtime Network Sync & SQLite Database Hydration on Application Boot
+  // Global Event-Driven Realtime Network Sync & PostgreSQL Database Hydration on Application Boot
   useEffect(() => {
     initNetworkSync();
     syncReservationsFromDB().catch(console.error);
@@ -343,9 +343,11 @@ function App() {
 
   // Handle Property Management
   const [editingProperty, setEditingProperty] = useState<any>(null);
+  const [editingPropertyTab, setEditingPropertyTab] = useState<string>('identity');
 
-  const handleManageProperty = (property: any) => {
+  const handleManageProperty = (property: any, initialTab = 'identity') => {
     setEditingProperty(property);
+    setEditingPropertyTab(initialTab);
     setActivePage('edit-property');
   };
 
@@ -358,15 +360,30 @@ function App() {
       case 'manager-dashboard':
         return <ManagerDashboard />;
       case 'property-create':
-        return <AddProperty onBack={() => setActivePage('properties')} />;
+      case 'add-property':
+        return <AddProperty onBack={() => setActivePage('properties')} isCreateMode={true} currentUser={currentUser} onNavigate={setActivePage} />;
       case 'hotel-info':
-        return <HotelInfoView property={propertiesData[0]} currentUser={currentUser} onManageProperty={() => handleManageProperty(propertiesData[0])} />;
+      case 'hotel-profile':
+        return (
+          <HotelInfoView
+            property={activeProperty || livePropertiesData[0]}
+            currentUser={currentUser}
+            onManageProperty={(tab) => handleManageProperty(activeProperty || livePropertiesData[0], tab || 'identity')}
+          />
+        );
       case 'front-desk':
         return <FrontDesk />;
-      case 'add-property':
-        return <AddProperty onBack={() => setActivePage('properties')} />;
       case 'edit-property':
-        return <AddProperty onBack={() => setActivePage('hotel-info')} initialData={editingProperty || propertiesData[0]} />;
+        return (
+          <AddProperty
+            onBack={() => setActivePage('hotel-info')}
+            initialData={editingProperty || activeProperty || livePropertiesData[0]}
+            initialTab={editingPropertyTab}
+            isCreateMode={false}
+            currentUser={currentUser}
+            onNavigate={setActivePage}
+          />
+        );
       case 'property-list':
       case 'all-properties':
       case 'properties':
@@ -382,7 +399,7 @@ function App() {
                   className: 'w-[42%]',
                   render: (row) => (
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200/80 flex items-center justify-center text-slate-700 font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200/80 flex items-center justify-center text-slate-700 text-xs flex-shrink-0 shadow-2xs overflow-hidden">
                         {row.logo && !row.logo.includes('placehold.co') ? (
                           <img src={row.logo} alt={row.name} className="w-full h-full object-cover" />
                         ) : (
@@ -390,7 +407,7 @@ function App() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-gray-900 text-xs sm:text-[13px] leading-tight truncate">{row.name}</p>
+                        <p className="text-gray-900 text-xs sm:text-[13px] leading-tight truncate">{row.name}</p>
                         <p className="text-gray-500 text-[11px] mt-0.5 leading-tight truncate">
                           {row.address}, {row.city}, {row.country}
                         </p>
@@ -404,7 +421,7 @@ function App() {
                   className: 'w-[18%]',
                   render: (row) => (
                     <div className="flex flex-col">
-                      <span className="font-bold text-gray-900 text-xs">{row.rooms} Rooms</span>
+                      <span className="text-gray-900 text-xs">{row.rooms} Rooms</span>
                       <span className="text-[10px] text-gray-400">Physical Units</span>
                     </div>
                   )
@@ -415,7 +432,7 @@ function App() {
                   className: 'w-[15%]',
                   render: (row) => (
                     <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/60 rounded-full">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">{row.grade}</span>
+                      <span className="text-[10px] uppercase tracking-wider">{row.grade}</span>
                     </div>
                   )
                 },
@@ -431,11 +448,18 @@ function App() {
                           onClick={() => {
                             setActivePropertyId(row.id);
                           }}
-                          className="h-7 px-2 rounded-lg text-[11px] font-bold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
+                          className="h-7 px-2 rounded-lg text-[11px] text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
                         >
                           Switch Hotel
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => handleManageProperty(row.raw || row)}
+                        className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-blue-700 hover:text-blue-800 bg-blue-50/70 hover:bg-blue-100 border border-blue-200/90 transition-all cursor-pointer active:scale-[0.98]"
+                      >
+                        Manage Property
+                      </button>
                       <button
                         type="button"
                         onClick={() => setViewingProperty(row.raw || row)}
@@ -702,7 +726,7 @@ function App() {
         return <PolicyManagement onNavigate={setActivePage} />;
       case 'general-settings':
       case 'system-settings':
-        return <GeneralSettings onNavigate={setActivePage} />;
+        return <GeneralSettings onNavigate={setActivePage} currentUser={currentUser} />;
       case 'advance-accounting':
         return <AdvanceAccountingDashboard />;
       case 'hrm-dashboard':

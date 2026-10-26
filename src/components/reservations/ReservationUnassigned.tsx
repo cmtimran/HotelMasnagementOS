@@ -360,25 +360,25 @@ export const ReservationUnassigned: React.FC = () => {
             {/* Operational Metric KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Unassigned</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Total Unassigned</span>
                     <div className="text-2xl font-black text-slate-900 font-mono mt-1">{unassignedList.length} Bookings</div>
                     <p className="text-[11px] text-slate-500 mt-1 font-medium">Pending physical room keys</p>
                 </div>
 
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Due In Today (Urgent)</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Due In Today (Urgent)</span>
                     <div className="text-2xl font-black text-rose-700 font-mono mt-1">{dueTodayCount} Guests</div>
                     <p className="text-[11px] text-slate-500 mt-1 font-medium">Arriving on 01 Jul 2026</p>
                 </div>
 
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Clean Rooms in Stock</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Clean Rooms in Stock</span>
                     <div className="text-2xl font-black text-emerald-700 font-mono mt-1">18 Ready</div>
                     <p className="text-[11px] text-slate-500 mt-1 font-medium">100% capacity available to allocate</p>
                 </div>
 
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Revenue In Queue</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Revenue In Queue</span>
                     <div className="text-2xl font-black text-slate-900 font-mono mt-1">BDT {totalRevenueAtRisk.toLocaleString()}</div>
                     <p className="text-[11px] text-slate-500 mt-1 font-medium">Guaranteed prepaid & corporate tariffs</p>
                 </div>
@@ -399,7 +399,7 @@ export const ReservationUnassigned: React.FC = () => {
 
                 <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Category:</span>
+                        <span className="text-[10px] text-slate-400 uppercase">Category:</span>
                         <select
                             value={filterCategory}
                             onChange={e => setFilterCategory(e.target.value)}
@@ -414,7 +414,7 @@ export const ReservationUnassigned: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Arrival Date:</span>
+                        <span className="text-[10px] text-slate-400 uppercase">Arrival Date:</span>
                         <select
                             value={filterDate}
                             onChange={e => setFilterDate(e.target.value)}
@@ -446,7 +446,7 @@ export const ReservationUnassigned: React.FC = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs min-w-[1080px]">
                         <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                 <th className="py-2.5 px-3.5 w-60">Res # &amp; Guest</th>
                                 <th className="py-2.5 px-3 w-48">Reserved Category</th>
                                 <th className="py-2.5 px-3 w-40">Stay Period</th>
@@ -466,12 +466,12 @@ export const ReservationUnassigned: React.FC = () => {
                                             {/* Res # & Guest */}
                                             <td className="py-2.5 px-3.5">
                                                 <div className="flex items-center gap-2.5">
-                                                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 flex items-center justify-center text-xs flex-shrink-0">
                                                         {u.guestName.charAt(0)}
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-1.5">
-                                                            <span className="font-bold text-slate-900">{u.guestName}</span>
+                                                            <span className="text-slate-900">{u.guestName}</span>
                                                             {u.vip && u.vip !== 'None' && u.vip !== 'Regular' && (
                                                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300">
                                                                     {u.vip}
@@ -494,7 +494,7 @@ export const ReservationUnassigned: React.FC = () => {
                                             {/* Reserved Category */}
                                             <td className="py-2.5 px-3">
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="font-bold text-slate-800">{u.roomType}</span>
+                                                    <span className="text-slate-800">{u.roomType}</span>
                                                     <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-100 text-rose-800 border border-rose-200">
                                                         No Room #
                                                     </span>
@@ -510,9 +510,9 @@ export const ReservationUnassigned: React.FC = () => {
                                                     <span>{u.checkIn}</span> ➔ <span>{u.checkOut}</span>
                                                 </div>
                                                 <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5">
-                                                    <span className="font-bold text-blue-700">{u.nights} Night{u.nights > 1 ? 's' : ''}</span>
+                                                    <span className="text-blue-700">{u.nights} Night{u.nights > 1 ? 's' : ''}</span>
                                                     {isToday && (
-                                                        <span className="px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold text-[9px]">
+                                                        <span className="px-1 py-0.2 rounded bg-rose-100 text-rose-800 text-[9px]">
                                                             Today!
                                                         </span>
                                                     )}
@@ -520,7 +520,7 @@ export const ReservationUnassigned: React.FC = () => {
                                             </td>
 
                                             {/* Pax */}
-                                            <td className="py-2.5 px-2.5 text-center font-bold text-slate-700">
+                                            <td className="py-2.5 px-2.5 text-center text-slate-700">
                                                 {u.adults || 1}A {(u.children || 0) > 0 ? `+ ${u.children}C` : ''}
                                             </td>
 
@@ -534,7 +534,7 @@ export const ReservationUnassigned: React.FC = () => {
 
                                             {/* Tariff */}
                                             <td className="py-2.5 px-3 text-right">
-                                                <div className="font-mono font-bold text-slate-900 text-xs">
+                                                <div className="font-mono text-slate-900 text-xs">
                                                     ৳{u.totalAmount ? u.totalAmount.toLocaleString() : '0'}
                                                 </div>
                                                 <span className="text-[9.5px] text-emerald-700 font-semibold block mt-0.5">
@@ -561,7 +561,7 @@ export const ReservationUnassigned: React.FC = () => {
                                     <td colSpan={7} className="py-12 text-center text-slate-400">
                                         <div className="flex flex-col items-center justify-center gap-1.5">
                                             <CheckCircle2 size={26} className="text-emerald-500" />
-                                            <p className="text-xs font-bold text-slate-700">All reservations have physical rooms assigned!</p>
+                                            <p className="text-xs text-slate-700">All reservations have physical rooms assigned!</p>
                                             <p className="text-[11px] text-slate-400">Zero unassigned backlogs in queue.</p>
                                         </div>
                                     </td>
@@ -574,98 +574,101 @@ export const ReservationUnassigned: React.FC = () => {
 
             {/* Clean Physical Room Allocation Modal */}
             {assignTarget && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[500px] w-full p-4.5 space-y-4 animate-in zoom-in-95 duration-150">
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[520px] w-full overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-bold">
-                                    <BedDouble size={16} />
+                        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-[#1e3a8a] text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-blue-100">
+                                    <BedDouble size={18} />
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-bold text-slate-900">Assign Clean Room</h3>
-                                    <p className="text-[11px] text-slate-500 font-mono">{assignTarget.reservationNumber} • {assignTarget.guestName}</p>
+                                    <p className="text-xs text-slate-500 font-mono mt-0.5">{assignTarget.reservationNumber} • {assignTarget.guestName}</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setAssignTarget(null)}
-                                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center cursor-pointer transition-colors"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        {/* Guest & Stay Context Summary */}
-                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200/80 space-y-1.5 text-xs">
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Reserved Category:</span>
-                                <strong className="text-blue-800 font-bold">{assignTarget.roomType}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Stay Duration:</span>
-                                <span className="font-medium text-slate-800">{assignTarget.checkIn} ➔ {assignTarget.checkOut} ({assignTarget.nights} Nights)</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Tariff Guaranteed:</span>
-                                <span className="font-mono font-bold text-emerald-700">BDT {assignTarget.totalAmount.toLocaleString()}</span>
-                            </div>
-                            {assignTarget.specialRequests && (
-                                <div className="border-t border-slate-200/60 pt-1 text-[11px] text-slate-600">
-                                    <strong>Guest Requests:</strong> {assignTarget.specialRequests}
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-4">
+                            {/* Guest & Stay Context Summary */}
+                            <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/80 space-y-1.5 text-xs">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 font-medium">Reserved Category:</span>
+                                    <strong className="text-blue-900 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{assignTarget.roomType}</strong>
                                 </div>
-                            )}
-                        </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 font-medium">Stay Duration:</span>
+                                    <span className="font-semibold text-slate-800">{assignTarget.checkIn} ➔ {assignTarget.checkOut} ({assignTarget.nights} Nights)</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 font-medium">Tariff Guaranteed:</span>
+                                    <span className="font-mono text-emerald-700 font-bold">BDT {assignTarget.totalAmount.toLocaleString()}</span>
+                                </div>
+                                {assignTarget.specialRequests && (
+                                    <div className="border-t border-slate-200/60 pt-1.5 mt-1 text-[11px] text-slate-600">
+                                        <strong className="text-slate-700">Guest Requests:</strong> {assignTarget.specialRequests}
+                                    </div>
+                                )}
+                            </div>
 
-                        {/* Room Selection from Live Clean Inventory */}
-                        <div className="space-y-1.5 text-xs">
-                            <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
-                                <span>Select Available Clean Room</span>
-                                <span className="text-emerald-700 font-semibold">{currentAvailableRooms.length} rooms ready</span>
-                            </label>
+                            {/* Room Selection from Live Clean Inventory */}
+                            <div className="space-y-2 text-xs">
+                                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center justify-between">
+                                    <span>Select Available Clean Room</span>
+                                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">{currentAvailableRooms.length} rooms ready</span>
+                                </label>
 
-                            {currentAvailableRooms.length > 0 ? (
-                                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
-                                    {currentAvailableRooms.map(rm => (
-                                        <div
-                                            key={rm.number}
-                                            onClick={() => setTargetRoom(rm.number)}
-                                            className={`p-2.5 rounded-lg border text-xs cursor-pointer transition-all flex flex-col justify-between ${
-                                                targetRoom === rm.number
-                                                    ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20'
-                                                    : 'border-slate-200 hover:border-blue-300 bg-white'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-black font-mono text-slate-900">Room {rm.number}</span>
-                                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                    {rm.status === 'inspected' ? 'Inspected' : 'Clean'}
-                                                </span>
+                                {currentAvailableRooms.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-2.5 max-h-48 overflow-y-auto p-1">
+                                        {currentAvailableRooms.map(rm => (
+                                            <div
+                                                key={rm.number}
+                                                onClick={() => setTargetRoom(rm.number)}
+                                                className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex flex-col justify-between ${
+                                                    targetRoom === rm.number
+                                                        ? 'border-blue-600 bg-blue-50/80 ring-2 ring-blue-500/20 shadow-xs'
+                                                        : 'border-slate-200 hover:border-blue-300 bg-white hover:bg-slate-50/50'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-black font-mono text-slate-900">Room {rm.number}</span>
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                        {rm.status === 'inspected' ? 'Inspected' : 'Clean'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 mt-1 font-medium">Floor {rm.floor} • {rm.bed} Bed</p>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 mt-1">Floor {rm.floor} • {rm.bed} Bed</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-xs">
-                                    No exact match found in current category. Room will be assigned from General Best Available Pool.
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs">
+                                        No exact match found in current category. Room will be assigned from General Best Available Pool.
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Modal Action Buttons */}
-                        <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
                             <button
                                 type="button"
                                 onClick={() => setAssignTarget(null)}
-                                className="h-8 px-3.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                className="h-9 px-4 border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={handleConfirmAssign}
-                                className="btn-primary"
+                                className="h-9 px-4.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all"
                             >
                                 <Check size={14} className="stroke-[3]" />
                                 <span>Confirm Room {targetRoom}</span>

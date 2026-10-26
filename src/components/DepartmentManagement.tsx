@@ -207,7 +207,7 @@ export const DepartmentManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Total Hotel Departments</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{departments.length} Divisions</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{departments.length} Divisions</div>
                         <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1 mt-0.5">
                             <Check size={11} /> {operationalCount} Revenue • {supportCount} Support
                         </span>
@@ -220,7 +220,7 @@ export const DepartmentManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Total Assigned Workforce</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{totalStaff} Personnel</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{totalStaff} Personnel</div>
                         <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">
                             Active Roster Coverage
                         </span>
@@ -233,7 +233,7 @@ export const DepartmentManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Total Monthly Operating Budget</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">৳ {(totalBudget / 1000000).toFixed(2)}M BDT</div>
+                        <div className="text-xl text-gray-900 mt-0.5">৳ {(totalBudget / 1000000).toFixed(2)}M BDT</div>
                         <span className="text-[10px] text-purple-600 font-semibold mt-0.5 block">
                             Monthly OPEX Allocation
                         </span>
@@ -246,7 +246,7 @@ export const DepartmentManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Cost Centers Registered</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{departments.length} CC Codes</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{departments.length} CC Codes</div>
                         <span className="text-[10px] text-amber-600 font-semibold mt-0.5 block">
                             Mapped to General Ledger
                         </span>
@@ -298,7 +298,7 @@ export const DepartmentManagement: React.FC = () => {
             {/* Table */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden text-xs">
                 <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                    <h2 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <h2 className="text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Building2 size={14} className="text-blue-700" />
                         <span>Hotel Operating & Administrative Departments</span>
                     </h2>
@@ -310,7 +310,7 @@ export const DepartmentManagement: React.FC = () => {
                 <div className="overflow-x-auto no-scrollbar">
                     <table className="w-full text-left min-w-[850px]">
                         <thead>
-                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                 <th className="px-3.5 py-2.5">Code</th>
                                 <th className="px-3.5 py-2.5">Department Name</th>
                                 <th className="px-3.5 py-2.5">Head of Department (HOD)</th>
@@ -325,30 +325,30 @@ export const DepartmentManagement: React.FC = () => {
                         <tbody className="divide-y divide-gray-100">
                             {filteredDepartments.map(dept => (
                                 <tr key={dept.id} className="hover:bg-blue-50/20 transition-colors">
-                                    <td className="px-3.5 py-2.5 font-mono font-bold text-blue-700">{dept.code}</td>
+                                    <td className="px-3.5 py-2.5 font-mono text-blue-700">{dept.code}</td>
                                     <td className="px-3.5 py-2.5 font-semibold text-gray-900">{dept.name}</td>
                                     <td className="px-3.5 py-2.5 text-gray-700 font-medium">{dept.hodName}</td>
                                     <td className="px-3.5 py-2.5 font-mono">
-                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded font-bold text-[10.5px]">
+                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded text-[10.5px]">
                                             {dept.costCenterCode}
                                         </span>
                                     </td>
                                     <td className="px-3.5 py-2.5">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${dept.type.includes('Operational') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${dept.type.includes('Operational') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
                                             {dept.type.includes('Operational') ? 'Revenue Center' : 'Support Center'}
                                         </span>
                                     </td>
-                                    <td className="px-3.5 py-2.5 font-bold text-gray-900">
+                                    <td className="px-3.5 py-2.5 text-gray-900">
                                         {dept.staffCount} Staff
                                     </td>
-                                    <td className="px-3.5 py-2.5 font-mono font-bold text-gray-800">
+                                    <td className="px-3.5 py-2.5 font-mono text-gray-800">
                                         ৳ {dept.monthlyBudgetBDT.toLocaleString()}
                                     </td>
                                     <td className="px-3.5 py-2.5">
                                         <button
                                             type="button"
                                             onClick={() => handleToggleStatus(dept.id)}
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${dept.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
+                                            className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${dept.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                                         >
                                             {dept.status}
                                         </button>
@@ -385,7 +385,7 @@ export const DepartmentManagement: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-2">
                                 <Building2 size={15} className="text-blue-700" />
                                 <span>{editingDepartment ? 'Edit Department Details' : 'Register New Department'}</span>
                             </h3>
@@ -463,7 +463,7 @@ export const DepartmentManagement: React.FC = () => {
                                         min={1}
                                         value={formData.staffCount}
                                         onChange={e => setFormData({ ...formData, staffCount: Number(e.target.value) })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-bold text-gray-900"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-gray-900"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -473,7 +473,7 @@ export const DepartmentManagement: React.FC = () => {
                                         min={0}
                                         value={formData.monthlyBudgetBDT}
                                         onChange={e => setFormData({ ...formData, monthlyBudgetBDT: Number(e.target.value) })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-bold text-gray-900"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-gray-900"
                                     />
                                 </div>
                             </div>

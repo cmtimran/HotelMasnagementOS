@@ -10,16 +10,9 @@ import { broadcastServerEvent } from './routes/realtime.routes.js';
 
 dotenv.config();
 
-// 1. Initialize Relational Database & Seed Data (Embedded High-Speed Engine)
-try {
-  initDatabase();
-} catch (err) {
-  console.error('⚠️ Database initialization error:', err);
-}
-
-// 2. Initialize PostgreSQL 16 Enterprise Cluster Engine
-initPostgres().catch((err) => {
-  console.warn('PostgreSQL initialization skipped:', err.message);
+// 1. Initialize Sole Database Engine: Cloud PostgreSQL 17
+initDatabase().catch((err) => {
+  console.error('🚨 PostgreSQL initialization error:', err);
 });
 
 // 3. Initialize Redis 7 Pub/Sub Cluster Bus & Distributed Redlock Engine

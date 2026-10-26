@@ -2,7 +2,7 @@
 -- HOTEL MANAGEMENT OS (PMS CORE) - RELATIONAL DATABASE SCHEMA (1NF - 4NF)
 -- Supports: Multi-Property Hotel Chains, Room Inventory, Group Reservations,
 --           USALI Double-Entry Accounting, Human Resources Management (HRM).
--- Engine: SQLite / PostgreSQL ANSI SQL Compatible
+-- Engine: PostgreSQL ANSI SQL Compatible
 -- ============================================================================
 
 PRAGMA foreign_keys = ON;
@@ -161,6 +161,10 @@ CREATE TABLE IF NOT EXISTS reservations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     property_id INTEGER NOT NULL,
     reservation_number TEXT NOT NULL UNIQUE,
+    group_code TEXT,
+    registration_number TEXT,
+    registration_date DATETIME,
+    folio_number TEXT,
     booker_guest_id INTEGER NOT NULL,
     corporate_account_id INTEGER,
     source TEXT NOT NULL DEFAULT 'Direct',
@@ -183,6 +187,10 @@ CREATE TABLE IF NOT EXISTS reservations (
 CREATE TABLE IF NOT EXISTS reservation_rooms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reservation_id INTEGER NOT NULL,
+    sub_booking_number TEXT,
+    registration_number TEXT,
+    registration_date DATETIME,
+    folio_number TEXT,
     room_id INTEGER NOT NULL,
     guest_id INTEGER,
     check_in_date DATE NOT NULL,
@@ -197,6 +205,13 @@ CREATE TABLE IF NOT EXISTS reservation_rooms (
     FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE RESTRICT,
     FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE SET NULL,
     CHECK(check_out_date > check_in_date)
+);
+
+CREATE TABLE IF NOT EXISTS daily_sequences (
+    seq_date TEXT NOT NULL,
+    seq_type TEXT NOT NULL,
+    current_val INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (seq_date, seq_type)
 );
 
 CREATE TABLE IF NOT EXISTS addon_services (
@@ -526,3 +541,147 @@ CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(entry_dat
 CREATE INDEX IF NOT EXISTS idx_employees_property_dept ON employees(property_id, department_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_employee_date ON attendance_records(employee_id, attendance_date);
 CREATE INDEX IF NOT EXISTS idx_folios_res ON folios(reservation_id);
+
+-- ============================================================================
+-- 6. RATES, PACKAGES, MEAL PLANS & CONNECTING ROOMS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS connecting_rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL DEFAULT 1,
+    name TEXT NOT NULL,
+    inventory_logic TEXT NOT NULL DEFAULT 'Auto-Sync',
+    pricing_strategy TEXT NOT NULL DEFAULT 'Sum of Rates',
+    fixed_price DECIMAL(12,2) DEFAULT 0.00,
+    status TEXT NOT NULL DEFAULT 'Active',
+    component_rooms_json TEXT NOT NULL DEFAULT '[]',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS rate_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL DEFAULT 1,
+    name TEXT NOT NULL,
+    short_code TEXT NOT NULL,
+    market_segment TEXT NOT NULL DEFAULT 'FIT / Direct',
+    currency TEXT NOT NULL DEFAULT 'BDT',
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'Active',
+    meal_plan TEXT DEFAULT 'EP',
+    package_id INTEGER,
+    tax_included BOOLEAN NOT NULL DEFAULT 0,
+    promo_code TEXT,
+    policies_json TEXT,
+    activation_date DATE,
+    expiration_date DATE,
+    stay_date_start DATE,
+    stay_date_end DATE,
+    is_seasonal BOOLEAN NOT NULL DEFAULT 0,
+    season_name TEXT,
+    season_start DATE,
+    season_end DATE,
+    valid_days_json TEXT,
+    min_nights INTEGER NOT NULL DEFAULT 1,
+    max_nights INTEGER,
+    cut_off_days INTEGER NOT NULL DEFAULT 0,
+    closed_to_arrival BOOLEAN NOT NULL DEFAULT 0,
+    closed_to_departure BOOLEAN NOT NULL DEFAULT 0,
+    stop_sell BOOLEAN NOT NULL DEFAULT 0,
+    pricing_json TEXT,
+    raw_json TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    UNIQUE(property_id, short_code)
+);
+
+CREATE TABLE IF NOT EXISTS meal_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL DEFAULT 1,
+    name TEXT NOT NULL,
+    marketing_name TEXT,
+    short_code TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'Active',
+    has_breakfast BOOLEAN DEFAULT 0,
+    breakfast_menu TEXT,
+    breakfast_style TEXT,
+    breakfast_venue TEXT,
+    breakfast_cuisine TEXT,
+    has_lunch BOOLEAN DEFAULT 0,
+    lunch_menu TEXT,
+    lunch_style TEXT,
+    lunch_venue TEXT,
+    lunch_cuisine TEXT,
+    has_dinner BOOLEAN DEFAULT 0,
+    dinner_menu TEXT,
+    dinner_style TEXT,
+    dinner_venue TEXT,
+    dinner_cuisine TEXT,
+    has_brunch BOOLEAN DEFAULT 0,
+    brunch_menu TEXT,
+    brunch_style TEXT,
+    brunch_venue TEXT,
+    brunch_cuisine TEXT,
+    has_cupole BOOLEAN DEFAULT 0,
+    cupole_menu TEXT,
+    cupole_style TEXT,
+    cupole_venue TEXT,
+    cupole_cuisine TEXT,
+    has_snacks BOOLEAN DEFAULT 0,
+    snacks_menu TEXT,
+    snacks_style TEXT,
+    snacks_venue TEXT,
+    snacks_cuisine TEXT,
+    serving_type TEXT DEFAULT 'Buffet',
+    internal_cost DECIMAL(12,2) DEFAULT 0.00,
+    selling_price_adult DECIMAL(12,2) DEFAULT 0.00,
+    selling_price_child DECIMAL(12,2) DEFAULT 0.00,
+    infant_meals_free BOOLEAN DEFAULT 1,
+    max_infant_age INTEGER DEFAULT 5,
+    posting_frequency TEXT DEFAULT 'Daily',
+    revenue_code TEXT DEFAULT 'REV-FB-MEAL',
+    tax_inclusive BOOLEAN DEFAULT 1,
+    start_time TEXT DEFAULT '07:00',
+    end_time TEXT DEFAULT '23:00',
+    venue TEXT DEFAULT 'Main Restaurant',
+    raw_json TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    UNIQUE(property_id, short_code)
+);
+
+CREATE TABLE IF NOT EXISTS hotel_packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL DEFAULT 1,
+    name TEXT NOT NULL,
+    short_code TEXT NOT NULL,
+    package_type TEXT NOT NULL DEFAULT 'Standard',
+    status TEXT NOT NULL DEFAULT 'Active',
+    color TEXT DEFAULT '#3B82F6',
+    description TEXT,
+    raw_json TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    UNIQUE(property_id, short_code)
+);
+
+CREATE TABLE IF NOT EXISTS rate_calendar_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL DEFAULT 1,
+    room_type_name TEXT NOT NULL,
+    date DATE NOT NULL,
+    rate DECIMAL(12,2) NOT NULL,
+    occupancy INTEGER DEFAULT 0,
+    is_weekend BOOLEAN DEFAULT 0,
+    is_holiday BOOLEAN DEFAULT 0,
+    event_name TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    UNIQUE(property_id, room_type_name, date)
+);

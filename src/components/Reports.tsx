@@ -291,7 +291,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
             <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-3 transition-all animate-in fade-in duration-200">
                 <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-200 border border-slate-200">
                     <div className="px-3.5 py-2 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0">
-                        <h2 className="text-sm font-bold text-slate-800 tracking-tight">Custom Report Template(s)</h2>
+                        <h2 className="text-sm text-slate-800 tracking-tight">Custom Report Template(s)</h2>
                         <button onClick={() => setIsTemplateListModalOpen(false)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded-md transition-colors">
                             <X size={15} strokeWidth={2.5} />
                         </button>
@@ -343,7 +343,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
             <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-3 transition-all animate-in fade-in duration-200">
                 <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-200 border border-slate-200">
                     <div className="px-3.5 py-2 border-b border-slate-200 flex justify-between items-center bg-white">
-                        <h2 className="text-sm font-bold text-slate-900 tracking-tight">Add Report Template</h2>
+                        <h2 className="text-sm text-slate-900 tracking-tight">Add Report Template</h2>
                         <button onClick={() => setIsAddTemplateModalOpen(false)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded-md transition-colors">
                             <X size={15} strokeWidth={2.5} />
                         </button>
@@ -3803,7 +3803,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
         if (!config) {
             return (
                 <div className="flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-lg shadow-2xs text-center m-4">
-                    <p className="text-slate-700 font-bold text-sm">Report Configuration Not Found</p>
+                    <p className="text-slate-700 text-sm">Report Configuration Not Found</p>
                     <p className="text-slate-400 text-xs mt-1">Please configure {activeReport} in REPORT_CONFIG</p>
                     <button onClick={() => setShowReport(false)} className="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-semibold text-xs transition-colors">
                         Go Back to Filters
@@ -3836,11 +3836,11 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
             <div className="mb-3">
                 <div className="flex justify-between items-end border-b-2 border-slate-800 pb-1.5 mb-1.5">
                     <div>
-                        <h1 className="text-lg font-bold text-slate-900 leading-tight">House of Dream</h1>
+                        <h1 className="text-lg text-slate-900 leading-tight">House of Dream</h1>
                         <p className="text-[10px] text-slate-500 font-medium">Hotel Management System • Operational Report</p>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-sm font-bold text-red-600 uppercase tracking-wider">{activeReport}</h2>
+                        <h2 className="text-sm text-red-600 uppercase tracking-wider">{activeReport}</h2>
                         <span className="text-[9px] text-slate-400 font-mono">Property Base Currency: USD ($)</span>
                     </div>
                 </div>
@@ -3885,7 +3885,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                             <thead className="border-b-2 border-slate-800 bg-slate-100/90">
                                 <tr>
                                     {config.columns.map((col, idx) => (
-                                        <th key={idx} className="py-1 px-1.5 font-bold text-slate-900 border-b border-slate-300 uppercase tracking-wider text-[9px] whitespace-nowrap">{col}</th>
+                                        <th key={idx} className="py-1 px-1.5 text-slate-900 border-b border-slate-300 uppercase tracking-wider text-[9px] whitespace-nowrap">{col}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -3898,7 +3898,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                     </tr>
                                 ))}
                                 {pageNum === totalPages && (
-                                    <tr className="border-t-2 border-slate-900 font-bold bg-slate-100/80">
+                                    <tr className="border-t-2 border-slate-900 bg-slate-100/80">
                                         <td className="py-1.5 px-1.5 text-slate-900" colSpan={Math.min(3, config.columns.length)}>Total Records: {filteredData.length}</td>
                                         <td className="py-1.5 px-1.5 text-right text-slate-900 font-mono text-[9px]" colSpan={Math.max(0, config.columns.length - 3)}>END OF REPORT</td>
                                     </tr>
@@ -3946,7 +3946,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                         {showSettingsMenu && (
                             <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 p-2.5 w-44 space-y-2 text-xs">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Page Size</label>
+                                    <label className="text-[10px] text-slate-600 uppercase tracking-wider block mb-1">Page Size</label>
                                     <select
                                         value={pageSize}
                                         onChange={(e) => setPageSize(e.target.value as 'A4' | 'Letter' | 'Ledger')}
@@ -3958,17 +3958,17 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Orientation</label>
+                                    <label className="text-[10px] text-slate-600 uppercase tracking-wider block mb-1">Orientation</label>
                                     <div className="flex bg-slate-100 rounded p-0.5">
                                         <button
                                             onClick={() => setOrientation('portrait')}
-                                            className={`flex-1 text-center text-xs py-0.5 rounded ${orientation === 'portrait' ? 'bg-white shadow-2xs font-bold text-blue-600' : 'text-slate-600'}`}
+                                            className={`flex-1 text-center text-xs py-0.5 rounded ${orientation === 'portrait' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-600'}`}
                                         >
                                             Portrait
                                         </button>
                                         <button
                                             onClick={() => setOrientation('landscape')}
-                                            className={`flex-1 text-center text-xs py-0.5 rounded ${orientation === 'landscape' ? 'bg-white shadow-2xs font-bold text-blue-600' : 'text-slate-600'}`}
+                                            className={`flex-1 text-center text-xs py-0.5 rounded ${orientation === 'landscape' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-600'}`}
                                         >
                                             Landscape
                                         </button>
@@ -4139,7 +4139,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 <ListOrdered size={13} />
                             </div>
                         </div>
-                        <p className="text-base font-bold text-gray-900">9 Reports</p>
+                        <p className="text-base text-gray-900">9 Reports</p>
                         <p className="text-[11px] text-gray-400 mt-0.5">Arrivals, cancellations & forecast</p>
                     </div>
 
@@ -4150,7 +4150,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 <Monitor size={13} />
                             </div>
                         </div>
-                        <p className="text-base font-bold text-gray-900">12 Reports</p>
+                        <p className="text-base text-gray-900">12 Reports</p>
                         <p className="text-[11px] text-gray-400 mt-0.5">Room status, check-ins & tasks</p>
                     </div>
 
@@ -4161,7 +4161,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 <Building2 size={13} />
                             </div>
                         </div>
-                        <p className="text-base font-bold text-gray-900">33 Reports</p>
+                        <p className="text-base text-gray-900">33 Reports</p>
                         <p className="text-[11px] text-gray-400 mt-0.5">Revenue, debtors, vouchers & taxes</p>
                     </div>
 
@@ -4172,7 +4172,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 <Shield size={13} />
                             </div>
                         </div>
-                        <p className="text-base font-bold text-gray-900">9 Reports</p>
+                        <p className="text-base text-gray-900">9 Reports</p>
                         <p className="text-[11px] text-gray-400 mt-0.5">Audit trails, IP logs & BI yield</p>
                     </div>
                 </div>
@@ -4180,7 +4180,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                 {/* 5 Domain Hub Cards */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Functional Reporting Modules</h2>
+                        <h2 className="text-xs text-gray-900 uppercase tracking-wider">Functional Reporting Modules</h2>
                         <span className="text-[11px] text-gray-400">Click any report to configure & generate</span>
                     </div>
 
@@ -4197,7 +4197,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                                 {cat.icon}
                                             </span>
                                             <div>
-                                                <h3 className="font-bold text-xs text-gray-900 leading-tight">{cat.title}</h3>
+                                                <h3 className="text-xs text-gray-900 leading-tight">{cat.title}</h3>
                                                 <span className="text-[10px] text-gray-400 font-medium">{cat.items.length} Reports</span>
                                             </div>
                                         </div>
@@ -4255,7 +4255,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 <FileText size={13} />
                             </div>
                             <div className="flex flex-col min-w-0">
-                                <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none truncate group-hover:text-blue-600 transition-colors">Reports OS</h1>
+                                <h1 className="text-xs text-gray-900 tracking-tight leading-none truncate group-hover:text-blue-600 transition-colors">Reports OS</h1>
                                 <p className="text-[8px] text-gray-400 font-semibold uppercase tracking-wider leading-none mt-0.5">Enterprise BI</p>
                             </div>
                         </div>
@@ -4421,7 +4421,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                         onMouseLeave={() => setFlyoutCategory(null)}
                                     >
                                         <div className="px-3 pb-2 border-b border-gray-100 flex items-center justify-between">
-                                            <div className="flex items-center gap-1.5 font-bold text-xs text-gray-900">
+                                            <div className="flex items-center gap-1.5 text-xs text-gray-900">
                                                 <span className={`p-1 rounded ${menu.color}`}>
                                                     {menu.icon}
                                                 </span>
@@ -4506,7 +4506,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 Reports
                             </button>
                             <span className="text-gray-300 hidden sm:inline">/</span>
-                            <h1 className="font-bold text-gray-900 truncate tracking-tight text-xs sm:text-[13px] max-w-[200px] sm:max-w-xs md:max-w-md">
+                            <h1 className="text-gray-900 truncate tracking-tight text-xs sm:text-[13px] max-w-[200px] sm:max-w-xs md:max-w-md">
                                 {isOverview ? 'Overview' : activeReport}
                             </h1>
                         </div>
@@ -4538,7 +4538,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             >
                                 <div className="text-right hidden sm:block">
-                                    <p className="text-[11px] font-bold text-gray-800 leading-tight">{user?.name || 'Manager'}</p>
+                                    <p className="text-[11px] text-gray-800 leading-tight">{user?.name || 'Manager'}</p>
                                     <p className="text-[9.5px] text-gray-500 leading-tight">{user?.property || 'Grand Palace'}</p>
                                 </div>
                                 <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden border border-gray-200 flex-shrink-0">
@@ -4604,7 +4604,7 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
                                         <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
                                             <FileText size={13} />
                                         </div>
-                                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Report Parameters & Filter Criteria</span>
+                                        <span className="text-xs text-slate-800 uppercase tracking-wider">Report Parameters & Filter Criteria</span>
                                     </div>
                                     <button
                                         type="button"

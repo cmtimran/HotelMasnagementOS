@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
 import { useProperty } from '../context/PropertyContext';
+import { formatToDisplayDate, formatToISODate, setOperatingSystemDate, getOperatingSystemDate } from '../utils/roomInventoryEngine';
 
 interface HeaderProps {
     activePage: string;
@@ -42,9 +43,23 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
 
     // Business System Date State (hydrated from localStorage or default '01 Jul 2026')
     const [systemDate, setSystemDate] = useState<string>(() => {
-        return localStorage.getItem('hotel_system_date') || '01 Jul 2026';
+        const saved = typeof window !== 'undefined' ? (localStorage.getItem('hotel_system_date') || localStorage.getItem('hotel_system_date_iso')) : null;
+        return formatToDisplayDate(saved);
     });
-    const [tempDateInput, setTempDateInput] = useState<string>('2026-07-01');
+    const [tempDateInput, setTempDateInput] = useState<string>(() => getOperatingSystemDate());
+
+    // Listen for cross-component / cross-tab System Date updates
+    useEffect(() => {
+        const handleSync = (e: any) => {
+            const detail = e?.detail;
+            if (detail?.type === 'SYSTEM_DATE_CHANGED' && detail?.displayDate) {
+                setSystemDate(detail.displayDate);
+                setTempDateInput(detail.systemDate);
+            }
+        };
+        window.addEventListener('hotel_pms_sync_event', handleSync);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
+    }, []);
 
     // Recent Operational Alerts
     const [alerts, setAlerts] = useState([
@@ -89,19 +104,17 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
 
     const handleApplyDate = () => {
         if (!tempDateInput) return;
-        const d = new Date(tempDateInput);
-        const day = String(d.getDate()).padStart(2, '0');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const formatted = `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-        setSystemDate(formatted);
-        localStorage.setItem('hotel_system_date', formatted);
+        const iso = formatToISODate(tempDateInput);
+        const display = formatToDisplayDate(iso);
+        setSystemDate(display);
+        setOperatingSystemDate(iso);
         setIsDatePopoverOpen(false);
     };
 
     const handleResetDate = () => {
+        setOperatingSystemDate('2026-07-01');
         setSystemDate('01 Jul 2026');
         setTempDateInput('2026-07-01');
-        localStorage.setItem('hotel_system_date', '01 Jul 2026');
         setIsDatePopoverOpen(false);
     };
 
@@ -168,7 +181,9 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
         'holiday-management': 'Holiday Calendar',
         'schema-explorer': 'Database Schema',
         'general-settings': 'General Settings',
-        'hotel-info': 'Hotel Specs',
+        'hotel-info': 'Hotel Profile',
+        'hotel-profile': 'Hotel Profile',
+        'edit-property': 'Manage Property',
     };
 
     // Format active page for breadcrumbs
@@ -192,12 +207,12 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                         title="Go to Front Desk Overview"
                     >
                         <Building2 size={13} className="text-blue-600" />
-                        <span className="font-bold text-[11px] tracking-tight">{activeProperty?.code || 'GPD'}</span>
+                        <span className="text-[11px] tracking-tight">{activeProperty?.code || 'GPD'}</span>
                     </button>
 
                     <span className="text-slate-300 font-light">/</span>
 
-                    <span className="font-bold text-slate-900 text-xs sm:text-[13px] truncate max-w-[200px] sm:max-w-xs">
+                    <span className="text-slate-900 text-xs sm:text-[13px] truncate max-w-[200px] sm:max-w-xs">
                         {pageTitle}
                     </span>
                 </div>
@@ -221,7 +236,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                             <span className="max-w-[140px] md:max-w-[180px] truncate hidden sm:inline">
                                 {activeProperty?.name || 'Grand Palace Dhaka'}
                             </span>
-                            <span className="sm:hidden font-mono text-[11px] font-bold text-blue-600">
+                            <span className="sm:hidden font-mono text-[11px] text-blue-600">
                                 {activeProperty?.code || 'GPD'}
                             </span>
                             <ChevronDown
@@ -234,7 +249,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                         {isPropertyPopoverOpen && (
                             <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                                 <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">
                                         Select Hotel Context
                                     </span>
                                     <button
@@ -243,7 +258,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                             setIsPropertyPopoverOpen(false);
                                             setActivePage('multi-property');
                                         }}
-                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1 cursor-pointer"
+                                        className="text-[10px] text-blue-600 hover:text-blue-800 transition flex items-center gap-1 cursor-pointer"
                                     >
                                         <span>Chain Console</span>
                                         <ExternalLink size={10} />
@@ -266,7 +281,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                                 }`}
                                             >
                                                 <div className="flex items-center gap-2.5 min-w-0">
-                                                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                                                         {p.code}
                                                     </span>
                                                     <div className="min-w-0">
@@ -306,17 +321,21 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                         <button
                             type="button"
                             onClick={() => {
-                                setIsDatePopoverOpen(!isDatePopoverOpen);
+                                const nextOpen = !isDatePopoverOpen;
+                                setIsDatePopoverOpen(nextOpen);
                                 setIsPropertyPopoverOpen(false);
                                 setIsAlertsPopoverOpen(false);
                                 setIsDropdownOpen(false);
+                                if (nextOpen) {
+                                    setTempDateInput(formatToISODate(systemDate));
+                                }
                             }}
                             className="h-8 px-2.5 sm:px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer select-none text-xs font-semibold"
                             title="PMS Operating System Date (Click to adjust business date)"
                         >
                             <Calendar size={13} className="text-slate-500" />
                             <span className="text-[10px] text-slate-400 font-medium hidden md:inline">Date:</span>
-                            <span className="text-[11.5px] font-bold text-slate-800 font-mono tracking-tight">{systemDate}</span>
+                            <span className="text-[11.5px] text-slate-800 font-mono tracking-tight">{systemDate}</span>
                         </button>
 
                         {/* Date Adjustment Popover */}
@@ -325,7 +344,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                 <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
                                     <div className="flex items-center gap-1.5">
                                         <Calendar size={14} className="text-blue-600" />
-                                        <span className="text-xs font-bold text-slate-900">PMS Business Date</span>
+                                        <span className="text-xs text-slate-900">PMS Business Date</span>
                                     </div>
                                     <button
                                         type="button"
@@ -344,7 +363,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                         type="date"
                                         value={tempDateInput}
                                         onChange={e => setTempDateInput(e.target.value)}
-                                        className="w-full h-8 px-2.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                                        className="w-full h-8 px-2.5 border border-slate-200 rounded-lg text-xs text-slate-900 outline-none focus:border-blue-500"
                                     />
                                 </div>
 
@@ -359,7 +378,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                     <button
                                         type="button"
                                         onClick={handleApplyDate}
-                                        className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                                        className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition shadow-2xs"
                                     >
                                         <Check size={12} />
                                         <span>Update Date</span>
@@ -465,7 +484,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                             <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-24px)] rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl p-3 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                                 <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
                                     <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-slate-800">Operational Alerts</span>
+                                        <span className="text-xs text-slate-800">Operational Alerts</span>
                                         <span className="text-[10px] text-slate-400">Live Hotel & F&B stream</span>
                                     </div>
                                     <button
@@ -485,7 +504,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                                 <span className="size-2 rounded-full mt-1 shrink-0 bg-blue-600" />
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center justify-between">
-                                                        <p className="text-[11.5px] font-bold text-slate-800 truncate">{a.title}</p>
+                                                        <p className="text-[11.5px] text-slate-800 truncate">{a.title}</p>
                                                         <span className="text-[9.5px] text-slate-400">{a.time}</span>
                                                     </div>
                                                     <p className="text-[10.5px] text-slate-500 mt-0.5">{a.desc}</p>
@@ -518,11 +537,11 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                             className="flex items-center gap-2 px-2 py-1 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-2xs group"
                             title="User Account"
                         >
-                            <div className="size-7 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs shrink-0">
+                            <div className="size-7 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs shadow-2xs shrink-0">
                                 {userInitial}
                             </div>
                             <div className="hidden sm:flex flex-col text-left max-w-[120px] leading-tight">
-                                <span className="text-xs font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                                <span className="text-xs text-slate-800 truncate group-hover:text-blue-600 transition-colors">
                                     {user?.name || 'Alexander Vance'}
                                 </span>
                                 <span className="text-[9.5px] font-semibold text-blue-600 truncate">
@@ -539,7 +558,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                         {isDropdownOpen && (
                             <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150 z-50">
                                 <div className="px-3.5 py-2 border-b border-slate-100">
-                                    <p className="text-xs font-bold text-slate-900 truncate">{user?.name || 'Alexander Vance'}</p>
+                                    <p className="text-xs text-slate-900 truncate">{user?.name || 'Alexander Vance'}</p>
                                     <p className="text-[10px] text-slate-400 truncate">{user?.email || 'superadmin@hotelmanagement.os'}</p>
                                     <div className="flex items-center gap-1.5 mt-1.5 text-[9.5px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/50">
                                         <span className="size-1.5 rounded-full bg-emerald-500"></span>
@@ -581,7 +600,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                         className="w-full text-left px-3.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer font-medium"
                                     >
                                         <SlidersHorizontal size={13} className="text-slate-400" />
-                                        <span>Hotel Profile & Specs</span>
+                                        <span>Property & General Settings</span>
                                     </button>
                                 </div>
 

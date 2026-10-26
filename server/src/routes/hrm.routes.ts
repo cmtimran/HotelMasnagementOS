@@ -8,10 +8,10 @@ const router = Router();
 // ==========================================
 
 // GET /api/hrm/departments - List all departments with stats
-router.get('/departments', (req: Request, res: Response) => {
+router.get('/departments', async (req: Request, res: Response) => {
     try {
         const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
-        const departments = db.prepare(`
+        const departments = await db.prepare(`
             SELECT 
                 d.*,
                 p.name as property_name,
@@ -30,13 +30,13 @@ router.get('/departments', (req: Request, res: Response) => {
 });
 
 // POST /api/hrm/departments - Create department
-router.post('/departments', (req: Request, res: Response) => {
+router.post('/departments', async (req: Request, res: Response) => {
     try {
         const { propertyId = 1, code, name, costCenterCode } = req.body;
         if (!code || !name) {
             return res.status(400).json({ success: false, error: 'code and name are required' });
         }
-        const result = db.prepare(`
+        const result = await db.prepare(`
             INSERT INTO departments (property_id, code, name, cost_center_code)
             VALUES (?, ?, ?, ?)
         `).run(propertyId, code.toUpperCase(), name, costCenterCode || `CC-${code.toUpperCase()}`);
@@ -48,11 +48,11 @@ router.post('/departments', (req: Request, res: Response) => {
 });
 
 // PUT /api/hrm/departments/:id - Update department
-router.put('/departments/:id', (req: Request, res: Response) => {
+router.put('/departments/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const { code, name, costCenterCode } = req.body;
-        db.prepare(`
+        await db.prepare(`
             UPDATE departments
             SET code = COALESCE(?, code),
                 name = COALESCE(?, name),
@@ -67,10 +67,10 @@ router.put('/departments/:id', (req: Request, res: Response) => {
 });
 
 // DELETE /api/hrm/departments/:id - Delete department
-router.delete('/departments/:id', (req: Request, res: Response) => {
+router.delete('/departments/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        db.prepare('DELETE FROM departments WHERE id = ?').run(id);
+        await db.prepare('DELETE FROM departments WHERE id = ?').run(id);
         res.json({ success: true, message: 'Department deleted successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to delete department' });
@@ -78,9 +78,9 @@ router.delete('/departments/:id', (req: Request, res: Response) => {
 });
 
 // GET /api/hrm/designations - List all designations
-router.get('/designations', (req: Request, res: Response) => {
+router.get('/designations', async (req: Request, res: Response) => {
     try {
-        const designations = db.prepare(`
+        const designations = await db.prepare(`
             SELECT 
                 des.*,
                 d.name as department_name,
@@ -101,7 +101,7 @@ router.get('/designations', (req: Request, res: Response) => {
 // ==========================================
 
 // GET /api/hrm/employees - List employees
-router.get('/employees', (req: Request, res: Response) => {
+router.get('/employees', async (req: Request, res: Response) => {
     try {
         const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
         const status = req.query.status as string;
@@ -129,7 +129,7 @@ router.get('/employees', (req: Request, res: Response) => {
 
         query += ' ORDER BY e.id ASC';
 
-        const employees = db.prepare(query).all(...params);
+        const employees = await db.prepare(query).all(...params);
 
         res.json({
             success: true,
@@ -142,7 +142,7 @@ router.get('/employees', (req: Request, res: Response) => {
 });
 
 // POST /api/hrm/employees - Add new employee
-router.post('/employees', (req: Request, res: Response) => {
+router.post('/employees', async (req: Request, res: Response) => {
     try {
         const {
             propertyId = 1,
@@ -170,7 +170,7 @@ router.post('/employees', (req: Request, res: Response) => {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
-        const result = insertStmt.run(
+        const result = await insertStmt.run(
             propertyId,
             departmentId,
             designationId,
@@ -196,7 +196,7 @@ router.post('/employees', (req: Request, res: Response) => {
 });
 
 // PUT /api/hrm/employees/:id - Update employee
-router.put('/employees/:id', (req: Request, res: Response) => {
+router.put('/employees/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const {
@@ -211,7 +211,7 @@ router.put('/employees/:id', (req: Request, res: Response) => {
             status
         } = req.body;
 
-        db.prepare(`
+        await db.prepare(`
             UPDATE employees
             SET department_id = COALESCE(?, department_id),
                 designation_id = COALESCE(?, designation_id),
@@ -244,10 +244,10 @@ router.put('/employees/:id', (req: Request, res: Response) => {
 });
 
 // DELETE /api/hrm/employees/:id - Delete employee
-router.delete('/employees/:id', (req: Request, res: Response) => {
+router.delete('/employees/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        db.prepare('DELETE FROM employees WHERE id = ?').run(id);
+        await db.prepare('DELETE FROM employees WHERE id = ?').run(id);
         res.json({ success: true, message: 'Employee deleted successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to delete employee' });
@@ -259,10 +259,10 @@ router.delete('/employees/:id', (req: Request, res: Response) => {
 // ==========================================
 
 // GET /api/hrm/shifts - List hotel work shifts
-router.get('/shifts', (req: Request, res: Response) => {
+router.get('/shifts', async (req: Request, res: Response) => {
     try {
         const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
-        const shifts = db.prepare(`
+        const shifts = await db.prepare(`
             SELECT 
                 s.*,
                 (SELECT COUNT(*) FROM employee_shift_rosters esr WHERE esr.shift_id = s.id AND esr.roster_date = CURRENT_DATE) as assigned_today
@@ -278,13 +278,13 @@ router.get('/shifts', (req: Request, res: Response) => {
 });
 
 // POST /api/hrm/shifts - Create shift
-router.post('/shifts', (req: Request, res: Response) => {
+router.post('/shifts', async (req: Request, res: Response) => {
     try {
         const { propertyId = 1, name, startTime, endTime, gracePeriodMinutes = 15 } = req.body;
         if (!name || !startTime || !endTime) {
             return res.status(400).json({ success: false, error: 'name, startTime, and endTime are required' });
         }
-        const result = db.prepare(`
+        const result = await db.prepare(`
             INSERT INTO shifts (property_id, name, start_time, end_time, grace_period_minutes)
             VALUES (?, ?, ?, ?, ?)
         `).run(propertyId, name, startTime, endTime, gracePeriodMinutes);
@@ -296,11 +296,11 @@ router.post('/shifts', (req: Request, res: Response) => {
 });
 
 // PUT /api/hrm/shifts/:id - Update shift
-router.put('/shifts/:id', (req: Request, res: Response) => {
+router.put('/shifts/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const { name, startTime, endTime, gracePeriodMinutes } = req.body;
-        db.prepare(`
+        await db.prepare(`
             UPDATE shifts
             SET name = COALESCE(?, name),
                 start_time = COALESCE(?, start_time),
@@ -316,10 +316,10 @@ router.put('/shifts/:id', (req: Request, res: Response) => {
 });
 
 // DELETE /api/hrm/shifts/:id - Delete shift
-router.delete('/shifts/:id', (req: Request, res: Response) => {
+router.delete('/shifts/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        db.prepare('DELETE FROM shifts WHERE id = ?').run(id);
+        await db.prepare('DELETE FROM shifts WHERE id = ?').run(id);
         res.json({ success: true, message: 'Shift deleted successfully' });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to delete shift' });
@@ -331,12 +331,12 @@ router.delete('/shifts/:id', (req: Request, res: Response) => {
 // ==========================================
 
 // GET /api/hrm/attendance - List attendance records
-router.get('/attendance', (req: Request, res: Response) => {
+router.get('/attendance', async (req: Request, res: Response) => {
     try {
         const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
         const date = req.query.date as string || '2026-07-01'; // Default to active seeded date
 
-        const attendance = db.prepare(`
+        const attendance = await db.prepare(`
             SELECT 
                 a.*,
                 e.employee_code,
@@ -351,7 +351,7 @@ router.get('/attendance', (req: Request, res: Response) => {
             JOIN departments d ON d.id = e.department_id
             JOIN designations des ON des.id = e.designation_id
             JOIN shifts s ON s.id = a.shift_id
-            WHERE e.property_id = ? AND a.attendance_date = ?
+            WHERE e.property_id = ? AND (a.attendance_date)::date = (?)::date
             ORDER BY a.clock_in ASC
         `).all(propertyId, date);
 
@@ -362,7 +362,7 @@ router.get('/attendance', (req: Request, res: Response) => {
 });
 
 // POST /api/hrm/attendance/clock - Clock in or Clock out terminal
-router.post('/attendance/clock', (req: Request, res: Response) => {
+router.post('/attendance/clock', async (req: Request, res: Response) => {
     try {
         const { employeeId, shiftId = 1, action, date = '2026-07-01' } = req.body;
 
@@ -373,9 +373,9 @@ router.post('/attendance/clock', (req: Request, res: Response) => {
         const now = new Date();
         const timeStr = `${date} ${now.toTimeString().slice(0, 8)}`;
 
-        const existing = db.prepare(`
+        const existing = await db.prepare(`
             SELECT * FROM attendance_records 
-            WHERE employee_id = ? AND attendance_date = ?
+            WHERE employee_id = ? AND (attendance_date)::date = (?)::date
         `).get(employeeId, date) as any;
 
         if (action === 'CLOCK_IN') {
@@ -384,13 +384,13 @@ router.post('/attendance/clock', (req: Request, res: Response) => {
             }
 
             if (existing) {
-                db.prepare(`
+                await db.prepare(`
                     UPDATE attendance_records
                     SET clock_in = ?, status = 'PRESENT', shift_id = ?
                     WHERE id = ?
                 `).run(timeStr, shiftId, existing.id);
             } else {
-                db.prepare(`
+                await db.prepare(`
                     INSERT INTO attendance_records (employee_id, shift_id, attendance_date, clock_in, status)
                     VALUES (?, ?, ?, ?, 'PRESENT')
                 `).run(employeeId, shiftId, date, timeStr);
@@ -407,7 +407,7 @@ router.post('/attendance/clock', (req: Request, res: Response) => {
             const outTime = new Date(timeStr).getTime();
             const hours = Number(((outTime - inTime) / (1000 * 60 * 60)).toFixed(2));
 
-            db.prepare(`
+            await db.prepare(`
                 UPDATE attendance_records
                 SET clock_out = ?, work_hours = ?
                 WHERE id = ?
@@ -427,10 +427,10 @@ router.post('/attendance/clock', (req: Request, res: Response) => {
 // ==========================================
 
 // GET /api/hrm/payroll - List payroll runs
-router.get('/payroll', (req: Request, res: Response) => {
+router.get('/payroll', async (req: Request, res: Response) => {
     try {
         const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
-        const runs = db.prepare(`
+        const runs = await db.prepare(`
             SELECT 
                 pr.*,
                 (SELECT COUNT(*) FROM payroll_items pi WHERE pi.payroll_run_id = pr.id) as total_employees_paid
@@ -446,10 +446,10 @@ router.get('/payroll', (req: Request, res: Response) => {
 });
 
 // GET /api/hrm/payroll/:id/items - Itemized payslips for a run
-router.get('/payroll/:id/items', (req: Request, res: Response) => {
+router.get('/payroll/:id/items', async (req: Request, res: Response) => {
     try {
         const runId = Number(req.params.id);
-        const items = db.prepare(`
+        const items = await db.prepare(`
             SELECT 
                 pi.*,
                 e.employee_code,
@@ -471,7 +471,7 @@ router.get('/payroll/:id/items', (req: Request, res: Response) => {
 });
 
 // POST /api/hrm/payroll/process - Run Monthly Payroll & Post to General Ledger
-router.post('/payroll/process', (req: Request, res: Response) => {
+router.post('/payroll/process', async (req: Request, res: Response) => {
     try {
         const { propertyId = 1, month, year } = req.body;
 
@@ -480,7 +480,7 @@ router.post('/payroll/process', (req: Request, res: Response) => {
         }
 
         // Check if payroll already run for this month/year
-        const existing = db.prepare(`
+        const existing = await db.prepare(`
             SELECT id FROM payroll_runs 
             WHERE property_id = ? AND period_month = ? AND period_year = ?
         `).get(propertyId, month, year) as any;
@@ -490,7 +490,7 @@ router.post('/payroll/process', (req: Request, res: Response) => {
         }
 
         // Fetch all active employees
-        const employees = db.prepare(`
+        const employees = await db.prepare(`
             SELECT id, basic_salary FROM employees
             WHERE property_id = ? AND status = 'ACTIVE'
         `).all(propertyId) as any[];
@@ -535,7 +535,7 @@ router.post('/payroll/process', (req: Request, res: Response) => {
             INSERT INTO payroll_runs (property_id, period_month, period_year, total_gross, total_deductions, total_net, is_posted_to_gl)
             VALUES (?, ?, ?, ?, ?, ?, 1)
         `);
-        const runResult = runStmt.run(propertyId, month, year, totalGross, totalDeductions, totalNet);
+        const runResult = await runStmt.run(propertyId, month, year, totalGross, totalDeductions, totalNet);
         const payrollRunId = Number(runResult.lastInsertRowid);
 
         // 2. Insert Payroll Items
@@ -546,7 +546,7 @@ router.post('/payroll/process', (req: Request, res: Response) => {
         `);
 
         for (const item of itemsToInsert) {
-            itemStmt.run(
+            await itemStmt.run(
                 payrollRunId,
                 item.employeeId,
                 item.basic,
@@ -558,13 +558,10 @@ router.post('/payroll/process', (req: Request, res: Response) => {
             );
         }
 
-        // 3. Post Balanced Double-Entry Journal to General Ledger:
-        // Dr: Salaries & Staff Wages Expense (5010) [totalGross]
-        // Cr: Operating Bank Account (1020) [totalNet]
-        // Cr: Government VAT / Tax Payable (2020) [totalDeductions]
-        const salaryAccount = db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '5010'").get() as any;
-        const bankAccount = db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '1020'").get() as any;
-        const taxAccount = db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '2020'").get() as any;
+        // 3. Post Balanced Double-Entry Journal to General Ledger
+        const salaryAccount = await db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '5010'").get() as any;
+        const bankAccount = await db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '1020'").get() as any;
+        const taxAccount = await db.prepare("SELECT id FROM chart_of_accounts WHERE account_code = '2020'").get() as any;
 
         if (salaryAccount && bankAccount) {
             const entryNumber = `JV-PR-${year}${String(month).padStart(2, '0')}-${payrollRunId}`;
@@ -573,7 +570,7 @@ router.post('/payroll/process', (req: Request, res: Response) => {
                     organization_id, property_id, entry_number, entry_date, description, reference_type, reference_id, is_posted
                 ) VALUES (1, ?, ?, CURRENT_DATE, ?, 'PAYROLL', ?, 1)
             `);
-            const jvResult = jvStmt.run(
+            const jvResult = await jvStmt.run(
                 propertyId,
                 entryNumber,
                 `Monthly Payroll Settlement for ${month}/${year} (${itemsToInsert.length} Staff)`,
@@ -587,14 +584,14 @@ router.post('/payroll/process', (req: Request, res: Response) => {
             `);
 
             // Debit Salary Expense
-            lineStmt.run(jvId, salaryAccount.id, totalGross, 0.00, `Staff Salary Expense ${month}/${year}`);
+            await lineStmt.run(jvId, salaryAccount.id, totalGross, 0.00, `Staff Salary Expense ${month}/${year}`);
 
             // Credit Bank Account
-            lineStmt.run(jvId, bankAccount.id, 0.00, totalNet, `Net Salary Disbursement via City Bank`);
+            await lineStmt.run(jvId, bankAccount.id, 0.00, totalNet, `Net Salary Disbursement via City Bank`);
 
             // Credit Tax/Deductions Payable if any
             if (totalDeductions > 0 && taxAccount) {
-                lineStmt.run(jvId, taxAccount.id, 0.00, totalDeductions, `Tax & PF Deductions Withheld`);
+                await lineStmt.run(jvId, taxAccount.id, 0.00, totalDeductions, `Tax & PF Deductions Withheld`);
             }
         }
 

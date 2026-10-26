@@ -107,9 +107,9 @@ const POSPage = () => {
                         {/* Content */}
                         <div className="p-6">
                             <div className="mb-6">
-                                <h3 className="text-xl font-bold text-gray-900 mb-1">{selectedProductForModal.name}</h3>
+                                <h3 className="text-xl text-gray-900 mb-1">{selectedProductForModal.name}</h3>
                                 <p className="text-gray-500 text-sm mb-2">with Spicy Special Sauce</p>
-                                <p className="text-xl font-bold text-gray-900">৳ {selectedProductForModal.price}</p>
+                                <p className="text-xl text-gray-900">৳ {selectedProductForModal.price}</p>
                             </div>
 
                             {/* Variants (Mock Data for demo) */}
@@ -147,7 +147,7 @@ const POSPage = () => {
 
                                 <button
                                     onClick={handleAddToCartFromModal}
-                                    className="bg-blue-900 text-white px-8 py-2.5 rounded-lg font-bold hover:bg-blue-800 transition-colors"
+                                    className="bg-blue-900 text-white px-8 py-2.5 rounded-lg hover:bg-blue-800 transition-colors"
                                 >
                                     Add to Cart
                                 </button>
@@ -176,7 +176,7 @@ const POSPage = () => {
 
                                 {/* Discount Section */}
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
-                                    <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wide">Discount</h3>
+                                    <h3 className="text-sm text-gray-800 mb-4 uppercase tracking-wide">Discount</h3>
                                     <div className="flex gap-4 mb-4">
                                         <div className="w-1/3 space-y-1">
                                             <label className="text-xs font-medium text-gray-600">Type</label>
@@ -201,7 +201,7 @@ const POSPage = () => {
 
                                 {/* Payment Method Section */}
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                                    <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wide">Payment Methods</h3>
+                                    <h3 className="text-sm text-gray-800 mb-4 uppercase tracking-wide">Payment Methods</h3>
                                     <div className="space-y-3">
 
                                         {/* Card Method */}
@@ -223,7 +223,7 @@ const POSPage = () => {
                                                 </div>
                                                 <div className="flex-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Amount</label>
-                                                    <input type="number" defaultValue="0.00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <input type="number" defaultValue="0.00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right outline-none focus:ring-2 focus:ring-blue-500" />
                                                 </div>
                                             </div>
                                         </div>
@@ -232,7 +232,7 @@ const POSPage = () => {
                                         <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex flex-col gap-3">
                                             <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                                                 <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                                    <span className="font-serif font-bold text-green-600">৳</span> Cash Payment
+                                                    <span className="font-serif text-green-600">৳</span> Cash Payment
                                                 </span>
                                                 <button className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                                             </div>
@@ -240,7 +240,7 @@ const POSPage = () => {
                                                 <div className="flex-1"></div>
                                                 <div className="w-1/3 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Received Amount</label>
-                                                    <input type="number" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <input type="number" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right outline-none focus:ring-2 focus:ring-blue-500" />
                                                 </div>
                                             </div>
                                         </div>
@@ -268,7 +268,7 @@ const POSPage = () => {
                                                 </div>
                                                 <div className="col-span-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Amount</label>
-                                                    <input type="number" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <input type="number" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right outline-none focus:ring-2 focus:ring-blue-500" />
                                                 </div>
                                             </div>
                                         </div>
@@ -279,7 +279,7 @@ const POSPage = () => {
                                                 <span className="text-sm font-semibold text-blue-900 flex items-center gap-2">
                                                     <Building2 size={16} className="text-blue-600" /> Charge to Hotel Room Folio
                                                 </span>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">In-House Guest Bill Posting</span>
+                                                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-700">In-House Guest Bill Posting</span>
                                             </div>
                                             <div className="grid grid-cols-3 gap-3">
                                                 <div className="col-span-1 space-y-1">
@@ -298,13 +298,13 @@ const POSPage = () => {
                                                 </div>
                                                 <div className="col-span-1 space-y-1">
                                                     <label className="text-[10px] font-medium text-gray-500 uppercase">Amount to Folio</label>
-                                                    <input type="number" defaultValue="0.00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                                                    <input type="number" defaultValue="0.00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right outline-none focus:ring-2 focus:ring-blue-500" />
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="flex justify-end mt-4">
-                                            <button className="bg-white border border-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-50 transition-colors flex items-center gap-2 shadow-sm">
+                                            <button className="bg-white border border-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm hover:bg-blue-50 transition-colors flex items-center gap-2 shadow-sm">
                                                 <Plus size={16} /> Add Payment Method
                                             </button>
                                         </div>
@@ -325,11 +325,11 @@ const POSPage = () => {
                                     </div>
                                     <div className="flex justify-between text-sm border-t pt-2">
                                         <span className="text-gray-800 font-semibold">Total Due</span>
-                                        <span className="font-bold text-lg">0.00</span>
+                                        <span className="text-lg">0.00</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-600">Paid</span>
-                                        <span className="font-bold text-green-600">0.00</span>
+                                        <span className="text-green-600">0.00</span>
                                     </div>
                                 </div>
 
@@ -353,10 +353,10 @@ const POSPage = () => {
                                 </div>
 
                                 <div className="mt-auto grid grid-cols-2 gap-4">
-                                    <button className="bg-blue-900 text-white py-3 rounded-lg font-bold hover:bg-blue-800">
+                                    <button className="bg-blue-900 text-white py-3 rounded-lg hover:bg-blue-800">
                                         Make Payment
                                     </button>
-                                    <button className="bg-blue-900/10 text-blue-900 py-3 rounded-lg font-bold hover:bg-blue-900/20">
+                                    <button className="bg-blue-900/10 text-blue-900 py-3 rounded-lg hover:bg-blue-900/20">
                                         Print & Save Invoice
                                     </button>
                                 </div>
@@ -409,7 +409,7 @@ const POSPage = () => {
                                             <input
                                                 type="number"
                                                 defaultValue={table.seats}
-                                                className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                             <button className="flex-1 bg-blue-900 text-white font-medium py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2">
                                                 <Plus size={18} /> Add
@@ -498,7 +498,7 @@ const POSPage = () => {
 
                 {/* Product Grid */}
                 <div className="flex-1 overflow-y-auto">
-                    <h2 className="text-base font-bold text-gray-800 mb-3">{selectedCategory}</h2>
+                    <h2 className="text-base text-gray-800 mb-3">{selectedCategory}</h2>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pb-20">
                         {products.map(product => (
                             <div
@@ -523,7 +523,7 @@ const POSPage = () => {
                                 <p className="text-[10px] text-gray-400 mb-1">{product.time}</p>
 
                                 <div className="flex items-center justify-between">
-                                    <span className="font-bold text-gray-800 text-sm">৳ {product.price.toFixed(2)}</span>
+                                    <span className="text-gray-800 text-sm">৳ {product.price.toFixed(2)}</span>
                                     <button
                                         onClick={() => addToCart(product)}
                                         className="p-0.5 bg-green-500 text-white rounded-full hover:bg-green-600 shadow-sm transition-transform active:scale-95"
@@ -612,7 +612,7 @@ const POSPage = () => {
                 {/* Total Section */}
                 <div className="p-3 bg-white border-t border-gray-100">
                     <div className="text-right mb-3">
-                        <h2 className="text-2xl font-bold text-gray-900">Total: ৳ {cart.reduce((sum, item) => sum + item.price, 0).toFixed(2)}</h2>
+                        <h2 className="text-2xl text-gray-900">Total: ৳ {cart.reduce((sum, item) => sum + item.price, 0).toFixed(2)}</h2>
                         <div className="flex justify-end gap-3 text-[10px] text-gray-500 mt-1">
                             <span>Tax: ৳ 0.00</span>
                             <span>Service: ৳ 0.00</span>
@@ -636,18 +636,18 @@ const POSPage = () => {
 
                         {/* Right Column: Numpad */}
                         <div className="grid grid-cols-4 gap-1 h-full">
-                            {[1, 2, 3].map(n => <button key={n} className="bg-white border border-gray-100 rounded hover:bg-gray-50 font-bold text-xs shadow-sm text-gray-700 p-0">{n}</button>)}
+                            {[1, 2, 3].map(n => <button key={n} className="bg-white border border-gray-100 rounded hover:bg-gray-50 text-xs shadow-sm text-gray-700 p-0">{n}</button>)}
                             <button className="bg-gray-50 border border-gray-100 rounded hover:bg-gray-100 text-[10px] text-gray-600 font-medium p-0">Qty</button>
 
-                            {[4, 5, 6].map(n => <button key={n} className="bg-white border border-gray-100 rounded hover:bg-gray-50 font-bold text-xs shadow-sm text-gray-700 p-0">{n}</button>)}
+                            {[4, 5, 6].map(n => <button key={n} className="bg-white border border-gray-100 rounded hover:bg-gray-50 text-xs shadow-sm text-gray-700 p-0">{n}</button>)}
                             <button className="bg-gray-50 border border-gray-100 rounded hover:bg-gray-100 text-[10px] text-gray-600 font-medium p-0">%</button>
 
-                            {[7, 8, 9].map(n => <button key={n} className="bg-white border border-gray-100 rounded hover:bg-gray-50 font-bold text-xs shadow-sm text-gray-700 p-0">{n}</button>)}
+                            {[7, 8, 9].map(n => <button key={n} className="bg-white border border-gray-100 rounded hover:bg-gray-50 text-xs shadow-sm text-gray-700 p-0">{n}</button>)}
                             <button className="bg-gray-50 border border-gray-100 rounded hover:bg-gray-100 text-[10px] text-gray-600 font-medium p-0">Price</button>
 
-                            <button className="bg-white border border-gray-100 rounded hover:bg-gray-50 font-bold text-xs shadow-sm text-gray-700 p-0">+/-</button>
-                            <button className="bg-white border border-gray-100 rounded hover:bg-gray-50 font-bold text-xs shadow-sm text-gray-700 p-0">0</button>
-                            <button className="bg-white border border-gray-100 rounded hover:bg-gray-50 font-bold text-xs shadow-sm text-gray-700 p-0">.</button>
+                            <button className="bg-white border border-gray-100 rounded hover:bg-gray-50 text-xs shadow-sm text-gray-700 p-0">+/-</button>
+                            <button className="bg-white border border-gray-100 rounded hover:bg-gray-50 text-xs shadow-sm text-gray-700 p-0">0</button>
+                            <button className="bg-white border border-gray-100 rounded hover:bg-gray-50 text-xs shadow-sm text-gray-700 p-0">.</button>
                             <button className="bg-white border border-gray-100 rounded hover:bg-red-50 text-red-500 shadow-sm flex items-center justify-center p-0"><Trash2 size={12} /></button>
                         </div>
                     </div>

@@ -5,7 +5,7 @@ import {
     ShieldCheck, CheckCircle2,
     Search
 } from 'lucide-react';
-import { broadcastPMSEvent, getAllStoredReservations } from '../utils/roomInventoryEngine';
+import { broadcastPMSEvent, getAllStoredReservations, syncReservationsFromDB } from '../utils/roomInventoryEngine';
 import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
 import { getApiBaseUrl } from '../utils/apiUrl';
 
@@ -46,17 +46,18 @@ interface FolioAccount {
 const buildFoliosFromCanonicalReservations = (): FolioAccount[] => {
     const canonical = getAllStoredReservations();
     return canonical.map((r, idx) => {
-        const folioId = idx + 1;
-        const nights = Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
-        const total = Number(r.totalRate) || 0;
+        const folioId = Number(r.id) || (idx + 1);
+        const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+        const total = Number(r.totalAmount) || Number(r.totalRate) || 0;
         const paid = Number(r.paidAmount) || 0;
+        const roomLabel = r.roomNumber || r.roomNo || (r.allocatedRooms && r.allocatedRooms.join(', ')) || '101';
         const txns: Transaction[] = [
             {
                 id: folioId * 100 + 1,
-                date: `${r.checkIn} 14:00`,
-                refNo: `TAR-${r.id}`,
+                date: `${r.checkIn || '2026-07-02'} 14:00`,
+                refNo: `TAR-${r.reservationNumber || folioId}`,
                 particulars: `Room Tariff (${nights} Night${nights > 1 ? 's' : ''})`,
-                description: `${r.roomType} stay charge`,
+                description: `${r.roomType || 'Standard'} stay charge`,
                 user: 'system_pms',
                 amount: -total,
                 windowId: 1,
@@ -66,8 +67,8 @@ const buildFoliosFromCanonicalReservations = (): FolioAccount[] => {
         if (paid > 0) {
             txns.push({
                 id: folioId * 100 + 2,
-                date: `${r.checkIn} 14:10`,
-                refNo: `PMT-${r.id}`,
+                date: `${r.checkIn || '2026-07-02'} 14:10`,
+                refNo: `PMT-${r.reservationNumber || folioId}`,
                 particulars: `Advance Payment (${r.paymentMethod || 'Cash'})`,
                 description: 'Collected at reservation/check-in',
                 user: 'frontdesk_pos',
@@ -78,13 +79,13 @@ const buildFoliosFromCanonicalReservations = (): FolioAccount[] => {
         }
         return {
             id: folioId,
-            roomNumber: r.roomNo || '101',
+            roomNumber: roomLabel,
             guestName: r.guestName,
-            folioNumber: `FOL-${r.id}`,
-            roomType: r.roomType || 'Deluxe',
+            folioNumber: r.folioNumber || (r.reservationNumber ? `FOL-${r.reservationNumber.replace(/^RES-/, '')}` : `FOL-${folioId}`),
+            roomType: r.roomType || 'Deluxe Room',
             checkIn: r.checkIn,
             checkOut: r.checkOut,
-            company: r.bookingSource || 'Direct Walk-In',
+            company: r.source || r.bookingSource || 'Direct Walk-In',
             package: r.ratePlan || 'Best Available Rate',
             allowances: [
                 { service: 'Complimentary Buffet Breakfast', total: nights * (Number(r.adults) || 1), used: 0, unit: 'Meals' },
@@ -96,174 +97,11 @@ const buildFoliosFromCanonicalReservations = (): FolioAccount[] => {
 };
 
 export const FolioOperations: React.FC = () => {
-    const [folios, setFolios] = useState<FolioAccount[]>(() => {
-        let baseList: FolioAccount[] = buildFoliosFromCanonicalReservations();
-        try {
-            const saved = localStorage.getItem('hotel_folios_v2');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    baseList = parsed;
-                }
-            }
-            const storedRes = localStorage.getItem('hotel_reservations_v2');
-            if (storedRes) {
-                const resList = JSON.parse(storedRes);
-                if (Array.isArray(resList)) {
-                    resList.forEach((r, idx) => {
-                        const existing = baseList.find(f => f.roomNumber === r.roomNumber || f.folioNumber === `FOL-${r.reservationNumber}`);
-                        if (!existing && r.guestName) {
-                            const newFolioId = 100 + idx + 1;
-                            const totalTax = Number(r.totalTaxAmount || 0);
-                            const addonsTotal = Number(r.addonCharges?.total || 0);
-                            const baseRate = Number(r.baseAmount) || Math.max(0, (r.totalAmount || 3000) - totalTax - addonsTotal);
-
-                            const txns: Transaction[] = [
-                                {
-                                    id: newFolioId * 10 + 1,
-                                    date: `${r.checkIn || '2026-07-01'} 14:00`,
-                                    refNo: `SYS-TAR-${r.reservationNumber || newFolioId}`,
-                                    particulars: `Room Tariff (${r.nights || 1} Night${(r.nights || 1) > 1 ? 's' : ''})`,
-                                    description: `${r.roomType || 'Deluxe'} base room rate (excl. Tax & VAT)`,
-                                    user: 'system_pms',
-                                    amount: -baseRate,
-                                    windowId: 1,
-                                    category: 'Room'
-                                }
-                            ];
-
-                            // Itemize Taxes & VAT configured at /taxes-vat
-                            if (r.taxDetails?.breakdown && Array.isArray(r.taxDetails.breakdown) && r.taxDetails.breakdown.length > 0) {
-                                r.taxDetails.breakdown.forEach((t: any, tIdx: number) => {
-                                    txns.push({
-                                        id: newFolioId * 100 + 20 + tIdx,
-                                        date: `${r.checkIn || '2026-07-01'} 14:05`,
-                                        refNo: `TAX-${r.reservationNumber || newFolioId}-${tIdx + 1}`,
-                                        particulars: `${t.name} (${t.rate}%)`,
-                                        description: `${t.formula || 'Statutory Tax'} [/taxes-vat]`,
-                                        user: 'tax_engine',
-                                        amount: -Number(t.amount || 0),
-                                        windowId: 1,
-                                        category: 'Tax'
-                                    });
-                                });
-                            } else if (totalTax > 0) {
-                                txns.push({
-                                    id: newFolioId * 100 + 20,
-                                    date: `${r.checkIn || '2026-07-01'} 14:05`,
-                                    refNo: `TAX-${r.reservationNumber || newFolioId}`,
-                                    particulars: `Statutory Tax & VAT (${r.taxConfigCode || 'HOSP-STD'})`,
-                                    description: `Government hospitality taxes & VAT [/taxes-vat]`,
-                                    user: 'tax_engine',
-                                    amount: -totalTax,
-                                    windowId: 1,
-                                    category: 'Tax'
-                                });
-                            }
-                            if (r.paidAmount > 0) {
-                                txns.push({
-                                    id: newFolioId * 10 + 2,
-                                    date: `${r.checkIn || '2026-07-01'} 14:15`,
-                                    refNo: `ADV-PMT-${r.reservationNumber || newFolioId}`,
-                                    particulars: 'Advance Settlement Received',
-                                    description: 'Advance payment collected at booking',
-                                    user: 'frontdesk_pos',
-                                    amount: Number(r.paidAmount),
-                                    windowId: 1,
-                                    category: 'Payment'
-                                });
-                            }
-                            if (r.addonCharges?.pickup > 0 || r.pickup?.enabled) {
-                                txns.push({
-                                    id: newFolioId * 10 + 3,
-                                    date: `${r.checkIn || '2026-07-01'} 11:00`,
-                                    refNo: `TRN-IN-${newFolioId}`,
-                                    particulars: `Airport Pickup (Inbound) - Flight ${r.pickup?.flightNumber || 'Arr'}`,
-                                    description: `Arrival transfer: ${r.pickup?.vehicleType || 'Executive Vehicle'} (${r.pickup?.terminal || 'Airport'})`,
-                                    user: 'concierge_ops',
-                                    amount: -(Number(r.addonCharges?.pickup) || 1500),
-                                    windowId: 2,
-                                    category: 'Transport'
-                                });
-                            }
-                            if (r.addonCharges?.drop > 0 || r.pickup?.dropEnabled) {
-                                txns.push({
-                                    id: newFolioId * 10 + 4,
-                                    date: `${r.checkOut || '2026-07-02'} 12:00`,
-                                    refNo: `TRN-OUT-${newFolioId}`,
-                                    particulars: `Airport Drop (Outbound) - Flight ${r.pickup?.dropFlightNumber || 'Dept'}`,
-                                    description: `Departure transfer: ${r.pickup?.dropVehicleType || 'Executive Vehicle'} (${r.pickup?.dropTerminal || 'Airport'})`,
-                                    user: 'concierge_ops',
-                                    amount: -(Number(r.addonCharges?.drop) || 1500),
-                                    windowId: 2,
-                                    category: 'Transport'
-                                });
-                            }
-                            if (r.addonCharges?.extraBed > 0 || r.extraBed?.enabled) {
-                                txns.push({
-                                    id: newFolioId * 10 + 5,
-                                    date: `${r.checkIn || '2026-07-01'} 15:00`,
-                                    refNo: `HK-BED-${newFolioId}`,
-                                    particulars: `Extra Bed / Baby Cot Surcharge`,
-                                    description: `${r.extraBed?.bedType || 'Rollaway'} setup for stay`,
-                                    user: 'hk_supervisor',
-                                    amount: -(Number(r.addonCharges?.extraBed) || 1000),
-                                    windowId: 2,
-                                    category: 'Room'
-                                });
-                            }
-                            if (r.addonCharges?.mealPlan > 0 || r.mealPlan?.enabled) {
-                                txns.push({
-                                    id: newFolioId * 10 + 6,
-                                    date: `${r.checkIn || '2026-07-01'} 19:30`,
-                                    refNo: `FB-MEAL-${newFolioId}`,
-                                    particulars: `Meal Plan: ${r.mealPlan?.planCode || 'Standard Plan'}`,
-                                    description: `${r.mealPlan?.covers || 1} covers dining package`,
-                                    user: 'pos_cashier',
-                                    amount: -(Number(r.addonCharges?.mealPlan) || 2000),
-                                    windowId: 2,
-                                    category: 'F&B'
-                                });
-                            }
-
-                            const allowances = [];
-                            if (r.pickup?.enabled) {
-                                allowances.push({ service: 'Airport Pickup Transfer', total: 1, used: 1, unit: 'Trip' });
-                            }
-                            if (r.pickup?.dropEnabled) {
-                                allowances.push({ service: 'Airport Drop Transfer', total: 1, used: 0, unit: 'Trip' });
-                            }
-                            if (r.mealPlan?.enabled) {
-                                allowances.push({ service: `${r.mealPlan.planCode} Daily Meals`, total: (r.nights || 1) * (r.mealPlan.covers || 1), used: 0, unit: 'Meals' });
-                            }
-                            if (allowances.length === 0) {
-                                allowances.push({ service: 'Complimentary High-Speed WiFi', total: 1, used: 1, unit: 'Access' });
-                            }
-
-                            baseList.push({
-                                id: newFolioId,
-                                roomNumber: r.roomNumber || String(100 + idx),
-                                guestName: r.guestName,
-                                folioNumber: `FOL-${r.reservationNumber || newFolioId}`,
-                                roomType: r.roomType || 'Standard',
-                                checkIn: r.checkIn || '2026-07-01',
-                                checkOut: r.checkOut || '2026-07-02',
-                                package: r.mealPlan?.enabled ? `${r.mealPlan.planCode} Stay Package` : 'Standard Rate Stay',
-                                company: r.source || 'Direct Leisure',
-                                allowances,
-                                transactions: txns
-                            });
-                        }
-                    });
-                }
-            }
-        } catch (e) {
-            console.error('Error synchronizing folios', e);
-        }
-        return baseList;
+    const [folios, setFolios] = useState<FolioAccount[]>(() => buildFoliosFromCanonicalReservations());
+    const [selectedFolioId, setSelectedFolioId] = useState<number>(() => {
+        const initial = buildFoliosFromCanonicalReservations();
+        return initial[0]?.id || 1;
     });
-
-    const [selectedFolioId, setSelectedFolioId] = useState<number>(1);
     const [activeTab, setActiveTab] = useState<'folio-operations' | 'allowances' | 'invoice-preview'>('folio-operations');
     const [activeWindow, setActiveWindow] = useState<1 | 2>(1);
     const [roomSearchQuery, setRoomSearchQuery] = useState('');
@@ -292,7 +130,12 @@ export const FolioOperations: React.FC = () => {
         try {
             const res = await fetch(`${API_BASE}/api/accounting/folios`);
             const json = await res.json();
-            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            if (json.success && Array.isArray(json.data)) {
+                if (json.data.length === 0) {
+                    setFolios([]);
+                    localStorage.removeItem('hotel_folios_v2');
+                    return;
+                }
                 const mapped: FolioAccount[] = json.data.map((f: any) => {
                     const charges = f.charges || [];
                     const payments = f.payments || [];
@@ -301,7 +144,7 @@ export const FolioOperations: React.FC = () => {
                     charges.forEach((c: any) => {
                         txns.push({
                             id: Number(c.id),
-                            date: c.charge_date ? `${c.charge_date} 12:00` : '2026-06-25 12:00',
+                            date: c.charge_date ? `${c.charge_date} 12:00` : '2026-07-02 12:00',
                             refNo: `CHG-${c.charge_code || 'SRV'}-${c.id}`,
                             particulars: c.description || 'Department Charge',
                             description: `Posted charge (Tax: ৳${Number(c.tax_amount || 0).toFixed(2)})`,
@@ -315,7 +158,7 @@ export const FolioOperations: React.FC = () => {
                     payments.forEach((p: any) => {
                         txns.push({
                             id: 10000 + Number(p.id),
-                            date: p.transaction_date ? String(p.transaction_date).slice(0, 16).replace('T', ' ') : '2026-06-25 14:00',
+                            date: p.transaction_date ? String(p.transaction_date).slice(0, 16).replace('T', ' ') : '2026-07-02 14:00',
                             refNo: p.payment_number || `PAY-${p.id}`,
                             particulars: `Payment Received (${p.payment_method})`,
                             description: `Receipt Ref: ${p.reference_code || 'Front Desk'}`,
@@ -326,40 +169,62 @@ export const FolioOperations: React.FC = () => {
                         });
                     });
 
+                    // If no charges recorded in DB yet, show Room Accommodation Tariff for folio balance
+                    if (txns.length === 0 && Number(f.balance) > 0) {
+                        txns.push({
+                            id: Number(f.id) * 100 + 1,
+                            date: `${f.check_in || '2026-07-02'} 14:00`,
+                            refNo: `TAR-${f.reservation_number || f.id}`,
+                            particulars: 'Room Accommodation Tariff',
+                            description: `${f.room_type || 'Room'} stay rate`,
+                            user: 'system_pms',
+                            amount: -Number(f.balance),
+                            windowId: 1,
+                            category: 'Room'
+                        });
+                    }
+
                     return {
                         id: Number(f.id),
                         roomNumber: String(f.room_number || '101'),
                         guestName: f.guest_name || 'Valued Guest',
                         folioNumber: f.folio_number || `FOL-${f.id}`,
                         roomType: f.room_type || 'Deluxe Room',
-                        checkIn: f.check_in || '2026-06-25',
-                        checkOut: f.check_out || '2026-06-28',
-                        company: 'Individual Guest',
+                        checkIn: f.check_in || '2026-07-02',
+                        checkOut: f.check_out || '2026-07-03',
+                        company: 'Direct Booking',
                         package: 'Best Available Rate',
                         allowances: [
-                            { service: 'Complimentary Buffet Breakfast', total: 2, used: 1, unit: 'Meals' },
+                            { service: 'Complimentary Buffet Breakfast', total: 2, used: 0, unit: 'Meals' },
                             { service: 'High-Speed Wi-Fi', total: 1, used: 1, unit: 'Access' }
                         ],
                         transactions: txns
                     };
                 });
 
-                setFolios(prev => {
-                    const mappedIds = new Set(mapped.map(m => m.id));
-                    const remaining = prev.filter(p => !mappedIds.has(p.id));
-                    return [...mapped, ...remaining];
+                setFolios(mapped);
+                localStorage.setItem('hotel_folios_v2', JSON.stringify(mapped));
+                setSelectedFolioId(prev => {
+                    const exists = mapped.some(m => m.id === prev);
+                    return exists ? prev : (mapped[0]?.id || 1);
                 });
             }
         } catch (e) {
             console.warn('API fetch folios fallback to local:', e);
+            const fallback = buildFoliosFromCanonicalReservations();
+            if (fallback.length > 0) {
+                setFolios(fallback);
+            }
         }
     }, []);
 
     useEffect(() => {
+        syncReservationsFromDB();
         fetchFoliosFromAPI();
         const handleSync = (e: any) => {
             const d = e.detail;
             if (d?.type === 'FOLIO_UPDATED' || d?.type === 'RESERVATION_COMMITTED' || d?.type === 'INVENTORY_REFRESH') {
+                syncReservationsFromDB();
                 fetchFoliosFromAPI();
             }
         };
@@ -430,7 +295,7 @@ export const FolioOperations: React.FC = () => {
             return { ...f, transactions: [newTxn, ...f.transactions] };
         }));
 
-        // Asynchronous persistence to SQLite DB & Network Broadcast
+        // Asynchronous persistence to PostgreSQL DB & Network Broadcast
         if (activeFolio && activeFolio.id) {
             fetch(`${API_BASE}/api/accounting/folios/${activeFolio.id}/charges`, {
                 method: 'POST',
@@ -480,7 +345,7 @@ export const FolioOperations: React.FC = () => {
             return { ...f, transactions: [settlementTxn, ...f.transactions] };
         }));
 
-        // Asynchronous persistence to SQLite DB & Network Broadcast
+        // Asynchronous persistence to PostgreSQL DB & Network Broadcast
         if (activeFolio && activeFolio.id) {
             fetch(`${API_BASE}/api/accounting/folios/${activeFolio.id}/payments`, {
                 method: 'POST',
@@ -521,6 +386,43 @@ export const FolioOperations: React.FC = () => {
         f.folioNumber.toLowerCase().includes(roomSearchQuery.toLowerCase())
     );
 
+    if (!activeFolio) {
+        return (
+            <div className="h-full min-h-[calc(100vh-48px)] bg-gray-50 flex flex-col font-sans text-xs select-none animate-in fade-in duration-150">
+                {toastMessage && (
+                    <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-3.5 py-2 rounded-lg shadow-lg border border-gray-700 text-xs font-semibold flex items-center gap-2">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        <span>{toastMessage}</span>
+                    </div>
+                )}
+                <header className="bg-white text-slate-900 px-4 py-3 flex items-center justify-between shadow-2xs z-20 border-b border-slate-200/90">
+                    <div className="flex items-center gap-3">
+                        <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
+                            <FileText size={18} />
+                        </div>
+                        <div>
+                            <h1 className="text-base tracking-tight text-slate-900 font-semibold">
+                                Billing & Folio Operations
+                            </h1>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Guest ledger accounts, multi-window billing, and settlement
+                            </p>
+                        </div>
+                    </div>
+                </header>
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                    <div className="size-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3 border border-slate-200">
+                        <FileText size={28} />
+                    </div>
+                    <h2 className="text-sm font-semibold text-slate-800">No Active Folios Available</h2>
+                    <p className="text-xs text-slate-400 max-w-sm mt-1">
+                        There are currently no active bookings or in-house guest folios. Once a reservation is created or checked in, its billing ledger will automatically appear here.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="h-full min-h-[calc(100vh-48px)] bg-gray-50 flex flex-col font-sans text-xs select-none animate-in fade-in duration-150">
             {toastMessage && (
@@ -538,7 +440,7 @@ export const FolioOperations: React.FC = () => {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base font-bold tracking-tight text-slate-900">
+                            <h1 className="text-base tracking-tight text-slate-900">
                                 {activeFolio.guestName}
                             </h1>
                             <span className="badge-code">
@@ -556,22 +458,22 @@ export const FolioOperations: React.FC = () => {
 
                 <div className="flex items-center gap-4">
                     <div className="text-right">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Window 1 (Master)</span>
-                        <span className={`text-xs font-bold font-mono mt-1 block leading-tight ${calcWindowNet(1) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block leading-none">Window 1 (Master)</span>
+                        <span className={`text-xs font-mono mt-1 block leading-tight ${calcWindowNet(1) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             ৳ {calcWindowNet(1).toLocaleString()}
                         </span>
                     </div>
 
                     <div className="text-right border-l border-slate-200 pl-3">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Window 2 (Extras)</span>
-                        <span className={`text-xs font-bold font-mono mt-1 block leading-tight ${calcWindowNet(2) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block leading-none">Window 2 (Extras)</span>
+                        <span className={`text-xs font-mono mt-1 block leading-tight ${calcWindowNet(2) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             ৳ {calcWindowNet(2).toLocaleString()}
                         </span>
                     </div>
 
                     <div className="text-right border-l border-slate-200 pl-3">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Net Guest Balance</span>
-                        <span className={`text-sm font-bold font-mono mt-1 block leading-tight ${calcTotalBalance() >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block leading-none">Net Guest Balance</span>
+                        <span className={`text-sm font-mono mt-1 block leading-tight ${calcTotalBalance() >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             ৳ {calcTotalBalance().toLocaleString()}
                         </span>
                     </div>
@@ -674,7 +576,7 @@ export const FolioOperations: React.FC = () => {
 
                     {/* Rooms List */}
                     <div className="space-y-1">
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wide px-1">In-House Accounts</span>
+                        <span className="text-[9.5px] text-gray-400 uppercase tracking-wide px-1">In-House Accounts</span>
                         {filteredFolios.map(f => {
                             const isSelected = f.id === activeFolio.id;
                             const bal = f.transactions.reduce((s, t) => s + t.amount, 0);
@@ -688,13 +590,13 @@ export const FolioOperations: React.FC = () => {
                                 >
                                     <div className="min-w-0 pr-1">
                                         <div className="flex items-center gap-1.5">
-                                            <span className="font-mono font-bold text-gray-900 text-xs">Rm {f.roomNumber}</span>
+                                            <span className="font-mono text-gray-900 text-xs">Rm {f.roomNumber}</span>
                                             <span className="text-[9.5px] text-gray-500 truncate max-w-[90px]">{f.guestName}</span>
                                         </div>
                                         <p className="text-[9.5px] text-gray-400 truncate mt-0.5">{f.package}</p>
                                     </div>
                                     <div className="text-right flex-shrink-0">
-                                        <span className={`text-[10.5px] font-mono font-bold block ${bal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        <span className={`text-[10.5px] font-mono block ${bal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                             ৳ {bal.toLocaleString()}
                                         </span>
                                         <span className="text-[8.5px] text-gray-400 uppercase block font-semibold">
@@ -708,7 +610,7 @@ export const FolioOperations: React.FC = () => {
 
                     {/* Window Switcher */}
                     <div className="pt-2 border-t border-gray-200 space-y-1.5">
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wide px-1">Split Windows</span>
+                        <span className="text-[9.5px] text-gray-400 uppercase tracking-wide px-1">Split Windows</span>
                         <div className="flex flex-col gap-1.5">
                             <button
                                 onClick={() => setActiveWindow(1)}
@@ -717,13 +619,13 @@ export const FolioOperations: React.FC = () => {
                                 }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${activeWindow === 1 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>1</span>
+                                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] ${activeWindow === 1 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>1</span>
                                     <div>
-                                        <p className="text-[11px] font-bold text-gray-900 leading-none">Window 1: Master</p>
+                                        <p className="text-[11px] text-gray-900 leading-none">Window 1: Master</p>
                                         <p className="text-[9px] text-gray-400 mt-0.5">Room & Package Inclusions</p>
                                     </div>
                                 </div>
-                                <span className={`text-[10px] font-mono font-bold ${calcWindowNet(1) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                <span className={`text-[10px] font-mono ${calcWindowNet(1) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                     ৳ {calcWindowNet(1).toLocaleString()}
                                 </span>
                             </button>
@@ -735,13 +637,13 @@ export const FolioOperations: React.FC = () => {
                                 }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${activeWindow === 2 ? 'bg-rose-600 text-white' : 'bg-gray-100 text-gray-500'}`}>2</span>
+                                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] ${activeWindow === 2 ? 'bg-rose-600 text-white' : 'bg-gray-100 text-gray-500'}`}>2</span>
                                     <div>
-                                        <p className="text-[11px] font-bold text-gray-900 leading-none">Window 2: Extras</p>
+                                        <p className="text-[11px] text-gray-900 leading-none">Window 2: Extras</p>
                                         <p className="text-[9px] text-gray-400 mt-0.5">Incidentals, F&B, Minibar</p>
                                     </div>
                                 </div>
-                                <span className={`text-[10px] font-mono font-bold ${calcWindowNet(2) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                <span className={`text-[10px] font-mono ${calcWindowNet(2) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                     ৳ {calcWindowNet(2).toLocaleString()}
                                 </span>
                             </button>
@@ -755,7 +657,7 @@ export const FolioOperations: React.FC = () => {
                         {/* Transaction Ledger */}
                         <div className="flex-1 overflow-auto">
                             <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10 text-[10px] text-gray-500 uppercase tracking-wider">
                                     <tr>
                                         <th className="px-3 py-2">Date & Time</th>
                                         <th className="px-3 py-2">Ref #</th>
@@ -780,7 +682,7 @@ export const FolioOperations: React.FC = () => {
                                                     {txn.date}
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <span className="text-[10px] font-mono font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                    <span className="text-[10px] font-mono text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
                                                         {txn.refNo}
                                                     </span>
                                                 </td>
@@ -789,7 +691,7 @@ export const FolioOperations: React.FC = () => {
                                                     <p className="text-[10px] text-gray-400 mt-0.5">{txn.description}</p>
                                                 </td>
                                                 <td className="px-3 py-2 whitespace-nowrap">
-                                                    <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                                                    <span className={`text-[9.5px] px-1.5 py-0.2 rounded uppercase ${
                                                         txn.category === 'Room' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                                                         txn.category === 'Tax' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
                                                         txn.category === 'Transport' ? 'bg-sky-50 text-sky-700 border border-sky-200' :
@@ -801,10 +703,10 @@ export const FolioOperations: React.FC = () => {
                                                         {txn.category}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-2 text-right font-mono font-bold text-gray-900 whitespace-nowrap">
+                                                <td className="px-3 py-2 text-right font-mono text-gray-900 whitespace-nowrap">
                                                     {txn.amount < 0 ? `৳ ${Math.abs(txn.amount).toLocaleString()}` : '-'}
                                                 </td>
-                                                <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600 whitespace-nowrap">
+                                                <td className="px-3 py-2 text-right font-mono text-emerald-600 whitespace-nowrap">
                                                     {txn.amount > 0 ? `৳ ${txn.amount.toLocaleString()}` : '-'}
                                                 </td>
                                                 <td className="px-3 py-2 text-center whitespace-nowrap">
@@ -827,13 +729,13 @@ export const FolioOperations: React.FC = () => {
                         <div className="bg-gray-50 border-t border-gray-200 px-3 py-2 flex justify-between items-center text-xs">
                             <div className="flex items-center gap-6">
                                 <div>
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase">Window {activeWindow} Net Balance:</span>
-                                    <p className={`text-base font-bold font-mono leading-none mt-0.5 ${calcWindowNet(activeWindow) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    <span className="text-[9px] text-gray-400 uppercase">Window {activeWindow} Net Balance:</span>
+                                    <p className={`text-base font-mono leading-none mt-0.5 ${calcWindowNet(activeWindow) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                         ৳ {calcWindowNet(activeWindow).toLocaleString()}
                                     </p>
                                 </div>
                                 <div className="border-l border-gray-200 pl-4 hidden sm:block">
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase">Zero-Variance Audit:</span>
+                                    <span className="text-[9px] text-gray-400 uppercase">Zero-Variance Audit:</span>
                                     <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-semibold mt-0.5">
                                         <ShieldCheck size={12} />
                                         <span>General Ledger Reconciled</span>
@@ -871,12 +773,12 @@ export const FolioOperations: React.FC = () => {
                     <div className="flex-1 p-4 overflow-auto space-y-4">
                         <div className="bg-blue-50/60 p-3 rounded-lg border border-blue-200/80 flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-bold text-blue-900">{activeFolio.package}</h3>
+                                <h3 className="text-xs text-blue-900">{activeFolio.package}</h3>
                                 <p className="text-[11px] text-blue-700 mt-0.5">
                                     Allowances configured automatically by rate plan. Front desk can redeem items on demand.
                                 </p>
                             </div>
-                            <span className="px-2 py-1 rounded bg-blue-600 text-white font-bold text-[10.5px]">
+                            <span className="px-2 py-1 rounded bg-blue-600 text-white text-[10.5px]">
                                 Active Entitlements
                             </span>
                         </div>
@@ -889,12 +791,12 @@ export const FolioOperations: React.FC = () => {
                                     <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-2xs space-y-2">
                                         <div className="flex justify-between items-start">
                                             <div>
-                                                <h4 className="font-bold text-gray-900 text-xs">{allow.service}</h4>
+                                                <h4 className="text-gray-900 text-xs">{allow.service}</h4>
                                                 <p className="text-[10px] text-gray-400 mt-0.5">
                                                     Entitlement: {allow.total} {allow.unit} Total
                                                 </p>
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                            <span className={`px-2 py-0.5 rounded text-[10px] ${
                                                 remaining > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                                             }`}>
                                                 {remaining} {allow.unit} Left
@@ -915,7 +817,7 @@ export const FolioOperations: React.FC = () => {
                                             <button
                                                 disabled={remaining <= 0}
                                                 onClick={() => handleRedeemAllowance(allow.service)}
-                                                className={`h-6 px-2.5 rounded text-[10.5px] font-bold transition-colors cursor-pointer ${
+                                                className={`h-6 px-2.5 rounded text-[10.5px] transition-colors cursor-pointer ${
                                                     remaining > 0
                                                         ? 'bg-blue-600 text-white hover:bg-blue-700'
                                                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -938,15 +840,15 @@ export const FolioOperations: React.FC = () => {
                             {/* Invoice Header */}
                             <div className="flex justify-between items-start border-b border-gray-200 pb-3">
                                 <div>
-                                    <h2 className="text-base font-bold text-gray-900">GRAND HOTEL ENTERPRISE ERP</h2>
+                                    <h2 className="text-base text-gray-900">GRAND HOTEL ENTERPRISE ERP</h2>
                                     <p className="text-[10px] text-gray-500">Plot 12, Gulshan Avenue, Dhaka-1212, Bangladesh</p>
                                     <p className="text-[10px] text-gray-500 font-mono">BIN: 002349182-0101 • Mushak-6.3 Tax Invoice</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="px-2 py-0.5 rounded bg-gray-900 text-white font-mono font-bold text-[10px]">
+                                    <span className="px-2 py-0.5 rounded bg-gray-900 text-white font-mono text-[10px]">
                                         TAX INVOICE
                                     </span>
-                                    <p className="font-mono font-bold text-gray-800 text-[11px] mt-1">INV-{activeFolio.folioNumber}</p>
+                                    <p className="font-mono text-gray-800 text-[11px] mt-1">INV-{activeFolio.folioNumber}</p>
                                     <p className="text-[10px] text-gray-400">Date: {new Date().toLocaleDateString('en-GB')}</p>
                                 </div>
                             </div>
@@ -954,13 +856,13 @@ export const FolioOperations: React.FC = () => {
                             {/* Guest Info */}
                             <div className="grid grid-cols-2 gap-4 bg-gray-50 p-2.5 rounded border border-gray-200/80">
                                 <div>
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase">Guest Name & Company</span>
-                                    <p className="font-bold text-gray-900">{activeFolio.guestName}</p>
+                                    <span className="text-[9px] text-gray-400 uppercase">Guest Name & Company</span>
+                                    <p className="text-gray-900">{activeFolio.guestName}</p>
                                     <p className="text-[10.5px] text-gray-600">{activeFolio.company || 'Private Leisure'}</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase">Stay Particulars</span>
-                                    <p className="font-bold text-gray-900">Room {activeFolio.roomNumber} ({activeFolio.roomType})</p>
+                                    <span className="text-[9px] text-gray-400 uppercase">Stay Particulars</span>
+                                    <p className="text-gray-900">Room {activeFolio.roomNumber} ({activeFolio.roomType})</p>
                                     <p className="text-[10.5px] text-gray-600 font-mono">{activeFolio.checkIn} to {activeFolio.checkOut}</p>
                                 </div>
                             </div>
@@ -968,7 +870,7 @@ export const FolioOperations: React.FC = () => {
                             {/* Line Items Table */}
                             <table className="w-full text-left border-collapse border border-gray-200">
                                 <thead>
-                                    <tr className="bg-gray-100 text-[10px] font-bold text-gray-600 uppercase border-b border-gray-200">
+                                    <tr className="bg-gray-100 text-[10px] text-gray-600 uppercase border-b border-gray-200">
                                         <th className="p-2">Date</th>
                                         <th className="p-2">Description</th>
                                         <th className="p-2">Ref</th>
@@ -983,7 +885,7 @@ export const FolioOperations: React.FC = () => {
                                             <td className="p-2 font-medium text-gray-900">
                                                 <span>{t.particulars}</span>
                                                 {t.category === 'Tax' && (
-                                                    <span className="ml-1.5 px-1 py-0.2 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded border border-indigo-200">
+                                                    <span className="ml-1.5 px-1 py-0.2 bg-indigo-50 text-indigo-700 text-[9px] rounded border border-indigo-200">
                                                         TAX/VAT
                                                     </span>
                                                 )}
@@ -1007,7 +909,7 @@ export const FolioOperations: React.FC = () => {
                                 if (totalTaxVal <= 0) return null;
                                 return (
                                     <div className="bg-slate-50/80 border border-slate-200 rounded p-2.5 text-[10.5px] space-y-1">
-                                        <div className="font-bold text-slate-700 flex justify-between border-b border-slate-200 pb-1">
+                                        <div className="text-slate-700 flex justify-between border-b border-slate-200 pb-1">
                                             <span>Mushak-6.3 Statutory Tax &amp; Service Charge Schedule</span>
                                             <span className="font-mono text-blue-900 font-bold">Total Taxes: ৳ {totalTaxVal.toLocaleString()}</span>
                                         </div>
@@ -1029,8 +931,8 @@ export const FolioOperations: React.FC = () => {
                                     Includes 15% VAT & 10% Service Charge per National Revenue Board guidelines.
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Net Balance Due</span>
-                                    <p className={`text-base font-bold font-mono ${calcTotalBalance() >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Net Balance Due</span>
+                                    <p className={`text-base font-mono ${calcTotalBalance() >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                                         ৳ {calcTotalBalance().toLocaleString()}
                                     </p>
                                 </div>
@@ -1056,7 +958,7 @@ export const FolioOperations: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full p-4 space-y-3">
                         <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                            <h3 className="text-sm font-bold text-gray-900">Post Transaction / Charge</h3>
+                            <h3 className="text-sm text-gray-900">Post Transaction / Charge</h3>
                             <button onClick={() => setShowPostChargeModal(false)} className="text-gray-400 hover:text-gray-700">✕</button>
                         </div>
 
@@ -1110,7 +1012,7 @@ export const FolioOperations: React.FC = () => {
                                     placeholder="0.00"
                                     value={postChargeForm.amount}
                                     onChange={e => setPostChargeForm({ ...postChargeForm, amount: e.target.value })}
-                                    className="w-full h-7 px-2 border border-gray-300 rounded text-xs font-mono font-bold outline-none focus:border-blue-500"
+                                    className="w-full h-7 px-2 border border-gray-300 rounded text-xs font-mono outline-none focus:border-blue-500"
                                     required
                                 />
                             </div>
@@ -1151,7 +1053,7 @@ export const FolioOperations: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full p-4 space-y-3">
                         <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                            <h3 className="text-sm font-bold text-gray-900">
+                            <h3 className="text-sm text-gray-900">
                                 Settle & Close Window {activeWindow}
                             </h3>
                             <button onClick={() => setShowSettleModal(false)} className="text-gray-400 hover:text-gray-700">✕</button>
@@ -1160,7 +1062,7 @@ export const FolioOperations: React.FC = () => {
                         <form onSubmit={handleSettleFolio} className="space-y-3">
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
                                 <span className="text-[10px] text-gray-500 font-semibold uppercase">Outstanding Net Charge</span>
-                                <p className="text-xl font-bold font-mono text-gray-900">
+                                <p className="text-xl font-mono text-gray-900">
                                     ৳ {Math.abs(calcWindowNet(activeWindow)).toLocaleString()}
                                 </p>
                             </div>

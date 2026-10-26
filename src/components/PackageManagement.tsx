@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Plus, Search, Package, Edit, Copy, Trash2,
     Utensils, Waves, Car, Shirt, Wine, Dumbbell, Star,
@@ -8,6 +8,8 @@ import {
     RefreshCw, AlertTriangle, CheckCircle2, Sparkles, Clock
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
 // ============================================================
@@ -147,10 +149,8 @@ interface HotelPackage {
 }
 
 // ============================================================
-// SAMPLE DATA
+// CONFIGURATION DEFAULTS
 // ============================================================
-
-const ROOM_TYPES = ['Deluxe Room', 'Deluxe King', 'Premium Suite', 'Junior Suite', 'Presidential Suite', 'Garden View', 'Sea View'];
 
 const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
     name: '',
@@ -225,413 +225,7 @@ const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
     finance: { baseSurcharge: 0, totalCost: 0, dateBasedSurcharges: [], autoPost: true, revenueAllocations: [] }
 });
 
-const SAMPLE_PACKAGES: HotelPackage[] = [
-    {
-        id: 1, name: 'Honeymoon Delight', shortCode: 'HONEY', packageType: 'Honeymoon',
-        status: 'Active', color: '#EC4899',
-        description: 'Complete romantic package with breakfast, candlelight dinner, pool access, airport transfer and spa credit.',
-        roomConfig: {
-            applicableRoomTypes: ['Premium Suite', 'Deluxe King'],
-            extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 2000,
-            extraChildRate: 1000, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 0, extraBedMealIncluded: true,
-            welcomeAmenity: 'Fruit Basket & Signature Juice',
-            lateCheckoutAllowed: true,
-            lateCheckoutTime: '14:00',
-            wifiIncluded: true,
-            priorityCheckin: true,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Sky Cafe', breakfastStyle: 'Buffet', breakfastMenu: 'Signature International', breakfastCuisine: 'Continental',
-            breakfastAdultRate: 1500, breakfastChildRate: 750, breakfastInfantFree: true,
-            hasLunch: false, lunchVenue: '', lunchStyle: 'Buffet', lunchAdultRate: 0, lunchChildRate: 0, lunchMenu: '', lunchCuisine: '',
-            hasDinner: true, dinnerVenue: 'Garden Grill', dinnerStyle: 'Set Menu', dinnerMenu: 'Traditional Bengali Thali', dinnerCuisine: 'Local',
-            dinnerCredit: 0, dinnerAdultRate: 2500, dinnerChildRate: 1250,
-            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
-            hasCupole: true, cupoleVenue: 'Cupole Rooftop', cupoleStyle: 'Set Menu', cupoleCredit: 3500, cupoleMenu: 'Sky Dinner', cupoleCuisine: 'Mediterranean',
-        },
-        poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 0, extraAdultRate: 500, extraChildRate: 300 },
-        transportConfig: { type: 'Both', vehicleType: 'Luxury Sedan', pickupRate: 1800, dropRate: 1800 },
-        laundryConfig: {
-            included: true, allowanceType: 'Per Stay', itemsAllowance: 12, extraItemRate: 150,
-            items: [
-                { name: 'Shirt/Blouse', includedQty: 4, extraRate: 120 },
-                { name: 'Trouser/Skirt', includedQty: 4, extraRate: 150 },
-                { name: 'Evening Dress', includedQty: 2, extraRate: 300 },
-            ]
-        },
-        minibarConfig: {
-            included: true, dailyCredit: 1000, replenishment: 'Daily',
-            items: [
-                { name: 'Sparkling Juice', category: 'Beverage', qty: 1, unitPrice: 850 },
-                { name: 'Premium Water', category: 'Beverage', qty: 2, unitPrice: 150 },
-                { name: 'Gourmet Chocolates', category: 'Snack', qty: 1, unitPrice: 450 },
-            ]
-        },
-        recreationConfig: { 
-            included: true, 
-            activities: [
-                { name: 'Couple Massage', includedSessions: 1, adultRate: 4500, childRate: 0, minAge: 18 },
-            ] 
-        },
-        outletCredits: [
-            { outletName: 'Sky Spa', creditType: 'Per Stay', creditAmount: 5000, revenueCode: 'REV-SPA-TREAT' },
-            { outletName: 'Pool Bar', creditType: 'Per Day', creditAmount: 1000, revenueCode: 'REV-FB-BAR' }
-        ],
-        validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 30, blackoutDates: '2025-12-24, 2025-12-25, 2025-12-31' },
-        finance: {
-            baseSurcharge: 4500,
-            totalCost: 3200, // Cost for Honeymoon amenities
-            dateBasedSurcharges: [],
-            autoPost: true,
-            revenueAllocations: [{ department: 'Rooms', amount: 70, type: 'Percentage' }, { department: 'F&B', amount: 30, type: 'Percentage' }]
-        }
-    },
-    {
-        id: 2, name: 'Family Adventure', shortCode: 'FAMADV', packageType: 'Family',
-        status: 'Active', color: '#10B981',
-        description: 'Fun-filled family package with all meals, pool, recreation and airport transfer.',
-        roomConfig: {
-            applicableRoomTypes: ['Deluxe Room', 'Junior Suite', 'Garden View'],
-            extraBedAllowed: true, extraBedRate: 2500, extraAdultRate: 1800,
-            extraChildRate: 1000, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 2, extraBedMealIncluded: true,
-            welcomeAmenity: 'Kids Activity Pack',
-            lateCheckoutAllowed: false,
-            lateCheckoutTime: '12:00',
-            wifiIncluded: true,
-            priorityCheckin: false,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Garden Terrace', breakfastStyle: 'Buffet', breakfastMenu: 'Family Buffet', breakfastCuisine: 'Multi-cuisine',
-            breakfastAdultRate: 750, breakfastChildRate: 400, breakfastInfantFree: true,
-            hasLunch: true, lunchVenue: 'Waves Poolside', lunchStyle: 'A La Carte', lunchAdultRate: 900, lunchChildRate: 500, lunchMenu: 'Aqua Lunch', lunchCuisine: 'Seafood',
-            hasDinner: true, dinnerVenue: 'Garden Terrace', dinnerStyle: 'Buffet', dinnerMenu: 'Grand Buffet', dinnerCuisine: 'Global',
-            dinnerCredit: 0, dinnerAdultRate: 1200, dinnerChildRate: 600,
-            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
-            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
-        },
-        poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 3, extraAdultRate: 500, extraChildRate: 0 },
-        transportConfig: { type: 'Both', vehicleType: 'Executive Van', pickupRate: 2500, dropRate: 2500 },
-        laundryConfig: {
-            included: true, allowanceType: 'Every 3 Days', itemsAllowance: 20, extraItemRate: 100,
-            items: [
-                { name: 'Kids Wear', includedQty: 10, extraRate: 80 },
-                { name: 'Adult Casual', includedQty: 10, extraRate: 120 },
-            ]
-        },
-        minibarConfig: {
-            included: true, dailyCredit: 500, replenishment: 'Daily',
-            items: [
-                { name: 'Mixed Fruit Juice', category: 'Non-Alcoholic', qty: 4, unitPrice: 120 },
-                { name: 'Potato Chips', category: 'Snack', qty: 2, unitPrice: 90 },
-                { name: 'Milk Carton', category: 'Beverage', qty: 2, unitPrice: 80 },
-            ]
-        },
-        recreationConfig: {
-            included: true, activities: [
-                { name: 'Kids Adventure Club', includedSessions: 10, adultRate: 0, childRate: 1500, minAge: 3 },
-                { name: 'Family Cycling', includedSessions: 2, adultRate: 500, childRate: 250, minAge: 6 },
-                { name: 'Movie Night', includedSessions: 1, adultRate: 200, childRate: 100, minAge: 0 },
-            ]
-        },
-        outletCredits: [
-            { outletName: 'Game Zone', creditType: 'Per Stay', creditAmount: 2000, revenueCode: 'REV-REC-GAME' }
-        ],
-        validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 3, maxNights: 14, blackoutDates: '' },
-        finance: {
-            baseSurcharge: 6500,
-            totalCost: 4800, // Cost for family meals/activities
-            dateBasedSurcharges: [],
-            autoPost: true,
-            revenueAllocations: [{ department: 'Rooms', amount: 50, type: 'Percentage' }, { department: 'F&B', amount: 50, type: 'Percentage' }]
-        }
-    },
-    {
-        id: 3, name: 'Corporate Executive', shortCode: 'BIZEXEC', packageType: 'Standard',
-        status: 'Active', color: '#3B82F6',
-        description: 'Designed for the modern professional. Includes airport transfers, express laundry and business breakfast.',
-        roomConfig: {
-            applicableRoomTypes: ['Deluxe King', 'Junior Suite'],
-            extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 2500,
-            extraChildRate: 1200, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 0, extraBedMealIncluded: false,
-            welcomeAmenity: 'Business Kit',
-            lateCheckoutAllowed: true,
-            lateCheckoutTime: '16:00',
-            wifiIncluded: true,
-            priorityCheckin: true,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Executive Lounge', breakfastStyle: 'A La Carte', breakfastMenu: 'Business Breakfast', breakfastCuisine: 'Continental',
-            breakfastAdultRate: 1200, breakfastChildRate: 0, breakfastInfantFree: true,
-            hasLunch: false, lunchVenue: '', lunchStyle: 'Set Menu', lunchAdultRate: 0, lunchChildRate: 0, lunchMenu: '', lunchCuisine: '',
-            hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet', dinnerMenu: '', dinnerCuisine: '',
-            dinnerCredit: 0, dinnerAdultRate: 0, dinnerChildRate: 0,
-            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
-            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
-        },
-        poolConfig: { included: true, complimentaryAdults: 1, complimentaryChildren: 0, extraAdultRate: 500, extraChildRate: 500 },
-        transportConfig: { type: 'Both', vehicleType: 'Tesla Model 3', pickupRate: 2000, dropRate: 2000 },
-        laundryConfig: {
-            included: true, allowanceType: 'Per Day', itemsAllowance: 3, extraItemRate: 200,
-            items: [
-                { name: 'Business Shirt', includedQty: 2, extraRate: 150 },
-                { name: 'Suit Trouser', includedQty: 1, extraRate: 250 },
-            ]
-        },
-        minibarConfig: {
-            included: true, dailyCredit: 800, replenishment: 'Daily',
-            items: [
-                { name: 'Espresso Pods', category: 'Beverage', qty: 4, unitPrice: 100 },
-                { name: 'Energy Drink', category: 'Beverage', qty: 2, unitPrice: 250 },
-            ]
-        },
-        recreationConfig: {
-            included: true, activities: [
-                { name: 'Gym Personal Trainer', includedSessions: 1, adultRate: 2000, childRate: 0, minAge: 18 },
-            ]
-        },
-        outletCredits: [
-            { outletName: 'Business Center', creditType: 'Per Stay', creditAmount: 1000, revenueCode: 'REV-GEN-BIZ' }
-        ],
-        validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 7, blackoutDates: '' },
-        finance: {
-            baseSurcharge: 4500,
-            totalCost: 2800, // Cost for Biz lounge/transfer
-            dateBasedSurcharges: [],
-            autoPost: true,
-            revenueAllocations: [{ department: 'Rooms', amount: 80, type: 'Percentage' }, { department: 'F&B', amount: 20, type: 'Percentage' }]
-        }
-    },
-    {
-        id: 4, name: 'Full Board Family Getaway', shortCode: 'FB-FAM', packageType: 'Family',
-        status: 'Active', color: '#10B981',
-        description: 'Complete family holiday with all meals (breakfast, lunch, dinner), arcade tokens and trampoline sessions.',
-        roomConfig: {
-            applicableRoomTypes: ['Family Suite', 'Interconnecting'],
-            extraBedAllowed: true, extraBedRate: 2500, extraAdultRate: 2000,
-            extraChildRate: 1000, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 2, extraBedMealIncluded: true,
-            welcomeAmenity: '',
-            lateCheckoutAllowed: false,
-            lateCheckoutTime: '12:00',
-            wifiIncluded: true,
-            priorityCheckin: false,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Main Restaurant', breakfastStyle: 'Buffet', breakfastMenu: 'Standard Buffet', breakfastCuisine: 'Continental',
-            breakfastAdultRate: 850, breakfastChildRate: 450, breakfastInfantFree: true,
-            hasLunch: true, lunchVenue: 'Waves Poolside', lunchStyle: 'Buffet', lunchAdultRate: 1500, lunchChildRate: 800, lunchMenu: 'Aqua Menu', lunchCuisine: 'Multi-cuisine',
-            hasDinner: true, dinnerVenue: 'Main Restaurant', dinnerStyle: 'Buffet', dinnerMenu: 'Global Feast', dinnerCuisine: 'Continental',
-            dinnerCredit: 0, dinnerAdultRate: 2200, dinnerChildRate: 1100,
-            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
-            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
-        },
-        poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 2, extraAdultRate: 800, extraChildRate: 400 },
-        transportConfig: { type: 'None', vehicleType: 'SUV', pickupRate: 0, dropRate: 0 },
-        laundryConfig: { included: false, allowanceType: 'Per Day', itemsAllowance: 0, extraItemRate: 0, items: [] },
-        minibarConfig: { included: false, dailyCredit: 0, replenishment: 'On Request', items: [] },
-        recreationConfig: { included: true, activities: [{ name: 'Trampoline Park', includedSessions: 2, adultRate: 1200, childRate: 1200, minAge: 5 }] },
-        outletCredits: [{ outletName: 'Arcade Zone', creditType: 'Per Day', creditAmount: 1000, revenueCode: 'REV-RECR-GAME' }],
-        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 14, blackoutDates: '' },
-        finance: {
-            baseSurcharge: 2500,
-            totalCost: 1500, // Cost for Breakfast
-            dateBasedSurcharges: [
-                { dateRange: '2024-12-24 to 2024-12-26', surchargeAmount: 5000, reason: 'Christmas Peak' }
-            ],
-            autoPost: true,
-            revenueAllocations: [
-                { department: 'Rooms', amount: 60, type: 'Percentage' },
-                { department: 'F&B', amount: 30, type: 'Percentage' },
-                { department: 'Others', amount: 10, type: 'Percentage' }
-            ]
-        }
-    },
-    {
-        id: 5, name: 'Wellness & Spa Retreat', shortCode: 'SPA-REL', packageType: 'Standard',
-        status: 'Active', color: '#8B5CF6',
-        description: 'Focus on health and tranquility. Detox and rejuvenate.',
-        roomConfig: {
-            applicableRoomTypes: ['Garden Villa', 'Zen Suite'],
-            extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 0,
-            extraChildRate: 0, childAgeFrom: 0, childAgeTo: 0,
-            infantFree: false, infantMaxAge: 0, maxExtraBeds: 0, extraBedMealIncluded: false,
-            welcomeAmenity: 'Herbal Tea Set',
-            lateCheckoutAllowed: true,
-            lateCheckoutTime: '15:00',
-            wifiIncluded: true,
-            priorityCheckin: true,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Organic Garden', breakfastStyle: 'A La Carte', breakfastMenu: 'Detox Morning', breakfastCuisine: 'Healthy/Organic',
-            breakfastAdultRate: 1500, breakfastChildRate: 0, breakfastInfantFree: false,
-            hasLunch: true, lunchVenue: 'Zen Terrace', lunchStyle: 'A La Carte', lunchAdultRate: 2500, lunchChildRate: 0, lunchMenu: 'Light & Green', lunchCuisine: 'Healthy/Organic',
-            hasDinner: true, dinnerVenue: 'Zen Terrace', dinnerStyle: 'Set Menu', dinnerMenu: 'Evening Rejuvenation', dinnerCuisine: 'Healthy/Organic',
-            dinnerCredit: 0, dinnerAdultRate: 3500, dinnerChildRate: 0,
-            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
-            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
-        },
-        poolConfig: { included: true, complimentaryAdults: 1, complimentaryChildren: 0, extraAdultRate: 500, extraChildRate: 0 },
-        transportConfig: { type: 'Pickup', vehicleType: 'Tesla Model S', pickupRate: 3500, dropRate: 0 },
-        laundryConfig: { included: true, allowanceType: 'Per Stay', itemsAllowance: 2, extraItemRate: 100, items: [] },
-        minibarConfig: { included: true, dailyCredit: 0, replenishment: 'Daily', items: [{ name: 'Cold Press Juice', category: 'Non-Alcoholic', qty: 2, unitPrice: 850 }] },
-        recreationConfig: {
-            included: true, activities: [
-                { name: 'Yoga Session', includedSessions: 2, adultRate: 1500, childRate: 0, minAge: 12 },
-                { name: 'Full Body Massage', includedSessions: 1, adultRate: 6500, childRate: 0, minAge: 18 }
-            ]
-        },
-        outletCredits: [],
-        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 10, blackoutDates: '' },
-        finance: {
-            baseSurcharge: 18000,
-            totalCost: 12000, // Cost for Spa/Detox meals
-            dateBasedSurcharges: [],
-            autoPost: true,
-            revenueAllocations: [{ department: 'Spa', amount: 100, type: 'Percentage' }]
-        }
-    },
-    {
-        id: 6, name: 'Business Executive Bundle', shortCode: 'BIZ-EXE', packageType: 'Corporate',
-        status: 'Active', color: '#1F2937',
-        description: 'Optimized for business travelers. High-speed WiFi and airport transfers.',
-        roomConfig: {
-            applicableRoomTypes: ['Executive Room', 'Business Suite'],
-            extraBedAllowed: false, extraBedRate: 0, extraAdultRate: 0,
-            extraChildRate: 0, childAgeFrom: 0, childAgeTo: 0,
-            infantFree: false, infantMaxAge: 0, maxExtraBeds: 0, extraBedMealIncluded: false,
-            welcomeAmenity: 'Welcome Drink',
-            lateCheckoutAllowed: true,
-            lateCheckoutTime: '16:00',
-            wifiIncluded: true,
-            priorityCheckin: true,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Executive Lounge', breakfastStyle: 'Buffet', breakfastMenu: 'Express Business', breakfastCuisine: 'Continental',
-            breakfastAdultRate: 950, breakfastChildRate: 0, breakfastInfantFree: false,
-            hasLunch: true, lunchVenue: 'Atrium Cafe', lunchStyle: 'Set Menu', lunchAdultRate: 1800, lunchChildRate: 0, lunchMenu: '3-Course Power Lunch', lunchCuisine: 'Multi-cuisine',
-            hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet', dinnerMenu: '', dinnerCuisine: '',
-            dinnerCredit: 5000, dinnerAdultRate: 0, dinnerChildRate: 0,
-            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
-            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
-        },
-        poolConfig: { included: true, complimentaryAdults: 1, complimentaryChildren: 0, extraAdultRate: 600, extraChildRate: 0 },
-        transportConfig: { type: 'Both', vehicleType: 'Luxury Sedan', pickupRate: 2000, dropRate: 2000 },
-        laundryConfig: { included: true, allowanceType: 'Per Day', itemsAllowance: 2, extraItemRate: 250, items: [] },
-        minibarConfig: { included: false, dailyCredit: 0, replenishment: 'Daily', items: [] },
-        recreationConfig: { included: false, activities: [] },
-        outletCredits: [
-            { outletName: 'Business Center', creditType: 'Per Stay', creditAmount: 5000, revenueCode: 'REV-MISC-BIZ' }
-        ],
-        validity: { startDate: '2025-01-01', endDate: '2025-12-31', minNights: 3, maxNights: 10, blackoutDates: '' },
-        finance: {
-            baseSurcharge: 12000,
-            totalCost: 7500, // Cost for Business Bundle
-            dateBasedSurcharges: [],
-            autoPost: true,
-            revenueAllocations: [{ department: 'Rooms', amount: 70, type: 'Percentage' }, { department: 'Transport', amount: 30, type: 'Percentage' }]
-        }
-    },
-    {
-        id: 7, name: 'Standard Bed & Breakfast', shortCode: 'STDBB', packageType: 'Standard',
-        status: 'Active', color: '#6366F1',
-        description: 'Simple and comfortable. Includes daily buffet breakfast for two.',
-        roomConfig: {
-            applicableRoomTypes: ['Deluxe Room', 'Deluxe King', 'Garden View'],
-            extraBedAllowed: true, extraBedRate: 2000, extraAdultRate: 1500,
-            extraChildRate: 800, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 1, extraBedMealIncluded: true,
-            welcomeAmenity: '',
-            lateCheckoutAllowed: false,
-            lateCheckoutTime: '12:00',
-            wifiIncluded: true,
-            priorityCheckin: false,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Main Restaurant', breakfastStyle: 'Buffet', breakfastMenu: 'Standard Buffet', breakfastCuisine: 'Continental',
-            breakfastAdultRate: 850, breakfastChildRate: 450, breakfastInfantFree: true,
-            hasLunch: false, lunchVenue: '', lunchStyle: 'Buffet', lunchAdultRate: 0, lunchChildRate: 0, lunchMenu: '', lunchCuisine: '',
-            hasDinner: false, dinnerVenue: '', dinnerStyle: 'Buffet', dinnerMenu: '', dinnerCuisine: '',
-            dinnerCredit: 0, dinnerAdultRate: 0, dinnerChildRate: 0,
-            hasBrunch: false, brunchVenue: '', brunchStyle: 'Buffet', brunchAdultRate: 0, brunchMenu: '', brunchCuisine: '',
-            hasCupole: false, cupoleVenue: '', cupoleStyle: 'Set Menu', cupoleCredit: 0, cupoleMenu: '', cupoleCuisine: '',
-        },
-        poolConfig: { included: true, complimentaryAdults: 2, complimentaryChildren: 1, extraAdultRate: 500, extraChildRate: 300 },
-        transportConfig: { type: 'None', vehicleType: 'Sedan', pickupRate: 0, dropRate: 0 },
-        laundryConfig: { included: false, allowanceType: 'Per Stay', itemsAllowance: 0, extraItemRate: 0, items: [] },
-        minibarConfig: { included: false, dailyCredit: 0, replenishment: 'Daily', items: [] },
-        recreationConfig: { included: false, activities: [] },
-        outletCredits: [],
-        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 1, maxNights: 30, blackoutDates: '' },
-        finance: {
-            baseSurcharge: 1000,
-            totalCost: 650, // Cost for Breakfast
-            dateBasedSurcharges: [],
-            autoPost: true,
-            revenueAllocations: [{ department: 'Rooms', amount: 100, type: 'Percentage' }]
-        }
-    },
-    {
-        id: 8, name: 'Royal Full Board Experience', shortCode: 'ROYALAP', packageType: 'Seasonal',
-        status: 'Active', color: '#F59E0B',
-        description: 'The ultimate stay. Includes Breakfast, Lunch, and Dinner with premium amenities.',
-        roomConfig: {
-            applicableRoomTypes: ['Presidential Suite', 'Premium Suite'],
-            extraBedAllowed: true, extraBedRate: 5000, extraAdultRate: 4000,
-            extraChildRate: 2500, childAgeFrom: 5, childAgeTo: 12,
-            infantFree: true, infantMaxAge: 4, maxExtraBeds: 2, extraBedMealIncluded: true,
-            welcomeAmenity: 'Champagne & Chocolates',
-            lateCheckoutAllowed: true,
-            lateCheckoutTime: '18:00',
-            wifiIncluded: true,
-            priorityCheckin: true,
-        },
-        mealInclusions: {
-            hasBreakfast: true, breakfastVenue: 'Executive Lounge', breakfastStyle: 'A La Carte', breakfastMenu: 'Royal Feast A', breakfastCuisine: 'Continental',
-            breakfastAdultRate: 1500, breakfastChildRate: 800, breakfastInfantFree: true,
-            hasLunch: true, lunchVenue: 'Waves Poolside', lunchStyle: 'Buffet', lunchAdultRate: 2000, lunchChildRate: 1200, lunchMenu: 'Aqua Gourmet', lunchCuisine: 'Pan-Asian',
-            hasDinner: true, dinnerVenue: 'Main Restaurant', dinnerStyle: 'Gourmet Buffet', dinnerMenu: 'Global Gala Night', dinnerCuisine: 'Multi-cuisine',
-            dinnerCredit: 0, dinnerAdultRate: 3500, dinnerChildRate: 1800,
-            hasBrunch: true, brunchVenue: 'Garden Terrace', brunchStyle: 'Buffet', brunchAdultRate: 2500, brunchMenu: 'Morning Bliss', brunchCuisine: 'Continental',
-            hasCupole: true, cupoleVenue: 'Private Beach', cupoleStyle: 'Set Menu', cupoleCredit: 8000, cupoleMenu: 'Starlight Dinner', cupoleCuisine: 'Italian',
-        },
-        poolConfig: { included: true, complimentaryAdults: 4, complimentaryChildren: 2, extraAdultRate: 0, extraChildRate: 0 },
-        transportConfig: { type: 'Both', vehicleType: 'Limousine', pickupRate: 5000, dropRate: 5000 },
-        laundryConfig: {
-            included: true, allowanceType: 'Per Day', itemsAllowance: 5, extraItemRate: 250,
-            items: [
-                { name: 'Suit', includedQty: 2, extraRate: 500 },
-                { name: 'Evening Gown', includedQty: 1, extraRate: 800 },
-            ]
-        },
-        minibarConfig: {
-            included: true, dailyCredit: 2500, replenishment: 'Daily',
-            items: [
-                { name: 'Champagne Mini', category: 'Spirit', qty: 1, unitPrice: 4500 },
-                { name: 'Imported Snacks', category: 'Snack', qty: 4, unitPrice: 350 },
-            ]
-        },
-        recreationConfig: {
-            included: true, activities: [
-                { name: 'Private Yacht Cruise', includedSessions: 1, adultRate: 15000, childRate: 5000, minAge: 0 },
-                { name: 'Spa Day Pass', includedSessions: 1, adultRate: 8000, childRate: 0, minAge: 16 },
-            ]
-        },
-        outletCredits: [
-            { outletName: 'Jewel Bar', creditType: 'Per Stay', creditAmount: 10000, revenueCode: 'REV-FB-BAR' }
-        ],
-        validity: { startDate: '2024-01-01', endDate: '2025-12-31', minNights: 2, maxNights: 7, blackoutDates: '' },
-        finance: {
-            baseSurcharge: 25000,
-            totalCost: 18000, // Cost for Royal AP (Limo/Fine Dining)
-            dateBasedSurcharges: [],
-            autoPost: true,
-            revenueAllocations: [{ department: 'Rooms', amount: 40, type: 'Percentage' }, { department: 'F&B', amount: 60, type: 'Percentage' }]
-        }
-    }
-];
+
 // ============================================================
 // ALLOWANCE ENGINE PREVIEW
 // ============================================================
@@ -716,7 +310,7 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
         <div className="space-y-4">
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
                 <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <h4 className="text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">
                         <TrendingUp size={15} className="text-primary" /> Revenue Allocation Engine
                     </h4>
                     <div className="text-[10px] bg-primary-subtle text-primary px-2.5 py-0.5 rounded-full border border-primary-border font-bold">FINANCE V1.2</div>
@@ -724,9 +318,9 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
                 <div className="grid grid-cols-2 gap-3">
                     {pkg.finance.revenueAllocations.map((alloc, i) => (
                         <div key={i} className="flex flex-col gap-1 p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                            <span className="text-[10px] text-primary font-bold uppercase tracking-wider">{alloc.department}</span>
+                            <span className="text-[10px] text-primary uppercase tracking-wider">{alloc.department}</span>
                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-slate-900">
+                                <span className="text-sm text-slate-900">
                                     {alloc.type === 'Fixed' ? `৳${alloc.amount.toLocaleString()}` : `${alloc.amount}%`}
                                 </span>
                                 <div className="h-1.5 flex-1 bg-slate-100 mx-3 rounded-full overflow-hidden">
@@ -738,7 +332,7 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
                 </div>
                 {pkg.finance.dateBasedSurcharges.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-2">
-                        <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider text-center">Seasonal Peak Rules Applied</div>
+                        <div className="text-[10px] text-amber-700 uppercase tracking-wider text-center">Seasonal Peak Rules Applied</div>
                         {pkg.finance.dateBasedSurcharges.map((s, i) => (
                             <div key={i} className="flex justify-between items-center bg-amber-50/60 p-2.5 rounded-xl border border-amber-200">
                                 <span className="text-xs text-amber-900 font-medium">{s.reason}</span>
@@ -825,8 +419,9 @@ const PackageManagement = () => {
         } catch {
             // fallback
         }
-        return SAMPLE_PACKAGES;
+        return [];
     });
+    const dynamicRoomTypes = useMemo(() => getDynamicRoomTypes().map(t => t.name), []);
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingPackage, setEditingPackage] = useState<HotelPackage | null>(null);
     const [formData, setFormData] = useState<Omit<HotelPackage, 'id'>>(defaultPackage());
@@ -850,6 +445,18 @@ const PackageManagement = () => {
 
     const [isCodeManual, setIsCodeManual] = useState(false);
     const existingCodes = useMemo(() => packages.map(p => p.shortCode), [packages]);
+
+    useEffect(() => {
+        fetch(`${getApiBaseUrl()}/api/rates/packages?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setPackages(json.data);
+                    localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(json.data));
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     const openCreate = () => {
         setFormData(defaultPackage());
@@ -876,20 +483,38 @@ const PackageManagement = () => {
         setFormData(prev => ({ ...prev, name, shortCode: nextCode }));
     };
 
-    const handleDuplicate = (pkg: HotelPackage) => {
+    const handleDuplicate = async (pkg: HotelPackage) => {
         const uniqueCode = generateUniqueShortCode(`${pkg.shortCode}-CPY`, existingCodes, { maxLength: 8 });
-        const newPkg: HotelPackage = { ...pkg, id: Date.now(), name: `${pkg.name} (Copy)`, shortCode: uniqueCode, status: 'Draft' };
+        let newPkg: HotelPackage = { ...pkg, id: Date.now(), name: `${pkg.name} (Copy)`, shortCode: uniqueCode, status: 'Draft' };
+        try {
+            const res = await fetch(`${getApiBaseUrl()}/api/rates/packages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newPkg)
+            });
+            const json = await res.json();
+            if (json.success && json.data?.id) newPkg = { ...newPkg, id: json.data.id };
+        } catch {}
         persistPackages([...packages, newPkg]);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this package? Linked bookings will keep existing line-item snapshots.')) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/rates/packages/${id}`, { method: 'DELETE' });
+            } catch {}
             const updated = packages.filter(p => p.id !== id);
             persistPackages(updated);
+            try {
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            } catch {}
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData.name || !formData.shortCode) {
             alert('Package Name and Short Code are required.');
             return;
@@ -899,13 +524,42 @@ const PackageManagement = () => {
             alert(`Short Code "${formData.shortCode}" is already in use by another package! Please provide a unique code.`);
             return;
         }
+
+        const API_BASE = getApiBaseUrl();
+        let finalPkg: HotelPackage;
+
+        if (editingPackage) {
+            finalPkg = { ...formData, id: editingPackage.id } as HotelPackage;
+            try {
+                await fetch(`${API_BASE}/api/rates/packages/${editingPackage.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(finalPkg)
+                });
+            } catch {}
+        } else {
+            finalPkg = { ...formData, id: Date.now() } as HotelPackage;
+            try {
+                const res = await fetch(`${API_BASE}/api/rates/packages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(finalPkg)
+                });
+                const json = await res.json();
+                if (json.success && json.data?.id) finalPkg.id = json.data.id;
+            } catch {}
+        }
+
         let updated: HotelPackage[];
         if (editingPackage) {
-            updated = packages.map(p => p.id === editingPackage.id ? { ...formData, id: editingPackage.id } : p);
+            updated = packages.map(p => p.id === editingPackage.id ? finalPkg : p);
         } else {
-            updated = [...packages, { ...formData, id: Date.now() }];
+            updated = [...packages, finalPkg];
         }
         persistPackages(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         setView('list');
     };
 
@@ -1054,7 +708,7 @@ const PackageManagement = () => {
                     />
                 </div>
                 <div className="text-xs text-slate-500 font-medium">
-                    Showing <span className="font-bold text-slate-900">{filtered.length}</span> packages
+                    Showing <span className="text-slate-900">{filtered.length}</span> packages
                 </div>
             </div>
 
@@ -1083,8 +737,8 @@ const PackageManagement = () => {
                                     <div className="flex items-start justify-between gap-3 mb-2">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                <h3 className="font-bold text-slate-900 text-base">{pkg.name}</h3>
-                                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${typeColors[pkg.packageType] || typeColors.Standard}`}>
+                                                <h3 className="text-slate-900 text-base">{pkg.name}</h3>
+                                                <span className={`text-[10px] px-2.5 py-0.5 rounded-full border ${typeColors[pkg.packageType] || typeColors.Standard}`}>
                                                     {pkg.packageType}
                                                 </span>
                                             </div>
@@ -1146,7 +800,7 @@ const PackageManagement = () => {
                                     </div>
                                     <div className="text-right">
                                         <span className="text-[10px] text-slate-400 uppercase font-semibold block">Surcharge</span>
-                                        <span className="text-base font-bold text-slate-900 font-mono">৳{pkg.finance.baseSurcharge.toLocaleString()}<span className="text-xs font-normal text-slate-400">/night</span></span>
+                                        <span className="text-base text-slate-900 font-mono">৳{pkg.finance.baseSurcharge.toLocaleString()}<span className="text-xs font-normal text-slate-400">/night</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -1162,7 +816,7 @@ const PackageManagement = () => {
                     <div className="size-10 rounded-xl bg-slate-100 group-hover:bg-primary-subtle flex items-center justify-center mb-3 transition">
                         <Plus className="size-5 text-slate-400 group-hover:text-primary transition" />
                     </div>
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-primary transition">Create New Package</span>
+                    <span className="text-xs text-slate-700 group-hover:text-primary transition">Create New Package</span>
                     <span className="text-[11px] text-slate-400 mt-1">Configure amenities & inclusion bundles</span>
                 </button>
             </div>
@@ -1179,7 +833,7 @@ const PackageManagement = () => {
                 <div className="flex items-center gap-3">
                     <button onClick={() => setView('list')} className="p-1.5 hover:bg-gray-100 rounded-lg transition-all text-gray-500"><ArrowLeft size={18} /></button>
                     <div>
-                        <h2 className="font-bold text-gray-900 text-sm">{editingPackage ? `Editing: ${editingPackage.name}` : 'Create New Package'}</h2>
+                        <h2 className="text-gray-900 text-sm">{editingPackage ? `Editing: ${editingPackage.name}` : 'Create New Package'}</h2>
                         <p className="text-xs text-gray-400">Configure inclusions, allowances, and revenue routing</p>
                     </div>
                 </div>
@@ -1256,14 +910,14 @@ const PackageManagement = () => {
                                                         upd('shortCode', auto);
                                                         setIsCodeManual(false);
                                                     }}
-                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
                                                 >
                                                     <RefreshCw size={10} /> Auto-Generate
                                                 </button>
                                             </div>
                                             <div className="relative">
                                                 <input
-                                                    className={`${inp} pr-8 uppercase font-mono font-bold ${
+                                                    className={`${inp} pr-8 uppercase font-mono ${
                                                         isShortCodeDuplicate(fm.shortCode, existingCodes, editingPackage?.shortCode)
                                                             ? 'border-rose-500 bg-rose-50 text-rose-700'
                                                             : ''
@@ -1319,7 +973,7 @@ const PackageManagement = () => {
                                 <div className="space-y-5">
                                 <FormSection title="Applicable Room Types" icon={<BedDouble size={16} />}>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {ROOM_TYPES.map(rt => (
+                                        {dynamicRoomTypes.map(rt => (
                                             <label key={rt} className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all text-sm ${fm.roomConfig.applicableRoomTypes.includes(rt) ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-700'}`}>
                                                 <input type="checkbox" className="accent-blue-600"
                                                     checked={fm.roomConfig.applicableRoomTypes.includes(rt)}
@@ -1380,7 +1034,7 @@ const PackageManagement = () => {
                                     </div>
 
                                     <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 grid grid-cols-2 gap-4">
-                                        <div className="col-span-2 text-xs font-bold text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-1">
+                                        <div className="col-span-2 text-xs text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-1">
                                             <Gift size={14} /> Room Experience (ETC Info)
                                         </div>
                                         <Field label="Welcome Amenity">
@@ -1845,14 +1499,14 @@ const PackageManagement = () => {
                                         </Field>
                                         <Field label="Package Surcharge (Selling)" hint="added to room rate/night">
                                             <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-bold">৳</span>
-                                                <input type="number" className={inp + ' pl-7 border-emerald-100 bg-emerald-50/20 font-bold text-emerald-900'} value={fm.finance.baseSurcharge}
+                                                <input type="number" className={inp + ' pl-7 border-emerald-100 bg-emerald-50/20 text-emerald-900'} value={fm.finance.baseSurcharge}
                                                     onChange={e => upd('finance.baseSurcharge', +e.target.value)} /></div>
                                         </Field>
                                         <div className="col-span-2">
                                             <div className={`p-3 rounded-lg flex items-center justify-between border ${fm.finance.baseSurcharge >= fm.finance.totalCost ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                                                 <div className="flex items-center gap-2">
                                                     <TrendingUp size={16} className={fm.finance.baseSurcharge >= fm.finance.totalCost ? 'text-emerald-600' : 'text-red-600'} />
-                                                    <span className={`text-sm font-bold ${fm.finance.baseSurcharge >= fm.finance.totalCost ? 'text-emerald-700' : 'text-red-700'}`}>
+                                                    <span className={`text-sm ${fm.finance.baseSurcharge >= fm.finance.totalCost ? 'text-emerald-700' : 'text-red-700'}`}>
                                                         {fm.finance.baseSurcharge >= fm.finance.totalCost ? 'Inclusion Profitability Check: PASS' : 'Inclusion Profitability Check: FAIL (Selling below cost)'}
                                                     </span>
                                                 </div>
@@ -1882,7 +1536,7 @@ const PackageManagement = () => {
                                             {fm.minibarConfig.included && <div className="flex justify-between text-[10px]"><span className="text-gray-500">Minibar Credit ৳{fm.minibarConfig.dailyCredit}</span><span className="text-pink-400 font-mono text-[9px]">DEPT-02 Minibar → REV-MINI-BAR</span></div>}
                                             {fm.outletCredits.map((oc, i) => <div key={i} className="flex justify-between text-[10px]"><span className="text-gray-500">{oc.outletName} Credit ({oc.creditType})</span><span className="text-orange-400 font-mono text-[9px]">DEPT-03 Outlets → {oc.revenueCode}</span></div>)}
                                             <div className="flex justify-between text-[10px] border-t border-gray-800 pt-2 mt-2">
-                                                <span className="text-gray-300 font-bold uppercase tracking-widest">Base Pkg Surcharge</span>
+                                                <span className="text-gray-300 uppercase tracking-widest">Base Pkg Surcharge</span>
                                                 <span className="text-white font-black">৳{fm.finance.baseSurcharge}/night → DEPT-01 Rooms</span>
                                             </div>
                                         </div>
@@ -1897,13 +1551,13 @@ const PackageManagement = () => {
                                 <div className="bg-white rounded-xl border border-gray-200 p-4">
                                     <div className="flex items-center gap-2 mb-3">
                                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: fm.color }} />
-                                        <h3 className="font-bold text-gray-900">{fm.name || 'Package Preview'}</h3>
+                                        <h3 className="text-gray-900">{fm.name || 'Package Preview'}</h3>
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full border ${typeColors[fm.packageType] || typeColors.Standard}`}>{fm.packageType}</span>
                                     </div>
                                     <p className="text-xs text-gray-500 mb-3">{fm.description || 'No description yet'}</p>
                                     <div className="flex items-center justify-between text-xs text-gray-500 border-t pt-2">
                                         <span>Min {fm.validity.minNights} nights</span>
-                                        <span className="font-bold text-gray-900">+৳{fm.finance.baseSurcharge}<span className="font-normal">/night</span></span>
+                                        <span className="text-gray-900">+৳{fm.finance.baseSurcharge}<span className="font-normal">/night</span></span>
                                     </div>
                                 </div>
                                 <AllowanceEngineViewer pkg={{ ...fm, id: 0 }} />

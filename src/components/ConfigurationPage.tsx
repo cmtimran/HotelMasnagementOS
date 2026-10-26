@@ -92,7 +92,7 @@ const ConfigurationPage: React.FC<ConfigurationPageProps> = ({
             <div className="table-container">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs text-slate-600">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-[10.5px] uppercase font-bold tracking-wider text-slate-500">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-[10.5px] uppercase tracking-wider text-slate-500">
                             <tr>
                                 {columns.map((col) => (
                                     <th key={col.key} className={`px-4 py-3 ${col.className || ''}`}>{col.header}</th>

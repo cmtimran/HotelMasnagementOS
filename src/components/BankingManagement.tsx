@@ -296,8 +296,8 @@ export const BankingManagement: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200/90 shadow-2xs flex items-center justify-between">
                     <div>
-                        <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">Commercial Banks</div>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{bankAccounts.length} Active</div>
+                        <div className="text-[10.5px] text-gray-400 uppercase tracking-wider">Commercial Banks</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{bankAccounts.length} Active</div>
                         <div className="text-[10px] text-gray-500 mt-0.5">Corporate & POS Clearing</div>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -307,8 +307,8 @@ export const BankingManagement: React.FC = () => {
 
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200/90 shadow-2xs flex items-center justify-between">
                     <div>
-                        <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">Default Folio Bank</div>
-                        <div className="text-sm font-bold text-blue-700 mt-0.5 truncate max-w-[150px]">{defaultBank?.bankName}</div>
+                        <div className="text-[10.5px] text-gray-400 uppercase tracking-wider">Default Folio Bank</div>
+                        <div className="text-sm text-blue-700 mt-0.5 truncate max-w-[150px]">{defaultBank?.bankName}</div>
                         <div className="text-[10px] text-gray-500 font-mono mt-0.5">A/C: {defaultBank?.accountNumber}</div>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
@@ -318,8 +318,8 @@ export const BankingManagement: React.FC = () => {
 
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200/90 shadow-2xs flex items-center justify-between">
                     <div>
-                        <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">MFS Merchant Channels</div>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{mfsWallets.length} Gateways</div>
+                        <div className="text-[10.5px] text-gray-400 uppercase tracking-wider">MFS Merchant Channels</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{mfsWallets.length} Gateways</div>
                         <div className="text-[10px] text-gray-500 mt-0.5">bKash, Nagad, Rocket, Upay</div>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
@@ -329,9 +329,9 @@ export const BankingManagement: React.FC = () => {
 
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200/90 shadow-2xs flex items-center justify-between">
                     <div>
-                        <div className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">MFS Daily Sweep Cap</div>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">৳ {mfsWallets.reduce((acc, m) => acc + m.dailyLimitBDT, 0).toLocaleString()}</div>
-                        <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Auto-Bank Settlement</div>
+                        <div className="text-[10.5px] text-gray-400 uppercase tracking-wider">MFS Daily Sweep Cap</div>
+                        <div className="text-xl text-gray-900 mt-0.5">৳ {mfsWallets.reduce((acc, m) => acc + m.dailyLimitBDT, 0).toLocaleString()}</div>
+                        <div className="text-[10px] text-emerald-600 mt-0.5">Auto-Bank Settlement</div>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
                         <ArrowUpRight size={18} />
@@ -382,7 +382,7 @@ export const BankingManagement: React.FC = () => {
                 <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                     <div className="p-3.5 border-b border-gray-100 flex items-center justify-between">
                         <div>
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                 <Landmark size={14} className="text-blue-600" />
                                 <span>Commercial Operating Bank Accounts</span>
                             </h3>
@@ -393,7 +393,7 @@ export const BankingManagement: React.FC = () => {
                         <button
                             type="button"
                             onClick={handleOpenAddBank}
-                            className="h-6 px-2 text-[10.5px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
+                            className="h-6 px-2 text-[10.5px] bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
                         >
                             + Add Bank
                         </button>
@@ -402,7 +402,7 @@ export const BankingManagement: React.FC = () => {
                     <div className="overflow-x-auto no-scrollbar">
                         <table className="w-full text-left text-xs min-w-[760px]">
                             <thead>
-                                <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                     <th className="px-3.5 py-2.5">Bank Name</th>
                                     <th className="px-3.5 py-2.5">Account Title</th>
                                     <th className="px-3.5 py-2.5">Account Number</th>
@@ -416,25 +416,25 @@ export const BankingManagement: React.FC = () => {
                             <tbody className="divide-y divide-gray-100">
                                 {filteredBanks.map(b => (
                                     <tr key={b.id} className="hover:bg-blue-50/20">
-                                        <td className="px-3.5 py-2.5 font-bold text-gray-900">{b.bankName}</td>
+                                        <td className="px-3.5 py-2.5 text-gray-900">{b.bankName}</td>
                                         <td className="px-3.5 py-2.5 text-gray-700">{b.accountTitle}</td>
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-blue-700">{b.accountNumber}</td>
+                                        <td className="px-3.5 py-2.5 font-mono text-blue-700">{b.accountNumber}</td>
                                         <td className="px-3.5 py-2.5 text-gray-600">
                                             <div>{b.branchName}</div>
                                             <div className="font-mono text-[10px] text-gray-400">Routing: {b.routingNumber}</div>
                                         </td>
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-gray-700">{b.swiftCode}</td>
+                                        <td className="px-3.5 py-2.5 font-mono text-gray-700">{b.swiftCode}</td>
                                         <td className="px-3.5 py-2.5 font-mono text-[11px] text-gray-500">{b.linkedGlCode}</td>
                                         <td className="px-3.5 py-2.5">
                                             {b.isDefaultSettlement ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                     <Check size={11} /> Primary Folio Default
                                                 </span>
                                             ) : (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSetDefaultBank(b.id)}
-                                                    className="px-2 py-0.5 text-[10px] font-bold text-gray-500 hover:text-blue-700 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded cursor-pointer transition-colors"
+                                                    className="px-2 py-0.5 text-[10px] text-gray-500 hover:text-blue-700 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded cursor-pointer transition-colors"
                                                 >
                                                     Set as Default
                                                 </button>
@@ -471,7 +471,7 @@ export const BankingManagement: React.FC = () => {
                 <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                     <div className="p-3.5 border-b border-gray-100 flex items-center justify-between">
                         <div>
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                 <Wallet size={14} className="text-indigo-600" />
                                 <span>Mobile Financial Services (MFS Merchant Gateways)</span>
                             </h3>
@@ -482,7 +482,7 @@ export const BankingManagement: React.FC = () => {
                         <button
                             type="button"
                             onClick={handleOpenAddMfs}
-                            className="h-6 px-2 text-[10.5px] font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded border border-indigo-200 cursor-pointer"
+                            className="h-6 px-2 text-[10.5px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded border border-indigo-200 cursor-pointer"
                         >
                             + Add MFS Wallet
                         </button>
@@ -495,7 +495,7 @@ export const BankingManagement: React.FC = () => {
                                 className="p-3.5 rounded-xl border border-gray-200 hover:border-indigo-300 bg-gray-50/50 transition-all flex flex-col justify-between space-y-2.5 relative group shadow-2xs"
                             >
                                 <div className="flex items-center justify-between">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${mfs.provider.includes('bKash') ? 'bg-pink-50 text-pink-700 border border-pink-200' : mfs.provider.includes('Nagad') ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] ${mfs.provider.includes('bKash') ? 'bg-pink-50 text-pink-700 border border-pink-200' : mfs.provider.includes('Nagad') ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}>
                                         {mfs.provider}
                                     </span>
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -516,7 +516,7 @@ export const BankingManagement: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="font-mono text-sm font-bold text-gray-900 tracking-wide mt-1">
+                                    <div className="font-mono text-sm text-gray-900 tracking-wide mt-1">
                                         {mfs.merchantNumber}
                                     </div>
                                     <div className="text-[10.5px] text-gray-600 font-semibold mt-0.5">{mfs.counterId}</div>
@@ -525,15 +525,15 @@ export const BankingManagement: React.FC = () => {
                                 <div className="pt-2 border-t border-gray-100 space-y-1 text-[10.5px]">
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-500">MDR Fee Rate:</span>
-                                        <span className="font-bold text-gray-900">{mfs.commissionRatePercent}%</span>
+                                        <span className="text-gray-900">{mfs.commissionRatePercent}%</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-500">Linked Sweep Bank:</span>
-                                        <span className="font-bold text-blue-700">{mfs.linkedBankName}</span>
+                                        <span className="text-blue-700">{mfs.linkedBankName}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-500">Daily Cap:</span>
-                                        <span className="font-mono font-bold text-gray-700">৳ {mfs.dailyLimitBDT.toLocaleString()}</span>
+                                        <span className="font-mono text-gray-700">৳ {mfs.dailyLimitBDT.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
@@ -548,7 +548,7 @@ export const BankingManagement: React.FC = () => {
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Landmark size={14} className="text-blue-600" />
                                 <span>{editingBank ? 'Edit Commercial Bank Account' : 'Register Commercial Bank Account'}</span>
                             </h3>
@@ -577,7 +577,7 @@ export const BankingManagement: React.FC = () => {
                                         placeholder="e.g. 1102938472001"
                                         value={bankForm.accountNumber}
                                         onChange={e => setBankForm({ ...bankForm, accountNumber: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono font-bold outline-none"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono outline-none"
                                     />
                                 </div>
                             </div>
@@ -620,7 +620,7 @@ export const BankingManagement: React.FC = () => {
                                         placeholder="e.g. CIBLBDDH"
                                         value={bankForm.swiftCode}
                                         onChange={e => setBankForm({ ...bankForm, swiftCode: e.target.value.toUpperCase() })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono font-bold outline-none"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono outline-none"
                                     />
                                 </div>
                             </div>
@@ -664,7 +664,7 @@ export const BankingManagement: React.FC = () => {
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Wallet size={14} className="text-indigo-600" />
                                 <span>{editingMfs ? 'Edit MFS Wallet' : 'Register MFS Merchant Wallet'}</span>
                             </h3>
@@ -679,7 +679,7 @@ export const BankingManagement: React.FC = () => {
                                     <select
                                         value={mfsForm.provider}
                                         onChange={e => setMfsForm({ ...mfsForm, provider: e.target.value as any })}
-                                        className="w-full h-8 px-2 border border-gray-200 rounded-lg bg-white font-bold outline-none"
+                                        className="w-full h-8 px-2 border border-gray-200 rounded-lg bg-white outline-none"
                                     >
                                         <option value="bKash Merchant">bKash Merchant</option>
                                         <option value="Nagad Sheba">Nagad Sheba</option>
@@ -695,7 +695,7 @@ export const BankingManagement: React.FC = () => {
                                         placeholder="e.g. 01711-928374"
                                         value={mfsForm.merchantNumber}
                                         onChange={e => setMfsForm({ ...mfsForm, merchantNumber: e.target.value })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono font-bold outline-none"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono outline-none"
                                     />
                                 </div>
                             </div>
@@ -719,7 +719,7 @@ export const BankingManagement: React.FC = () => {
                                         max={5}
                                         value={mfsForm.commissionRatePercent}
                                         onChange={e => setMfsForm({ ...mfsForm, commissionRatePercent: Number(e.target.value) })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono font-bold outline-none"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono outline-none"
                                     />
                                 </div>
                                 <div className="space-y-1">

@@ -50,7 +50,7 @@ const GenericSectionModal: React.FC<GenericSectionModalProps> = ({
                 {/* Header */}
                 <div className="bg-white border-b px-6 py-4 flex justify-between items-center rounded-t-xl">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+                        <h2 className="text-xl text-gray-800">{title}</h2>
                         {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
                     </div>
                     <button onClick={onClose} className="hover:bg-gray-100 p-2 rounded-full transition-colors text-gray-500">
@@ -63,7 +63,7 @@ const GenericSectionModal: React.FC<GenericSectionModalProps> = ({
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {sections.map((section, index) => (
                             <div key={index} className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                                <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
+                                <h3 className="text-sm text-gray-800 mb-4 uppercase tracking-wide border-b pb-2 flex items-center gap-2">
                                     <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">{index + 1}</span>
                                     {section.title}
                                 </h3>

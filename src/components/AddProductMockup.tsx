@@ -35,7 +35,7 @@ const AddProductMockup = () => {
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800">Add New Product</h1>
+                        <h1 className="text-xl text-gray-800">Add New Product</h1>
                         <p className="text-xs text-gray-500">Create a new menu item for your restaurant</p>
                     </div>
                 </div>
@@ -395,7 +395,7 @@ const AddProductMockup = () => {
                                                 </tbody>
                                             </table>
                                             <div className="p-3 bg-gray-50 border-t">
-                                                <button className="text-blue-600 text-xs font-bold flex items-center gap-1 hover:underline"><Plus size={14} /> ADD NEW ROW</button>
+                                                <button className="text-blue-600 text-xs flex items-center gap-1 hover:underline"><Plus size={14} /> ADD NEW ROW</button>
                                             </div>
                                         </div>
                                     </div>
@@ -407,7 +407,7 @@ const AddProductMockup = () => {
                                 <div className="mt-6">
                                     <div className="flex items-center gap-3 mb-4">
                                         <input type="checkbox" id="allowAddons" className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
-                                        <label htmlFor="allowAddons" className="text-sm font-bold text-gray-800 cursor-pointer">Allow Add-ons / Toppings?</label>
+                                        <label htmlFor="allowAddons" className="text-sm text-gray-800 cursor-pointer">Allow Add-ons / Toppings?</label>
                                     </div>
 
                                     <div className="pl-7">
@@ -462,7 +462,7 @@ const AddProductMockup = () => {
                                             onChange={() => setIsOfferActive(!isOfferActive)}
                                             className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
                                         />
-                                        <label htmlFor="offerActive" className="text-sm font-bold text-gray-800 cursor-pointer">Offer Available?</label>
+                                        <label htmlFor="offerActive" className="text-sm text-gray-800 cursor-pointer">Offer Available?</label>
                                     </div>
 
                                     {isOfferActive && (

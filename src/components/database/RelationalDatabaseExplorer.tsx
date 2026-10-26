@@ -120,7 +120,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
                             <Database size={24} />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                            <h1 className="text-2xl text-slate-900 tracking-tight flex items-center gap-2">
                                 Relational Enterprise Schema Explorer
                                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                                     1NF • 2NF • 3NF • 4NF Certified
@@ -162,19 +162,21 @@ export const RelationalDatabaseExplorer: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Tables</div>
-                        <div className="text-2xl font-bold text-slate-800 mt-1">{meta.totalTables} Relational Relations</div>
+                        <div className="text-2xl text-slate-800 mt-1">{meta.totalTables} Relational Relations</div>
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Live Records Seeded</div>
-                        <div className="text-2xl font-bold text-indigo-600 mt-1">{meta.totalRecords} Rows</div>
+                        <div className="text-2xl text-indigo-600 mt-1">{meta.totalRecords} Rows</div>
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Database Engine</div>
-                        <div className="text-base font-bold text-slate-800 mt-1 truncate">SQLite 3 (WAL + FK)</div>
+                        <div className="text-base text-slate-800 mt-1 truncate" title={meta.databaseEngine || 'PostgreSQL 17 (Enterprise Cloud Cluster)'}>
+                            {meta.databaseEngine || 'PostgreSQL 17 (Enterprise Cloud Cluster)'}
+                        </div>
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Integrity Constraints</div>
-                        <div className="text-base font-bold text-emerald-600 mt-1 flex items-center gap-1.5">
+                        <div className="text-base text-emerald-600 mt-1 flex items-center gap-1.5">
                             <CheckCircle2 size={16} /> Strict Foreign Keys ON
                         </div>
                     </div>
@@ -186,7 +188,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
                 <div className="mt-6 bg-white p-6 rounded-2xl border-2 border-indigo-200 shadow-sm">
                     <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                         <div>
-                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <h2 className="text-lg text-slate-900 flex items-center gap-2">
                                 <ShieldCheck className="text-indigo-600" size={20} />
                                 Enterprise Normalization Compliance Audit (1NF - 4NF)
                             </h2>
@@ -205,7 +207,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
                         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold text-emerald-900 flex items-center gap-1.5 text-sm">
+                                <span className="text-emerald-900 flex items-center gap-1.5 text-sm">
                                     <CheckCircle2 size={16} className="text-emerald-600" /> First Normal Form (1NF)
                                 </span>
                                 <span className="text-xs font-semibold bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded">PASSED</span>
@@ -218,7 +220,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
 
                         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold text-emerald-900 flex items-center gap-1.5 text-sm">
+                                <span className="text-emerald-900 flex items-center gap-1.5 text-sm">
                                     <CheckCircle2 size={16} className="text-emerald-600" /> Second Normal Form (2NF)
                                 </span>
                                 <span className="text-xs font-semibold bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded">PASSED</span>
@@ -231,7 +233,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
 
                         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold text-emerald-900 flex items-center gap-1.5 text-sm">
+                                <span className="text-emerald-900 flex items-center gap-1.5 text-sm">
                                     <CheckCircle2 size={16} className="text-emerald-600" /> Third Normal Form (3NF)
                                 </span>
                                 <span className="text-xs font-semibold bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded">PASSED</span>
@@ -244,7 +246,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
 
                         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold text-emerald-900 flex items-center gap-1.5 text-sm">
+                                <span className="text-emerald-900 flex items-center gap-1.5 text-sm">
                                     <CheckCircle2 size={16} className="text-emerald-600" /> Fourth Normal Form (4NF)
                                 </span>
                                 <span className="text-xs font-semibold bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded">PASSED</span>
@@ -314,8 +316,8 @@ export const RelationalDatabaseExplorer: React.FC = () => {
                             <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs uppercase font-bold text-slate-400">TABLE:</span>
-                                        <h2 className="text-base font-bold text-slate-900 font-mono">{activeTableMeta.name}</h2>
+                                        <span className="text-xs uppercase text-slate-400">TABLE:</span>
+                                        <h2 className="text-base text-slate-900 font-mono">{activeTableMeta.name}</h2>
                                         <span className="text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-medium">
                                             {activeTableMeta.rowCount} records
                                         </span>
@@ -421,7 +423,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
                                                     <tr key={col.name} className="hover:bg-slate-50">
                                                         <td className="p-2.5">
                                                             {col.pk ? (
-                                                                <span className="flex items-center gap-1 text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 w-fit">
+                                                                <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 w-fit">
                                                                     <Key size={12} /> PK
                                                                 </span>
                                                             ) : (
@@ -458,7 +460,7 @@ export const RelationalDatabaseExplorer: React.FC = () => {
                                                         <LinkIcon size={14} className="text-indigo-600" />
                                                         <span className="font-mono font-semibold text-slate-800">{activeTableMeta.name}.{fk.from}</span>
                                                         <ArrowRight size={12} className="text-slate-400" />
-                                                        <span className="font-mono font-bold text-indigo-700">{fk.table}.{fk.to}</span>
+                                                        <span className="font-mono text-indigo-700">{fk.table}.{fk.to}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2 text-[10px]">
                                                         <span className="bg-slate-200 px-2 py-0.5 rounded font-mono text-slate-700">

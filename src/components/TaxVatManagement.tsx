@@ -775,7 +775,7 @@ export default function TaxVatManagement() {
                             <ShieldCheck className="size-4" />
                         </div>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight">{masters.length}</div>
+                    <div className="mt-2 text-xl text-slate-800 tracking-tight">{masters.length}</div>
                     <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{masters.filter(m => m.status === 'Active').length} Active Masters</div>
                 </div>
 
@@ -786,7 +786,7 @@ export default function TaxVatManagement() {
                             <Layers className="size-4" />
                         </div>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight">{configurations.length}</div>
+                    <div className="mt-2 text-xl text-slate-800 tracking-tight">{configurations.length}</div>
                     <div className="mt-1 text-[11px] text-slate-400 font-medium">Bundled tax profiles</div>
                 </div>
 
@@ -797,18 +797,18 @@ export default function TaxVatManagement() {
                             <Calculator className="size-4" />
                         </div>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight">{builderLines.length} Lines</div>
+                    <div className="mt-2 text-xl text-slate-800 tracking-tight">{builderLines.length} Lines</div>
                     <div className="mt-1 text-[11px] text-amber-600 font-medium">In builder workspace</div>
                 </div>
 
                 <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Simulated Tax</span>
-                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs font-mono">
+                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-mono">
                             ৳
                         </div>
                     </div>
-                    <div className="mt-2 text-xl font-bold text-slate-800 tracking-tight font-mono">
+                    <div className="mt-2 text-xl text-slate-800 tracking-tight font-mono">
                         ৳ {simulationResult.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                     <div className="mt-1 text-[11px] text-slate-500 font-medium">Grand: ৳ {simulationResult.grand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -886,13 +886,13 @@ export default function TaxVatManagement() {
                     {/* Builder Header Bar */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                         <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-slate-700">
+                            <span className="text-xs text-slate-700">
                                 Active Rule Configuration:
                             </span>
                             <select
                                 value={activeConfigId}
                                 onChange={e => handleConfigDropdownChange(e.target.value)}
-                                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none"
+                                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none"
                             >
                                 {configurations.map(c => (
                                     <option key={c.id} value={c.id}>
@@ -927,7 +927,7 @@ export default function TaxVatManagement() {
                         <div className="lg:col-span-7 space-y-4">
                             <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                                 <div className="border-b border-slate-100 pb-3">
-                                    <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <div className="text-sm text-slate-900 flex items-center gap-2">
                                         <SlidersHorizontal className="size-4 text-rose-600" />
                                         <span>Tax Execution Pipeline & Order</span>
                                     </div>
@@ -958,7 +958,7 @@ export default function TaxVatManagement() {
                                             type="text"
                                             value={builderCode}
                                             onChange={e => setBuilderCode(e.target.value.toUpperCase())}
-                                            className="w-full px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                                            className="w-full px-3 py-1.5 text-xs font-mono uppercase bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
                                         />
                                     </div>
                                 </div>
@@ -1001,7 +1001,7 @@ export default function TaxVatManagement() {
                                                         </div>
 
                                                         {/* Execution Order Badge */}
-                                                        <div className="size-6 rounded-md bg-rose-50 text-rose-700 border border-rose-200/70 font-bold text-xs flex items-center justify-center shrink-0">
+                                                        <div className="size-6 rounded-md bg-rose-50 text-rose-700 border border-rose-200/70 text-xs flex items-center justify-center shrink-0">
                                                             {idx + 1}
                                                         </div>
 
@@ -1102,7 +1102,7 @@ export default function TaxVatManagement() {
                                             <Calculator className="size-4" />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-bold text-slate-800">Live Bill & Tax Simulator</h3>
+                                            <h3 className="text-sm text-slate-800">Live Bill & Tax Simulator</h3>
                                             <p className="text-[11px] text-slate-400">Real-time statutory tax evaluation in BDT (৳)</p>
                                         </div>
                                     </div>
@@ -1122,7 +1122,7 @@ export default function TaxVatManagement() {
                                             type="number"
                                             value={simBaseAmount}
                                             onChange={e => setSimBaseAmount(parseFloat(e.target.value) || 0)}
-                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
+                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
                                         />
                                     </div>
                                     <div>
@@ -1134,7 +1134,7 @@ export default function TaxVatManagement() {
                                             min={1}
                                             value={simQty}
                                             onChange={e => setSimQty(parseInt(e.target.value) || 1)}
-                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
+                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
                                         />
                                     </div>
                                     <div>
@@ -1146,7 +1146,7 @@ export default function TaxVatManagement() {
                                             min={0}
                                             value={simDiscount}
                                             onChange={e => setSimDiscount(parseFloat(e.target.value) || 0)}
-                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
+                                            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
                                         />
                                     </div>
                                 </div>
@@ -1155,7 +1155,7 @@ export default function TaxVatManagement() {
                                 <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
                                     <div className="flex justify-between text-slate-600 font-medium">
                                         <span>Gross Room / Service Subtotal ({simQty}x)</span>
-                                        <span className="font-mono font-bold text-slate-800">৳ {simulationResult.gross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-mono text-slate-800">৳ {simulationResult.gross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                     {simDiscount > 0 && (
                                         <div className="flex justify-between text-emerald-600 font-medium">
@@ -1165,12 +1165,12 @@ export default function TaxVatManagement() {
                                     )}
                                     <div className="flex justify-between text-slate-800 font-semibold border-b border-slate-100 pb-2">
                                         <span>Net Taxable Base Tariff</span>
-                                        <span className="font-mono font-bold text-slate-900">৳ {simulationResult.net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-mono text-slate-900">৳ {simulationResult.net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
 
                                     {/* Breakdown Steps with clean cards */}
                                     <div className="space-y-2 py-1">
-                                        <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                                        <div className="text-[10px] uppercase text-slate-400 tracking-wider">
                                             Itemized Tax Compounding Breakdown
                                         </div>
                                         {simulationResult.breakdown.length === 0 ? (
@@ -1182,7 +1182,7 @@ export default function TaxVatManagement() {
                                                 <div key={idx} className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/70 space-y-1">
                                                     <div className="flex justify-between items-center text-slate-700">
                                                         <span className="flex items-center gap-1.5 font-semibold text-xs">
-                                                            <span className="size-5 rounded-md bg-white border border-slate-200 text-[10px] flex items-center justify-center font-bold text-slate-600 shadow-2xs">
+                                                            <span className="size-5 rounded-md bg-white border border-slate-200 text-[10px] flex items-center justify-center text-slate-600 shadow-2xs">
                                                                 #{b.step}
                                                             </span>
                                                             <span className="text-slate-900">{b.name}</span>
@@ -1190,7 +1190,7 @@ export default function TaxVatManagement() {
                                                                 {b.rate}%
                                                             </span>
                                                         </span>
-                                                        <span className="font-mono text-rose-600 font-bold text-xs">
+                                                        <span className="font-mono text-rose-600 text-xs">
                                                             +৳ {b.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </span>
                                                     </div>
@@ -1212,7 +1212,7 @@ export default function TaxVatManagement() {
                                         </div>
                                         <div className="flex justify-between items-center p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50/60 border border-emerald-200/80">
                                             <div>
-                                                <span className="text-xs uppercase tracking-wider font-bold text-emerald-900">Grand Total (Net + Taxes)</span>
+                                                <span className="text-xs uppercase tracking-wider text-emerald-900">Grand Total (Net + Taxes)</span>
                                                 <div className="text-[10px] text-emerald-700">Statutory Mushak-6.3 Compliant</div>
                                             </div>
                                             <span className="font-mono text-lg font-black text-emerald-700">
@@ -1234,7 +1234,7 @@ export default function TaxVatManagement() {
                 <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                         <div>
-                            <h2 className="text-sm font-bold text-slate-900">
+                            <h2 className="text-sm text-slate-900">
                                 Master Tax Configurations
                             </h2>
                             <p className="text-xs text-slate-500">
@@ -1259,21 +1259,21 @@ export default function TaxVatManagement() {
                             >
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="px-2 py-0.5 rounded font-mono text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                        <span className="px-2 py-0.5 rounded font-mono text-xs bg-slate-100 text-slate-700 border border-slate-200">
                                             {cfg.code}
                                         </span>
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                             {cfg.status}
                                         </span>
                                     </div>
-                                    <h3 className="font-bold text-slate-900 text-sm mb-1">
+                                    <h3 className="text-slate-900 text-sm mb-1">
                                         {cfg.name}
                                     </h3>
                                     <p className="text-xs text-slate-400 line-clamp-2">{cfg.remarks}</p>
 
                                     {/* Lines Preview */}
                                     <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase">
+                                        <div className="text-[10px] text-slate-400 uppercase">
                                             Pipeline Steps ({cfg.lines.length}):
                                         </div>
                                         {cfg.lines.map((l, i) => {
@@ -1337,7 +1337,7 @@ export default function TaxVatManagement() {
                 <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                         <div>
-                            <h2 className="text-sm font-bold text-slate-900">
+                            <h2 className="text-sm text-slate-900">
                                 Master Tax & Surcharge Catalog
                             </h2>
                             <p className="text-xs text-slate-500">
@@ -1438,7 +1438,7 @@ export default function TaxVatManagement() {
                     >
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <div>
-                                <h3 className="text-sm font-bold text-slate-900">
+                                <h3 className="text-sm text-slate-900">
                                     Global Channel Default Tax Policies
                                 </h3>
                                 <p className="text-xs text-slate-500">
@@ -1531,7 +1531,7 @@ export default function TaxVatManagement() {
                     {/* Branch Tax Allocations & BIN Table */}
                     <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                         <div>
-                            <h3 className="text-sm font-bold text-slate-900">
+                            <h3 className="text-sm text-slate-900">
                                 Property / Branch Tax BIN Allocations
                             </h3>
                             <p className="text-xs text-slate-500">
@@ -1591,7 +1591,7 @@ export default function TaxVatManagement() {
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <Percent className="size-5 text-rose-600" />
-                                <h2 className="text-base font-bold text-slate-900">
+                                <h2 className="text-base text-slate-900">
                                     {editingMaster ? 'Edit Tax Master' : 'Create Tax Master'}
                                 </h2>
                             </div>
@@ -1640,7 +1640,7 @@ export default function TaxVatManagement() {
                                             setMasterCode(e.target.value.toUpperCase());
                                             setMasterCodeError('');
                                         }}
-                                        className="w-full px-3 py-2 text-xs font-mono font-bold uppercase bg-white border border-slate-200 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs font-mono uppercase bg-white border border-slate-200 rounded-lg"
                                     />
                                     {masterCodeError && (
                                         <p className="text-[10px] text-rose-500 mt-0.5">{masterCodeError}</p>
@@ -1657,7 +1657,7 @@ export default function TaxVatManagement() {
                                         required
                                         value={masterRate}
                                         onChange={e => setMasterRate(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-200 rounded-lg"
                                     />
                                 </div>
                             </div>

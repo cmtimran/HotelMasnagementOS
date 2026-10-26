@@ -958,13 +958,13 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                         </div>
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                                <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
+                                <h1 className="text-lg sm:text-xl text-slate-900 tracking-tight leading-tight">
                                     Dynamic Hotel Policy & Rules Engine
                                 </h1>
                                 <span className="badge-status-active">
                                     Computational Engine
                                 </span>
-                                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-primary border border-blue-200">
+                                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-primary border border-blue-200">
                                     GL Ledger Mapped
                                 </span>
                             </div>
@@ -1020,7 +1020,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                 <div className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-50/60 via-indigo-50/40 to-white border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                         <SlidersHorizontal size={13} className="text-blue-600 flex-shrink-0" />
-                        <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider">
+                        <span className="text-gray-700 text-[11px] uppercase tracking-wider">
                             Seasonal Strategy Preset:
                         </span>
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -1077,7 +1077,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                 >
                                     <IconComponent size={12} className={isActive ? 'text-primary' : 'text-slate-400'} />
                                     <span>{cat.label}</span>
-                                    <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isActive ? 'bg-blue-50 text-primary border border-blue-100' : 'bg-slate-100 text-slate-500'}`}>
+                                    <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-blue-50 text-primary border border-blue-100' : 'bg-slate-100 text-slate-500'}`}>
                                         {count}
                                     </span>
                                 </button>
@@ -1096,7 +1096,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                 <Play size={13} />
                             </div>
                             <div>
-                                <h3 className="text-xs font-bold text-white tracking-wide uppercase">
+                                <h3 className="text-xs text-white tracking-wide uppercase">
                                     Real-Time Dynamic Policy Evaluation Simulator
                                 </h3>
                                 <p className="text-[11px] text-indigo-200/80">
@@ -1116,7 +1116,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                         {/* Scenario Picker */}
                         <div className="space-y-2">
-                            <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider block">
+                            <span className="text-[11px] text-indigo-300 uppercase tracking-wider block">
                                 1. Select Operational Scenario:
                             </span>
                             <div className="space-y-1.5">
@@ -1131,7 +1131,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                         type="button"
                                         onClick={() => setSimScenario(sc.id)}
                                         className={`w-full text-left p-2 rounded-lg border text-[11px] font-medium transition-all cursor-pointer ${simScenario === sc.id
-                                            ? 'bg-indigo-600 border-indigo-400 text-white font-bold shadow-md'
+                                            ? 'bg-indigo-600 border-indigo-400 text-white shadow-md'
                                             : 'bg-white/5 border-white/10 text-indigo-200 hover:bg-white/10'
                                             }`}
                                     >
@@ -1145,10 +1145,10 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                         {evaluatedSimulation && (
                             <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl p-3 space-y-2.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-mono text-indigo-300 font-bold bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-700">
+                                    <span className="text-[10px] font-mono text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-700">
                                         Dynamically Evaluated Rule: {evaluatedSimulation.ruleCode}
                                     </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${evaluatedSimulation.requiresApproval
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${evaluatedSimulation.requiresApproval
                                         ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
                                         : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
                                         }`}>
@@ -1156,14 +1156,14 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     </span>
                                 </div>
 
-                                <div className="text-sm font-bold text-white">
+                                <div className="text-sm text-white">
                                     {evaluatedSimulation.ruleTitle}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 p-2 bg-black/20 rounded-lg border border-white/5 text-[11px]">
                                     <div>
                                         <span className="text-indigo-300 block text-[10px] uppercase">Calculated Dynamic Charge</span>
-                                        <span className="font-bold text-emerald-400">{evaluatedSimulation.calculatedFee}</span>
+                                        <span className="text-emerald-400">{evaluatedSimulation.calculatedFee}</span>
                                     </div>
                                     <div>
                                         <span className="text-indigo-300 block text-[10px] uppercase">General Ledger Credit Code</span>
@@ -1269,7 +1269,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                 {filteredPolicies.length === 0 ? (
                     <div className="bg-white rounded-xl border border-gray-200/90 p-12 text-center shadow-2xs">
                         <ShieldCheck size={32} className="mx-auto text-gray-300 mb-2" />
-                        <h3 className="text-sm font-bold text-gray-700">No policy rules match your search or filter.</h3>
+                        <h3 className="text-sm text-gray-700">No policy rules match your search or filter.</h3>
                         <p className="text-xs text-gray-400 mt-1">Try modifying your keyword or reset filters to view all configured rules.</p>
                         <button
                             type="button"
@@ -1289,22 +1289,22 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             {/* Card Top Row: Identity & Status Toggle */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-mono text-[10.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                    <span className="font-mono text-[10.5px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                                         {rule.code}
                                     </span>
-                                    <h3 className="text-sm font-bold text-gray-900 tracking-tight">
+                                    <h3 className="text-sm text-gray-900 tracking-tight">
                                         {rule.title}
                                     </h3>
                                     <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
                                         Scope: {rule.scope.replace('_', ' ')}
                                     </span>
                                     {rule.requiresApproval ? (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                                             <Lock size={10} />
                                             <span>Requires {rule.supervisorTier} Approval</span>
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                                             <CheckCircle2 size={10} />
                                             <span>Automated Engine Execution</span>
                                         </span>
@@ -1316,7 +1316,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     <button
                                         type="button"
                                         onClick={() => handleToggleRuleStatus(rule.id)}
-                                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold transition-all cursor-pointer ${rule.isActive
+                                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] transition-all cursor-pointer ${rule.isActive
                                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                             : 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
                                             }`}
@@ -1350,7 +1350,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             <div className="p-2.5 bg-gradient-to-r from-slate-50 via-gray-50 to-blue-50/30 rounded-lg border border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
                                 <div className="flex items-center gap-2">
                                     <Sliders size={13} className="text-blue-600" />
-                                    <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider">
+                                    <span className="text-gray-700 text-[11px] uppercase tracking-wider">
                                         Dynamic Rule Variables:
                                     </span>
                                 </div>
@@ -1364,17 +1364,17 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateParam(rule.id, 'hoursThreshold', Math.max(0, (rule.params.hoursThreshold ?? 48) - 12))}
-                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center cursor-pointer text-xs"
                                                 >
                                                     -
                                                 </button>
-                                                <span className="font-mono font-bold text-blue-700 text-xs px-1">
+                                                <span className="font-mono text-blue-700 text-xs px-1">
                                                     {rule.params.hoursThreshold}h
                                                 </span>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateParam(rule.id, 'hoursThreshold', (rule.params.hoursThreshold ?? 48) + 12)}
-                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center cursor-pointer text-xs"
                                                 >
                                                     +
                                                 </button>
@@ -1390,17 +1390,17 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateParam(rule.id, 'feePercentage', Math.max(0, (rule.params.feePercentage ?? 50) - 10))}
-                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center cursor-pointer text-xs"
                                                 >
                                                     -
                                                 </button>
-                                                <span className="font-mono font-bold text-emerald-700 text-xs px-1">
+                                                <span className="font-mono text-emerald-700 text-xs px-1">
                                                     {rule.params.feePercentage}%
                                                 </span>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateParam(rule.id, 'feePercentage', Math.min(100, (rule.params.feePercentage ?? 50) + 10))}
-                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center cursor-pointer text-xs"
                                                 >
                                                     +
                                                 </button>
@@ -1416,17 +1416,17 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateParam(rule.id, 'flatAmountBDT', Math.max(0, (rule.params.flatAmountBDT ?? 5000) - 1000))}
-                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center cursor-pointer text-xs"
                                                 >
                                                     -
                                                 </button>
-                                                <span className="font-mono font-bold text-gray-900 text-xs px-1">
+                                                <span className="font-mono text-gray-900 text-xs px-1">
                                                     ৳ {rule.params.flatAmountBDT.toLocaleString()}
                                                 </span>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateParam(rule.id, 'flatAmountBDT', (rule.params.flatAmountBDT ?? 5000) + 1000)}
-                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold flex items-center justify-center cursor-pointer text-xs"
+                                                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 flex items-center justify-center cursor-pointer text-xs"
                                                 >
                                                     +
                                                 </button>
@@ -1438,7 +1438,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     {rule.params.timeWindowStart && rule.params.timeWindowEnd && (
                                         <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs text-[11px]">
                                             <span className="text-[10.5px] font-medium text-gray-500">Active Window:</span>
-                                            <span className="font-mono font-bold text-indigo-700">
+                                            <span className="font-mono text-indigo-700">
                                                 {rule.params.timeWindowStart} – {rule.params.timeWindowEnd}
                                             </span>
                                         </div>
@@ -1448,7 +1448,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     {rule.params.ageThreshold !== undefined && (
                                         <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-2xs text-[11px]">
                                             <span className="text-[10.5px] font-medium text-gray-500">Age Limit:</span>
-                                            <span className="font-bold text-gray-800">
+                                            <span className="text-gray-800">
                                                 {rule.params.ageThreshold} Years
                                             </span>
                                         </div>
@@ -1466,19 +1466,19 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-2 text-xs items-stretch">
                                 {/* IF NODE (Trigger) */}
                                 <div className="md:col-span-5 p-2.5 rounded-lg bg-gray-50 border border-gray-200/80 space-y-1">
-                                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1">
+                                    <span className="text-[10px] text-blue-700 uppercase tracking-wider flex items-center gap-1">
                                         <Clock size={11} className="text-blue-600" />
                                         <span>IF (Operational Trigger Condition)</span>
                                     </span>
                                     <p className="text-gray-800 font-medium leading-snug">
                                         {rule.conditionSummary}
                                         {rule.params.hoursThreshold !== undefined && (
-                                            <span className="font-bold text-blue-700 ml-1">
+                                            <span className="text-blue-700 ml-1">
                                                 (Currently set to {rule.params.hoursThreshold} hours)
                                             </span>
                                         )}
                                         {rule.params.timeWindowStart && (
-                                            <span className="font-bold text-indigo-700 ml-1">
+                                            <span className="text-indigo-700 ml-1">
                                                 ({rule.params.timeWindowStart} to {rule.params.timeWindowEnd})
                                             </span>
                                         )}
@@ -1493,7 +1493,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                 {/* THEN NODE (Folio Action) */}
                                 <div className="md:col-span-6 p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/80 space-y-1 flex flex-col justify-between">
                                     <div>
-                                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                                        <span className="text-[10px] text-emerald-800 uppercase tracking-wider flex items-center gap-1">
                                             <Check size={11} className="text-emerald-600" />
                                             <span>THEN (Automated Folio Action & Fee)</span>
                                         </span>
@@ -1503,7 +1503,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     </div>
 
                                     <div className="flex items-center justify-between pt-1 border-t border-emerald-200/50 text-[11px]">
-                                        <span className="text-[10px] uppercase font-bold text-emerald-800">Computed Charge Rate:</span>
+                                        <span className="text-[10px] uppercase text-emerald-800">Computed Charge Rate:</span>
                                         <strong className="text-emerald-800 font-bold">
                                             {rule.params.feePercentage !== undefined ? `${rule.params.feePercentage}%` : ''}
                                             {rule.params.flatAmountBDT !== undefined ? `৳ ${rule.params.flatAmountBDT.toLocaleString()}` : ''}
@@ -1547,7 +1547,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                     <ShieldCheck size={16} />
                                 </div>
                                 <div>
-                                    <h2 className="text-sm font-bold text-gray-900">
+                                    <h2 className="text-sm text-gray-900">
                                         {editingRule ? `Configure Dynamic Policy: ${editingRule.code}` : 'Register Dynamic Hotel Policy Rule'}
                                     </h2>
                                     <p className="text-[11px] text-gray-500">
@@ -1568,7 +1568,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                         <form onSubmit={handleSaveRuleModal} className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-3.5 text-xs">
                             {/* Section 1: Identification */}
                             <div className="space-y-1">
-                                <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider block">
+                                <span className="text-gray-700 text-[11px] uppercase tracking-wider block">
                                     1. Rule Identification & Domain
                                 </span>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 bg-gray-50/70 border border-gray-200/80 rounded-xl">
@@ -1579,7 +1579,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                             name="code"
                                             required
                                             defaultValue={editingRule?.code || `POL-${activeTab.slice(0, 4).toUpperCase()}-${Date.now().toString().slice(-3)}`}
-                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono font-bold text-xs"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
                                         />
                                     </div>
 
@@ -1643,7 +1643,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
 
                             {/* Section 2: Computational Parameters */}
                             <div className="space-y-1">
-                                <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider block flex items-center gap-1 text-blue-700">
+                                <span className="text-gray-700 text-[11px] uppercase tracking-wider block flex items-center gap-1 text-blue-700">
                                     <Sliders size={12} />
                                     <span>2. Dynamic Computational Parameters (Live Input)</span>
                                 </span>
@@ -1655,7 +1655,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                             name="paramHoursThreshold"
                                             defaultValue={editingRule?.params.hoursThreshold ?? ''}
                                             placeholder="e.g. 48"
-                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono font-bold text-xs"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
                                         />
                                     </div>
 
@@ -1668,7 +1668,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                             max={100}
                                             defaultValue={editingRule?.params.feePercentage ?? ''}
                                             placeholder="e.g. 50"
-                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono font-bold text-xs"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
                                         />
                                     </div>
 
@@ -1679,7 +1679,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                                             name="paramFlatAmountBDT"
                                             defaultValue={editingRule?.params.flatAmountBDT ?? ''}
                                             placeholder="e.g. 5000"
-                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono font-bold text-xs"
+                                            className="w-full h-8 px-2.5 border border-gray-200 rounded-lg bg-white outline-none font-mono text-xs"
                                         />
                                     </div>
 
@@ -1720,7 +1720,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
 
                             {/* Section 3: Natural Language Summaries & GL */}
                             <div className="space-y-1">
-                                <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider block">
+                                <span className="text-gray-700 text-[11px] uppercase tracking-wider block">
                                     3. Rule Statements & GL Ledger
                                 </span>
                                 <div className="space-y-2.5 p-3 bg-gray-50/70 border border-gray-200/80 rounded-xl">
@@ -1764,7 +1764,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
 
                             {/* Section 4: Governance & Legal */}
                             <div className="space-y-1">
-                                <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wider block">
+                                <span className="text-gray-700 text-[11px] uppercase tracking-wider block">
                                     4. Supervisor Override & Legal Disclosures
                                 </span>
                                 <div className="space-y-2.5 p-3 bg-gray-50/70 border border-gray-200/80 rounded-xl">

@@ -11,7 +11,7 @@ import {
     FileText
 } from 'lucide-react';
 import PageHeader from '../common/PageHeader';
-import { updateReservationStatusInDB, broadcastPMSEvent } from '../../utils/roomInventoryEngine';
+import { updateReservationStatusInDB, broadcastPMSEvent, saveStoredReservations, getAllStoredReservations } from '../../utils/roomInventoryEngine';
 
 export interface CancelledItem {
     id: number;
@@ -185,10 +185,8 @@ export const ReservationCancel: React.FC = () => {
             // Remove from cancelled list
             setCancelledList(prev => prev.filter(c => c.id !== id));
 
-            // Push to hotel_reservations_v2 so it reflects everywhere
             try {
-                const existingRes = localStorage.getItem('hotel_reservations_v2');
-                const resList = existingRes ? JSON.parse(existingRes) : [];
+                const resList = [...getAllStoredReservations()];
                 
                 const origTotal = item.originalTotalBDT || 12000;
                 const retFee = item.retentionFeeBDT || 0;
@@ -203,21 +201,21 @@ export const ReservationCancel: React.FC = () => {
                     checkIn: item.checkIn || '2026-06-25',
                     checkOut: item.checkOut || '2026-06-28',
                     nights: item.nights || 2,
-                    status: 'CONFIRMED',
+                    status: 'CONFIRMED' as const,
                     paidAmount: Math.max(0, origTotal - retFee),
                     totalAmount: origTotal,
+                    dueAmount: 0,
                     notes: `Reinstated on ${new Date().toLocaleDateString('en-GB')} by FOM. Reason: Guest renewed arrival.`
                 };
                 
-                resList.push(restoredReservation);
-                localStorage.setItem('hotel_reservations_v2', JSON.stringify(resList));
-                localStorage.setItem('hotel_reservations_v3', JSON.stringify(resList));
+                resList.push(restoredReservation as any);
+                saveStoredReservations(resList);
                 
-                // Relational SQLite DB synchronization & SSE broadcast
+                // Relational PostgreSQL DB synchronization & SSE broadcast
                 updateReservationStatusInDB(item.reservationNumber, 'CONFIRMED').catch(console.warn);
                 broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             } catch (e) {
-                console.error('Failed to sync to hotel_reservations_v2', e);
+                console.error('Failed to sync restored reservation', e);
             }
 
             showToast(`Reservation ${item.reservationNumber} reinstated and transferred to Active Ledger.`);
@@ -312,7 +310,7 @@ export const ReservationCancel: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Cancelled</span>
+                        <span className="text-[11px] text-slate-400 uppercase tracking-wider">Total Cancelled</span>
                         <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{cancelledList.length} <span className="text-xs font-normal text-slate-400">Bookings</span></p>
                     </div>
                     <div className="size-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center">
@@ -322,7 +320,7 @@ export const ReservationCancel: React.FC = () => {
 
                 <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fees Retained (GL-4501)</span>
+                        <span className="text-[11px] text-slate-400 uppercase tracking-wider">Fees Retained (GL-4501)</span>
                         <p className="text-2xl font-black text-rose-700 font-mono mt-1">৳ {totalRetainedBDT.toLocaleString()}</p>
                         <p className="text-[11px] text-slate-400 font-mono mt-0.5">Booked: ৳ {totalOriginalBDT.toLocaleString()}</p>
                     </div>
@@ -333,7 +331,7 @@ export const ReservationCancel: React.FC = () => {
 
                 <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Full Refunds Disbursed</span>
+                        <span className="text-[11px] text-slate-400 uppercase tracking-wider">Full Refunds Disbursed</span>
                         <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">{fullRefundsCount} <span className="text-xs font-normal text-slate-400">Waivers</span></p>
                     </div>
                     <div className="size-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
@@ -343,7 +341,7 @@ export const ReservationCancel: React.FC = () => {
 
                 <div className="card-container p-4 flex items-center justify-between">
                     <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Penalties / Forfeitures</span>
+                        <span className="text-[11px] text-slate-400 uppercase tracking-wider">Penalties / Forfeitures</span>
                         <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{penaltyAppliedCount} <span className="text-xs font-normal text-slate-400">Accounts</span></p>
                     </div>
                     <div className="size-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center">
@@ -387,7 +385,7 @@ export const ReservationCancel: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase mr-1">Status:</span>
+                        <span className="text-[10px] text-gray-400 uppercase mr-1">Status:</span>
                         {[
                             { key: 'ALL', label: 'All' },
                             { key: 'FULL', label: 'Full Refund' },
@@ -423,7 +421,7 @@ export const ReservationCancel: React.FC = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left min-w-[1180px] border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider">
+                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-600 uppercase tracking-wider">
                                 <th className="px-3.5 py-2.5 w-24">Res #</th>
                                 <th className="px-3.5 py-2.5 w-44">Guest Identity</th>
                                 <th className="px-3.5 py-2.5 w-36">Room Details</th>
@@ -445,7 +443,7 @@ export const ReservationCancel: React.FC = () => {
                             ) : (
                                 filtered.map(c => (
                                     <tr key={c.id} className="hover:bg-rose-50/20 transition-colors">
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-rose-800">
+                                        <td className="px-3.5 py-2.5 font-mono text-rose-800">
                                             {c.reservationNumber}
                                         </td>
                                         <td className="px-3.5 py-2.5">
@@ -466,7 +464,7 @@ export const ReservationCancel: React.FC = () => {
                                         </td>
                                         <td className="px-3.5 py-2.5 max-w-xs">
                                             <div className="flex items-center gap-1.5 mb-0.5">
-                                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-gray-100 text-gray-700 border border-gray-200">
+                                                <span className="px-1.5 py-0.2 rounded text-[9px] uppercase bg-gray-100 text-gray-700 border border-gray-200">
                                                     {c.reasonCategory}
                                                 </span>
                                                 <span className="text-[10px] text-gray-400 font-mono">{c.cancellationDate}</span>
@@ -479,7 +477,7 @@ export const ReservationCancel: React.FC = () => {
                                             {c.cancelledBy}
                                         </td>
                                         <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                                            <div className="font-mono font-bold text-rose-700">
+                                            <div className="font-mono text-rose-700">
                                                 ৳ {(c.retentionFeeBDT || 0).toLocaleString()}
                                             </div>
                                             <div className="text-[9.5px] text-gray-400 font-mono">
@@ -487,7 +485,7 @@ export const ReservationCancel: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-3.5 py-2.5 whitespace-nowrap">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                            <span className={`px-2 py-0.5 rounded text-[10px] ${
                                                 (c.refundStatus || '').includes('Full')
                                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                     : (c.refundStatus || '').includes('Partial')
@@ -511,7 +509,7 @@ export const ReservationCancel: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => handleReinstate(c.id)}
-                                                className="h-6.5 px-2.5 text-[10.5px] font-bold bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                                className="h-6.5 px-2.5 text-[10.5px] bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded shadow-2xs cursor-pointer inline-flex items-center gap-1"
                                                 title="Reinstate to Active Booking"
                                             >
                                                 <RotateCcw size={11} className="text-blue-600" />
@@ -536,7 +534,7 @@ export const ReservationCancel: React.FC = () => {
                                     <FileText size={15} />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold text-gray-900 leading-none">
+                                    <h3 className="text-sm text-gray-900 leading-none">
                                         Cancellation & GL Forfeiture Voucher
                                     </h3>
                                     <p className="text-[10px] text-gray-400 font-mono mt-0.5">
@@ -556,31 +554,31 @@ export const ReservationCancel: React.FC = () => {
                         <div className="bg-gray-50 p-3 rounded-lg border border-gray-200/80 space-y-2 text-xs">
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Guest Name</span>
-                                    <p className="font-bold text-gray-900">{viewVoucherItem.guestName}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Guest Name</span>
+                                    <p className="text-gray-900">{viewVoucherItem.guestName}</p>
                                     <p className="text-[10px] text-gray-500 font-mono">{viewVoucherItem.phone}</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Room Category</span>
-                                    <p className="font-bold text-gray-900">{viewVoucherItem.roomType}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Room Category</span>
+                                    <p className="text-gray-900">{viewVoucherItem.roomType}</p>
                                     <p className="text-[10px] text-gray-500 font-mono">Stay: {viewVoucherItem.stayDates}</p>
                                 </div>
                             </div>
 
                             <div className="border-t border-gray-200 pt-2 grid grid-cols-2 gap-2">
                                 <div>
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Cancellation Recorded</span>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Cancellation Recorded</span>
                                     <p className="font-mono text-gray-800 text-[11px]">{viewVoucherItem.cancellationDate}</p>
                                     <p className="text-[10px] text-gray-500">By: {viewVoucherItem.cancelledBy}</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Reason Classification</span>
-                                    <p className="font-bold text-gray-800">{viewVoucherItem.reasonCategory}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Reason Classification</span>
+                                    <p className="text-gray-800">{viewVoucherItem.reasonCategory}</p>
                                 </div>
                             </div>
 
                             <div className="border-t border-gray-200 pt-2">
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase">Official Cancellation Note</span>
+                                <span className="text-[9.5px] text-gray-400 uppercase">Official Cancellation Note</span>
                                 <p className="text-gray-700 text-[11px] italic bg-white p-2 rounded border border-gray-200 mt-1">
                                     "{viewVoucherItem.reason}"
                                 </p>
@@ -588,12 +586,12 @@ export const ReservationCancel: React.FC = () => {
 
                             <div className="border-t border-gray-200 pt-2 flex justify-between items-center">
                                 <div>
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Refund Mode</span>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Refund Mode</span>
                                     <p className="font-semibold text-emerald-700">{viewVoucherItem.refundMethod}</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">GL Retention Fee</span>
-                                    <p className="text-base font-bold text-rose-700 font-mono leading-none mt-0.5">
+                                    <span className="text-[9.5px] text-gray-400 uppercase">GL Retention Fee</span>
+                                    <p className="text-base text-rose-700 font-mono leading-none mt-0.5">
                                         ৳ {(viewVoucherItem.retentionFeeBDT || 0).toLocaleString()}
                                     </p>
                                 </div>

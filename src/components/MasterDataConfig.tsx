@@ -1123,10 +1123,10 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                         </div>
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                                <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
+                                <h1 className="text-lg sm:text-xl text-slate-900 tracking-tight leading-tight">
                                     Master Data & Financial Configuration
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-primary border border-blue-200 flex-shrink-0">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-primary border border-blue-200 flex-shrink-0">
                                     Base: {baseCurrency.name} ({baseCurrency.symbol} {baseCurrency.code})
                                 </span>
                                 <span className="badge-status-active">
@@ -1272,7 +1272,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             >
                                 <t.icon size={13} />
                                 <span>{t.label}</span>
-                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-primary border border-blue-100">
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-50 text-primary border border-blue-100">
                                     {t.count}
                                 </span>
                             </button>
@@ -1301,21 +1301,21 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider">
                                     Hotel Settlement Currencies & Base Configuration
                                 </h3>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
                                     Active Base: <strong>{baseCurrency.name} ({baseCurrency.code})</strong> • Symbol: <strong>{baseCurrency.symbol}</strong>
                                 </p>
                             </div>
-                            <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                                 Real-Time FX Conversion Enabled
                             </span>
                         </div>
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left text-xs min-w-[700px]">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Currency Name</th>
                                         <th className="px-3 py-2">ISO Code</th>
                                         <th className="px-3 py-2">Symbol</th>
@@ -1329,12 +1329,12 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     {currencies.map(c => (
                                         <tr key={c.id} className="hover:bg-blue-50/20">
                                             <td className="px-3 py-2 font-semibold text-gray-900">{c.name}</td>
-                                            <td className="px-3 py-2 font-mono font-bold text-gray-900">{c.code}</td>
-                                            <td className="px-3 py-2 font-bold text-blue-600 text-sm">{c.symbol}</td>
+                                            <td className="px-3 py-2 font-mono text-gray-900">{c.code}</td>
+                                            <td className="px-3 py-2 text-blue-600 text-sm">{c.symbol}</td>
                                             <td className="px-3 py-2 font-mono text-gray-600">{c.decimals} digits</td>
                                             <td className="px-3 py-2">
                                                 {c.isBase ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                         <Check size={12} className="text-emerald-600" />
                                                         Primary Base Currency (Default)
                                                     </span>
@@ -1343,7 +1343,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                <span className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
                                                     Accepted at Desk
                                                 </span>
                                             </td>
@@ -1353,13 +1353,13 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => handleSetDefaultCurrency(c.code)}
-                                                            className="h-6 px-2 text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded cursor-pointer transition-colors"
+                                                            className="h-6 px-2 text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded cursor-pointer transition-colors"
                                                             title="Make this the Default Operational Base Currency across the Hotel PMS"
                                                         >
                                                             Set as Default Base
                                                         </button>
                                                     ) : (
-                                                        <span className="text-[10px] text-emerald-600 font-bold px-1.5 py-0.5 bg-emerald-50 rounded">
+                                                        <span className="text-[10px] text-emerald-600 px-1.5 py-0.5 bg-emerald-50 rounded">
                                                             Active Default
                                                         </span>
                                                     )}
@@ -1392,7 +1392,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <TrendingUp size={14} className="text-emerald-600" />
                                     <span>FX Exchange Rates Board (Relative to Base {baseCurrency.code})</span>
                                 </h3>
@@ -1411,7 +1411,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left text-xs min-w-[700px]">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Currency Pair</th>
                                         <th className="px-3 py-2">Buying Rate (1 FX = {baseCurrency.code})</th>
                                         <th className="px-3 py-2">Selling Rate (1 FX = {baseCurrency.code})</th>
@@ -1429,17 +1429,17 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                         return (
                                             <tr key={r.id} className="hover:bg-gray-50">
                                                 <td className="px-3 py-2">
-                                                    <div className="font-bold text-gray-900 font-mono">
+                                                    <div className="text-gray-900 font-mono">
                                                         {r.currencyCode}/{baseCurrency.code}
                                                     </div>
                                                     <div className="text-[10px] text-gray-400">{r.currencyName}</div>
                                                 </td>
-                                                <td className="px-3 py-2 font-mono font-bold text-emerald-700">{r.buyingRate}</td>
-                                                <td className="px-3 py-2 font-mono font-bold text-blue-700">{r.sellingRate}</td>
+                                                <td className="px-3 py-2 font-mono text-emerald-700">{r.buyingRate}</td>
+                                                <td className="px-3 py-2 font-mono text-blue-700">{r.sellingRate}</td>
                                                 <td className="px-3 py-2 font-mono text-[11px] text-gray-600">{spread}%</td>
                                                 <td className="px-3 py-2 text-gray-500">{r.effectiveDate}</td>
                                                 <td className="px-3 py-2">
-                                                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${r.autoUpdate ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                    <span className={`px-1.5 py-0.2 rounded text-[10px] ${r.autoUpdate ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
                                                         {r.autoUpdate ? 'Auto API' : 'Manual Lock'}
                                                     </span>
                                                 </td>
@@ -1447,7 +1447,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingRate(r)}
-                                                        className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
+                                                        className="px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
                                                     >
                                                         Adjust Rate
                                                     </button>
@@ -1470,12 +1470,12 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     {/* USALI Concept Explainer */}
                     <div className="bg-gradient-to-r from-emerald-50/70 via-blue-50/50 to-white p-3 rounded-xl border border-emerald-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
                                 <TrendingUp size={16} />
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-bold text-gray-900">USALI 2-Tier Chart of Accounts Hierarchy</span>
+                                    <span className="text-gray-900">USALI 2-Tier Chart of Accounts Hierarchy</span>
                                     <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">Global Hospitality Standard</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-0.5">
@@ -1498,14 +1498,14 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     {/* Revenue Groups (Tier 1) Overview */}
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                 <Database size={13} className="text-blue-600" />
                                 <span>Tier 1: USALI Operating & Non-Operating Revenue Groups</span>
                             </h3>
                             <button
                                 type="button"
                                 onClick={handleOpenAddRevGroup}
-                                className="h-6 px-2 text-[10.5px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
+                                className="h-6 px-2 text-[10.5px] bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
                             >
                                 + Add Group
                             </button>
@@ -1519,7 +1519,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                         className="p-3 rounded-xl border border-gray-200 hover:border-blue-300 bg-gray-50/40 transition-all flex flex-col justify-between space-y-2 relative group"
                                     >
                                         <div className="flex items-center justify-between">
-                                            <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                                            <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
                                                 {group.code}
                                             </span>
                                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1550,12 +1550,12 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                             </div>
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-gray-900 text-xs">{group.name}</h4>
+                                            <h4 className="text-gray-900 text-xs">{group.name}</h4>
                                             <div className="text-[10px] text-gray-500 mt-0.5">{group.departmentHead}</div>
                                         </div>
                                         <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[10.5px]">
-                                            <span className="font-mono font-bold text-gray-600">{group.glPrefix}</span>
-                                            <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                                            <span className="font-mono text-gray-600">{group.glPrefix}</span>
+                                            <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
                                                 {headCount} Sub-Heads
                                             </span>
                                         </div>
@@ -1569,7 +1569,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <Receipt size={14} className="text-emerald-600" />
                                     <span>Tier 2: Detailed Chart of Revenue Heads (Sub-Ledgers & Folio Mappings)</span>
                                 </h3>
@@ -1595,7 +1595,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left text-xs min-w-[760px]">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Head Code</th>
                                         <th className="px-3 py-2">Revenue Head Name</th>
                                         <th className="px-3 py-2">USALI Group</th>
@@ -1612,25 +1612,25 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                         const parentGroup = revenueGroups.find(g => g.id === head.groupId);
                                         return (
                                             <tr key={head.id} className="hover:bg-blue-50/20">
-                                                <td className="px-3 py-2 font-mono font-bold text-blue-700">{head.code}</td>
+                                                <td className="px-3 py-2 font-mono text-blue-700">{head.code}</td>
                                                 <td className="px-3 py-2 font-semibold text-gray-900">{head.name}</td>
                                                 <td className="px-3 py-2">
                                                     <span className="text-[10.5px] font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
                                                         {parentGroup?.name || 'Operating'}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-2 font-mono font-bold text-gray-900">
+                                                <td className="px-3 py-2 font-mono text-gray-900">
                                                     <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded border border-blue-200 font-bold">
                                                         {head.glAccountCode}
                                                     </span>
                                                 </td>
                                                 <td className="px-3 py-2 text-gray-600 text-[11px]">{head.costCenter}</td>
                                                 <td className="px-3 py-2">
-                                                    <span className="font-bold text-gray-900">{head.defaultTaxRate}%</span>
+                                                    <span className="text-gray-900">{head.defaultTaxRate}%</span>
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     {head.serviceChargeApplicable ? (
-                                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                             10% Applicable
                                                         </span>
                                                     ) : (
@@ -1638,7 +1638,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                                     )}
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${head.accountType.includes('Contra') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] ${head.accountType.includes('Contra') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
                                                         {head.accountType}
                                                     </span>
                                                 </td>
@@ -1694,7 +1694,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                 className="bg-white p-3.5 rounded-xl border border-gray-200/90 shadow-2xs hover:border-blue-300 transition-all flex flex-col justify-between space-y-2.5 relative group"
                             >
                                 <div className="flex items-center justify-between">
-                                    <span className="font-mono text-[10px] font-bold text-blue-600 uppercase bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                                    <span className="font-mono text-[10px] text-blue-600 uppercase bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
                                         {charge.code}
                                     </span>
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1715,27 +1715,27 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-[10px] font-bold text-indigo-600 uppercase">{charge.category}</div>
-                                    <h4 className="font-bold text-gray-900 mt-0.5 text-sm leading-tight">{charge.name}</h4>
+                                    <div className="text-[10px] text-indigo-600 uppercase">{charge.category}</div>
+                                    <h4 className="text-gray-900 mt-0.5 text-sm leading-tight">{charge.name}</h4>
                                     <div className="text-[10px] text-gray-500 font-mono mt-1">{charge.revenueLedgerCode}</div>
                                 </div>
                                 <div className="space-y-1 pt-2 border-t border-gray-100">
                                     <div className="flex items-center justify-between">
-                                        <span className="font-bold text-gray-900 text-sm">
+                                        <span className="text-gray-900 text-sm">
                                             {charge.pricingRule === 'Room Rate %' ? `${charge.basePrice}% of Daily Rate` : `${baseCurrency.symbol} ${charge.basePrice.toLocaleString()}`}
                                         </span>
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-gray-100 text-gray-700">
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-700">
                                             {charge.pricingRule}
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 pt-1">
                                         {charge.taxApplicable && (
-                                            <span className="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 font-bold border border-blue-100">
+                                            <span className="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-100">
                                                 15% VAT
                                             </span>
                                         )}
                                         {charge.serviceChargeApplicable && (
-                                            <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                                            <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
                                                 10% SC
                                             </span>
                                         )}
@@ -1770,7 +1770,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden text-xs">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <h3 className="text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <Percent size={14} className="text-blue-600" />
                                     <span>Authorized Discount & Concession Policies</span>
                                 </h3>
@@ -1791,13 +1791,13 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             {discounts.map(disc => (
                                 <div key={disc.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50 transition-colors">
                                     <div className="flex items-start sm:items-center gap-3">
-                                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-sm flex-shrink-0">
                                             {disc.type === 'Percentage (%)' ? '%' : '৳'}
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-900 text-sm">{disc.name}</span>
-                                                <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                                                <span className="text-gray-900 text-sm">{disc.name}</span>
+                                                <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
                                                     {disc.code}
                                                 </span>
                                                 <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
@@ -1819,7 +1819,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     </div>
                                     <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
                                         {disc.requiresManagerPin && (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <span className="px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
                                                 Supervisor PIN Required
                                             </span>
                                         )}
@@ -1831,7 +1831,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                                 );
                                                 showToast(`Discount ${disc.code} is now ${!disc.active ? 'Active' : 'Inactive'}.`);
                                             }}
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${disc.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
+                                            className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${disc.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                                         >
                                             {disc.active ? 'Active' : 'Inactive'}
                                         </button>
@@ -1877,7 +1877,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <Landmark size={14} className="text-blue-600" />
                                     <span>Hotel Operating Commercial Bank Accounts</span>
                                 </h3>
@@ -1888,7 +1888,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             <button
                                 type="button"
                                 onClick={handleOpenAddBank}
-                                className="h-6 px-2 text-[10.5px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
+                                className="h-6 px-2 text-[10.5px] bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
                             >
                                 + Add Bank Account
                             </button>
@@ -1896,7 +1896,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left text-xs min-w-[760px]">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Bank Name</th>
                                         <th className="px-3 py-2">Account Title</th>
                                         <th className="px-3 py-2">Account Number</th>
@@ -1910,25 +1910,25 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                 <tbody className="divide-y divide-gray-100">
                                     {bankAccounts.map(b => (
                                         <tr key={b.id} className="hover:bg-blue-50/20">
-                                            <td className="px-3 py-2 font-bold text-gray-900">{b.bankName}</td>
+                                            <td className="px-3 py-2 text-gray-900">{b.bankName}</td>
                                             <td className="px-3 py-2 text-gray-700">{b.accountTitle}</td>
-                                            <td className="px-3 py-2 font-mono font-bold text-blue-700">{b.accountNumber}</td>
+                                            <td className="px-3 py-2 font-mono text-blue-700">{b.accountNumber}</td>
                                             <td className="px-3 py-2 text-gray-600">
                                                 <div>{b.branchName}</div>
                                                 <div className="font-mono text-[10px] text-gray-400">Routing: {b.routingNumber}</div>
                                             </td>
-                                            <td className="px-3 py-2 font-mono font-bold text-gray-700">{b.swiftCode}</td>
+                                            <td className="px-3 py-2 font-mono text-gray-700">{b.swiftCode}</td>
                                             <td className="px-3 py-2 font-mono text-[11px] text-gray-500">{b.linkedGlCode}</td>
                                             <td className="px-3 py-2">
                                                 {b.isDefaultSettlement ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                         <Check size={11} /> Default Folio Bank
                                                     </span>
                                                 ) : (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleSetDefaultBank(b.id)}
-                                                        className="px-2 py-0.5 text-[10px] font-bold text-gray-500 hover:text-blue-700 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded cursor-pointer transition-colors"
+                                                        className="px-2 py-0.5 text-[10px] text-gray-500 hover:text-blue-700 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded cursor-pointer transition-colors"
                                                     >
                                                         Make Default
                                                     </button>
@@ -1963,7 +1963,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <Wallet size={14} className="text-emerald-600" />
                                     <span>Mobile Financial Services (MFS) Merchant Wallets</span>
                                 </h3>
@@ -1974,7 +1974,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             <button
                                 type="button"
                                 onClick={handleOpenAddMfs}
-                                className="h-6 px-2 text-[10.5px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded border border-emerald-200 cursor-pointer"
+                                className="h-6 px-2 text-[10.5px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded border border-emerald-200 cursor-pointer"
                             >
                                 + Add MFS Wallet
                             </button>
@@ -1986,7 +1986,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     className="p-3.5 rounded-xl border border-gray-200 hover:border-emerald-300 bg-gray-50/50 transition-all flex flex-col justify-between space-y-2 relative group"
                                 >
                                     <div className="flex items-center justify-between">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${mfs.provider.includes('bKash') ? 'bg-pink-50 text-pink-700 border border-pink-200' : mfs.provider.includes('Nagad') ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}>
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${mfs.provider.includes('bKash') ? 'bg-pink-50 text-pink-700 border border-pink-200' : mfs.provider.includes('Nagad') ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}>
                                             {mfs.provider}
                                         </span>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2007,7 +2007,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="font-mono text-sm font-bold text-gray-900 tracking-wide mt-1">
+                                        <div className="font-mono text-sm text-gray-900 tracking-wide mt-1">
                                             {mfs.merchantNumber}
                                         </div>
                                         <div className="text-[10.5px] text-gray-500 mt-0.5">{mfs.counterId}</div>
@@ -2016,11 +2016,11 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     <div className="pt-2 border-t border-gray-100 space-y-1 text-[10.5px]">
                                         <div className="flex items-center justify-between">
                                             <span className="text-gray-500">MDR Fee:</span>
-                                            <span className="font-bold text-gray-900">{mfs.commissionRatePercent}%</span>
+                                            <span className="text-gray-900">{mfs.commissionRatePercent}%</span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-gray-500">Daily Cap:</span>
-                                            <span className="font-mono font-bold text-gray-700">{baseCurrency.symbol} {mfs.dailyLimitBDT.toLocaleString()}</span>
+                                            <span className="font-mono text-gray-700">{baseCurrency.symbol} {mfs.dailyLimitBDT.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -2050,7 +2050,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <Building2 size={14} className="text-blue-600" />
                                     <span>Hotel Operating Departments & Cost Centers</span>
                                 </h3>
@@ -2061,7 +2061,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             <button
                                 type="button"
                                 onClick={handleOpenAddDept}
-                                className="h-6 px-2 text-[10.5px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
+                                className="h-6 px-2 text-[10.5px] bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer"
                             >
                                 + Add Department
                             </button>
@@ -2069,7 +2069,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left text-xs min-w-[700px]">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Code</th>
                                         <th className="px-3 py-2">Department Name</th>
                                         <th className="px-3 py-2">Head of Department (HOD)</th>
@@ -2083,16 +2083,16 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                 <tbody className="divide-y divide-gray-100">
                                     {departments.map(d => (
                                         <tr key={d.id} className="hover:bg-blue-50/20">
-                                            <td className="px-3 py-2 font-mono font-bold text-blue-700">{d.code}</td>
-                                            <td className="px-3 py-2 font-bold text-gray-900">{d.name}</td>
+                                            <td className="px-3 py-2 font-mono text-blue-700">{d.code}</td>
+                                            <td className="px-3 py-2 text-gray-900">{d.name}</td>
                                             <td className="px-3 py-2 text-gray-700">{d.hodName}</td>
                                             <td className="px-3 py-2 font-mono text-[11px] text-gray-600 font-bold">{d.costCenterCode}</td>
                                             <td className="px-3 py-2">
-                                                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${d.type.includes('Operational') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                <span className={`px-1.5 py-0.2 rounded text-[10px] ${d.type.includes('Operational') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
                                                     {d.type.includes('Operational') ? 'Operational' : 'Support / Overhead'}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-2 font-bold text-gray-900">{d.staffCount} Staff</td>
+                                            <td className="px-3 py-2 text-gray-900">{d.staffCount} Staff</td>
                                             <td className="px-3 py-2 font-mono text-gray-700">{baseCurrency.symbol} {d.monthlyBudgetBDT.toLocaleString()}</td>
                                             <td className="px-3 py-2 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
@@ -2123,7 +2123,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <Clock size={14} className="text-purple-600" />
                                     <span>24/7 Hotel Work Shifts & Handover Protocols</span>
                                 </h3>
@@ -2134,7 +2134,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             <button
                                 type="button"
                                 onClick={handleOpenAddShift}
-                                className="h-6 px-2 text-[10.5px] font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 rounded border border-purple-200 cursor-pointer"
+                                className="h-6 px-2 text-[10.5px] bg-purple-50 text-purple-700 hover:bg-purple-100 rounded border border-purple-200 cursor-pointer"
                             >
                                 + Add Work Shift
                             </button>
@@ -2146,7 +2146,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     className={`p-3.5 rounded-xl border ${s.color} transition-all flex flex-col justify-between space-y-2 relative group shadow-2xs`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <span className="font-mono text-[10px] font-bold uppercase bg-white/80 px-1.5 py-0.2 rounded border border-current">
+                                        <span className="font-mono text-[10px] uppercase bg-white/80 px-1.5 py-0.2 rounded border border-current">
                                             {s.code}
                                         </span>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2167,8 +2167,8 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                         </div>
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-sm">{s.name}</h4>
-                                        <div className="font-mono text-xs font-bold mt-1">
+                                        <h4 className="text-sm">{s.name}</h4>
+                                        <div className="font-mono text-xs mt-1">
                                             {s.startTime} - {s.endTime}
                                         </div>
                                         <div className="text-[10.5px] opacity-80 mt-0.5">Grace: {s.gracePeriodMinutes} mins</div>
@@ -2202,7 +2202,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     {/* Market Codes */}
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                 <Target size={14} className="text-blue-600" />
                                 <span>Hotel Market Codes</span>
                             </h3>
@@ -2219,10 +2219,10 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                 <div key={mc.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                                            <span className="font-mono text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
                                                 {mc.code}
                                             </span>
-                                            <span className="font-bold text-gray-900">{mc.description}</span>
+                                            <span className="text-gray-900">{mc.description}</span>
                                         </div>
                                         <div className="text-[10.5px] text-gray-400 mt-0.5">{mc.reportGroup}</div>
                                     </div>
@@ -2234,7 +2234,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     {/* Business Sources */}
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                 <TrendingUp size={14} className="text-emerald-600" />
                                 <span>Business Channels & OTA Comms</span>
                             </h3>
@@ -2250,13 +2250,13 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                             {businessSources.map(bs => (
                                 <div key={bs.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
                                     <div>
-                                        <div className="font-bold text-gray-900">{bs.name}</div>
+                                        <div className="text-gray-900">{bs.name}</div>
                                         <div className="text-[10.5px] text-gray-400 mt-0.5">
                                             Type: {bs.type} • Linked Rate: {bs.linkedRatePlan}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-amber-50 text-amber-800 border border-amber-200">
+                                        <span className="px-2 py-0.5 rounded font-mono text-xs bg-amber-50 text-amber-800 border border-amber-200">
                                             Comm: {bs.commission}
                                         </span>
                                     </div>
@@ -2276,7 +2276,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Coins size={14} className="text-blue-600" />
                                 <span>{editingCurrency ? 'Edit Currency Parameters' : 'Register New Settlement Currency'}</span>
                             </h3>
@@ -2372,7 +2372,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <TrendingUp size={14} className="text-emerald-600" />
                                 <span>{editingRevGroup ? 'Edit Revenue Group' : 'Register USALI Revenue Group'}</span>
                             </h3>
@@ -2454,7 +2454,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Receipt size={14} className="text-emerald-600" />
                                 <span>{editingRevHead ? 'Edit Revenue Head & GL Link' : 'Register New USALI Revenue Head'}</span>
                             </h3>
@@ -2575,7 +2575,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Receipt size={14} className="text-blue-600" />
                                 <span>{editingCharge ? 'Edit Extra Charge Item' : 'Register New Folio Add-on Charge'}</span>
                             </h3>
@@ -2712,7 +2712,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Percent size={14} className="text-blue-600" />
                                 <span>{editingDiscount ? 'Edit Discount Policy' : 'Create New Discount & Rebate Policy'}</span>
                             </h3>
@@ -2854,7 +2854,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Landmark size={14} className="text-blue-600" />
                                 <span>{editingBank ? 'Edit Bank Account' : 'Register Commercial Bank Account'}</span>
                             </h3>
@@ -2970,7 +2970,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Wallet size={14} className="text-emerald-600" />
                                 <span>{editingMfs ? 'Edit MFS Wallet' : 'Register MFS Merchant Wallet'}</span>
                             </h3>
@@ -3080,7 +3080,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Building2 size={14} className="text-blue-600" />
                                 <span>{editingDept ? 'Edit Department' : 'Create Hotel Department'}</span>
                             </h3>
@@ -3175,7 +3175,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <Clock size={14} className="text-purple-600" />
                                 <span>{editingShift ? 'Edit Work Shift' : 'Configure Hotel Work Shift'}</span>
                             </h3>
@@ -3279,7 +3279,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                 <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-sm w-full border border-gray-200 shadow-xl overflow-hidden">
                         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-1.5">
                                 <TrendingUp size={14} className="text-emerald-600" />
                                 <span>Adjust FX Rate: {editingRate.currencyCode}/{baseCurrency.code}</span>
                             </h3>
@@ -3309,7 +3309,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     type="text"
                                     name="buyingRate"
                                     defaultValue={editingRate.buyingRate}
-                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono font-bold text-emerald-700"
+                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono text-emerald-700"
                                 />
                             </div>
                             <div className="space-y-1">
@@ -3318,7 +3318,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                                     type="text"
                                     name="sellingRate"
                                     defaultValue={editingRate.sellingRate}
-                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono font-bold text-blue-700"
+                                    className="w-full h-8 px-2.5 border border-gray-200 rounded-lg font-mono text-blue-700"
                                 />
                             </div>
                             <label className="flex items-center gap-2 font-semibold text-gray-700 cursor-pointer pt-1">

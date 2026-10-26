@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl } from '../utils/apiUrl';
-import { getDynamicRoomTypes, syncRoomTypesAndRoomsFromDB } from '../utils/roomInventoryEngine';
+import { getDynamicRoomTypes, syncRoomTypesAndRoomsFromDB, broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
 interface RoomType {
@@ -88,24 +88,47 @@ const RoomTypeManagement = () => {
     });
 
     useEffect(() => {
-        syncRoomTypesAndRoomsFromDB(1).then(({ roomTypes: dbRoomTypes }) => {
-            if (dbRoomTypes && dbRoomTypes.length > 0) {
-                setRoomTypes(prev => {
-                    const mapped = dbRoomTypes.map((dbRt: any, idx: number) => {
-                        const existing = prev.find(p => Number(p.id) === Number(dbRt.id) || p.shortCode === dbRt.code);
-                        return existing ? {
-                            ...existing,
-                            id: Number(dbRt.id),
-                            name: dbRt.name || existing.name,
-                            shortCode: dbRt.code || existing.shortCode,
-                            basePrice: Number(dbRt.baseRate || dbRt.basePrice || existing.basePrice)
-                        } : mapDynamicToRoomType(dbRt, idx);
-                    });
+        const loadRoomTypesFromDB = async () => {
+            try {
+                const res = await fetch(`${getApiBaseUrl()}/api/properties/1`);
+                const json = await res.json();
+                if (json.success && json.data?.roomTypes && Array.isArray(json.data.roomTypes)) {
+                    const mapped: RoomType[] = json.data.roomTypes.map((rt: any, idx: number) => ({
+                        id: Number(rt.id),
+                        name: rt.name,
+                        shortCode: rt.code,
+                        description: rt.description || '',
+                        size: Number(rt.size) || 350,
+                        status: rt.status || 'Active',
+                        displayOrder: idx + 1,
+                        baseAdult: Number(rt.base_occupancy || rt.baseAdult) || 2,
+                        baseChild: Number(rt.base_child || rt.max_child || rt.baseChild) || 1,
+                        maxAdult: Number(rt.max_occupancy || rt.max_adult || rt.maxAdult) || 3,
+                        maxChild: Number(rt.max_child || rt.maxChild) || 2,
+                        totalCapacity: (Number(rt.max_occupancy || rt.maxAdult) || 3) + (Number(rt.max_child || rt.maxChild) || 1),
+                        extraBedAllowed: Boolean(rt.extra_bed_rate || rt.extraBedAllowed),
+                        extraBedQuantity: 1,
+                        babyCotAllowed: true,
+                        isConnecting: Boolean(rt.is_connecting || rt.isConnecting),
+                        basePrice: Number(rt.base_rate || rt.basePrice) || 3000,
+                        extraAdultPrice: Number(rt.extra_adult_price || rt.extraAdultPrice) || 1000,
+                        extraChildPrice: Number(rt.extra_child_price || rt.extraChildPrice) || 500,
+                        pricingUnit: rt.pricing_unit || rt.pricingUnit || 'Per Room',
+                        bedType: rt.bed_type || rt.bedType || 'King',
+                        viewType: rt.view_type || rt.viewType || 'City View',
+                        smokingPolicy: rt.smoking_policy || rt.smokingPolicy || 'Non-Smoking',
+                        amenities: Array.isArray(rt.amenities) ? rt.amenities : (typeof rt.amenities === 'string' ? JSON.parse(rt.amenities || '[]') : ['AC', 'TV', 'Wifi', 'Safe']),
+                        photos: Array.isArray(rt.photos) ? rt.photos : (typeof rt.photos === 'string' ? JSON.parse(rt.photos || '[]') : []),
+                        showOnWebsite: Boolean(rt.show_on_website ?? true)
+                    }));
+                    setRoomTypes(mapped);
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
-                    return mapped;
-                });
+                }
+            } catch (err) {
+                console.warn('Could not load room types from DB, using dynamic cached engine:', err);
             }
-        }).catch(() => {});
+        };
+        loadRoomTypesFromDB();
     }, []);
 
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -201,7 +224,20 @@ const RoomTypeManagement = () => {
                         name: formData.name,
                         baseOccupancy: formData.baseAdult,
                         maxOccupancy: formData.maxAdult,
-                        baseRate: formData.basePrice
+                        maxChild: formData.maxChild,
+                        baseRate: formData.basePrice,
+                        extraAdultPrice: formData.extraAdultPrice,
+                        extraChildPrice: formData.extraChildPrice,
+                        size: formData.size,
+                        bedType: formData.bedType,
+                        viewType: formData.viewType,
+                        smokingPolicy: formData.smokingPolicy,
+                        amenities: formData.amenities,
+                        photos: formData.photos,
+                        isConnecting: formData.isConnecting,
+                        showOnWebsite: formData.showOnWebsite,
+                        status: formData.status,
+                        description: formData.description
                     })
                 });
             } catch {}
@@ -217,7 +253,20 @@ const RoomTypeManagement = () => {
                         name: formData.name,
                         baseOccupancy: formData.baseAdult,
                         maxOccupancy: formData.maxAdult,
-                        baseRate: formData.basePrice
+                        maxChild: formData.maxChild,
+                        baseRate: formData.basePrice,
+                        extraAdultPrice: formData.extraAdultPrice,
+                        extraChildPrice: formData.extraChildPrice,
+                        size: formData.size,
+                        bedType: formData.bedType,
+                        viewType: formData.viewType,
+                        smokingPolicy: formData.smokingPolicy,
+                        amenities: formData.amenities,
+                        photos: formData.photos,
+                        isConnecting: formData.isConnecting,
+                        showOnWebsite: formData.showOnWebsite,
+                        status: formData.status,
+                        description: formData.description
                     })
                 });
                 const json = await res.json();
@@ -226,6 +275,10 @@ const RoomTypeManagement = () => {
             updated = [...roomTypes, { ...formData, id: newId }];
         }
         persistRoomTypes(updated);
+        try {
+            await syncRoomTypesAndRoomsFromDB(1);
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         setView('list');
     };
 
@@ -236,6 +289,10 @@ const RoomTypeManagement = () => {
             } catch {}
             const updated = roomTypes.filter(rt => rt.id !== id);
             persistRoomTypes(updated);
+            try {
+                await syncRoomTypesAndRoomsFromDB(1);
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            } catch {}
         }
     };
 
@@ -409,7 +466,7 @@ const RoomTypeManagement = () => {
                                     </div>
                                 </div>
 
-                                <h3 className="text-base font-bold text-slate-900 leading-snug">{rt.name}</h3>
+                                <h3 className="text-base text-slate-900 leading-snug">{rt.name}</h3>
                                 <p className="text-xs text-slate-500 mt-1 line-clamp-2">{rt.description}</p>
 
                                 <div className="mt-4 flex flex-wrap gap-1.5">
@@ -428,12 +485,12 @@ const RoomTypeManagement = () => {
 
                             <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 border-t border-slate-100 pt-3.5 mt-4">
                                 <div>
-                                    <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Occupancy</span>
+                                    <span className="block text-[10px] uppercase text-slate-400 tracking-wider">Occupancy</span>
                                     <span className="font-semibold text-slate-800">{rt.baseAdult}A, {rt.baseChild}C (Max {rt.totalCapacity})</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Base Tariff</span>
-                                    <span className="font-bold font-mono text-primary text-sm">৳{rt.basePrice.toLocaleString()}</span>
+                                    <span className="block text-[10px] uppercase text-slate-400 tracking-wider">Base Tariff</span>
+                                    <span className="font-mono text-primary text-sm">৳{rt.basePrice.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -452,7 +509,7 @@ const RoomTypeManagement = () => {
                         <ChevronLeft className="size-4 text-slate-600" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900">{editingId ? 'Edit Room Type' : 'Create Room Type'}</h1>
+                        <h1 className="text-xl text-slate-900">{editingId ? 'Edit Room Type' : 'Create Room Type'}</h1>
                         <p className="text-xs text-slate-500">Configure room category specifications, occupancy limits, and base tariff</p>
                     </div>
                 </div>
@@ -480,7 +537,7 @@ const RoomTypeManagement = () => {
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold transition w-full text-left ${
                                         activeTab === tab.id
-                                            ? 'bg-primary-subtle text-primary font-bold shadow-2xs'
+                                            ? 'bg-primary-subtle text-primary shadow-2xs'
                                             : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                     }`}
                                 >
@@ -500,7 +557,7 @@ const RoomTypeManagement = () => {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <Tags className="size-5 text-primary" />
                                     <div>
-                                        <h2 className="text-sm font-bold text-slate-900">Basic Information</h2>
+                                        <h2 className="text-sm text-slate-900">Basic Information</h2>
                                         <p className="text-xs text-slate-500">Room class designation, short code, and physical dimensions</p>
                                     </div>
                                 </div>
@@ -542,7 +599,7 @@ const RoomTypeManagement = () => {
                                                     updateField('shortCode', e.target.value.toUpperCase());
                                                 }}
                                                 placeholder="e.g. SUPK"
-                                                className={`input-standard pr-8 font-mono font-bold uppercase ${
+                                                className={`input-standard pr-8 font-mono uppercase ${
                                                     isShortCodeDuplicate(formData?.shortCode || '', existingCodes, editingId ? roomTypes.find(rt => rt.id === editingId)?.shortCode : undefined)
                                                         ? 'border-rose-400 bg-rose-50/50 text-rose-700'
                                                         : ''
@@ -624,7 +681,7 @@ const RoomTypeManagement = () => {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <Users className="size-5 text-primary" />
                                     <div>
-                                        <h2 className="text-sm font-bold text-slate-900">Occupancy & Guest Limits</h2>
+                                        <h2 className="text-sm text-slate-900">Occupancy & Guest Limits</h2>
                                         <p className="text-xs text-slate-500">Base allowance and maximum guest limits per reservation</p>
                                     </div>
                                 </div>
@@ -671,7 +728,7 @@ const RoomTypeManagement = () => {
                                             type="number"
                                             value={formData?.totalCapacity || 3}
                                             onChange={e => updateField('totalCapacity', parseInt(e.target.value) || 3)}
-                                            className="input-standard bg-slate-50 font-bold text-primary"
+                                            className="input-standard bg-slate-50 text-primary"
                                         />
                                         <p className="text-[11px] text-slate-400">Total persons permitted in room (Adults + Children)</p>
                                     </div>
@@ -685,14 +742,14 @@ const RoomTypeManagement = () => {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <BedDouble className="size-5 text-primary" />
                                     <div>
-                                        <h2 className="text-sm font-bold text-slate-900">Extra Bedding Policies</h2>
+                                        <h2 className="text-sm text-slate-900">Extra Bedding Policies</h2>
                                         <p className="text-xs text-slate-500">Rollaway bedding configuration and supplemental crib options</p>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                                         <div>
-                                            <span className="text-xs font-bold text-slate-800">Rollaway Extra Bed Allowed?</span>
+                                            <span className="text-xs text-slate-800">Rollaway Extra Bed Allowed?</span>
                                             <p className="text-[11px] text-slate-500">Can an extra mattress / rollaway bed be accommodated in this room?</p>
                                         </div>
                                         <input
@@ -731,7 +788,7 @@ const RoomTypeManagement = () => {
 
                                     <div className="flex items-center justify-between p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                                         <div>
-                                            <span className="text-xs font-bold text-slate-800">Baby Crib / Cot Permitted?</span>
+                                            <span className="text-xs text-slate-800">Baby Crib / Cot Permitted?</span>
                                             <p className="text-[11px] text-slate-500">Complimentary or paid baby cot for infants under 3 years</p>
                                         </div>
                                         <input
@@ -751,7 +808,7 @@ const RoomTypeManagement = () => {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <DollarSign className="size-5 text-primary" />
                                     <div>
-                                        <h2 className="text-sm font-bold text-slate-900">Base Pricing & Surcharges</h2>
+                                        <h2 className="text-sm text-slate-900">Base Pricing & Surcharges</h2>
                                         <p className="text-xs text-slate-500">Standard rack rate and extra occupant pricing</p>
                                     </div>
                                 </div>
@@ -764,7 +821,7 @@ const RoomTypeManagement = () => {
                                                 type="number"
                                                 value={formData?.basePrice || 0}
                                                 onChange={e => updateField('basePrice', parseFloat(e.target.value) || 0)}
-                                                className="input-standard pl-8 font-mono font-bold text-primary text-base"
+                                                className="input-standard pl-8 font-mono text-primary text-base"
                                             />
                                         </div>
                                         <p className="text-[11px] text-slate-400">Standard nightly price for base occupancy</p>
@@ -808,7 +865,7 @@ const RoomTypeManagement = () => {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <Star className="size-5 text-primary" />
                                     <div>
-                                        <h2 className="text-sm font-bold text-slate-900">Attributes & Amenities Checklist</h2>
+                                        <h2 className="text-sm text-slate-900">Attributes & Amenities Checklist</h2>
                                         <p className="text-xs text-slate-500">Bed styles, views, policies, and room catalog photos</p>
                                     </div>
                                 </div>

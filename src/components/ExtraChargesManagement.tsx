@@ -226,7 +226,7 @@ export const ExtraChargesManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Active Extra Charges</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{activeCount} / {extraCharges.length}</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{activeCount} / {extraCharges.length}</div>
                         <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
                             <Check size={11} /> Ready on Folios
                         </span>
@@ -239,7 +239,7 @@ export const ExtraChargesManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Auto-Post Triggers</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{autoPostCount} Services</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{autoPostCount} Services</div>
                         <span className="text-[10px] text-blue-600 font-semibold mt-0.5 block">
                             On Resv / Check-In
                         </span>
@@ -252,7 +252,7 @@ export const ExtraChargesManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Taxable Add-ons</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">
+                        <div className="text-xl text-gray-900 mt-0.5">
                             {extraCharges.filter(c => c.taxApplicable).length} Items
                         </div>
                         <span className="text-[10px] text-amber-600 font-semibold mt-0.5 block">
@@ -267,7 +267,7 @@ export const ExtraChargesManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Service Charge (10%)</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">
+                        <div className="text-xl text-gray-900 mt-0.5">
                             {extraCharges.filter(c => c.serviceChargeApplicable).length} Items
                         </div>
                         <span className="text-[10px] text-purple-600 font-semibold mt-0.5 block">
@@ -318,7 +318,7 @@ export const ExtraChargesManagement: React.FC = () => {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
                                     {getCategoryIcon(charge.category)}
-                                    <span className="font-mono text-[10px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                                    <span className="font-mono text-[10px] text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
                                         {charge.code}
                                     </span>
                                 </div>
@@ -343,28 +343,28 @@ export const ExtraChargesManagement: React.FC = () => {
                             </div>
 
                             <div>
-                                <div className="text-[10px] font-bold text-gray-500 uppercase">{charge.category}</div>
-                                <h3 className="font-bold text-gray-900 mt-0.5 text-sm leading-snug">{charge.name}</h3>
+                                <div className="text-[10px] text-gray-500 uppercase">{charge.category}</div>
+                                <h3 className="text-gray-900 mt-0.5 text-sm leading-snug">{charge.name}</h3>
                                 <div className="text-[10px] text-gray-500 font-mono mt-1">{charge.revenueLedgerCode}</div>
                             </div>
 
                             <div className="space-y-1.5 pt-2.5 border-t border-gray-100">
                                 <div className="flex items-center justify-between">
-                                    <span className="font-bold text-gray-900 text-sm">
+                                    <span className="text-gray-900 text-sm">
                                         {charge.pricingRule === 'Room Rate %' ? `${charge.basePrice}% of Room Rate` : `৳ ${charge.basePrice.toLocaleString()}`}
                                     </span>
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700">
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-700">
                                         {charge.pricingRule}
                                     </span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 pt-1">
                                     {charge.taxApplicable && (
-                                        <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-100">
+                                        <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                                             15% VAT
                                         </span>
                                     )}
                                     {charge.serviceChargeApplicable && (
-                                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
                                             10% SC
                                         </span>
                                     )}
@@ -379,7 +379,7 @@ export const ExtraChargesManagement: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleToggleActive(charge.id)}
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${charge.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
+                                    className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${charge.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                                 >
                                     {charge.active ? 'Active' : 'Inactive'}
                                 </button>
@@ -392,7 +392,7 @@ export const ExtraChargesManagement: React.FC = () => {
                     <div className="overflow-x-auto no-scrollbar">
                         <table className="w-full text-left text-xs min-w-[850px]">
                             <thead>
-                                <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                     <th className="px-3.5 py-2.5">Code</th>
                                     <th className="px-3.5 py-2.5">Charge Name</th>
                                     <th className="px-3.5 py-2.5">Category</th>
@@ -408,7 +408,7 @@ export const ExtraChargesManagement: React.FC = () => {
                             <tbody className="divide-y divide-gray-100">
                                 {filteredCharges.map(charge => (
                                     <tr key={charge.id} className="hover:bg-indigo-50/20 transition-colors">
-                                        <td className="px-3.5 py-2.5 font-mono font-bold text-indigo-600">{charge.code}</td>
+                                        <td className="px-3.5 py-2.5 font-mono text-indigo-600">{charge.code}</td>
                                         <td className="px-3.5 py-2.5 font-semibold text-gray-900">{charge.name}</td>
                                         <td className="px-3.5 py-2.5">
                                             <span className="text-[10.5px] font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
@@ -416,12 +416,12 @@ export const ExtraChargesManagement: React.FC = () => {
                                             </span>
                                         </td>
                                         <td className="px-3.5 py-2.5 text-gray-600 font-medium">{charge.pricingRule}</td>
-                                        <td className="px-3.5 py-2.5 font-bold text-gray-900">
+                                        <td className="px-3.5 py-2.5 text-gray-900">
                                             {charge.pricingRule === 'Room Rate %' ? `${charge.basePrice}%` : `৳ ${charge.basePrice.toLocaleString()}`}
                                         </td>
                                         <td className="px-3.5 py-2.5">
                                             {charge.taxApplicable ? (
-                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
                                                     15% VAT
                                                 </span>
                                             ) : (
@@ -430,7 +430,7 @@ export const ExtraChargesManagement: React.FC = () => {
                                         </td>
                                         <td className="px-3.5 py-2.5">
                                             {charge.serviceChargeApplicable ? (
-                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                     10% SC
                                                 </span>
                                             ) : (
@@ -446,7 +446,7 @@ export const ExtraChargesManagement: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => handleToggleActive(charge.id)}
-                                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${charge.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
+                                                className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${charge.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                                             >
                                                 {charge.active ? 'Active' : 'Inactive'}
                                             </button>
@@ -484,7 +484,7 @@ export const ExtraChargesManagement: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-2">
                                 <Plus size={15} className="text-indigo-600" />
                                 <span>{editingCharge ? 'Edit Extra Charge & Surcharge' : 'Add New Extra Charge'}</span>
                             </h3>
@@ -558,7 +558,7 @@ export const ExtraChargesManagement: React.FC = () => {
                                         min={0}
                                         value={formData.basePrice}
                                         onChange={e => setFormData({ ...formData, basePrice: Number(e.target.value) })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-bold text-gray-900"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-gray-900"
                                     />
                                 </div>
                             </div>

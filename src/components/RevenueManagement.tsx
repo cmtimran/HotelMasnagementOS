@@ -308,7 +308,7 @@ export const RevenueManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">USALI Revenue Groups</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{totalGroupsCount} Tier-1 Groups</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{totalGroupsCount} Tier-1 Groups</div>
                         <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
                             <Check size={11} /> 100% Operating & Non-Op
                         </span>
@@ -321,7 +321,7 @@ export const RevenueManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Active Revenue Heads</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{activeHeadsCount} / {totalHeadsCount}</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{activeHeadsCount} / {totalHeadsCount}</div>
                         <span className="text-[10px] text-blue-600 font-semibold mt-0.5 block">
                             Sub-Ledger GL Accounts
                         </span>
@@ -334,7 +334,7 @@ export const RevenueManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Service Charge Applicable</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{scApplicableCount} Heads</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{scApplicableCount} Heads</div>
                         <span className="text-[10px] text-purple-600 font-semibold mt-0.5 block">
                             10% Standard Hotel SC
                         </span>
@@ -347,7 +347,7 @@ export const RevenueManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Standard Tax Bracket</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">15% VAT</div>
+                        <div className="text-xl text-gray-900 mt-0.5">15% VAT</div>
                         <span className="text-[10px] text-amber-600 font-semibold mt-0.5 block">
                             NBR Hospitality Tax Rate
                         </span>
@@ -361,7 +361,7 @@ export const RevenueManagement: React.FC = () => {
             {/* Tier 1: USALI Revenue Groups Card Deck */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
                 <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                    <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <h2 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Database size={14} className="text-blue-600" />
                         <span>Tier 1: USALI Revenue Groups (Divisions)</span>
                     </h2>
@@ -380,7 +380,7 @@ export const RevenueManagement: React.FC = () => {
                                 className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 relative group ${isSelected ? 'border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-500/20' : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-xs'}`}
                             >
                                 <div className="flex items-center justify-between">
-                                    <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                    <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                                         {group.code}
                                     </span>
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
@@ -403,12 +403,12 @@ export const RevenueManagement: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-gray-900 text-xs">{group.name}</h3>
+                                    <h3 className="text-gray-900 text-xs">{group.name}</h3>
                                     <div className="text-[10px] text-gray-500 mt-0.5">{group.departmentHead}</div>
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[10.5px]">
-                                    <span className="font-mono font-bold text-gray-600">{group.glPrefix}</span>
-                                    <span className={`font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-emerald-600 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                                    <span className="font-mono text-gray-600">{group.glPrefix}</span>
+                                    <span className={`px-2 py-0.5 rounded-full ${isSelected ? 'bg-emerald-600 text-white' : 'bg-blue-50 text-blue-700'}`}>
                                         {count} Sub-Heads
                                     </span>
                                 </div>
@@ -422,7 +422,7 @@ export const RevenueManagement: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gray-50/50">
                     <div>
-                        <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <h2 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                             <Receipt size={14} className="text-emerald-600" />
                             <span>Tier 2: Detailed Chart of Revenue Heads & Folio Ledger Mappings</span>
                         </h2>
@@ -472,7 +472,7 @@ export const RevenueManagement: React.FC = () => {
                 <div className="overflow-x-auto no-scrollbar">
                     <table className="w-full text-left text-xs min-w-[850px]">
                         <thead>
-                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                            <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                 <th className="px-3.5 py-2.5">Head Code</th>
                                 <th className="px-3.5 py-2.5">Revenue Head Name</th>
                                 <th className="px-3.5 py-2.5">USALI Group</th>
@@ -497,7 +497,7 @@ export const RevenueManagement: React.FC = () => {
                                     const parentGroup = revenueGroups.find(g => g.id === head.groupId);
                                     return (
                                         <tr key={head.id} className="hover:bg-blue-50/20 transition-colors">
-                                            <td className="px-3.5 py-2.5 font-mono font-bold text-blue-700">{head.code}</td>
+                                            <td className="px-3.5 py-2.5 font-mono text-blue-700">{head.code}</td>
                                             <td className="px-3.5 py-2.5 font-semibold text-gray-900">{head.name}</td>
                                             <td className="px-3.5 py-2.5">
                                                 <span className="text-[10.5px] font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
@@ -511,13 +511,13 @@ export const RevenueManagement: React.FC = () => {
                                             </td>
                                             <td className="px-3.5 py-2.5 text-gray-600 text-[11px]">{head.costCenter}</td>
                                             <td className="px-3.5 py-2.5">
-                                                <span className={`font-bold px-1.5 py-0.5 rounded text-[10.5px] ${head.defaultTaxRate > 0 ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-gray-100 text-gray-500'}`}>
+                                                <span className={`px-1.5 py-0.5 rounded text-[10.5px] ${head.defaultTaxRate > 0 ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-gray-100 text-gray-500'}`}>
                                                     {head.defaultTaxRate}% VAT
                                                 </span>
                                             </td>
                                             <td className="px-3.5 py-2.5">
                                                 {head.serviceChargeApplicable ? (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                         10% Applicable
                                                     </span>
                                                 ) : (
@@ -525,7 +525,7 @@ export const RevenueManagement: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="px-3.5 py-2.5">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${head.accountType.includes('Contra') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] ${head.accountType.includes('Contra') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
                                                     {head.accountType}
                                                 </span>
                                             </td>
@@ -533,7 +533,7 @@ export const RevenueManagement: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleToggleHeadActive(head.id)}
-                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${head.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
+                                                    className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${head.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                                                 >
                                                     {head.active ? 'Active' : 'Inactive'}
                                                 </button>
@@ -572,7 +572,7 @@ export const RevenueManagement: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-2">
                                 <Receipt size={15} className="text-emerald-600" />
                                 <span>{editingHead ? 'Edit Revenue Head' : 'Create New Revenue Head'}</span>
                             </h3>
@@ -717,7 +717,7 @@ export const RevenueManagement: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-md w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-2">
                                 <Database size={15} className="text-blue-600" />
                                 <span>{editingGroup ? 'Edit Revenue Group' : 'Add Revenue Group (Tier 1)'}</span>
                             </h3>

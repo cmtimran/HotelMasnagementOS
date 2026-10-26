@@ -261,7 +261,7 @@ export const GuestProfile: React.FC = () => {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+                            <h1 className="text-base text-slate-900 tracking-tight">
                                 Guest Profiles 360 & Loyalty CRM
                             </h1>
                             <span className="badge-status-active">
@@ -341,11 +341,11 @@ export const GuestProfile: React.FC = () => {
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                            <span className="font-bold text-gray-900 truncate text-[11.5px]">
+                                            <span className="text-gray-900 truncate text-[11.5px]">
                                                 {g.title} {g.name}
                                             </span>
                                         </div>
-                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                                        <span className={`px-1.5 py-0.2 rounded text-[9px] ${
                                             g.vipTier.includes('Platinum') ? 'bg-purple-100 text-purple-800 border border-purple-200' :
                                             g.vipTier.includes('Corporate') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
                                             g.vipTier.includes('Gold') ? 'bg-amber-100 text-amber-800 border border-amber-200' :
@@ -357,7 +357,7 @@ export const GuestProfile: React.FC = () => {
 
                                     <div className="flex items-center justify-between text-[10px] text-gray-500">
                                         <span className="font-mono">{g.phone}</span>
-                                        <span className="font-mono font-bold text-gray-800">৳ {(g.lifetimeSpendBDT / 1000).toFixed(0)}k</span>
+                                        <span className="font-mono text-gray-800">৳ {(g.lifetimeSpendBDT / 1000).toFixed(0)}k</span>
                                     </div>
 
                                     {g.company && (
@@ -376,15 +376,15 @@ export const GuestProfile: React.FC = () => {
                     {/* Top Identity Hero Card */}
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex items-center gap-3.5">
-                            <div className="w-14 h-14 rounded-full bg-slate-900 text-white font-bold text-lg flex items-center justify-center flex-shrink-0 shadow-sm border-2 border-white ring-2 ring-blue-500/30">
+                            <div className="w-14 h-14 rounded-full bg-slate-900 text-white text-lg flex items-center justify-center flex-shrink-0 shadow-sm border-2 border-white ring-2 ring-blue-500/30">
                                 {activeGuest.name.slice(0, 2).toUpperCase()}
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-base font-bold text-gray-900 leading-tight">
+                                    <h2 className="text-base text-gray-900 leading-tight">
                                         {activeGuest.title} {activeGuest.name}
                                     </h2>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    <span className={`px-2 py-0.5 rounded text-[10px] ${
                                         activeGuest.vipTier.includes('Platinum') ? 'bg-purple-50 text-purple-700 border border-purple-200' :
                                         activeGuest.vipTier.includes('Corporate') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                                         'bg-amber-50 text-amber-700 border border-amber-200'
@@ -392,7 +392,7 @@ export const GuestProfile: React.FC = () => {
                                         <Star size={10} className="inline mr-1 -mt-0.5" />
                                         {activeGuest.vipTier}
                                     </span>
-                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                                         <ShieldCheck size={11} /> KYC Verified
                                     </span>
                                 </div>
@@ -417,20 +417,20 @@ export const GuestProfile: React.FC = () => {
                         {/* Top Lifetime Stats */}
                         <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-gray-200 pt-2 md:pt-0 md:pl-4">
                             <div className="text-center px-2">
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase block">Stays</span>
-                                <span className="text-sm font-bold text-gray-900 mt-0.5 block">{activeGuest.totalStays}</span>
+                                <span className="text-[9.5px] text-gray-400 uppercase block">Stays</span>
+                                <span className="text-sm text-gray-900 mt-0.5 block">{activeGuest.totalStays}</span>
                             </div>
                             <div className="text-center px-2 border-l border-gray-100">
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase block">Nights</span>
-                                <span className="text-sm font-bold text-gray-900 mt-0.5 block">{activeGuest.totalNights}</span>
+                                <span className="text-[9.5px] text-gray-400 uppercase block">Nights</span>
+                                <span className="text-sm text-gray-900 mt-0.5 block">{activeGuest.totalNights}</span>
                             </div>
                             <div className="text-center px-2 border-l border-gray-100">
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase block">Total Spend</span>
-                                <span className="text-sm font-bold text-blue-700 font-mono mt-0.5 block">৳ {activeGuest.lifetimeSpendBDT.toLocaleString()}</span>
+                                <span className="text-[9.5px] text-gray-400 uppercase block">Total Spend</span>
+                                <span className="text-sm text-blue-700 font-mono mt-0.5 block">৳ {activeGuest.lifetimeSpendBDT.toLocaleString()}</span>
                             </div>
                             <div className="text-center px-2 border-l border-gray-100">
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase block">Reward Pts</span>
-                                <span className="text-sm font-bold text-emerald-700 font-mono mt-0.5 block">{activeGuest.loyaltyPoints}</span>
+                                <span className="text-[9.5px] text-gray-400 uppercase block">Reward Pts</span>
+                                <span className="text-sm text-emerald-700 font-mono mt-0.5 block">{activeGuest.loyaltyPoints}</span>
                             </div>
                         </div>
                     </div>
@@ -468,7 +468,7 @@ export const GuestProfile: React.FC = () => {
                     {activeTab === 'overview' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
                             <div className="flex justify-between items-center">
-                                <h3 className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                                <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
                                     <Clock size={13} className="text-blue-600" />
                                     <span>Historical Stays & Active Bookings ({activeGuest.stayHistory.length})</span>
                                 </h3>
@@ -479,7 +479,7 @@ export const GuestProfile: React.FC = () => {
 
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Res #</th>
                                         <th className="px-3 py-2">Room Assigned</th>
                                         <th className="px-3 py-2">Stay Dates</th>
@@ -491,11 +491,11 @@ export const GuestProfile: React.FC = () => {
                                 <tbody className="divide-y divide-gray-100 text-[11.5px]">
                                     {activeGuest.stayHistory.map((s, idx) => (
                                         <tr key={idx} className="hover:bg-gray-50/70 transition-colors">
-                                            <td className="px-3 py-2 font-mono font-bold text-blue-700">
+                                            <td className="px-3 py-2 font-mono text-blue-700">
                                                 {s.resNumber}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <span className="font-bold text-gray-900 font-mono">Room {s.roomNumber}</span>
+                                                <span className="text-gray-900 font-mono">Room {s.roomNumber}</span>
                                                 <span className="text-[10px] text-gray-400 ml-1.5">({s.roomType})</span>
                                             </td>
                                             <td className="px-3 py-2 font-mono text-gray-600 text-[10.5px]">
@@ -504,11 +504,11 @@ export const GuestProfile: React.FC = () => {
                                             <td className="px-3 py-2 text-gray-700">
                                                 {s.nights} Nights
                                             </td>
-                                            <td className="px-3 py-2 text-right font-mono font-bold text-gray-900">
+                                            <td className="px-3 py-2 text-right font-mono text-gray-900">
                                                 ৳ {s.totalAmountBDT.toLocaleString()}
                                             </td>
                                             <td className="px-3 py-2 text-right">
-                                                <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold ${
+                                                <span className={`px-2 py-0.5 rounded text-[9.5px] ${
                                                     s.status === 'In-House' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                                                     s.status === 'Checked-Out' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                                                     'bg-rose-50 text-rose-700 border border-rose-200'
@@ -526,41 +526,41 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 2: Preferences & CRM */}
                     {activeTab === 'preferences' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
                                 <Heart size={13} className="text-rose-500" />
                                 <span>Hospitality Preferences & Personalization</span>
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Preferred Room Type & Location</span>
-                                    <p className="font-bold text-gray-900">{activeGuest.preferences.roomType}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Preferred Room Type & Location</span>
+                                    <p className="text-gray-900">{activeGuest.preferences.roomType}</p>
                                     <span className="inline-block mt-1 px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[9.5px] font-semibold">
                                         {activeGuest.preferences.floorPreference}
                                     </span>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Pillow & Bedding Preference</span>
-                                    <p className="font-bold text-gray-900">{activeGuest.preferences.pillowType}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Pillow & Bedding Preference</span>
+                                    <p className="text-gray-900">{activeGuest.preferences.pillowType}</p>
                                     <p className="text-[10px] text-gray-400">Housekeeping auto-provisions on check-in</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Dietary Requirements & Allergens</span>
-                                    <p className="font-bold text-gray-900">{activeGuest.preferences.dietary}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Dietary Requirements & Allergens</span>
+                                    <p className="text-gray-900">{activeGuest.preferences.dietary}</p>
                                     <p className="text-[10px] text-gray-400">Notified to Executive Chef & Room Service</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Morning Newspaper Subscription</span>
-                                    <p className="font-bold text-gray-900">{activeGuest.preferences.newspaper}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Morning Newspaper Subscription</span>
+                                    <p className="text-gray-900">{activeGuest.preferences.newspaper}</p>
                                     <p className="text-[10px] text-gray-400">Delivered to door at 06:30 AM</p>
                                 </div>
                             </div>
 
                             <div className="bg-blue-50/60 p-3 rounded-lg border border-blue-200">
-                                <span className="text-[9.5px] font-bold text-blue-800 uppercase block mb-1">General Manager & Concierge Notes</span>
+                                <span className="text-[9.5px] text-blue-800 uppercase block mb-1">General Manager & Concierge Notes</span>
                                 <p className="text-gray-800 italic leading-relaxed text-[11px]">
                                     "{activeGuest.preferences.specialNotes}"
                                 </p>
@@ -571,25 +571,25 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 3: ID & Verification Vault */}
                     {activeTab === 'vault' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
                                 <ShieldCheck size={13} className="text-emerald-600" />
                                 <span>KYC & Document Verification Records</span>
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase block">Document Type</span>
-                                    <p className="font-bold text-gray-900 text-xs mt-0.5">{activeGuest.idType}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase block">Document Type</span>
+                                    <p className="text-gray-900 text-xs mt-0.5">{activeGuest.idType}</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase block">Document Number</span>
-                                    <p className="font-bold font-mono text-gray-900 text-xs mt-0.5">{activeGuest.idNumber}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase block">Document Number</span>
+                                    <p className="font-mono text-gray-900 text-xs mt-0.5">{activeGuest.idNumber}</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase block">Issuing Country / Authority</span>
-                                    <p className="font-bold text-gray-900 text-xs mt-0.5">{activeGuest.nationality}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase block">Issuing Country / Authority</span>
+                                    <p className="text-gray-900 text-xs mt-0.5">{activeGuest.nationality}</p>
                                 </div>
                             </div>
 
@@ -598,7 +598,7 @@ export const GuestProfile: React.FC = () => {
                                     <CheckCircle2 size={16} />
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-emerald-900 text-xs">SB Police Verification & Foreigner Registration Clearance</h4>
+                                    <h4 className="text-emerald-900 text-xs">SB Police Verification & Foreigner Registration Clearance</h4>
                                     <p className="text-[10.5px] text-emerald-700 mt-0.5">
                                         Identity verified against National Database on initial check-in. Fully compliant with Special Branch hotel ledger requirements.
                                     </p>
@@ -610,25 +610,25 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 4: Corporate Profile */}
                     {activeTab === 'corporate' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
                                 <Building2 size={13} className="text-blue-600" />
                                 <span>Corporate Affiliation & City Ledger Agreement</span>
                             </h3>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Affiliated Company</span>
-                                    <p className="font-bold text-gray-900 text-xs">{activeGuest.company || 'Not affiliated with a corporate account'}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Affiliated Company</span>
+                                    <p className="text-gray-900 text-xs">{activeGuest.company || 'Not affiliated with a corporate account'}</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Designation</span>
-                                    <p className="font-bold text-gray-900 text-xs">{activeGuest.designation || 'Individual Traveler'}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Designation</span>
+                                    <p className="text-gray-900 text-xs">{activeGuest.designation || 'Individual Traveler'}</p>
                                 </div>
                             </div>
 
                             <div className="p-3 bg-blue-50/70 rounded-lg border border-blue-200 space-y-1">
-                                <span className="text-[9.5px] font-bold text-blue-800 uppercase">Billing Instruction & Direct City Ledger</span>
+                                <span className="text-[9.5px] text-blue-800 uppercase">Billing Instruction & Direct City Ledger</span>
                                 <p className="text-[11px] text-blue-900 leading-relaxed">
                                     Authorized for Direct Billing under Master Services Agreement (MSA #CORP-2026-99). Room and laundry billable to company account; all personal incidentals to be settled at checkout.
                                 </p>
@@ -643,7 +643,7 @@ export const GuestProfile: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-lg w-full p-4 space-y-3">
                         <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                            <h3 className="text-sm font-bold text-gray-900">Register New Guest Profile</h3>
+                            <h3 className="text-sm text-gray-900">Register New Guest Profile</h3>
                             <button onClick={() => setShowAddGuestModal(false)} className="text-gray-400 hover:text-gray-700">✕</button>
                         </div>
 

@@ -8,7 +8,7 @@ import {
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
 import { getApiBaseUrl } from '../utils/apiUrl';
-import { getCanonicalRooms, syncRoomTypesAndRoomsFromDB } from '../utils/roomInventoryEngine';
+import { getCanonicalRooms, syncRoomTypesAndRoomsFromDB, broadcastPMSEvent } from '../utils/roomInventoryEngine';
 
 // ============================================================================
 // DATA MODELS & INTERFACES
@@ -337,20 +337,20 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             id: String(b.id),
                             title: b.name || b.title || `Building ${b.id}`,
                             shortCode: b.code || b.shortCode || `BLD-${b.id}`,
-                            type: b.id === 1 ? 'Main Tower' : 'Executive Block',
-                            description: b.description || `${b.name} accommodation wing`,
+                            type: b.type || (b.id === 1 ? 'Main Tower' : 'Accommodation Wing'),
+                            description: b.description || `${b.name || b.title} accommodation wing`,
                             totalFloors: Number(b.total_floors || b.totalFloors || 3),
-                            groundFloorLabel: 'G (Lobby)',
-                            hasBasement: b.id === 1,
-                            hasElevator: true,
-                            wheelchairAccess: true,
-                            distanceFromLobby: b.id === 1 ? '0 mins (Connected)' : '2 mins (Skybridge)',
-                            mapCoordinates: '21.4272° N, 91.9805° E',
-                            specificAddress: 'Grand Palace Campus',
+                            groundFloorLabel: b.ground_floor_label || 'G (Lobby)',
+                            hasBasement: Boolean(b.has_basement ?? (b.id === 1)),
+                            hasElevator: Boolean(b.has_elevator ?? true),
+                            wheelchairAccess: Boolean(b.wheelchair_access ?? true),
+                            distanceFromLobby: b.distance_from_lobby || '0 mins (Connected)',
+                            mapCoordinates: b.map_coordinates || '21.4272° N, 91.9805° E',
+                            specificAddress: b.specific_address || 'Property Campus',
                             status: b.status === 'INACTIVE' ? 'Inactive' : 'Active',
-                            openingDate: '2022-01-01',
-                            remarks: b.description || '',
-                            amenityIds: ['ELEV-GST', 'ADA-RMP', 'FIRE-EXT', 'SMK-DET', 'EMRG-LGT', 'CCTV-247']
+                            openingDate: b.opening_date || '2022-01-01',
+                            remarks: b.remarks || b.description || '',
+                            amenityIds: Array.isArray(b.amenities) ? b.amenities : ['ELEV-GST', 'ADA-RMP', 'FIRE-EXT', 'SMK-DET', 'EMRG-LGT', 'CCTV-247']
                         }));
                         setBuildings(mappedBlds);
                         localStorage.setItem(STORAGE_KEY_BUILDINGS, JSON.stringify(mappedBlds));
@@ -362,15 +362,15 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             floorNumber: Number(f.floor_number || f.floorNumber || idx + 1),
                             code: f.code || `FL-0${f.floor_number || idx + 1}`,
                             buildingId: String(f.building_id || f.buildingId || '1'),
-                            category: Number(f.floor_number) >= 4 ? 'Executive Club' : 'Guest Rooms',
-                            roomCapacity: 8,
-                            hasElevatorAccess: true,
-                            hasFireExit: true,
-                            hasLinenCloset: true,
-                            hasServiceStation: true,
-                            hasIceMachine: true,
-                            amenityIds: ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'LIN-CLST', 'CCTV-247'],
-                            status: 'Open',
+                            category: f.category || (Number(f.floor_number) >= 4 ? 'Executive Club' : 'Guest Rooms'),
+                            roomCapacity: Number(f.room_capacity || f.roomCapacity || 8),
+                            hasElevatorAccess: Boolean(f.has_elevator_access ?? true),
+                            hasFireExit: Boolean(f.has_fire_exit ?? true),
+                            hasLinenCloset: Boolean(f.has_linen_closet ?? true),
+                            hasServiceStation: Boolean(f.has_service_station ?? true),
+                            hasIceMachine: Boolean(f.has_ice_machine ?? true),
+                            amenityIds: Array.isArray(f.amenities) ? f.amenities : ['FIRE-EXIT', 'FIRE-EXT', 'SMK-DET', 'ELEV-GST', 'LIN-CLST', 'CCTV-247'],
+                            status: f.status || 'Open',
                             description: f.description || `${f.name} corridor & rooms`,
                             sortOrder: idx + 1
                         }));
@@ -651,7 +651,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         setIsBuildingModalOpen(true);
     };
 
-    const handleSaveBuilding = (e: React.FormEvent) => {
+    const handleSaveBuilding = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingBuilding) return;
         if (!editingBuilding.title.trim()) {
@@ -668,40 +668,51 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
         const exists = buildings.some(b => b.id === editingBuilding.id);
         let updated: Building[];
+        const payload = {
+            code: editingBuilding.shortCode,
+            name: editingBuilding.title,
+            sortOrder: editingBuilding.totalFloors || 1,
+            totalFloors: editingBuilding.totalFloors,
+            type: editingBuilding.type,
+            description: editingBuilding.description,
+            status: editingBuilding.status,
+            amenityIds: editingBuilding.amenityIds
+        };
+
         if (exists) {
             updated = buildings.map(b => b.id === editingBuilding.id ? editingBuilding : b);
-            fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${editingBuilding.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    code: editingBuilding.shortCode,
-                    name: editingBuilding.title,
-                    totalFloors: editingBuilding.totalFloors,
-                    description: editingBuilding.description
-                })
-            }).catch(() => {});
+            try {
+                await fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${editingBuilding.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch {}
             showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) updated!`);
         } else {
-            updated = [...buildings, editingBuilding];
-            fetch(`${getApiBaseUrl()}/api/properties/1/buildings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    code: editingBuilding.shortCode,
-                    name: editingBuilding.title,
-                    totalFloors: editingBuilding.totalFloors,
-                    description: editingBuilding.description
-                })
-            }).catch(() => {});
+            let newId = editingBuilding.id;
+            try {
+                const res = await fetch(`${getApiBaseUrl()}/api/properties/1/buildings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const json = await res.json();
+                if (json.success && json.data?.id) newId = String(json.data.id);
+            } catch {}
+            updated = [...buildings, { ...editingBuilding, id: newId }];
             showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) created!`);
         }
 
         saveBuildings(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         setIsBuildingModalOpen(false);
         setEditingBuilding(null);
     };
 
-    const handleDeleteBuilding = (building: Building) => {
+    const handleDeleteBuilding = async (building: Building) => {
         const attachedFloors = floors.filter(f => f.buildingId === building.id);
         const attachedRooms = rooms.filter(r => r.buildingId === building.id);
 
@@ -719,7 +730,10 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
         const updatedBuildings = buildings.filter(b => b.id !== building.id);
         saveBuildings(updatedBuildings);
-        fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${building.id}`, { method: 'DELETE' }).catch(() => {});
+        try {
+            await fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${building.id}`, { method: 'DELETE' });
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         showToast(`Building "${building.title}" removed.`);
     };
 
@@ -773,7 +787,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         setIsFloorModalOpen(true);
     };
 
-    const handleSaveFloor = (e: React.FormEvent) => {
+    const handleSaveFloor = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingFloor) return;
         if (!editingFloor.name.trim()) {
@@ -790,40 +804,51 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
         const exists = floors.some(f => f.id === editingFloor.id);
         let updated: Floor[];
+        const floorPayload = {
+            buildingId: editingFloor.buildingId,
+            floorNumber: editingFloor.floorNumber,
+            name: editingFloor.name,
+            category: editingFloor.category,
+            roomCapacity: editingFloor.roomCapacity,
+            description: editingFloor.description,
+            status: editingFloor.status,
+            amenityIds: editingFloor.amenityIds
+        };
+
         if (exists) {
             updated = floors.map(f => f.id === editingFloor.id ? editingFloor : f);
-            fetch(`${getApiBaseUrl()}/api/properties/1/floors/${editingFloor.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    buildingId: editingFloor.buildingId,
-                    floorNumber: editingFloor.floorNumber,
-                    name: editingFloor.name,
-                    description: editingFloor.description
-                })
-            }).catch(() => {});
+            try {
+                await fetch(`${getApiBaseUrl()}/api/properties/1/floors/${editingFloor.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(floorPayload)
+                });
+            } catch {}
             showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) updated!`);
         } else {
-            updated = [...floors, editingFloor];
-            fetch(`${getApiBaseUrl()}/api/properties/1/floors`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    buildingId: editingFloor.buildingId,
-                    floorNumber: editingFloor.floorNumber,
-                    name: editingFloor.name,
-                    description: editingFloor.description
-                })
-            }).catch(() => {});
+            let newId = editingFloor.id;
+            try {
+                const res = await fetch(`${getApiBaseUrl()}/api/properties/1/floors`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(floorPayload)
+                });
+                const json = await res.json();
+                if (json.success && json.data?.id) newId = String(json.data.id);
+            } catch {}
+            updated = [...floors, { ...editingFloor, id: newId }];
             showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) created!`);
         }
 
         saveFloors(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         setIsFloorModalOpen(false);
         setEditingFloor(null);
     };
 
-    const handleDeleteFloor = (floor: Floor) => {
+    const handleDeleteFloor = async (floor: Floor) => {
         const attachedRooms = rooms.filter(r => r.floorId === floor.id);
         if (attachedRooms.length > 0) {
             if (!confirm(`Warning: Floor "${floor.name}" currently has ${attachedRooms.length} room(s) assigned (${attachedRooms.map(r => r.number).join(', ')}). Are you sure you want to delete this floor?`)) {
@@ -835,7 +860,10 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
         const updatedFloors = floors.filter(f => f.id !== floor.id);
         saveFloors(updatedFloors);
-        fetch(`${getApiBaseUrl()}/api/properties/1/floors/${floor.id}`, { method: 'DELETE' }).catch(() => {});
+        try {
+            await fetch(`${getApiBaseUrl()}/api/properties/1/floors/${floor.id}`, { method: 'DELETE' });
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         showToast(`Floor "${floor.name}" deleted.`);
     };
 
@@ -1192,7 +1220,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     {filteredBuildings.length === 0 ? (
                         <div className="text-center py-16 bg-gray-50/50 rounded-xl border border-dashed border-gray-300">
                             <Building2 size={36} className="mx-auto text-gray-300 mb-2" />
-                            <h3 className="text-sm font-bold text-gray-700">No buildings matched your criteria</h3>
+                            <h3 className="text-sm text-gray-700">No buildings matched your criteria</h3>
                             <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
                                 Try refining your search query or reset status filters.
                             </p>
@@ -1225,7 +1253,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                             <div className="flex justify-between items-start gap-2 mb-2">
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono border border-indigo-200/60">
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono border border-indigo-200/60">
                                                             {building.shortCode}
                                                         </span>
                                                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
@@ -1238,7 +1266,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                             {building.status}
                                                         </span>
                                                     </div>
-                                                    <h3 className="text-sm font-bold text-gray-900 mt-1.5 line-clamp-1">
+                                                    <h3 className="text-sm text-gray-900 mt-1.5 line-clamp-1">
                                                         {building.title}
                                                     </h3>
                                                     <p className="text-[11px] text-gray-500 font-medium">{building.type}</p>
@@ -1272,13 +1300,13 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                             <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-xs mb-3">
                                                 <div>
                                                     <span className="text-[10px] text-gray-400 font-medium block">Total Floors</span>
-                                                    <span className="font-bold text-gray-800">
+                                                    <span className="text-gray-800">
                                                         {buildingFloors.length} ({building.groundFloorLabel || 'G'})
                                                     </span>
                                                 </div>
                                                 <div>
                                                     <span className="text-[10px] text-gray-400 font-medium block">Rooms Assigned</span>
-                                                    <span className="font-bold text-gray-800">
+                                                    <span className="text-gray-800">
                                                         {buildingRooms.length} Keys{' '}
                                                         <span className="text-[10px] text-emerald-600 font-normal">
                                                             ({cleanRoomsCount} ready)
@@ -1343,7 +1371,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
                             <div className="overflow-x-auto min-w-[760px]">
                                 <table className="w-full text-left text-xs text-gray-700 divide-y divide-gray-200">
-                                    <thead className="bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                                    <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
                                         <tr>
                                             <th className="py-2.5 px-3">Code</th>
                                             <th className="py-2.5 px-3">Building Title</th>
@@ -1363,11 +1391,11 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
                                             return (
                                                 <tr key={building.id} className="hover:bg-gray-50/80 transition-colors">
-                                                    <td className="py-2 px-3 font-mono font-bold text-indigo-700">
+                                                    <td className="py-2 px-3 font-mono text-indigo-700">
                                                         {building.shortCode}
                                                     </td>
                                                     <td className="py-2 px-3">
-                                                        <div className="font-bold text-gray-900">{building.title}</div>
+                                                        <div className="text-gray-900">{building.title}</div>
                                                         <div className="text-[10px] text-gray-400">{building.specificAddress}</div>
                                                     </td>
                                                     <td className="py-2 px-3 font-medium text-gray-600">{building.type}</td>
@@ -1375,7 +1403,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         {buildingFloors.length} Floors
                                                     </td>
                                                     <td className="py-2 px-3">
-                                                        <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                                                        <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
                                                             {buildingRooms.length} Rooms
                                                         </span>
                                                     </td>
@@ -1385,7 +1413,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                                 <span key={item.id} title={item.name}>{item.icon}</span>
                                                             ))}
                                                             {bAmenities.length > 4 && (
-                                                                <span className="text-[10px] font-bold text-gray-500 font-mono">
+                                                                <span className="text-[10px] text-gray-500 font-mono">
                                                                     +{bAmenities.length - 4}
                                                                 </span>
                                                             )}
@@ -1537,7 +1565,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     {filteredFloors.length === 0 ? (
                         <div className="text-center py-16 bg-gray-50/50 rounded-xl border border-dashed border-gray-300">
                             <Layers size={36} className="mx-auto text-gray-300 mb-2" />
-                            <h3 className="text-sm font-bold text-gray-700">No floors match this filter</h3>
+                            <h3 className="text-sm text-gray-700">No floors match this filter</h3>
                             <p className="text-xs text-gray-400 mt-1">Try resetting the building or category filters.</p>
                             <button
                                 onClick={() => {
@@ -1567,12 +1595,12 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                             {/* Floor Card Header */}
                                             <div className="flex justify-between items-start gap-2 mb-2">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-700 flex flex-col items-center justify-center font-bold text-xs">
+                                                    <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-700 flex flex-col items-center justify-center text-xs">
                                                         <span className="text-[9px] uppercase leading-none text-indigo-500">FL</span>
                                                         <span className="leading-none mt-0.5">{floor.floorNumber}</span>
                                                     </div>
                                                     <div>
-                                                        <h3 className="text-sm font-bold text-gray-900 leading-tight">
+                                                        <h3 className="text-sm text-gray-900 leading-tight">
                                                             {floor.name}
                                                         </h3>
                                                         <div className="flex items-center gap-1.5 mt-0.5">
@@ -1680,7 +1708,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         {floorRooms.map(rm => (
                                                             <span
                                                                 key={rm.id}
-                                                                className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border ${getHkBadgeClass(rm.housekeepingStatus)}`}
+                                                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${getHkBadgeClass(rm.housekeepingStatus)}`}
                                                                 title={`Room ${rm.number} • Status: ${rm.status} • Housekeeping: ${rm.housekeepingStatus}`}
                                                             >
                                                                 {rm.number}
@@ -1707,7 +1735,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
                             <div className="overflow-x-auto min-w-[720px]">
                                 <table className="w-full text-left text-xs text-gray-700 divide-y divide-gray-200">
-                                    <thead className="bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                                    <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
                                         <tr>
                                             <th className="py-2.5 px-3">Level / Code</th>
                                             <th className="py-2.5 px-3">Floor Name</th>
@@ -1727,13 +1755,13 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
                                             return (
                                                 <tr key={floor.id} className="hover:bg-gray-50/80 transition-colors">
-                                                    <td className="py-2 px-3 font-mono font-bold text-gray-800">
+                                                    <td className="py-2 px-3 font-mono text-gray-800">
                                                         <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px]">
                                                             {floor.code}
                                                         </span>
                                                     </td>
                                                     <td className="py-2 px-3">
-                                                        <div className="font-bold text-gray-900">{floor.name}</div>
+                                                        <div className="text-gray-900">{floor.name}</div>
                                                         <div className="text-[10px] text-gray-400">{floor.description}</div>
                                                     </td>
                                                     <td className="py-2 px-3 font-medium text-gray-700">
@@ -1753,7 +1781,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                                 <span key={item.id} title={item.name}>{item.icon}</span>
                                                             ))}
                                                             {fAmenities.length > 5 && (
-                                                                <span className="text-[10px] font-bold text-gray-500 font-mono">
+                                                                <span className="text-[10px] text-gray-500 font-mono">
                                                                     +{fAmenities.length - 5}
                                                                 </span>
                                                             )}
@@ -1868,7 +1896,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     {filteredAmenities.length === 0 ? (
                         <div className="text-center py-16 bg-gray-50/50 rounded-xl border border-dashed border-gray-300">
                             <ShieldCheck size={36} className="mx-auto text-gray-300 mb-2" />
-                            <h3 className="text-sm font-bold text-gray-700">No amenities or safety assets found</h3>
+                            <h3 className="text-sm text-gray-700">No amenities or safety assets found</h3>
                             <p className="text-xs text-gray-400 mt-1">Try refining your search keyword or reset filters.</p>
                         </div>
                     ) : (
@@ -1890,16 +1918,16 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                     </span>
                                                     <div>
                                                         <div className="flex items-center gap-1.5">
-                                                            <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                                                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                                                                 {item.id}
                                                             </span>
                                                             {item.isMandatory && (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200 uppercase">
+                                                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200 uppercase">
                                                                     Statutory
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <h4 className="text-xs font-bold text-gray-900 mt-1 line-clamp-1">
+                                                        <h4 className="text-xs text-gray-900 mt-1 line-clamp-1">
                                                             {item.name}
                                                         </h4>
                                                     </div>
@@ -1960,7 +1988,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                             <Compass size={18} />
                         </div>
                         <div>
-                            <h2 className="text-sm font-bold text-gray-900">Hotel Architectural Matrix & Room Spread</h2>
+                            <h2 className="text-sm text-gray-900">Hotel Architectural Matrix & Room Spread</h2>
                             <p className="text-xs text-gray-600 mt-0.5">
                                 Visual representation of the property's vertical floor stacks, room assignments, and current housekeeping statuses across all registered wings.
                             </p>
@@ -1981,13 +2009,13 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                         <div className="flex items-center gap-2">
                                             <Building2 size={16} className="text-blue-400" />
                                             <div>
-                                                <h3 className="text-sm font-bold tracking-tight">{building.title}</h3>
+                                                <h3 className="text-sm tracking-tight">{building.title}</h3>
                                                 <span className="text-[10px] text-gray-300 font-mono">
                                                     {building.shortCode} • {building.type}
                                                 </span>
                                             </div>
                                         </div>
-                                        <span className="text-xs bg-gray-700/80 px-2.5 py-1 rounded-md font-bold font-mono">
+                                        <span className="text-xs bg-gray-700/80 px-2.5 py-1 rounded-md font-mono">
                                             {buildingRooms.length} Rooms Total
                                         </span>
                                     </div>
@@ -2009,7 +2037,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                     >
                                                         <div className="flex justify-between items-center text-xs mb-2 pb-1.5 border-b border-gray-100">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-gray-900">
+                                                                <span className="text-gray-900">
                                                                     Level {fl.floorNumber}: {fl.name}
                                                                 </span>
                                                                 <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded font-medium">
@@ -2026,7 +2054,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                             {floorRooms.map((rm) => (
                                                                 <div
                                                                     key={rm.id}
-                                                                    className={`px-2 py-1 rounded-md text-xs font-mono font-bold border flex items-center gap-1.5 ${getHkBadgeClass(
+                                                                    className={`px-2 py-1 rounded-md text-xs font-mono border flex items-center gap-1.5 ${getHkBadgeClass(
                                                                         rm.housekeepingStatus
                                                                     )}`}
                                                                 >
@@ -2058,7 +2086,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                         {/* Modal Header */}
                         <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/70 rounded-t-xl">
                             <div>
-                                <h3 className="text-base font-bold text-gray-900">
+                                <h3 className="text-base text-gray-900">
                                     {buildings.some(b => b.id === editingBuilding.id) ? 'Edit Building Master' : 'Add New Building'}
                                 </h3>
                                 <p className="text-xs text-gray-500">Configure tower identity, structural capacity, and location</p>
@@ -2128,7 +2156,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         setIsBuildingCodeManual(false);
                                                         showToast(`Auto-created unique code: ${auto}`);
                                                     }}
-                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
                                                 >
                                                     <RefreshCw size={10} /> Auto-Generate
                                                 </button>
@@ -2144,7 +2172,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         setEditingBuilding({ ...editingBuilding, shortCode: e.target.value.toUpperCase() });
                                                     }}
                                                     placeholder="e.g. OCN, EW"
-                                                    className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono focus:ring-1 outline-none uppercase font-bold ${
+                                                    className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono focus:ring-1 outline-none uppercase ${
                                                         isShortCodeDuplicate(editingBuilding.shortCode, existingBuildingCodes, buildings.find(b => b.id === editingBuilding.id)?.shortCode)
                                                             ? 'border-rose-500 bg-rose-50 text-rose-700 focus:ring-rose-500'
                                                             : 'border-gray-300 focus:ring-blue-500 text-blue-700'
@@ -2272,7 +2300,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center">
                                         <div>
-                                            <h4 className="text-xs font-bold text-gray-800">Assign Building-Wide Safety & Amenities</h4>
+                                            <h4 className="text-xs text-gray-800">Assign Building-Wide Safety & Amenities</h4>
                                             <p className="text-[11px] text-gray-500">Check all facilities that apply across this entire building</p>
                                         </div>
                                         <button
@@ -2307,7 +2335,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-1.5">
                                                             <span>{item.icon}</span>
-                                                            <span className="text-xs font-bold truncate">{item.name}</span>
+                                                            <span className="text-xs truncate">{item.name}</span>
                                                         </div>
                                                         <div className="flex items-center gap-1 mt-0.5">
                                                             <span className="text-[9px] font-mono px-1 rounded bg-gray-100 text-gray-600">
@@ -2448,7 +2476,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                         {/* Header */}
                         <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/70 rounded-t-xl">
                             <div>
-                                <h3 className="text-base font-bold text-gray-900">
+                                <h3 className="text-base text-gray-900">
                                     {floors.some(f => f.id === editingFloor.id) ? 'Edit Floor Configuration' : 'Add New Floor Level'}
                                 </h3>
                                 <p className="text-xs text-gray-500">Assign floor to a building, configure capacity and dynamic safety amenities</p>
@@ -2540,7 +2568,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         setIsFloorCodeManual(false);
                                                         showToast(`Auto-created unique code: ${auto}`);
                                                     }}
-                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                                    className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
                                                 >
                                                     <RefreshCw size={10} /> Auto
                                                 </button>
@@ -2556,7 +2584,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                         setEditingFloor({ ...editingFloor, code: e.target.value.toUpperCase() });
                                                     }}
                                                     placeholder="e.g. FL-01"
-                                                    className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono outline-none uppercase font-bold ${
+                                                    className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono outline-none uppercase ${
                                                         isShortCodeDuplicate(editingFloor.code, existingFloorCodes, floors.find(f => f.id === editingFloor.id)?.code)
                                                             ? 'border-rose-500 bg-rose-50 text-rose-700'
                                                             : 'border-gray-300 text-indigo-700'
@@ -2663,7 +2691,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center">
                                         <div>
-                                            <h4 className="text-xs font-bold text-gray-800">Dynamic Floor Amenities & Safety</h4>
+                                            <h4 className="text-xs text-gray-800">Dynamic Floor Amenities & Safety</h4>
                                             <p className="text-[11px] text-gray-500">Select life safety assets and amenities active on this floor</p>
                                         </div>
                                         <button
@@ -2683,7 +2711,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
                                             return (
                                                 <div key={category} className="border border-gray-200 rounded-lg p-2.5 bg-gray-50/40">
-                                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider block mb-2">
                                                         {category}
                                                     </span>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2709,14 +2737,14 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                                                     <div className="flex-1 min-w-0">
                                                                         <div className="flex items-center gap-1.5">
                                                                             <span>{item.icon}</span>
-                                                                            <span className="text-xs font-bold truncate">{item.name}</span>
+                                                                            <span className="text-xs truncate">{item.name}</span>
                                                                         </div>
                                                                         <div className="flex items-center gap-1 mt-0.5">
                                                                             <span className="text-[9px] font-mono px-1 rounded bg-gray-100 text-gray-600">
                                                                                 {item.id}
                                                                             </span>
                                                                             {item.isMandatory && (
-                                                                                <span className="text-[8.5px] font-bold text-rose-600 bg-rose-50 px-1 rounded">
+                                                                                <span className="text-[8.5px] text-rose-600 bg-rose-50 px-1 rounded">
                                                                                     Mandatory
                                                                                 </span>
                                                                             )}
@@ -2764,7 +2792,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                         {/* Header */}
                         <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/70 rounded-t-xl">
                             <div>
-                                <h3 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                                <h3 className="text-base text-gray-900 flex items-center gap-1.5">
                                     <ShieldCheck size={16} className="text-emerald-600" />
                                     <span>{amenitiesCatalog.some(a => a.id === editingAmenity.id) ? 'Edit Life Safety / Amenity' : 'Create New Amenity / Safety Asset'}</span>
                                 </h3>
@@ -2807,7 +2835,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                             setIsAmenityCodeManual(false);
                                             showToast(`Auto-created code: ${auto}`);
                                         }}
-                                        className="text-[10px] text-emerald-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                        className="text-[10px] text-emerald-600 hover:underline flex items-center gap-0.5 cursor-pointer"
                                     >
                                         <RefreshCw size={10} /> Auto-Code
                                     </button>
@@ -2822,7 +2850,7 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                                             setEditingAmenity({ ...editingAmenity, id: e.target.value.toUpperCase() });
                                         }}
                                         placeholder="e.g. EYE-WASH, AED-01"
-                                        className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono outline-none uppercase font-bold ${
+                                        className={`w-full h-8 px-3 pr-8 text-xs border rounded-lg font-mono outline-none uppercase ${
                                             isShortCodeDuplicate(editingAmenity.id, existingAmenityCodes, amenitiesCatalog.find(a => a.id === editingAmenity.id)?.id)
                                                 ? 'border-rose-500 bg-rose-50 text-rose-700'
                                                 : 'border-gray-300 text-gray-800'

@@ -40,8 +40,19 @@ import {
 } from '../../types/reservationServices';
 import {
     getAvailableRoomsForStay,
-    validateAndCommitReservation
+    validateAndCommitReservation,
+    getCanonicalRooms,
+    getDynamicRoomTypes,
+    calculateTariffForRatePlan,
+    getRoomTypeCapacity,
+    generateMasterReservationNumber,
+    generateGroupCode,
+    generateSubBookingNumber,
+    generateRegistrationNumber,
+    generateFolioNumber
 } from '../../utils/roomInventoryEngine';
+import { getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 import { toast } from '../../context/ToastContext';
 import {
     calculateReservationTaxes,
@@ -126,7 +137,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 id: 1,
                 roomType: 'Deluxe Double',
                 roomsCount: 1,
-                ratePlan: 'Summer Vacation',
+                ratePlan: '',
                 roomNumber: freeRoom,
                 assignedRooms: [freeRoom],
                 adults: 2,
@@ -137,10 +148,42 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         ];
     });
 
-    // Hydrate form when editing an existing reservation
+    const [dbRatePlans, setDbRatePlans] = useState<any[]>(() => {
+        try {
+            const saved = localStorage.getItem('hotel_rate_plans_v1');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        } catch {}
+        return [];
+    });
+
+    useEffect(() => {
+        fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setDbRatePlans(json.data);
+                    localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    const availableRatePlans = dbRatePlans;
+    const availableRoomTypesList = useMemo(() => {
+        return getDynamicRoomTypes().map(t => t.name);
+    }, []);
+
+    // Hydrate form when opening or editing a reservation
     useEffect(() => {
         if (!isOpen) return;
+
         if (editingReservation) {
+            setStep(1);
             if (editingReservation.checkIn) setCheckIn(editingReservation.checkIn);
             if (editingReservation.checkOut) setCheckOut(editingReservation.checkOut);
             if (editingReservation.nights) setNights(Number(editingReservation.nights) || 1);
@@ -160,47 +203,129 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 setRemarksMap(prev => ({ ...prev, Guest: editingReservation.specialRequests }));
             }
 
+            const defaultPlan = availableRatePlans[0]?.name || '';
+
             if (editingReservation.roomsList && Array.isArray(editingReservation.roomsList) && editingReservation.roomsList.length > 0) {
-                setRoomsList(editingReservation.roomsList.map((r: any, idx: number) => ({
-                    id: r.id || idx + 1,
-                    roomType: r.roomType || 'Deluxe Double',
-                    roomsCount: r.roomsCount || 1,
-                    ratePlan: r.ratePlan || 'Summer Vacation',
-                    roomNumber: r.roomNumber || '101',
-                    assignedRooms: r.assignedRooms || [r.roomNumber || '101'],
-                    adults: r.adults || 2,
-                    children: r.children || 0,
-                    rate: r.rate || 3000,
-                    isAssign: true,
-                    checkInDate: r.checkInDate || editingReservation.checkIn,
-                    checkOutDate: r.checkOutDate || editingReservation.checkOut,
-                    nights: r.nights || editingReservation.nights || 1,
-                    servicesBundle: r.servicesBundle,
-                    extraBed: r.extraBed,
-                    pickup: r.pickup
-                })));
+                setRoomsList(editingReservation.roomsList.map((r: any, idx: number) => {
+                    const cleanRm = String(r.roomNumber || '101');
+                    const canonical = getCanonicalRooms().find(c => c.number === cleanRm);
+                    return {
+                        id: r.id || idx + 1,
+                        roomType: r.roomType || canonical?.roomTypeName || 'Deluxe Double',
+                        roomsCount: r.roomsCount || 1,
+                        ratePlan: r.ratePlan || defaultPlan,
+                        roomNumber: cleanRm,
+                        assignedRooms: r.assignedRooms || [cleanRm],
+                        adults: r.adults || 2,
+                        children: r.children || 0,
+                        rate: r.rate || canonical?.baseRate || 3000,
+                        isAssign: true,
+                        checkInDate: r.checkInDate || editingReservation.checkIn,
+                        checkOutDate: r.checkOutDate || editingReservation.checkOut,
+                        nights: r.nights || editingReservation.nights || 1,
+                        servicesBundle: r.servicesBundle,
+                        extraBed: r.extraBed,
+                        pickup: r.pickup
+                    };
+                }));
             } else if (editingReservation.allocatedRooms && editingReservation.allocatedRooms.length > 0) {
-                setRoomsList(editingReservation.allocatedRooms.map((rm: string, idx: number) => ({
-                    id: idx + 1,
-                    roomType: editingReservation.roomType || 'Deluxe Double',
-                    roomsCount: 1,
-                    ratePlan: 'Summer Vacation',
-                    roomNumber: rm,
-                    assignedRooms: [rm],
-                    adults: 2,
-                    children: 0,
-                    rate: 3000,
-                    isAssign: true,
-                    checkInDate: editingReservation.checkIn,
-                    checkOutDate: editingReservation.checkOut,
-                    nights: editingReservation.nights || 1
-                })));
+                setRoomsList(editingReservation.allocatedRooms.map((rm: string, idx: number) => {
+                    const canonical = getCanonicalRooms().find(c => c.number === rm);
+                    return {
+                        id: idx + 1,
+                        roomType: editingReservation.roomType || canonical?.roomTypeName || 'Deluxe Double',
+                        roomsCount: 1,
+                        ratePlan: defaultPlan,
+                        roomNumber: rm,
+                        assignedRooms: [rm],
+                        adults: Number(editingReservation.adults) || 2,
+                        children: Number(editingReservation.children) || 0,
+                        rate: canonical?.baseRate || 3000,
+                        isAssign: true,
+                        checkInDate: editingReservation.checkIn,
+                        checkOutDate: editingReservation.checkOut,
+                        nights: editingReservation.nights || 1
+                    };
+                }));
+            } else if (editingReservation.roomNumber) {
+                const rm = String(editingReservation.roomNumber);
+                const canonical = getCanonicalRooms().find(c => c.number === rm);
+                setRoomsList([
+                    {
+                        id: 1,
+                        roomType: editingReservation.roomType || canonical?.roomTypeName || 'Deluxe Double',
+                        roomsCount: 1,
+                        ratePlan: editingReservation.ratePlan || defaultPlan,
+                        roomNumber: rm,
+                        assignedRooms: [rm],
+                        adults: Number(editingReservation.adults) || 2,
+                        children: Number(editingReservation.children) || 0,
+                        rate: canonical?.baseRate || 3000,
+                        isAssign: true,
+                        checkInDate: editingReservation.checkIn,
+                        checkOutDate: editingReservation.checkOut,
+                        nights: editingReservation.nights || 1
+                    }
+                ]);
             }
             if (editingReservation.paidAmount !== undefined) {
                 setPaymentRows([{ id: 1, method: 'Cash', amount: editingReservation.paidAmount }]);
             }
+        } else {
+            // Fresh Reservation from StayView or Header
+            setStep(1);
+            setGuestName('');
+            setPhone('');
+            setMobile('');
+            setEmail('');
+            setVipStatus('None');
+            setBusinessSource('Direct');
+            setBusinessAgent('Direct');
+            setPurposeOfVisit('Business');
+            setRemarksMap({
+                Guest: '',
+                'Check In': '',
+                'Check Out': '',
+                'House Keeping': '',
+                'Payment Note': ''
+            });
+
+            const start = initialStartDate || getSystemDateISO();
+            const end = initialEndDate || getNextDayISO(start, 1);
+            setCheckIn(start);
+            setCheckOut(end);
+            const startD = new Date(start);
+            const endD = new Date(end);
+            const calculatedNights = Math.max(1, Math.round((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)));
+            setNights(calculatedNights);
+
+            const cleanRoom = (initialRoom || '101').replace(/[^0-9a-zA-Z-]/g, '') || '101';
+            const canonicalList = getCanonicalRooms();
+            const canonical = canonicalList.find(r => r.number === cleanRoom);
+            const defaultType = canonical?.roomTypeName || 'Deluxe Double';
+            const defaultRate = canonical?.baseRate || 3000;
+            const defaultPlan = availableRatePlans[0]?.name || '';
+
+            setRoomsList([
+                {
+                    id: 1,
+                    roomType: defaultType,
+                    roomsCount: 1,
+                    ratePlan: defaultPlan,
+                    roomNumber: cleanRoom,
+                    assignedRooms: [cleanRoom],
+                    adults: 2,
+                    children: 1,
+                    rate: defaultRate,
+                    isAssign: true,
+                    checkInDate: start,
+                    checkOutDate: end,
+                    nights: calculatedNights
+                }
+            ]);
+            setPaymentRows([{ id: 1, method: 'Cash', amount: defaultRate * calculatedNights }]);
         }
-    }, [isOpen, editingReservation]);
+    }, [isOpen, editingReservation, initialRoom, initialStartDate, initialEndDate]);
 
     // Live Availability Report for selected stay dates
     const liveAvailabilityReport = useMemo(() => {
@@ -306,7 +431,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const getMaxRoomsAllowedForRow = (typeName: string, currentRowId: number): number => {
         const totalFree = getTotalInventoryForType(typeName);
         const takenInOthers = getAllocatedCountInOtherRows(typeName, currentRowId);
-        return Math.max(1, totalFree - takenInOthers);
+        return Math.max(0, totalFree - takenInOthers);
     };
 
     // Overbooking validation check across the entire modal form
@@ -314,7 +439,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
         if (totalRoomsAllocatedInForm > liveAvailabilityReport.availableCount) return true;
         for (const r of roomsList) {
             const maxForThis = getMaxRoomsAllowedForRow(r.roomType, r.id);
-            if ((Number(r.roomsCount) || 1) > maxForThis) return true;
+            if (maxForThis <= 0 || (Number(r.roomsCount) || 1) > maxForThis) return true;
         }
         return false;
     }, [totalRoomsAllocatedInForm, liveAvailabilityReport.availableCount, roomsList]);
@@ -536,18 +661,24 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             return;
         }
 
+        const defPlan = availableRatePlans[0]?.name || '';
+        const roomType = freeRoom.roomTypeName || 'Deluxe Double';
+        const capacity = getRoomTypeCapacity(roomType);
+        const defaultAdults = Math.max(1, Math.min(2, capacity.maxAdults));
+        const defRate = calculateTariffForRatePlan(defPlan, roomType, freeRoom.baseRate || 3000, defaultAdults, 0, availableRatePlans);
+
         setRoomsList([
             ...roomsList,
             {
                 id: nextId,
-                roomType: freeRoom.roomTypeName || 'Deluxe Double',
+                roomType,
                 roomsCount: 1,
-                ratePlan: 'BAR Rack Rate',
+                ratePlan: defPlan,
                 roomNumber: freeRoom.number,
                 assignedRooms: [freeRoom.number],
-                adults: 1,
+                adults: defaultAdults,
                 children: 0,
-                rate: freeRoom.baseRate || 3000,
+                rate: defRate,
                 isAssign: true
             }
         ]);
@@ -576,15 +707,24 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             return;
         }
 
+        const copiedType = freeRoom.roomTypeName || row.roomType;
+        const capacity = getRoomTypeCapacity(copiedType);
+        const safeAdults = Math.max(1, Math.min(row.adults, capacity.maxAdults));
+        const safeChildren = Math.min(row.children, capacity.maxChildren);
+        const resolvedRate = calculateTariffForRatePlan(row.ratePlan, copiedType, freeRoom.baseRate || 3000, safeAdults, safeChildren, availableRatePlans);
+
         setRoomsList([
             ...roomsList,
             {
                 ...row,
                 id: nextId,
-                roomType: freeRoom.roomTypeName || row.roomType,
+                roomType: copiedType,
                 roomsCount: 1,
                 roomNumber: freeRoom.number,
-                assignedRooms: [freeRoom.number]
+                assignedRooms: [freeRoom.number],
+                adults: safeAdults,
+                children: safeChildren,
+                rate: resolvedRate
             }
         ]);
     };
@@ -634,16 +774,102 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
     const updateRoomRow = (id: number, field: keyof RoomRow, value: any) => {
         setRoomsList(prev => prev.map(r => {
             if (r.id !== id) return r;
+            if (field === 'ratePlan') {
+                const assignedRm = r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(value, r.roomType, canonicalRate, r.adults, r.children, availableRatePlans);
+                return {
+                    ...r,
+                    ratePlan: value,
+                    rate: newRate
+                };
+            }
+            if (field === 'adults') {
+                const capacity = getRoomTypeCapacity(r.roomType);
+                const rawAdults = Number(value) || 1;
+                const newAdults = Math.max(1, Math.min(rawAdults, capacity.maxAdults));
+                if (rawAdults > capacity.maxAdults) {
+                    toast.warning(`Capacity Limit: Maximum ${capacity.maxAdults} adult(s) permitted for ${r.roomType}!`);
+                }
+                const assignedRm = r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, newAdults, r.children, availableRatePlans);
+                return {
+                    ...r,
+                    adults: newAdults,
+                    rate: newRate
+                };
+            }
+            if (field === 'children') {
+                const capacity = getRoomTypeCapacity(r.roomType);
+                const rawChildren = Math.max(0, Number(value) || 0);
+                const newChildren = Math.min(rawChildren, capacity.maxChildren);
+                if (rawChildren > capacity.maxChildren) {
+                    toast.warning(`Capacity Limit: Maximum ${capacity.maxChildren} child(ren) permitted for ${r.roomType}!`);
+                }
+                const assignedRm = r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, r.adults, newChildren, availableRatePlans);
+                return {
+                    ...r,
+                    children: newChildren,
+                    rate: newRate
+                };
+            }
             if (field === 'roomType') {
                 const maxForNewType = getMaxRoomsAllowedForRow(value, id);
+                if (maxForNewType <= 0) {
+                    toast.error(`Overbooking Prevented: No rooms available in "${value}" for the selected dates!`);
+                    return r;
+                }
                 const safeCount = Math.min(r.roomsCount, maxForNewType);
                 const autoAssigned = getAutoAssignedRoomsForRow({ ...r, roomType: value, roomsCount: safeCount });
+                const assignedRm = autoAssigned[0] || r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === value);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+
+                const newCapacity = getRoomTypeCapacity(value);
+                const clampedAdults = Math.max(1, Math.min(r.adults, newCapacity.maxAdults));
+                const clampedChildren = Math.min(r.children, newCapacity.maxChildren);
+                if (r.adults > newCapacity.maxAdults || r.children > newCapacity.maxChildren) {
+                    toast.info(`Occupancy adjusted to ${value} limits (Max Adults: ${newCapacity.maxAdults}, Max Children: ${newCapacity.maxChildren}).`);
+                }
+
+                const resolvedRate = calculateTariffForRatePlan(r.ratePlan, value, canonicalRate, clampedAdults, clampedChildren, availableRatePlans);
                 return { 
                     ...r, 
                     roomType: value, 
+                    adults: clampedAdults,
+                    children: clampedChildren,
                     roomsCount: Math.max(1, safeCount),
                     assignedRooms: autoAssigned,
-                    roomNumber: autoAssigned[0] || r.roomNumber
+                    roomNumber: assignedRm,
+                    rate: resolvedRate
+                };
+            }
+            if (field === 'roomNumber') {
+                const selectedRoomNum = String(value);
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === selectedRoomNum);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, r.adults, r.children, availableRatePlans);
+                return {
+                    ...r,
+                    roomNumber: selectedRoomNum,
+                    assignedRooms: [selectedRoomNum],
+                    rate: newRate
                 };
             }
             if (field === 'roomsCount') {
@@ -720,12 +946,17 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
     // Save Reservation to LocalStorage
     const handleFinalizeBooking = (actionType: 'reserve' | 'checkin' | 'hold') => {
+        if (availableRatePlans.length === 0) {
+            toast.error('Cannot proceed: No Rate Plans configured. Please configure Rate Plans in Rate Plan Management (/rate-plans) first!');
+            return;
+        }
+
         if (hasOverbookingError) {
             toast.error('Overbooking Prevented: Requested rooms exceed available inventory for the selected dates!');
             return;
         }
 
-        const reservationNumber = editingReservation?.reservationNumber || `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
+        const reservationNumber = editingReservation?.reservationNumber || generateMasterReservationNumber();
         const reservationId = editingReservation?.id || Date.now();
 
         // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
@@ -737,9 +968,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             const countNeeded = Number(r.roomsCount) || 1;
             let roomsForThisRow: string[] = [];
 
-            if (!r.isAssign && r.assignedRooms && r.assignedRooms.length === countNeeded && r.assignedRooms.every(rm => !usedRoomsAcrossBooking.has(rm))) {
+            if (r.assignedRooms && r.assignedRooms.length === countNeeded && r.assignedRooms.every(rm => !usedRoomsAcrossBooking.has(rm))) {
                 roomsForThisRow = [...r.assignedRooms];
-            } else if (!r.isAssign && countNeeded === 1 && r.roomNumber && !usedRoomsAcrossBooking.has(r.roomNumber)) {
+            } else if (countNeeded === 1 && r.roomNumber && r.roomNumber !== 'TBA' && r.roomNumber !== 'Unassigned' && !usedRoomsAcrossBooking.has(r.roomNumber)) {
                 roomsForThisRow = [r.roomNumber];
             } else {
                 const report = getAvailableRoomsForStay(checkIn, checkOut, r.roomType, {
@@ -770,12 +1001,57 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             });
         }
 
+        const isGroup = allocatedRoomNumbers.length > 1;
+        const groupCode = isGroup ? (editingReservation?.groupCode || generateGroupCode()) : (editingReservation?.groupCode || undefined);
+        const statusVal = actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : (editingReservation?.status || 'confirmed');
+        const regNo = statusVal === 'in-house' ? (editingReservation?.registrationNumber || generateRegistrationNumber(reservationNumber)) : undefined;
+        const folioNo = editingReservation?.folioNumber || generateFolioNumber(reservationNumber);
+
+        const assignedRoomsExpanded = roomsList.flatMap((r) => {
+            const countNeeded = Number(r.roomsCount) || 1;
+            const assigned = rowAllocatedMap.get(r.id) || (
+                (r.assignedRooms && r.assignedRooms.length === countNeeded)
+                    ? r.assignedRooms
+                    : [r.roomNumber]
+            );
+            return assigned.map(rm => {
+                const dateConf = r.roomDatesMap?.[rm];
+                return {
+                    ...r,
+                    roomsCount: 1,
+                    roomNumber: rm,
+                    assignedRooms: [rm],
+                    checkInDate: dateConf?.checkIn || checkIn,
+                    checkOutDate: dateConf?.checkOut || checkOut,
+                    nights: dateConf?.nights || nights
+                };
+            });
+        });
+
+        const subRoomsWithNumbers = assignedRoomsExpanded.map((rm, idx) => {
+            const subBookingNum = isGroup ? generateSubBookingNumber(reservationNumber, idx + 1) : `${reservationNumber}-01`;
+            const roomRegNo = statusVal === 'in-house' ? generateRegistrationNumber(subBookingNum) : undefined;
+            const roomFolioNo = generateFolioNumber(subBookingNum);
+            return {
+                ...rm,
+                subBookingNumber: subBookingNum,
+                registrationNumber: roomRegNo,
+                folioNumber: roomFolioNo
+            };
+        });
+
         const mainRoom = roomsList[0] || { roomNumber: '101', roomType: 'Deluxe Double' };
         const primaryRoomNumber = allocatedRoomNumbers[0] || mainRoom.roomNumber;
 
         const newReservation = {
             id: reservationId,
             reservationNumber,
+            groupCode,
+            subBookingNumber: isGroup ? `${reservationNumber}-01` : `${reservationNumber}-01`,
+            isGroup,
+            registrationNumber: regNo,
+            registeredAt: statusVal === 'in-house' ? new Date().toISOString() : undefined,
+            folioNumber: folioNo,
             guestName: `${salutation} ${guestName || 'Valued Guest'}`,
             phone: mobile || phone || '+880 1711-000000',
             email: email || 'guest@hospitality.com',
@@ -788,7 +1064,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             nights,
             adults: mainRoom.adults,
             children: mainRoom.children,
-            status: actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : 'arriving',
+            status: statusVal,
             totalAmount: finalPayable,
             paidAmount: actionType === 'hold' ? 0 : totalPaid,
             dueAmount: actionType === 'hold' ? finalPayable : totalDue,
@@ -815,26 +1091,25 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             spaWellness: mainRoom.servicesBundle?.spaWellness || null,
             timingFlex: mainRoom.servicesBundle?.timingFlex || null,
             customAddons: mainRoom.servicesBundle?.customAddons || [],
-            roomsList: roomsList.flatMap((r) => {
-                const countNeeded = Number(r.roomsCount) || 1;
-                const assigned = rowAllocatedMap.get(r.id) || (
-                    (r.assignedRooms && r.assignedRooms.length === countNeeded)
-                        ? r.assignedRooms
-                        : [r.roomNumber]
-                );
-                return assigned.map(rm => {
-                    const dateConf = r.roomDatesMap?.[rm];
-                    return {
-                        ...r,
-                        roomsCount: 1,
-                        roomNumber: rm,
-                        assignedRooms: [rm],
-                        checkInDate: dateConf?.checkIn || checkIn,
-                        checkOutDate: dateConf?.checkOut || checkOut,
-                        nights: dateConf?.nights || nights
-                    };
-                });
-            }),
+            roomsList: subRoomsWithNumbers,
+            groupRoomsList: subRoomsWithNumbers.map((rm, idx) => ({
+                reservationNumber: rm.subBookingNumber,
+                masterReservationNumber: reservationNumber,
+                subBookingNumber: rm.subBookingNumber,
+                registrationNumber: rm.registrationNumber,
+                folioNumber: rm.folioNumber,
+                roomNumber: rm.roomNumber,
+                roomType: rm.roomType || mainRoom.roomType,
+                ratePlan: rm.ratePlan || mainRoom.ratePlan || 'Standard Rate',
+                guestName: `${salutation} ${guestName || 'Valued Guest'}`,
+                adults: rm.adults || mainRoom.adults,
+                children: rm.children || mainRoom.children,
+                status: statusVal,
+                checkIn: rm.checkInDate || checkIn,
+                checkOut: rm.checkOutDate || checkOut,
+                isPrimary: idx === 0,
+                groupCode
+            })),
             addonCharges: {
                 extraBed: totalExtraBedCharge,
                 pickup: totalPickupArrivalCharge,
@@ -920,7 +1195,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                             onClick={() => setStep(1)}
                             className={`flex items-center gap-2.5 cursor-pointer ${step >= 1 ? 'opacity-100 font-semibold' : 'opacity-60'}`}
                         >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 1 ? 'bg-[#1e3a8a] text-white' : 'bg-gray-200 text-gray-600'}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${step >= 1 ? 'bg-[#1e3a8a] text-white' : 'bg-gray-200 text-gray-600'}`}>
                                 1
                             </div>
                             <span className={`text-sm ${step === 1 ? 'text-[#0f172a] font-bold' : 'text-gray-600 font-medium'}`}>
@@ -934,7 +1209,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                             onClick={() => setStep(2)}
                             className={`flex items-center gap-2.5 cursor-pointer ${step >= 2 ? 'opacity-100 font-semibold' : 'opacity-60'}`}
                         >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 2 ? 'bg-[#1e3a8a] text-white' : 'bg-gray-200 text-gray-600'}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${step >= 2 ? 'bg-[#1e3a8a] text-white' : 'bg-gray-200 text-gray-600'}`}>
                                 2
                             </div>
                             <span className={`text-sm ${step === 2 ? 'text-[#0f172a] font-bold' : 'text-gray-600 font-medium'}`}>
@@ -948,7 +1223,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                             onClick={() => setStep(3)}
                             className={`flex items-center gap-2.5 cursor-pointer ${step >= 3 ? 'opacity-100 font-semibold' : 'opacity-60'}`}
                         >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 3 ? 'bg-[#1e3a8a] text-white' : 'bg-gray-200 text-gray-600'}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${step >= 3 ? 'bg-[#1e3a8a] text-white' : 'bg-gray-200 text-gray-600'}`}>
                                 3
                             </div>
                             <span className={`text-sm ${step === 3 ? 'text-[#0f172a] font-bold' : 'text-gray-600 font-medium'}`}>
@@ -1098,10 +1373,10 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-2xs">
                                 <div className="px-3.5 py-2.5 bg-slate-50/90 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                                        <span className="text-[11px] text-slate-700 uppercase tracking-wider">
                                             Room Allocation &amp; Inventory Check
                                         </span>
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border font-bold text-[10px] shadow-2xs transition-all ${
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] shadow-2xs transition-all ${
                                             remainingOverallFreeRooms > 0 
                                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                                                 : 'bg-amber-50 text-amber-800 border-amber-300'
@@ -1120,6 +1395,21 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                     <div className="mx-3.5 my-2 p-2 rounded-md bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2">
                                         <AlertTriangle size={14} className="text-red-600 flex-shrink-0 animate-pulse" />
                                         <span>⚠️ Overbooking Warning: Room quantity exceeds total available rooms in this category! Please adjust room counts before proceeding.</span>
+                                    </div>
+                                )}
+
+                                {availableRatePlans.length === 0 && (
+                                    <div className="mx-3.5 my-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
+                                        <div className="flex items-center gap-2">
+                                            <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
+                                            <span>
+                                                <strong>No Active Rate Plans Found:</strong> Please configure Rate Plans in{' '}
+                                                <a href="/rate-plans" className="underline text-blue-700 hover:text-blue-900">
+                                                    Rate Plan Management (/rate-plans)
+                                                </a>{' '}
+                                                first before creating reservations.
+                                            </span>
+                                        </div>
                                     </div>
                                 )}
 
@@ -1147,11 +1437,15 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                 onChange={e => updateRoomRow(row.id, 'roomType', e.target.value)}
                                                                 className="w-full h-8 px-2 border border-gray-300 rounded text-xs bg-white outline-none font-medium"
                                                             >
-                                                                <option value="Deluxe Double">Deluxe Double [{getRemainingFreeCountForType('Deluxe Double')}]</option>
-                                                                <option value="Executive Suite">Executive Suite [{getRemainingFreeCountForType('Executive Suite')}]</option>
-                                                                <option value="Superior King">Superior King [{getRemainingFreeCountForType('Superior King')}]</option>
-                                                                <option value="Standard Single">Standard Single [{getRemainingFreeCountForType('Standard Single')}]</option>
-                                                                <option value="Presidential Suite">Presidential Suite [{getRemainingFreeCountForType('Presidential Suite')}]</option>
+                                                                {availableRoomTypesList.map(typeOpt => {
+                                                                    const availForRow = getMaxRoomsAllowedForRow(typeOpt, row.id);
+                                                                    const isSoldOut = availForRow <= 0;
+                                                                    return (
+                                                                        <option key={typeOpt} value={typeOpt} disabled={isSoldOut && typeOpt !== row.roomType}>
+                                                                            {typeOpt} {isSoldOut ? '[Sold Out]' : `[${availForRow} Available]`}
+                                                                        </option>
+                                                                    );
+                                                                })}
                                                             </select>
                                                             {/* Ultra-Compact & Elegant Active Addons Pill */}
                                                             {(() => {
@@ -1160,7 +1454,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                 if (b.pickup?.enabled) activeNames.push('Pickup');
                                                                 if (b.pickup?.dropEnabled) activeNames.push('Drop');
                                                                 if (b.extraBed?.enabled) activeNames.push(`${b.extraBed.quantity || 1}x Bed`);
-                                                                if (b.mealPlan?.enabled) activeNames.push(b.mealPlan.planType.split(' ')[0]);
+                                                                if (b.mealPlan?.enabled) activeNames.push((b.mealPlan.planType || 'Meal').split(' ')[0]);
                                                                 if (b.celebration?.enabled) activeNames.push('Decor');
                                                                 if (b.spaWellness?.enabled) activeNames.push('Spa');
                                                                 if (b.timingFlex?.earlyCheckIn || b.timingFlex?.lateCheckOut) activeNames.push('Flex');
@@ -1182,7 +1476,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                             <Sparkles size={11} className="text-blue-600 flex-shrink-0" />
                                                                             <span className="truncate">{activeNames.slice(0, 2).join(', ')}{activeNames.length > 2 ? ` +${activeNames.length - 2}` : ''}{scopeLabel}</span>
                                                                         </div>
-                                                                        <span className="text-[9px] font-bold text-blue-700 bg-white/90 px-1 rounded border border-blue-200/60 flex-shrink-0 ml-1">
+                                                                        <span className="text-[9px] text-blue-700 bg-white/90 px-1 rounded border border-blue-200/60 flex-shrink-0 ml-1">
                                                                             +৳{addonsCost.toLocaleString()}
                                                                         </span>
                                                                     </button>
@@ -1199,7 +1493,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                 if (isDedicatedSingle) {
                                                                     return (
                                                                         <div className="flex flex-col items-center justify-center">
-                                                                            <span className="w-12 h-8 flex items-center justify-center bg-slate-50 border border-slate-300 rounded text-xs font-bold text-slate-800 shadow-2xs">
+                                                                            <span className="w-12 h-8 flex items-center justify-center bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 shadow-2xs">
                                                                                 1
                                                                             </span>
                                                                             <span className="text-[9px] font-semibold text-blue-700 bg-blue-50/90 px-1 py-0.5 rounded border border-blue-200/80 mt-0.5 whitespace-nowrap shadow-2xs">
@@ -1229,7 +1523,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                                     updateRoomRow(row.id, 'roomsCount', raw);
                                                                                 }
                                                                             }}
-                                                                            className={`w-16 h-8 px-2 border rounded text-xs text-center font-bold outline-none transition-all ${
+                                                                            className={`w-16 h-8 px-2 border rounded text-xs text-center outline-none transition-all ${
                                                                                 isExceeded 
                                                                                     ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-400' 
                                                                                     : 'border-gray-300 focus:border-blue-500'
@@ -1248,10 +1542,13 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                 onChange={e => updateRoomRow(row.id, 'ratePlan', e.target.value)}
                                                                 className="w-full h-8 px-2 border border-gray-300 rounded text-xs bg-white outline-none"
                                                             >
-                                                                <option value="Summer Vacation">Summer Vacation</option>
-                                                                <option value="Standard BAR">Standard BAR</option>
-                                                                <option value="Corporate Special">Corporate Special</option>
-                                                                <option value="Complimentary">Complimentary</option>
+                                                                {availableRatePlans.length === 0 ? (
+                                                                    <option value="" disabled>No rate plans configured (Configure in Rate Plans)</option>
+                                                                ) : (
+                                                                    availableRatePlans.map(p => (
+                                                                        <option key={p.id} value={p.name}>{p.name}</option>
+                                                                    ))
+                                                                )}
                                                             </select>
                                                         </td>
                                                         <td className="p-3 text-center">
@@ -1272,7 +1569,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                                     requiredCount: row.roomsCount,
                                                                                     isAutoMode: true
                                                                                 })}
-                                                                                className="w-32 h-8 px-2 border border-blue-300 bg-blue-50/90 hover:bg-blue-100 text-blue-900 rounded-md text-xs font-bold flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all group"
+                                                                                className="w-32 h-8 px-2 border border-blue-300 bg-blue-50/90 hover:bg-blue-100 text-blue-900 rounded-md text-xs flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all group"
                                                                                 title="Auto-Allocated. Click to view or customize assigned rooms"
                                                                             >
                                                                                 <div className="flex items-center gap-1 truncate">
@@ -1300,7 +1597,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                                 requiredCount: row.roomsCount,
                                                                                 isAutoMode: false
                                                                             })}
-                                                                            className={`w-32 h-8 px-2 border rounded-md text-xs font-bold flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all ${
+                                                                            className={`w-32 h-8 px-2 border rounded-md text-xs flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all ${
                                                                                 isFullyPicked 
                                                                                     ? 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' 
                                                                                     : 'border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 ring-2 ring-amber-300/60'
@@ -1315,7 +1612,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                                 )}
                                                                                 <span>{assignedList.length}/{row.roomsCount} Rms</span>
                                                                             </div>
-                                                                            <span className="text-[9px] font-mono font-bold bg-white/90 px-1 py-0.5 rounded border border-slate-200 truncate max-w-[45px]">
+                                                                            <span className="text-[9px] font-mono bg-white/90 px-1 py-0.5 rounded border border-slate-200 truncate max-w-[45px]">
                                                                                 {isFullyPicked 
                                                                                     ? `${assignedList.map(rm => {
                                                                                         const conf = row.roomDatesMap?.[rm];
@@ -1332,7 +1629,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                     const singleAuto = assignedList[0] || row.roomNumber;
                                                                     return (
                                                                         <div
-                                                                            className="w-28 h-8 px-1.5 border border-blue-200 bg-blue-50/70 text-blue-800 rounded text-xs font-bold flex items-center justify-center cursor-default select-none shadow-2xs mx-auto"
+                                                                            className="w-28 h-8 px-1.5 border border-blue-200 bg-blue-50/70 text-blue-800 rounded text-xs flex items-center justify-center cursor-default select-none shadow-2xs mx-auto"
                                                                             title={`Auto-Allocated: ${singleAuto}`}
                                                                         >
                                                                             <Sparkles size={12} className="text-blue-600 mr-1" />
@@ -1348,7 +1645,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                     <select
                                                                         value={row.roomNumber}
                                                                         onChange={e => updateRoomRow(row.id, 'roomNumber', e.target.value)}
-                                                                        className="w-28 h-8 px-1 border border-blue-400 bg-white text-blue-900 rounded text-xs font-bold text-center outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs mx-auto"
+                                                                        className="w-28 h-8 px-1 border border-blue-400 bg-white text-blue-900 rounded text-xs text-center outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs mx-auto"
                                                                         title="Manual Room Selection"
                                                                     >
                                                                         {(() => {
@@ -1383,30 +1680,52 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                 );
                                                             })()}
                                                         </td>
-                                                        <td className="p-3">
-                                                            <input
-                                                                type="number"
-                                                                min={1}
-                                                                value={row.adults}
-                                                                onChange={e => updateRoomRow(row.id, 'adults', Number(e.target.value))}
-                                                                className="w-14 h-8 px-2 border border-gray-300 rounded text-xs text-center"
-                                                            />
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                value={row.children}
-                                                                onChange={e => updateRoomRow(row.id, 'children', Number(e.target.value))}
-                                                                className="w-14 h-8 px-2 border border-gray-300 rounded text-xs text-center"
-                                                            />
-                                                        </td>
+                                                        {(() => {
+                                                            const capacity = getRoomTypeCapacity(row.roomType);
+                                                            return (
+                                                                <>
+                                                                    <td className="p-3">
+                                                                        <div className="flex flex-col items-center">
+                                                                            <input
+                                                                                type="number"
+                                                                                min={1}
+                                                                                max={capacity.maxAdults}
+                                                                                value={row.adults}
+                                                                                onChange={e => updateRoomRow(row.id, 'adults', Number(e.target.value))}
+                                                                                className="w-14 h-8 px-2 border border-gray-300 rounded text-xs text-center font-semibold focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                                                                title={`Adults: 1 to ${capacity.maxAdults} for ${row.roomType}`}
+                                                                            />
+                                                                            <span className="text-[10px] text-slate-400 mt-0.5 font-medium">Max {capacity.maxAdults}</span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        <div className="flex flex-col items-center">
+                                                                            <input
+                                                                                type="number"
+                                                                                min={0}
+                                                                                max={capacity.maxChildren}
+                                                                                disabled={capacity.maxChildren === 0}
+                                                                                value={row.children}
+                                                                                onChange={e => updateRoomRow(row.id, 'children', Number(e.target.value))}
+                                                                                className={`w-14 h-8 px-2 border rounded text-xs text-center font-semibold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${
+                                                                                    capacity.maxChildren === 0 ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'border-gray-300'
+                                                                                }`}
+                                                                                title={capacity.maxChildren === 0 ? `Children not permitted in ${row.roomType}` : `Children: 0 to ${capacity.maxChildren} for ${row.roomType}`}
+                                                                            />
+                                                                            <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                                                                {capacity.maxChildren === 0 ? 'N/A' : `Max ${capacity.maxChildren}`}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                </>
+                                                            );
+                                                        })()}
                                                         <td className="p-3">
                                                             <input
                                                                 type="number"
                                                                 value={row.rate}
                                                                 onChange={e => updateRoomRow(row.id, 'rate', Number(e.target.value))}
-                                                                className="w-20 h-8 px-2 border border-gray-300 rounded text-xs font-bold text-gray-800"
+                                                                className="w-20 h-8 px-2 border border-gray-300 rounded text-xs text-gray-800"
                                                             />
                                                         </td>
                                                         {(() => {
@@ -1415,7 +1734,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                             const rowBase = row.rate * row.roomsCount * nights;
                                                             const computedTotal = rowBase + rowAddons;
                                                             return (
-                                                                <td className="p-3 font-bold text-gray-900 font-mono">
+                                                                <td className="p-3 text-gray-900 font-mono">
                                                                     <div>৳ {computedTotal.toFixed(2)}</div>
                                                                     {rowAddons > 0 && (
                                                                         <div className="text-[10px] text-slate-400 font-normal">
@@ -1442,7 +1761,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                         type="button"
                                                                         onClick={() => handleSplitRowIntoRooms(row.id)}
                                                                         title={`Split group row into ${row.roomsCount} separate individual room rows`}
-                                                                        className="px-1.5 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-900 rounded border border-blue-200 cursor-pointer transition-colors flex items-center gap-1 text-[10px] font-bold shadow-2xs"
+                                                                        className="px-1.5 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-900 rounded border border-blue-200 cursor-pointer transition-colors flex items-center gap-1 text-[10px] shadow-2xs"
                                                                     >
                                                                         <Split size={12} className="text-blue-600" />
                                                                         <span>Split ({row.roomsCount})</span>
@@ -1506,7 +1825,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                 className="fixed z-[99999] w-64 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100 select-none max-h-[82vh] overflow-y-auto"
                                                 onClick={e => e.stopPropagation()}
                                             >
-                                                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                                                <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
                                                     <span>Room #{row.roomNumber || row.id} Services</span>
                                                     <span className="text-[9px] text-blue-600 font-semibold">Expert Addons</span>
                                                 </div>
@@ -1524,7 +1843,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         <span>Airport Pickup (Arrival)</span>
                                                     </span>
                                                     {row.servicesBundle?.pickup?.enabled || row.pickup?.enabled ? (
-                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                                     ) : (
                                                         <span className="text-[10px] text-slate-400">+ Add</span>
                                                     )}
@@ -1543,7 +1862,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         <span>Airport Drop (Departure)</span>
                                                     </span>
                                                     {row.servicesBundle?.pickup?.dropEnabled || row.pickup?.dropEnabled ? (
-                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                                     ) : (
                                                         <span className="text-[10px] text-slate-400">+ Add</span>
                                                     )}
@@ -1562,7 +1881,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         <span>Extra Bed &amp; Baby Cot</span>
                                                     </span>
                                                     {row.servicesBundle?.extraBed?.enabled || row.extraBed?.enabled ? (
-                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                                     ) : (
                                                         <span className="text-[10px] text-slate-400">+ Add</span>
                                                     )}
@@ -1581,7 +1900,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         <span>Meal Plans &amp; Dining</span>
                                                     </span>
                                                     {row.servicesBundle?.mealPlan?.enabled ? (
-                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                                     ) : (
                                                         <span className="text-[10px] text-slate-400">+ Add</span>
                                                     )}
@@ -1600,7 +1919,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         <span>Honeymoon &amp; Decor</span>
                                                     </span>
                                                     {row.servicesBundle?.celebration?.enabled ? (
-                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                                     ) : (
                                                         <span className="text-[10px] text-slate-400">+ Add</span>
                                                     )}
@@ -1619,7 +1938,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         <span>Spa &amp; Wellness Pass</span>
                                                     </span>
                                                     {row.servicesBundle?.spaWellness?.enabled ? (
-                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                                     ) : (
                                                         <span className="text-[10px] text-slate-400">+ Add</span>
                                                     )}
@@ -1638,7 +1957,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         <span>Early / Late Check-Out</span>
                                                     </span>
                                                     {row.servicesBundle?.timingFlex?.earlyCheckIn || row.servicesBundle?.timingFlex?.lateCheckOut ? (
-                                                        <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                                     ) : (
                                                         <span className="text-[10px] text-slate-400">+ Add</span>
                                                     )}
@@ -1652,7 +1971,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         setServiceModalConfig({ isOpen: true, rowId: row.id, initialTab: 'pickup' });
                                                         setMenuAnchor(null);
                                                     }}
-                                                    className="w-full px-3 py-1.5 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
+                                                    className="w-full px-3 py-1.5 text-left text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
                                                 >
                                                     <Sparkles size={13} />
                                                     <span>Manage All Services...</span>
@@ -1692,7 +2011,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             <UserIcon size={20} />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-bold text-gray-900">Guest Profile</h3>
+                                            <h3 className="text-sm text-gray-900">Guest Profile</h3>
                                             <p className="text-[11px] text-gray-500">Identity, contact and travel information</p>
                                         </div>
                                     </div>
@@ -1750,7 +2069,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                     value={mobile}
                                                     onChange={e => setMobile(e.target.value)}
                                                     placeholder="Mobile number..."
-                                                    className="w-full h-8 px-2.5 border border-gray-300 rounded text-xs bg-white outline-none font-bold text-gray-800"
+                                                    className="w-full h-8 px-2.5 border border-gray-300 rounded text-xs bg-white outline-none text-gray-800"
                                                 />
                                             </div>
 
@@ -1895,12 +2214,12 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                             <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-2xs space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                        <h4 className="text-xs text-gray-700 uppercase tracking-wider">
                                             REMARKS & PREFERENCES
                                         </h4>
                                         <p className="text-[11px] text-gray-400">Keep guest-facing and internal notes organized.</p>
                                     </div>
-                                    <span className="px-2 py-0.5 rounded bg-gray-100 text-blue-600 font-bold text-[10px] tracking-wider">
+                                    <span className="px-2 py-0.5 rounded bg-gray-100 text-blue-600 text-[10px] tracking-wider">
                                         OPTIONAL
                                     </span>
                                 </div>
@@ -1913,7 +2232,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             onClick={() => setActivePrefTab(tab)}
                                             className={`pb-2 text-xs font-medium cursor-pointer relative ${
                                                 activePrefTab === tab
-                                                    ? 'text-blue-600 font-bold border-b-2 border-blue-600 -mb-[1px]'
+                                                    ? 'text-blue-600 border-b-2 border-blue-600 -mb-[1px]'
                                                     : 'text-gray-500 hover:text-gray-800'
                                             }`}
                                         >
@@ -1941,7 +2260,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             <MapPin size={20} />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-bold text-gray-900">Home Address</h3>
+                                            <h3 className="text-sm text-gray-900">Home Address</h3>
                                             <p className="text-[11px] text-gray-500">Primary residence and location details</p>
                                         </div>
                                     </div>
@@ -2012,7 +2331,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             <Briefcase size={20} />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-bold text-gray-900">Work Details</h3>
+                                            <h3 className="text-sm text-gray-900">Work Details</h3>
                                             <p className="text-[11px] text-gray-500">Organization and business contact information</p>
                                         </div>
                                     </div>
@@ -2081,7 +2400,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                             <div className="lg:col-span-3 space-y-6">
                                 {/* Discount Section */}
                                 <div className="space-y-2">
-                                    <h3 className="text-base font-bold text-gray-900">Discount</h3>
+                                    <h3 className="text-base text-gray-900">Discount</h3>
                                     <div className="flex items-center gap-3">
                                         <select
                                             value={discountType}
@@ -2097,7 +2416,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             min={0}
                                             value={discountValue}
                                             onChange={e => setDiscountValue(Number(e.target.value))}
-                                            className="w-44 h-9 px-3 border border-gray-300 rounded-md text-xs font-bold bg-white text-gray-800 outline-none"
+                                            className="w-44 h-9 px-3 border border-gray-300 rounded-md text-xs bg-white text-gray-800 outline-none"
                                         />
 
                                         <button
@@ -2114,7 +2433,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
                                 {/* Payment Method Section */}
                                 <div className="space-y-3">
-                                    <h3 className="text-base font-bold text-gray-900">Payment Method</h3>
+                                    <h3 className="text-base text-gray-900">Payment Method</h3>
 
                                     <div className="space-y-2.5">
                                         {paymentRows.map((p, idx) => (
@@ -2145,7 +2464,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                         type="number"
                                                         value={p.amount}
                                                         onChange={e => updatePaymentRow(p.id, 'amount', Number(e.target.value))}
-                                                        className="h-8 px-2.5 border border-gray-300 rounded text-xs font-bold text-emerald-700"
+                                                        className="h-8 px-2.5 border border-gray-300 rounded text-xs text-emerald-700"
                                                     />
                                                 </div>
 
@@ -2180,73 +2499,73 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                 <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-2 text-xs">
                                     <div className="flex justify-between py-1 border-b border-gray-100 text-gray-600">
                                         <span>Room Base Tariff</span>
-                                        <span className="font-bold text-gray-900 font-mono">৳ {roomBaseTotal.toFixed(2)}</span>
+                                        <span className="text-gray-900 font-mono">৳ {roomBaseTotal.toFixed(2)}</span>
                                     </div>
 
                                     {totalPickupArrivalCharge > 0 && (
                                         <div className="flex justify-between py-1 text-blue-700">
                                             <span className="flex items-center gap-1"><Car size={11} /> Airport Pickup (Inbound)</span>
-                                            <span className="font-bold font-mono">+৳ {totalPickupArrivalCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalPickupArrivalCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     {totalDropDepartureCharge > 0 && (
                                         <div className="flex justify-between py-1 text-sky-700">
                                             <span className="flex items-center gap-1"><Plane size={11} /> Airport Drop (Outbound)</span>
-                                            <span className="font-bold font-mono">+৳ {totalDropDepartureCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalDropDepartureCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     {totalExtraBedCharge > 0 && (
                                         <div className="flex justify-between py-1 text-indigo-700">
                                             <span className="flex items-center gap-1"><BedDouble size={11} /> Extra Bed &amp; Cot</span>
-                                            <span className="font-bold font-mono">+৳ {totalExtraBedCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalExtraBedCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     {totalMealPlanCharge > 0 && (
                                         <div className="flex justify-between py-1 text-amber-700">
                                             <span className="flex items-center gap-1"><Utensils size={11} /> Meal Plans</span>
-                                            <span className="font-bold font-mono">+৳ {totalMealPlanCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalMealPlanCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     {totalCelebrationCharge > 0 && (
                                         <div className="flex justify-between py-1 text-rose-700">
                                             <span className="flex items-center gap-1"><Gift size={11} /> Decor &amp; Romance</span>
-                                            <span className="font-bold font-mono">+৳ {totalCelebrationCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalCelebrationCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     {totalSpaCharge > 0 && (
                                         <div className="flex justify-between py-1 text-teal-700">
                                             <span className="flex items-center gap-1"><Sparkles size={11} /> Spa Treatment</span>
-                                            <span className="font-bold font-mono">+৳ {totalSpaCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalSpaCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     {totalTimingCharge > 0 && (
                                         <div className="flex justify-between py-1 text-sky-700">
                                             <span className="flex items-center gap-1"><Clock size={11} /> Time Flex</span>
-                                            <span className="font-bold font-mono">+৳ {totalTimingCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalTimingCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     {totalCustomCharge > 0 && (
                                         <div className="flex justify-between py-1 text-purple-700">
                                             <span>Custom Services</span>
-                                            <span className="font-bold font-mono">+৳ {totalCustomCharge.toFixed(2)}</span>
+                                            <span className="font-mono">+৳ {totalCustomCharge.toFixed(2)}</span>
                                         </div>
                                     )}
 
                                     <div className="flex justify-between py-1.5 border-t border-dashed border-gray-200 text-gray-700 font-semibold">
                                         <span>Total Gross</span>
-                                        <span className="font-bold text-gray-900 font-mono">৳ {grossTotal.toFixed(2)}</span>
+                                        <span className="text-gray-900 font-mono">৳ {grossTotal.toFixed(2)}</span>
                                     </div>
 
                                     <div className="flex justify-between py-1 border-b border-dashed border-gray-200 text-gray-600">
                                         <span>Discounted Amount</span>
-                                        <span className="font-bold text-emerald-600 font-mono">-৳ {discountedAmount.toFixed(2)}</span>
+                                        <span className="text-emerald-600 font-mono">-৳ {discountedAmount.toFixed(2)}</span>
                                     </div>
 
                                     <div className="flex justify-between py-1 text-gray-700 text-xs">
@@ -2257,7 +2576,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                     {/* Statutory Taxes & VAT itemized breakdown from /taxes-vat */}
                                     {taxCalculation.isTaxApplicable && taxCalculation.breakdown.length > 0 ? (
                                         <div className="my-1 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
-                                            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider pb-0.5 border-b border-slate-200">
+                                            <div className="flex items-center justify-between text-[10px] text-slate-500 uppercase tracking-wider pb-0.5 border-b border-slate-200">
                                                 <span>{taxCalculation.configCode} Tax Rules</span>
                                                 <span className="text-blue-700 font-mono">+৳ {taxCalculation.totalTaxAmount.toFixed(2)}</span>
                                             </div>
@@ -2286,7 +2605,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
 
                                     <div className="flex justify-between py-1 border-b border-dashed border-gray-200 text-gray-600">
                                         <span>Total Paid</span>
-                                        <span className="font-bold text-emerald-700 font-mono">৳ {totalPaid.toFixed(2)}</span>
+                                        <span className="text-emerald-700 font-mono">৳ {totalPaid.toFixed(2)}</span>
                                     </div>
 
                                     <div className="flex justify-between py-1.5 text-sm text-gray-900 font-bold">
@@ -2308,28 +2627,28 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('1')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 1
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('2')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 2
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('3')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 3
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('CLEAR')}
-                                                className="h-10 bg-red-50 text-red-700 border border-red-200 rounded text-xs font-bold hover:bg-red-100 cursor-pointer"
+                                                className="h-10 bg-red-50 text-red-700 border border-red-200 rounded text-xs hover:bg-red-100 cursor-pointer"
                                             >
                                                 Clear
                                             </button>
@@ -2337,28 +2656,28 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('4')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 4
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('5')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 5
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('6')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 6
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('BACK')}
-                                                className="h-10 bg-gray-100 text-gray-700 border border-gray-200 rounded text-sm font-bold hover:bg-gray-200 flex items-center justify-center cursor-pointer"
+                                                className="h-10 bg-gray-100 text-gray-700 border border-gray-200 rounded text-sm hover:bg-gray-200 flex items-center justify-center cursor-pointer"
                                             >
                                                 <Delete size={18} />
                                             </button>
@@ -2366,28 +2685,28 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('7')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 7
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('8')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 8
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('9')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 9
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleKeypadPress('0')}
-                                                className="h-10 bg-white border border-gray-200 rounded text-sm font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                                className="h-10 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                             >
                                                 0
                                             </button>
@@ -2396,7 +2715,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => handleKeypadPress('FULL')}
-                                            className="w-full mt-2 h-7 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold cursor-pointer"
+                                            className="w-full mt-2 h-7 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] cursor-pointer"
                                         >
                                             Pay Full Due (৳ {totalDue.toFixed(2)})
                                         </button>

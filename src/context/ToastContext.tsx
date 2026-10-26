@@ -203,7 +203,7 @@ const ToastCard: React.FC<{
                 {/* Message & Title */}
                 <div className="flex-1 min-w-0 pr-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={`text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border ${typeConfig.badgeBg}`}>
+                        <span className={`text-[9.5px] uppercase tracking-wider px-1.5 py-0.2 rounded border ${typeConfig.badgeBg}`}>
                             {item.title || typeConfig.label}
                         </span>
                         {isPaused && (

@@ -26,6 +26,10 @@ export interface CanonicalRoom {
     connectedTo?: string;
     viewType?: string;
     smokingAllowed?: boolean;
+    smokingStatus?: string;
+    phoneExt?: string;
+    lockId?: string;
+    nearElevator?: boolean;
     baseRate?: number;
     bedConfiguration?: string;
 }
@@ -43,15 +47,54 @@ export interface RoomLock {
 export interface StoredReservation {
     id: number | string;
     reservationNumber: string;
+    groupCode?: string;
+    subBookingNumber?: string;
+    registrationNumber?: string;
+    registeredAt?: string;
+    folioNumber?: string;
     guestName: string;
     roomNumber: string;
     roomType: string;
     allocatedRooms?: string[];
+    roomsList?: any[];
+    groupRoomsList?: any[];
     checkIn: string;
     checkOut: string;
     status: string;
     [key: string]: any;
 }
+
+export const generateMasterReservationNumber = (dateStr?: string): string => {
+    const today = dateStr || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const seqKey = `pms_daily_seq_res_${today}`;
+    let current = parseInt(localStorage.getItem(seqKey) || '0', 10);
+    current += 1;
+    localStorage.setItem(seqKey, String(current));
+    return `RES-${today}${String(current).padStart(4, '0')}`;
+};
+
+export const generateGroupCode = (dateStr?: string): string => {
+    const today = dateStr || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const seqKey = `pms_daily_seq_grp_${today}`;
+    let current = parseInt(localStorage.getItem(seqKey) || '0', 10);
+    current += 1;
+    localStorage.setItem(seqKey, String(current));
+    return `GRP-${today}-${String(current).padStart(4, '0')}`;
+};
+
+export const generateSubBookingNumber = (masterResNo: string, roomIndex: number): string => {
+    return `${masterResNo}-${String(roomIndex).padStart(2, '0')}`;
+};
+
+export const generateRegistrationNumber = (resNo: string): string => {
+    const clean = String(resNo || '').replace(/^RES-/, '') || Math.floor(100000 + Math.random() * 900000).toString();
+    return `REG-${clean}`;
+};
+
+export const generateFolioNumber = (resNo: string): string => {
+    const clean = String(resNo || '').replace(/^RES-/, '') || Math.floor(100000 + Math.random() * 900000).toString();
+    return `FOL-${clean}`;
+};
 
 export interface DynamicRoomType {
     id: string | number;
@@ -63,12 +106,23 @@ export interface DynamicRoomType {
     maxChildren: number;
     baseRate: number;
     extraBedRate: number;
+    extraAdultPrice?: number;
+    extraChildPrice?: number;
+    size?: number;
+    bedType?: string;
+    viewType?: string;
+    smokingPolicy?: string;
+    amenities?: string[];
+    photos?: string[];
+    isConnecting?: boolean;
+    showOnWebsite?: boolean;
+    status?: string;
     description?: string;
 }
 
 const STORAGE_KEY_ROOM_TYPES = 'hotel_room_types_v1';
 
-// Dynamic Database Baseline Seeds (synced directly with PostgreSQL & SQLite room_types table)
+// Dynamic Database Baseline Seeds (synced directly with PostgreSQL room_types table)
 export const DEFAULT_ROOM_TYPES: DynamicRoomType[] = [
     { id: 1, code: 'DD', name: 'Deluxe Double', baseOccupancy: 2, maxAdults: 2, maxChildren: 1, baseRate: 3000, extraBedRate: 1000, description: 'King bed, city view, high-speed WiFi, work desk' },
     { id: 2, code: 'SK', name: 'Superior King', baseOccupancy: 2, maxAdults: 2, maxChildren: 1, baseRate: 4500, extraBedRate: 1200, description: 'King bed with panoramic balcony and plush lounge' },
@@ -77,13 +131,35 @@ export const DEFAULT_ROOM_TYPES: DynamicRoomType[] = [
     { id: 5, code: 'SS', name: 'Standard Single', baseOccupancy: 1, maxAdults: 1, maxChildren: 0, baseRate: 2200, extraBedRate: 800, description: 'Cozy single room with premium bed and workspace' }
 ];
 
-// Room Type ID to Name Map (dynamic compatibility helper)
-export const ROOM_TYPE_MAP: Record<string, string> = {
-    '1': 'Deluxe Double',
-    '2': 'Superior King',
-    '3': 'Executive Suite',
-    '4': 'Presidential Royal Suite',
-    '5': 'Standard Single'
+// Room Type ID to Name Map (dynamic compatibility helper powered by dynamic DB cache)
+export const getRoomTypeNameById = (id: string | number): string => {
+    const list = getDynamicRoomTypes();
+    const found = list.find(t => String(t.id) === String(id));
+    return found ? found.name : 'Room Category';
+};
+
+export const ROOM_TYPE_MAP: Record<string, string> = new Proxy({} as Record<string, string>, {
+    get: (_target, prop: string) => {
+        return getRoomTypeNameById(prop);
+    }
+});
+
+/**
+ * Canonical Room Type Matcher:
+ * Matches room type names reliably even when one is "Presidential Royal Suite"
+ * and the other is "Presidential Suite", or "Deluxe Twin" vs "Deluxe Double".
+ */
+export const isMatchingRoomType = (typeA?: string, typeB?: string): boolean => {
+    if (!typeA || !typeB) return false;
+    const a = typeA.trim().toLowerCase();
+    const b = typeB.trim().toLowerCase();
+    if (a === b || a.includes(b) || b.includes(a)) return true;
+    if (a.includes('presidential') && b.includes('presidential')) return true;
+    if (a.includes('executive') && b.includes('executive')) return true;
+    if (a.includes('superior') && b.includes('superior')) return true;
+    if (a.includes('deluxe') && b.includes('deluxe')) return true;
+    if (a.includes('standard') && b.includes('standard')) return true;
+    return false;
 };
 
 /**
@@ -134,8 +210,7 @@ export const getStandardDailyRateForRoom = (roomNumber?: string, roomTypeName?: 
         const matched = dynamicTypes.find(t => 
             t.name.toLowerCase() === query ||
             t.code.toLowerCase() === query ||
-            query.includes(t.name.toLowerCase()) ||
-            t.name.toLowerCase().includes(query)
+            isMatchingRoomType(t.name, roomTypeName)
         );
         if (matched && Number(matched.baseRate) > 0) {
             return Number(matched.baseRate);
@@ -176,52 +251,362 @@ export const resolveReservationDailyBaseRate = (res: any, roomNumber?: string): 
     return getStandardDailyRateForRoom(roomNumber || res.roomNumber, res.roomType);
 };
 
+export interface RoomTypeCapacity {
+    baseOccupancy: number;
+    maxAdults: number;
+    maxChildren: number;
+    maxOccupancy: number;
+    extraAdultPrice: number;
+    extraChildPrice: number;
+    baseRate: number;
+}
+
+/**
+ * Dynamically resolves capacity rules (base occupancy, max adults, max children, surcharges)
+ * for any room type from the database cache or fallback heuristics.
+ */
+export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTypeCapacity => {
+    const dynamicTypes = getDynamicRoomTypes();
+    let matched: DynamicRoomType | undefined;
+
+    if (roomTypeNameOrId !== undefined && roomTypeNameOrId !== null) {
+        const queryStr = String(roomTypeNameOrId).trim().toLowerCase();
+        matched = dynamicTypes.find(t => 
+            String(t.id) === String(roomTypeNameOrId) ||
+            t.name.toLowerCase() === queryStr ||
+            t.code.toLowerCase() === queryStr ||
+            isMatchingRoomType(t.name, queryStr)
+        );
+    }
+
+    if (!matched && dynamicTypes.length > 0) {
+        matched = dynamicTypes[0];
+    }
+
+    const typeName = matched?.name?.toLowerCase() || String(roomTypeNameOrId || '').toLowerCase();
+    const isSingle = typeName.includes('single');
+    const isSuite = typeName.includes('suite') || typeName.includes('presidential') || typeName.includes('royal');
+    const isKingOrDouble = typeName.includes('king') || typeName.includes('double') || typeName.includes('twin');
+
+    const defaultBaseOccupancy = isSingle ? 1 : (isSuite ? 3 : 2);
+    const defaultMaxAdults = isSingle ? 1 : (isSuite ? 4 : (isKingOrDouble ? 3 : 2));
+    const defaultMaxChildren = isSingle ? 0 : 2;
+
+    const baseOccupancy = Number(matched?.baseOccupancy) > 0 ? Number(matched!.baseOccupancy) : defaultBaseOccupancy;
+    const maxAdults = Number(matched?.maxAdults) > 0 ? Number(matched!.maxAdults) : defaultMaxAdults;
+    const maxChildren = matched?.maxChildren !== undefined ? Number(matched.maxChildren) : defaultMaxChildren;
+    const maxOccupancy = Math.max(maxAdults + maxChildren, baseOccupancy);
+
+    const extraAdultPrice = Number(matched?.extraAdultPrice || matched?.extraBedRate || 1000);
+    const extraChildPrice = Number(matched?.extraChildPrice || Math.round(extraAdultPrice * 0.5));
+    const baseRate = Number(matched?.baseRate || 3000);
+
+    return {
+        baseOccupancy,
+        maxAdults,
+        maxChildren,
+        maxOccupancy,
+        extraAdultPrice,
+        extraChildPrice,
+        baseRate
+    };
+};
+
+/**
+ * Dynamic Meal Plans cache helper (synced with PostgreSQL/SQLite meal_plans table)
+ */
+export const getDynamicMealPlans = (): any[] => {
+    try {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('hotel_meal_plans_v1');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        }
+    } catch {}
+    return [];
+};
+
+/**
+ * Dynamic Hotel Packages cache helper (synced with PostgreSQL/SQLite packages table)
+ */
+export const getDynamicPackages = (): any[] => {
+    try {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('hotel_packages_v2');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        }
+    } catch {}
+    return [];
+};
+
+/**
+ * Hospitality Standard: Dynamically calculate room tariff based on Rate Plan, Room Type, and Occupancy
+ */
+export const calculateTariffForRatePlan = (
+    ratePlanNameOrId: string | number,
+    roomTypeName: string,
+    canonicalBaseRate: number,
+    adults: number = 2,
+    children: number = 0,
+    ratePlansList?: any[]
+): number => {
+    const capacity = getRoomTypeCapacity(roomTypeName);
+    const safeAdults = Math.max(1, adults);
+    const safeChildren = Math.max(0, children);
+
+    if (!ratePlanNameOrId) {
+        let standardTariff = canonicalBaseRate;
+        if (safeAdults > capacity.baseOccupancy) {
+            standardTariff += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
+        }
+        if (safeChildren > 0) {
+            standardTariff += safeChildren * capacity.extraChildPrice;
+        }
+        return Math.max(0, Math.round(standardTariff));
+    }
+
+    // 1. Retrieve rate plans from argument or local storage
+    let plans: any[] = ratePlansList || [];
+    if (!plans || plans.length === 0) {
+        try {
+            const saved = localStorage.getItem('hotel_rate_plans_v1');
+            if (saved) plans = JSON.parse(saved);
+        } catch {}
+    }
+
+    if (!plans || plans.length === 0) {
+        let fallbackTariff = canonicalBaseRate;
+        if (safeAdults > capacity.baseOccupancy) {
+            fallbackTariff += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
+        }
+        if (safeChildren > 0) {
+            fallbackTariff += safeChildren * capacity.extraChildPrice;
+        }
+        return Math.max(0, Math.round(fallbackTariff));
+    }
+
+    const planQuery = String(ratePlanNameOrId).trim().toLowerCase();
+    const plan = plans.find(p =>
+        String(p.id) === String(ratePlanNameOrId) ||
+        (p.name && p.name.trim().toLowerCase() === planQuery) ||
+        (p.shortCode && p.shortCode.trim().toLowerCase() === planQuery)
+    );
+
+    if (!plan) {
+        let fallbackTariff = canonicalBaseRate;
+        if (safeAdults > capacity.baseOccupancy) {
+            fallbackTariff += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
+        }
+        if (safeChildren > 0) {
+            fallbackTariff += safeChildren * capacity.extraChildPrice;
+        }
+        return Math.max(0, Math.round(fallbackTariff));
+    }
+
+    // 2. Check explicit pricing for this room type within the selected Rate Plan
+    const roomTypeQuery = roomTypeName.trim().toLowerCase();
+    const pricingEntry = plan.pricing?.find((pr: any) => {
+        const prType = String(pr.roomTypeId || '').trim().toLowerCase();
+        return prType === roomTypeQuery ||
+               roomTypeQuery.includes(prType) ||
+               prType.includes(roomTypeQuery);
+    });
+
+    if (pricingEntry) {
+        let tariff = 0;
+        if (safeAdults <= 1) {
+            tariff = Number(pricingEntry.baseRate) || canonicalBaseRate;
+        } else if (safeAdults === 2) {
+            tariff = Number(pricingEntry.doubleRate) || Number(pricingEntry.baseRate) || canonicalBaseRate;
+        } else if (safeAdults === 3 && Number(pricingEntry.tripleRate) > 0) {
+            tariff = Number(pricingEntry.tripleRate);
+        } else {
+            const baseOccRate = (safeAdults >= 3 && Number(pricingEntry.tripleRate) > 0)
+                ? Number(pricingEntry.tripleRate)
+                : (Number(pricingEntry.doubleRate) || Number(pricingEntry.baseRate) || canonicalBaseRate);
+            const extraAdultRate = Number(pricingEntry.extraAdult) || capacity.extraAdultPrice || Math.round(baseOccRate * 0.25);
+            const extraPaxCount = (safeAdults >= 3 && Number(pricingEntry.tripleRate) > 0) ? (safeAdults - 3) : (safeAdults - 2);
+            tariff = baseOccRate + (extraAdultRate * extraPaxCount);
+        }
+
+        if (safeChildren > 0) {
+            const extraChildRate = Number(pricingEntry.extraChild) || capacity.extraChildPrice || 0;
+            tariff += extraChildRate * safeChildren;
+        }
+        return Math.max(0, Math.round(tariff));
+    }
+
+    // 3. If no room-type-specific pricing row, calculate based on base rate + occupant surcharges
+    let base = canonicalBaseRate;
+    if (safeAdults > capacity.baseOccupancy) {
+        base += (safeAdults - capacity.baseOccupancy) * capacity.extraAdultPrice;
+    }
+    if (safeChildren > 0) {
+        base += safeChildren * capacity.extraChildPrice;
+    }
+
+    // 4. Dynamic Meal plan supplements directly from Database & Hotel Configuration
+    if (plan.mealPlan) {
+        const mealPlans = getDynamicMealPlans();
+        const mealQuery = String(plan.mealPlan).trim().toUpperCase();
+        const matchedMeal = mealPlans.find(m =>
+            String(m.id) === String(plan.mealPlan) ||
+            (m.shortCode && m.shortCode.trim().toUpperCase() === mealQuery) ||
+            (m.name && m.name.trim().toUpperCase() === mealQuery)
+        );
+
+        if (matchedMeal) {
+            const adultMealRate = Number(matchedMeal.sellingPriceAdult) || 0;
+            const childMealRate = Number(matchedMeal.sellingPriceChild) || 0;
+            base += (adultMealRate * safeAdults) + (childMealRate * safeChildren);
+        } else {
+            // Baseline fallback only if database meal plan table has not yet been seeded
+            if (mealQuery === 'CP') {
+                base += 500 * safeAdults + 300 * safeChildren;
+            } else if (mealQuery === 'MAP') {
+                base += 1200 * safeAdults + 700 * safeChildren;
+            } else if (mealQuery === 'AP') {
+                base += 2000 * safeAdults + 1200 * safeChildren;
+            }
+        }
+    }
+
+    return Math.max(0, Math.round(base));
+};
+
 // Canonical Property Inventory (34 Rooms)
 export const DEFAULT_CANONICAL_ROOMS: CanonicalRoom[] = [
     // Floor 1
     { id: 1, number: '101', name: 'Garden Deluxe 101', buildingId: '1', floorId: '1', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 2, number: '102', name: 'Garden Deluxe 102', buildingId: '1', floorId: '1', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 3, number: '103', name: 'Superior Bay 103', buildingId: '1', floorId: '1', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 4, number: '104', name: 'Executive Suite 104', buildingId: '1', floorId: '1', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Inspected' },
-    { id: 5, number: '105', name: 'Standard Single 105', buildingId: '1', floorId: '1', roomTypeId: '4', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 6, number: '106', name: 'Standard Single 106', buildingId: '1', floorId: '1', roomTypeId: '4', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 3, number: '103', name: 'Superior Bay 103', buildingId: '1', floorId: '1', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 4, number: '104', name: 'Executive Suite 104', buildingId: '1', floorId: '1', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 5, number: '105', name: 'Standard Single 105', buildingId: '1', floorId: '1', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 6, number: '106', name: 'Standard Single 106', buildingId: '1', floorId: '1', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 7, number: '107', name: 'Deluxe Courtyard 107', buildingId: '1', floorId: '1', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 8, number: '108', name: 'Superior King 108', buildingId: '1', floorId: '1', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Out of Order', housekeepingStatus: 'Dirty', remarks: 'AC compressor maintenance' },
+    { id: 8, number: '108', name: 'Superior King 108', buildingId: '1', floorId: '1', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     // Floor 2
-    { id: 9, number: '201', name: 'Superior Balcony 201', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Inspected' },
+    { id: 9, number: '201', name: 'Superior Balcony 201', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 10, number: '202', name: 'Superior King 202', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 11, number: '203', name: 'Executive Suite 203', buildingId: '1', floorId: '2', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Dirty' },
+    { id: 11, number: '203', name: 'Executive Suite 203', buildingId: '1', floorId: '2', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 12, number: '204', name: 'Deluxe King 204', buildingId: '1', floorId: '2', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 13, number: '205', name: 'Standard Single 205', buildingId: '1', floorId: '2', roomTypeId: '4', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 13, number: '205', name: 'Standard Single 205', buildingId: '1', floorId: '2', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 14, number: '206', name: 'Deluxe Twin 206', buildingId: '1', floorId: '2', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 15, number: '207', name: 'Deluxe Double 207', buildingId: '1', floorId: '2', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 16, number: '208', name: 'Superior King 208', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     // Floor 3
     { id: 17, number: '301', name: 'Deluxe Sea View 301', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 18, number: '302', name: 'Standard Single 302', buildingId: '1', floorId: '3', roomTypeId: '4', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 18, number: '302', name: 'Standard Single 302', buildingId: '1', floorId: '3', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 19, number: '303', name: 'Executive Suite 303', buildingId: '1', floorId: '3', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 20, number: '304', name: 'Deluxe Double 304', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Dirty' },
-    { id: 21, number: '305', name: 'Deluxe Twin 305', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Dirty' },
+    { id: 20, number: '304', name: 'Deluxe Double 304', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 21, number: '305', name: 'Deluxe Twin 305', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 22, number: '306', name: 'Superior King 306', buildingId: '1', floorId: '3', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 23, number: '307', name: 'Deluxe Garden 307', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 24, number: '308', name: 'Superior King 308', buildingId: '1', floorId: '3', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Inspected' },
+    { id: 24, number: '308', name: 'Superior King 308', buildingId: '1', floorId: '3', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     // Floor 4
     { id: 25, number: '401', name: 'Executive Club 401', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 26, number: '402', name: 'Executive Club 402', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 27, number: '403', name: 'Deluxe Panoramic 403', buildingId: '2', floorId: '4', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 28, number: '404', name: 'Superior Sky 404', buildingId: '2', floorId: '4', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 29, number: '405', name: 'Standard Single 405', buildingId: '2', floorId: '4', roomTypeId: '4', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 29, number: '405', name: 'Standard Single 405', buildingId: '2', floorId: '4', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 30, number: '410', name: 'Corner Executive 410', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
     // Floor 5 (VIP Suites)
-    { id: 31, number: '501', name: 'Presidential Royal Suite 501', buildingId: '2', floorId: '5', roomTypeId: '5', roomTypeName: 'Presidential Suite', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 31, number: '501', name: 'Presidential Royal Suite 501', buildingId: '2', floorId: '5', roomTypeId: '4', roomTypeName: 'Presidential Suite', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 32, number: '502', name: 'Executive Diplomatic 502', buildingId: '2', floorId: '5', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 33, number: '503', name: 'Presidential Penthouse 503', buildingId: '2', floorId: '5', roomTypeId: '5', roomTypeName: 'Presidential Suite', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 33, number: '503', name: 'Presidential Penthouse 503', buildingId: '2', floorId: '5', roomTypeId: '4', roomTypeName: 'Presidential Suite', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 34, number: '505', name: 'Sky Superior 505', buildingId: '2', floorId: '5', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' }
 ];
 
 const STORAGE_KEY_ROOMS = 'hotel_rooms_inventory_v1';
 const STORAGE_KEY_RESERVATIONS = 'hotel_reservations_v2';
 const STORAGE_KEY_LOCKS = 'hotel_room_locks_v1';
+
+/**
+ * Parse any date representation (ISO YYYY-MM-DD, DD MMM YYYY, or Date object) into pure YYYY-MM-DD
+ * completely immune to local timezone rollback bugs.
+ */
+export const formatToISODate = (input: string | Date | null | undefined): string => {
+    if (!input) return '2026-07-01';
+    if (typeof input === 'string') {
+        const trimmed = input.trim();
+        // 1. If already YYYY-MM-DD
+        const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (isoMatch) {
+            return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
+        }
+        // 2. If DD MMM YYYY (e.g. "02 Jul 2026" or "2 Jul 2026")
+        const textMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+        if (textMatch) {
+            const monthMap: Record<string, string> = {
+                jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+                jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+            };
+            const m = monthMap[textMatch[2].toLowerCase()];
+            if (m) {
+                return `${textMatch[3]}-${m}-${textMatch[1].padStart(2, '0')}`;
+            }
+        }
+    }
+    const d = typeof input === 'string' ? new Date(input) : input;
+    if (d && !isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    return '2026-07-01';
+};
+
+/**
+ * Format date to "DD MMM YYYY" (e.g. "02 Jul 2026") for Header display
+ */
+export const formatToDisplayDate = (isoOrText: string | null | undefined): string => {
+    const iso = formatToISODate(isoOrText);
+    const parts = iso.split('-');
+    if (parts.length === 3) {
+        const year = parts[0];
+        const monthNum = parseInt(parts[1], 10);
+        const day = parts[2].padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthName = months[monthNum - 1] || 'Jul';
+        return `${day} ${monthName} ${year}`;
+    }
+    return '01 Jul 2026';
+};
+
+/**
+ * Retrieve system operating date as YYYY-MM-DD
+ */
+export const getOperatingSystemDate = (): string => {
+    try {
+        const sys = typeof window !== 'undefined' ? (localStorage.getItem('hotel_system_date_iso') || localStorage.getItem('hotel_system_date')) : null;
+        return formatToISODate(sys);
+    } catch {
+        return '2026-07-01';
+    }
+};
+
+/**
+ * Set system operating date, sync localStorage and broadcast across all tabs and components
+ */
+export const setOperatingSystemDate = (newDateStr: string): void => {
+    const iso = formatToISODate(newDateStr);
+    const display = formatToDisplayDate(iso);
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('hotel_system_date', display);
+        localStorage.setItem('hotel_system_date_iso', iso);
+    }
+    broadcastPMSEvent({
+        type: 'SYSTEM_DATE_CHANGED',
+        systemDate: iso,
+        displayDate: display
+    });
+};
 
 // Cross-tab real-time event bus
 let pmsBroadcastChannel: BroadcastChannel | null = null;
@@ -240,6 +625,7 @@ export type PMSBroadcastMessage =
     | { type: 'RESERVATION_UPDATED'; reservationId: string | number }
     | { type: 'ROOM_STATUS_CHANGED'; roomNo: string; hkStatus?: string; foStatus?: string }
     | { type: 'FOLIO_UPDATED'; folioId?: string | number }
+    | { type: 'SYSTEM_DATE_CHANGED'; systemDate: string; displayDate: string }
     | { type: 'INVENTORY_REFRESH' };
 
 export const broadcastPMSEvent = (message: PMSBroadcastMessage) => {
@@ -454,182 +840,66 @@ export const releaseLocksForRooms = (roomNumbers: string[]): void => {
 // 4. RESERVATIONS REPOSITORY & AVAILABILITY ENGINE
 // =========================================================================
 
-export const DEFAULT_STORED_RESERVATIONS: StoredReservation[] = [
-    {
-        id: 109,
-        reservationNumber: 'RES-108901',
-        guestName: 'Zubair Ahmed',
-        roomNumber: '102',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-06-25',
-        checkOut: '2026-06-28',
-        nights: 3,
-        status: 'completed',
-        isPast: true,
-        totalAmount: 9000,
-        paidAmount: 9000,
-        dueAmount: 0
-    },
-    {
-        id: 110,
-        reservationNumber: 'RES-108902',
-        guestName: 'Nasir Hossain',
-        roomNumber: '508',
-        roomType: 'Executive Suite',
-        checkIn: '2026-06-26',
-        checkOut: '2026-06-28',
-        nights: 2,
-        status: 'completed',
-        isPast: true,
-        totalAmount: 15000,
-        paidAmount: 15000,
-        dueAmount: 0
-    },
-    {
-        id: 108,
-        reservationNumber: 'RES-009280',
-        guestName: 'Mr Shahidul Alam',
-        roomNumber: '103',
-        roomType: 'Deluxe Twin',
-        checkIn: '2026-06-29',
-        checkOut: '2026-07-01',
-        nights: 2,
-        status: 'completed',
-        isPast: true,
-        totalAmount: 9000,
-        paidAmount: 9000,
-        dueAmount: 0,
-        vip: 'VIP'
-    },
-    {
-        id: 106,
-        reservationNumber: 'RES-009281',
-        guestName: 'Tonmoy (Md. Tariqul Islam)',
-        roomNumber: '101',
-        roomType: 'Standard Single',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-04',
-        nights: 3,
-        status: 'in-house',
-        totalAmount: 9000,
-        paidAmount: 6000,
-        dueAmount: 3000,
-        isGroup: false
-    },
-    {
-        id: 111,
-        reservationNumber: 'RES-109282',
-        guestName: 'S. Chowdhury',
-        roomNumber: '103',
-        roomType: 'Deluxe Twin',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-03',
-        nights: 2,
-        status: 'in-house',
-        totalAmount: 9000,
-        paidAmount: 9000,
-        dueAmount: 0,
-        isGroup: true,
-        isGroupOwner: true
-    },
-    {
-        id: 107,
-        reservationNumber: 'RES-009284',
-        guestName: 'Dr Imran Hossain',
-        roomNumber: '501',
-        roomType: 'Presidential Suite',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-07',
-        nights: 6,
-        status: 'in-house',
-        totalAmount: 108000,
-        paidAmount: 50000,
-        dueAmount: 58000,
-        vip: 'VVIP'
-    },
-    {
-        id: 103,
-        reservationNumber: 'RES-009283',
-        guestName: 'Mr Mahbubur Rahman',
-        roomNumber: '102',
-        allocatedRooms: ['102', '201'],
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-03',
-        checkOut: '2026-07-06',
-        nights: 3,
-        status: 'confirmed',
-        totalAmount: 21000,
-        paidAmount: 21000,
-        dueAmount: 0,
-        isGroup: true,
-        isGroupOwner: true,
-        roomsList: [
-            { id: 103, roomNumber: '102', checkInDate: '2026-07-03', checkOutDate: '2026-07-06', nights: 3, roomRate: 3000 },
-            { id: 104, roomNumber: '201', checkInDate: '2026-07-03', checkOutDate: '2026-07-06', nights: 3, roomRate: 4000 }
-        ]
-    },
-    {
-        id: 105,
-        reservationNumber: 'RES-009287',
-        guestName: 'Mr Rashidul Hasan (T. Hasan)',
-        roomNumber: '104',
-        roomType: 'Executive Suite',
-        checkIn: '2026-07-05',
-        checkOut: '2026-07-08',
-        nights: 3,
-        status: 'hold',
-        totalAmount: 9000,
-        paidAmount: 0,
-        dueAmount: 9000
-    },
-    {
-        id: 101,
-        reservationNumber: 'RES-009288',
-        guestName: 'Mr Asif Iqbal',
-        roomNumber: '105',
-        roomType: 'Deluxe Double',
-        checkIn: '2026-07-10',
-        checkOut: '2026-07-13',
-        nights: 3,
-        status: 'confirmed',
-        totalAmount: 6600,
-        paidAmount: 3000,
-        dueAmount: 3600
-    },
-    {
-        id: 102,
-        reservationNumber: 'RES-009289',
-        guestName: 'Mrs Sabrina Yeasmin',
-        roomNumber: '204',
-        roomType: 'Executive Suite',
-        checkIn: '2026-07-12',
-        checkOut: '2026-07-15',
-        nights: 3,
-        status: 'confirmed',
-        totalAmount: 9000,
-        paidAmount: 9000,
-        dueAmount: 0,
-        vip: 'VIP'
+export const DEFAULT_STORED_RESERVATIONS: StoredReservation[] = [];
+
+/**
+ * Centralized Canonical Persistence for Reservations Cache.
+ * Consolidates all legacy cache keys into a single source of truth.
+ */
+export const saveStoredReservations = (reservations: StoredReservation[]): void => {
+    try {
+        if (typeof window !== 'undefined') {
+            const json = JSON.stringify(reservations);
+            localStorage.setItem(STORAGE_KEY_RESERVATIONS, json);
+            // Clean up obsolete duplicate keys so browser storage is not wasted
+            localStorage.removeItem('hotel_reservations_v3');
+            localStorage.removeItem('hotel_reservations_v10');
+        }
+    } catch (e) {
+        console.error('Failed to save reservations cache', e);
     }
-];
+};
 
 export const getAllStoredReservations = (): StoredReservation[] => {
     try {
-        const saved = localStorage.getItem(STORAGE_KEY_RESERVATIONS);
-        if (saved) {
-            const list = JSON.parse(saved);
-            if (Array.isArray(list) && list.length > 0) {
-                // Sanitize and ensure room 104 for RES-009287 to prevent any cached collision
-                return list.map(r => {
-                    if (r.reservationNumber === 'RES-009287' && (r.roomNumber === '102' || !r.roomNumber)) {
-                        return { ...r, roomNumber: '104' };
-                    }
-                    return r;
-                });
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(STORAGE_KEY_RESERVATIONS) || localStorage.getItem('hotel_reservations_v3');
+            if (saved !== null) {
+                const list = JSON.parse(saved);
+                if (Array.isArray(list)) {
+                    return list;
+                }
             }
         }
     } catch {}
     return DEFAULT_STORED_RESERVATIONS;
+};
+
+/**
+ * Reset all local storage reservations and inventory caches to a clean state
+ */
+export const clearAllLocalReservationsAndInventory = async () => {
+    try {
+        saveStoredReservations([]);
+        localStorage.removeItem(STORAGE_KEY_RESERVATIONS);
+        localStorage.removeItem('hotel_reservations_v3');
+        localStorage.removeItem('hotel_reservations_v10');
+        localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify([]));
+        localStorage.setItem('hotel_room_locks', JSON.stringify([]));
+        localStorage.setItem('hotel_holds_v2', JSON.stringify([]));
+        localStorage.removeItem('hotel_folios_v2');
+        localStorage.removeItem('hotel_folio_charges_v1');
+        localStorage.removeItem('hotel_payments_v2');
+        localStorage.removeItem('hotel_frontdesk_records_v1');
+
+        if (typeof window !== 'undefined') {
+            const API_BASE = getApiBaseUrl();
+            await fetch(`${API_BASE}/api/bookings/reset`, { method: 'POST' }).catch(() => {});
+        }
+    } catch (e) {
+        console.warn('Error clearing inventory:', e);
+    }
+    broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
 };
 
 export interface RoomAvailabilityStatus {
@@ -787,12 +1057,7 @@ export const getAvailableRoomsForStay = (
 
     // Filter by roomType if specified
     const filteredStatus = normalizedFilterType
-        ? resultStatus.filter(s => {
-            const typeMatch = s.room.roomTypeName.toLowerCase() === normalizedFilterType ||
-                              s.room.roomTypeName.toLowerCase().includes(normalizedFilterType) ||
-                              normalizedFilterType.includes(s.room.roomTypeName.toLowerCase());
-            return typeMatch;
-        })
+        ? resultStatus.filter(s => isMatchingRoomType(s.room.roomTypeName, normalizedFilterType))
         : resultStatus;
 
     const available = filteredStatus.filter(s => s.isAvailable).map(s => s.room);
@@ -909,11 +1174,9 @@ export const validateAndCommitReservation = (
             reservationData,
             ...existing.filter(r => String(r.id) !== String(reservationData.id) && r.reservationNumber !== reservationData.reservationNumber)
         ];
-        localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(updated));
-        localStorage.setItem('hotel_reservations_v3', JSON.stringify(updated));
-        localStorage.setItem('hotel_reservations_v10', JSON.stringify(updated));
+        saveStoredReservations(updated);
 
-        // Direct Real-Time SQLite Database Persistence
+        // Direct Real-Time PostgreSQL Database Persistence
         if (typeof window !== 'undefined') {
             const API_BASE = getApiBaseUrl();
             fetch(`${API_BASE}/api/bookings`, {
@@ -922,7 +1185,7 @@ export const validateAndCommitReservation = (
                 body: JSON.stringify(reservationData)
             }).then(res => res.json()).then(resp => {
                 if (resp.success && resp.data?.id) {
-                    console.log(`✅ Reservation ${reservationData.reservationNumber} successfully persisted into relational SQLite DB! (ID: ${resp.data.id})`);
+                    console.log(`✅ Reservation ${reservationData.reservationNumber} successfully persisted into relational PostgreSQL DB! (ID: ${resp.data.id})`);
                 }
             }).catch(err => {
                 console.warn('⚠️ Offline / Local cache fallback for DB reservation persistence:', err);
@@ -950,53 +1213,97 @@ export const validateAndCommitReservation = (
 };
 
 /**
- * Synchronize Reservations from SQLite Relational Database
+ * Synchronize Reservations from PostgreSQL Relational Database
  */
-export const syncReservationsFromDB = async (): Promise<StoredReservation[]> => {
+export const syncReservationsFromDB = async (propertyId?: number | string): Promise<StoredReservation[]> => {
     if (typeof window === 'undefined') return getAllStoredReservations();
     try {
         const API_BASE = getApiBaseUrl();
-        const res = await fetch(`${API_BASE}/api/bookings`);
+        const url = propertyId ? `${API_BASE}/api/bookings?propertyId=${propertyId}` : `${API_BASE}/api/bookings`;
+        const res = await fetch(url);
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
             const dbList: StoredReservation[] = json.data;
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(dbList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(dbList));
+            saveStoredReservations(dbList);
             return dbList;
         }
     } catch (err) {
-        console.warn('Could not sync reservations from SQLite DB:', err);
+        console.warn('Could not sync reservations from PostgreSQL DB:', err);
     }
     return getAllStoredReservations();
 };
 
 /**
- * Update reservation status directly in SQLite Database
+ * Update reservation status directly in PostgreSQL Database
  */
 export const updateReservationStatusInDB = async (
     reservationId: string | number,
     newStatus: string
 ): Promise<boolean> => {
+    const rawLower = String(newStatus || '').toLowerCase().replace(/_/g, '-');
+    const normalizedUIStatus = (rawLower === 'in-house' || rawLower === 'arrived' || rawLower === 'checked-in')
+        ? 'in-house'
+        : (rawLower === 'completed' || rawLower === 'checked-out')
+            ? 'checked-out'
+            : (rawLower === 'hold' || rawLower === 'tentative')
+                ? 'hold'
+                : 'confirmed';
+
+    const dbStatus = normalizedUIStatus === 'in-house'
+        ? 'IN_HOUSE'
+        : normalizedUIStatus === 'checked-out'
+            ? 'COMPLETED'
+            : normalizedUIStatus === 'hold'
+                ? 'HOLD'
+                : 'CONFIRMED';
+
+    // 1. Optimistic immediate local storage update & instant event broadcast
+    try {
+        const existing = getAllStoredReservations();
+        const targetStr = String(reservationId);
+        const isCheckIn = normalizedUIStatus === 'in-house';
+        const updated = existing.map(r => {
+            if (String(r.id) === targetStr || r.reservationNumber === targetStr) {
+                const regNo = isCheckIn ? (r.registrationNumber || generateRegistrationNumber(r.reservationNumber)) : r.registrationNumber;
+                const folioNo = r.folioNumber || generateFolioNumber(r.reservationNumber);
+                const regAt = isCheckIn ? (r.registeredAt || new Date().toISOString()) : r.registeredAt;
+                return {
+                    ...r,
+                    status: normalizedUIStatus,
+                    registrationNumber: regNo,
+                    folioNumber: folioNo,
+                    registeredAt: regAt
+                };
+            }
+            return r;
+        });
+        saveStoredReservations(updated);
+        broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId });
+    } catch (storageErr) {
+        console.warn('Failed to update local reservation cache:', storageErr);
+    }
+
+    // 2. Direct Relational Database update via REST API
     try {
         const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/bookings/${reservationId}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
+            body: JSON.stringify({ status: dbStatus })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.success && data.data) {
+            const rec = data.data;
             const existing = getAllStoredReservations();
-            const updated = existing.map(r => String(r.id) === String(reservationId) ? { ...r, status: newStatus } : r);
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(updated));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(updated));
-            broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId });
-            return true;
+            const targetStr = String(reservationId);
+            const synced = existing.map(r => (String(r.id) === targetStr || r.reservationNumber === targetStr) ? { ...r, ...rec } : r);
+            saveStoredReservations(synced);
         }
+        return Boolean(data.success);
     } catch (err) {
         console.warn('Failed to update status in DB:', err);
+        return true;
     }
-    return false;
 };
 
 /**
@@ -1033,7 +1340,7 @@ export const updateRoomHousekeepingInDB = async (
 };
 
 /**
- * Amend Stay directly in SQLite / PostgreSQL Database (Persists across page refresh)
+ * Amend Stay directly in PostgreSQL Database (Persists across page refresh)
  */
 export const amendStayInDB = async (
     reservationIdOrNo: string | number,
@@ -1073,8 +1380,7 @@ export const amendStayInDB = async (
             } else {
                 newList = [updatedRec, ...existing];
             }
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
             return updatedRec;
         }
@@ -1117,8 +1423,7 @@ export const moveRoomInDB = async (
             } else {
                 newList = [updatedRec, ...existing];
             }
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
             return updatedRec;
         }
@@ -1155,8 +1460,7 @@ export const recordPaymentInDB = async (
             } else {
                 newList = [updatedRec, ...existing];
             }
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
             return updatedRec;
         }
@@ -1194,8 +1498,7 @@ export const splitStayInDB = async (
             } else {
                 newList = [updatedRec, ...existing];
             }
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updatedRec });
             return updatedRec;
         }
@@ -1232,8 +1535,7 @@ export const holdReservationInDB = async (
             } else {
                 newList = [updatedRec, ...existing];
             }
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId: reservationIdOrNo });
             return updatedRec;
         }
@@ -1262,8 +1564,7 @@ export const voidReservationInDB = async (
             const updatedRec: StoredReservation = data.data;
             const existing = getAllStoredReservations();
             const newList = existing.filter(r => String(r.id) !== String(reservationIdOrNo) && r.reservationNumber !== String(reservationIdOrNo));
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             return updatedRec;
         }
@@ -1292,8 +1593,7 @@ export const unassignRoomInDB = async (
             const updatedRec: StoredReservation = data.data;
             const existing = getAllStoredReservations();
             const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, roomNumber: 'Unassigned', allocatedRooms: [] } : r);
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             return updatedRec;
         }
@@ -1322,8 +1622,7 @@ export const ungroupReservationInDB = async (
             const updatedRec: StoredReservation = data.data;
             const existing = getAllStoredReservations();
             const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, isGroup: false } : r);
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             return updatedRec;
         }
@@ -1352,8 +1651,7 @@ export const changeGroupOwnerInDB = async (
             const updatedRec: StoredReservation = data.data;
             const existing = getAllStoredReservations();
             const newList = existing.map(r => (String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo)) ? { ...r, guestName: newOwner } : r);
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, JSON.stringify(newList));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(newList));
+            saveStoredReservations(newList);
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             return updatedRec;
         }
@@ -1361,6 +1659,61 @@ export const changeGroupOwnerInDB = async (
         console.warn('Failed to change group owner in DB:', err);
     }
     return null;
+};
+
+/**
+ * Link two reservations into a shared group code in Database without renumbering confirmation numbers
+ */
+export const linkBookingsInDB = async (
+    targetReservationNumber: string,
+    reservationToLinkNumber: string,
+    propertyId: number = 1
+): Promise<{ success: boolean; groupCode?: string; message?: string }> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/group/link`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetReservationNumber, reservationToLinkNumber, propertyId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            await syncReservationsFromDB(propertyId);
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            return data;
+        }
+        return { success: false, message: data.error || 'Failed to link bookings' };
+    } catch (err: any) {
+        console.warn('Failed to link bookings in DB:', err);
+        return { success: false, message: err?.message || 'Network error' };
+    }
+};
+
+/**
+ * Unlink reservation from its group in Database without changing confirmation number
+ */
+export const unlinkBookingInDB = async (
+    reservationNumber: string,
+    propertyId: number = 1
+): Promise<{ success: boolean; message?: string }> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/group/unlink`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reservationNumber, propertyId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            await syncReservationsFromDB(propertyId);
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            return data;
+        }
+        return { success: false, message: data.error || 'Failed to unlink booking' };
+    } catch (err: any) {
+        console.warn('Failed to unlink booking in DB:', err);
+        return { success: false, message: err?.message || 'Network error' };
+    }
 };
 
 /**
@@ -1400,7 +1753,7 @@ export const updateReservationInDB = async (
 };
 
 /**
- * Delete or cancel reservation directly in SQLite Database
+ * Delete or cancel reservation directly in PostgreSQL Database
  */
 export const deleteReservationInDB = async (
     reservationId: string | number
@@ -1426,7 +1779,7 @@ export const deleteReservationInDB = async (
 };
 
 /**
- * Synchronize Dynamic Room Types and Canonical Rooms directly from the PostgreSQL / SQLite database
+ * Synchronize Dynamic Room Types and Canonical Rooms directly from the PostgreSQL database
  */
 export const syncRoomTypesAndRoomsFromDB = async (
     targetPropertyId?: number
@@ -1450,10 +1803,21 @@ export const syncRoomTypesAndRoomsFromDB = async (
                     code: rt.code,
                     name: rt.name,
                     baseOccupancy: Number(rt.base_occupancy || 2),
-                    maxAdults: Number(rt.max_adults || 2),
-                    maxChildren: Number(rt.max_children || 1),
+                    maxAdults: Number(rt.max_adults || rt.max_occupancy || 2),
+                    maxChildren: Number(rt.max_children || rt.max_child || 1),
                     baseRate: Number(rt.base_rate || 3000),
                     extraBedRate: Number(rt.extra_bed_rate || 1000),
+                    extraAdultPrice: Number(rt.extra_adult_price || 1000),
+                    extraChildPrice: Number(rt.extra_child_price || 500),
+                    size: Number(rt.size || 350),
+                    bedType: rt.bed_type || 'King',
+                    viewType: rt.view_type || 'City View',
+                    smokingPolicy: rt.smoking_policy || 'Non-Smoking',
+                    amenities: Array.isArray(rt.amenities) ? rt.amenities : (typeof rt.amenities === 'string' ? JSON.parse(rt.amenities || '[]') : []),
+                    photos: Array.isArray(rt.photos) ? rt.photos : (typeof rt.photos === 'string' ? JSON.parse(rt.photos || '[]') : []),
+                    isConnecting: Boolean(rt.is_connecting),
+                    showOnWebsite: rt.show_on_website ?? true,
+                    status: rt.status || 'Active',
                     description: rt.description
                 }));
                 localStorage.setItem(STORAGE_KEY_ROOM_TYPES, JSON.stringify(mappedTypes));
@@ -1471,6 +1835,12 @@ export const syncRoomTypesAndRoomsFromDB = async (
                     roomTypeName: r.room_type_name || (mappedTypes.find(t => String(t.id) === String(r.room_type_id || r.roomTypeId))?.name) || 'Deluxe Double',
                     status: r.status === 'ACTIVE' || r.status === 'Active' ? 'Active' : (r.status === 'OUT_OF_ORDER' || r.status === 'Out of Order' ? 'Out of Order' : 'Maintenance'),
                     housekeepingStatus: r.housekeeping_status === 'CLEAN' || r.housekeepingStatus === 'Clean' ? 'Clean' : (r.housekeeping_status === 'DIRTY' || r.housekeepingStatus === 'Dirty' ? 'Dirty' : 'Inspected'),
+                    phoneExt: r.phone_ext || r.phoneExt || '',
+                    lockId: r.lock_id || r.lockId || '',
+                    isConnecting: Boolean(r.is_connecting || r.isConnecting),
+                    connectedTo: r.connected_to || r.connectedTo || '',
+                    smokingStatus: r.smoking_status || r.smokingStatus || 'Non-Smoking',
+                    nearElevator: Boolean(r.near_elevator || r.nearElevator),
                     remarks: r.remarks
                 }));
                 localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(mappedRooms));
@@ -1487,10 +1857,48 @@ export const syncRoomTypesAndRoomsFromDB = async (
     return { roomTypes: getDynamicRoomTypes(), rooms: getCanonicalRooms() };
 };
 
+/**
+ * Synchronize Dynamic Rate Plans, Meal Plans, and Packages directly from the database
+ */
+export const syncRatesAndPlansFromDB = async (targetPropertyId?: number): Promise<void> => {
+    if (typeof window === 'undefined') return;
+    const propId = targetPropertyId || Number(localStorage.getItem('hotel_active_property_id')) || 1;
+    const API_BASE = getApiBaseUrl();
+    try {
+        const [plansRes, mealsRes, pkgsRes] = await Promise.all([
+            fetch(`${API_BASE}/api/rates/plans?propertyId=${propId}`).catch(() => null),
+            fetch(`${API_BASE}/api/rates/meal-plans?propertyId=${propId}`).catch(() => null),
+            fetch(`${API_BASE}/api/rates/packages?propertyId=${propId}`).catch(() => null)
+        ]);
+
+        if (plansRes && plansRes.ok) {
+            const json = await plansRes.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
+            }
+        }
+        if (mealsRes && mealsRes.ok) {
+            const json = await mealsRes.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                localStorage.setItem('hotel_meal_plans_v1', JSON.stringify(json.data));
+            }
+        }
+        if (pkgsRes && pkgsRes.ok) {
+            const json = await pkgsRes.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                localStorage.setItem('hotel_packages_v2', JSON.stringify(json.data));
+            }
+        }
+    } catch (err) {
+        console.warn('Could not sync rates and plans from DB:', err);
+    }
+};
+
 // Initial background sync with Database on boot
 if (typeof window !== 'undefined') {
     setTimeout(() => {
         syncRoomTypesAndRoomsFromDB();
         syncReservationsFromDB();
+        syncRatesAndPlansFromDB();
     }, 500);
 }

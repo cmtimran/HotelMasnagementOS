@@ -33,7 +33,7 @@ export default function PageHeader({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-snug">
+            <h1 className="text-base sm:text-lg tracking-tight text-slate-900 leading-snug">
               {title}
             </h1>
             {badge && <div className="shrink-0">{badge}</div>}

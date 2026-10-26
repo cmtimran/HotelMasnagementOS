@@ -147,7 +147,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                             <div>
                                 <div className="flex items-center gap-3 mb-2">
                                     <h2 className="text-3xl font-bold">{guest.name}</h2>
-                                    <span className={`px-4 py-1.5 rounded-full text-sm font-bold border-2 ${getVIPBadge(guest.vipStatus)} bg-white`}>
+                                    <span className={`px-4 py-1.5 rounded-full text-sm border-2 ${getVIPBadge(guest.vipStatus)} bg-white`}>
                                         <Award size={14} className="inline mr-1" />
                                         {guest.vipStatus}
                                     </span>
@@ -225,7 +225,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Personal Information */}
                             <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl p-6 border border-blue-200">
-                                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <h3 className="text-lg text-gray-900 mb-4 flex items-center gap-2">
                                     <User size={20} className="text-blue-600" />
                                     Personal Information
                                 </h3>
@@ -251,7 +251,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
 
                             {/* Spending Analytics */}
                             <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-2xl p-6 border border-emerald-200">
-                                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <h3 className="text-lg text-gray-900 mb-4 flex items-center gap-2">
                                     <TrendingUp size={20} className="text-emerald-600" />
                                     Spending Analytics
                                 </h3>
@@ -259,7 +259,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                                     <div>
                                         <div className="flex justify-between mb-2">
                                             <span className="text-sm text-gray-600">Lifetime Value</span>
-                                            <span className="text-lg font-bold text-emerald-600">৳ {guest.totalSpent.toLocaleString()}</span>
+                                            <span className="text-lg text-emerald-600">৳ {guest.totalSpent.toLocaleString()}</span>
                                         </div>
                                         <div className="w-full bg-emerald-200 rounded-full h-2">
                                             <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-2 rounded-full" style={{ width: '75%' }} />
@@ -268,11 +268,11 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="bg-white rounded-xl p-3 border border-emerald-200">
                                             <p className="text-xs text-gray-600 mb-1">Avg. per Stay</p>
-                                            <p className="text-lg font-bold text-gray-900">৳ {guest.averageSpending.toLocaleString()}</p>
+                                            <p className="text-lg text-gray-900">৳ {guest.averageSpending.toLocaleString()}</p>
                                         </div>
                                         <div className="bg-white rounded-xl p-3 border border-emerald-200">
                                             <p className="text-xs text-gray-600 mb-1">Total Nights</p>
-                                            <p className="text-lg font-bold text-gray-900">{guest.stays.reduce((sum, stay) => sum + stay.nights, 0)}</p>
+                                            <p className="text-lg text-gray-900">{guest.stays.reduce((sum, stay) => sum + stay.nights, 0)}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -280,7 +280,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
 
                             {/* Special Notes */}
                             <div className="lg:col-span-2 bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-2xl p-6 border border-amber-200">
-                                <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                <h3 className="text-lg text-gray-900 mb-3 flex items-center gap-2">
                                     <AlertCircle size={20} className="text-amber-600" />
                                     Special Notes & Alerts
                                 </h3>
@@ -299,11 +299,11 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                                                 <Building2 size={24} className="text-blue-600" />
                                             </div>
                                             <div>
-                                                <h4 className="text-lg font-bold text-gray-900">{stay.roomType}</h4>
+                                                <h4 className="text-lg text-gray-900">{stay.roomType}</h4>
                                                 <p className="text-sm text-gray-500">Room {stay.roomNumber}</p>
                                             </div>
                                         </div>
-                                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold border ${getStatusColor(stay.status)}`}>
+                                        <span className={`px-3 py-1.5 rounded-full text-xs border ${getStatusColor(stay.status)}`}>
                                             {stay.status}
                                         </span>
                                     </div>
@@ -318,7 +318,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 mb-1">Total Spent</p>
-                                            <p className="text-sm font-bold text-emerald-600">
+                                            <p className="text-sm text-emerald-600">
                                                 {stay.totalSpent > 0 ? `৳ ${stay.totalSpent.toLocaleString()}` : 'Upcoming'}
                                             </p>
                                         </div>
@@ -332,7 +332,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {guest.preferences.map((pref, idx) => (
                                 <div key={idx} className="bg-gradient-to-br from-purple-50 to-purple-100/50 rounded-2xl p-6 border border-purple-200">
-                                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                    <h3 className="text-lg text-gray-900 mb-4 flex items-center gap-2">
                                         <Star size={18} className="text-purple-600" />
                                         {pref.category}
                                     </h3>
@@ -359,14 +359,14 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                                                     <AlertCircle size={20} className="text-red-600" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-gray-900">{complaint.issue}</h4>
+                                                    <h4 className="text-gray-900">{complaint.issue}</h4>
                                                     <p className="text-xs text-gray-500 flex items-center gap-1">
                                                         <Clock size={12} />
                                                         {complaint.date}
                                                     </p>
                                                 </div>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(complaint.status)}`}>
+                                            <span className={`px-3 py-1 rounded-full text-xs border ${getStatusColor(complaint.status)}`}>
                                                 {complaint.status}
                                             </span>
                                         </div>
@@ -383,7 +383,7 @@ const GuestProfile360 = ({ guestId, onClose }: GuestProfile360Props) => {
                                     <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <Star size={32} className="text-emerald-600" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-gray-700 mb-2">No Complaints</h3>
+                                    <h3 className="text-lg text-gray-700 mb-2">No Complaints</h3>
                                     <p className="text-sm text-gray-500">This guest has a perfect satisfaction record!</p>
                                 </div>
                             )}

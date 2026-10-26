@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
+import {
     User, LogIn, LogOut, Search,
     DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, Monitor,
     BedDouble, Key, Printer, Calendar,
@@ -10,7 +10,15 @@ import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
 import { QuickReservationModal } from './modals/QuickReservationModal';
 import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
-import { syncReservationsFromDB, updateReservationStatusInDB, getCanonicalRooms } from '../utils/roomInventoryEngine';
+import {
+    syncReservationsFromDB,
+    updateReservationStatusInDB,
+    getCanonicalRooms,
+    getOperatingSystemDate,
+    formatToDisplayDate,
+    generateRegistrationNumber,
+    generateFolioNumber
+} from '../utils/roomInventoryEngine';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -27,6 +35,11 @@ import PageHeader from './common/PageHeader';
 export interface FrontDeskGuestRecord {
     id: string | number;
     reservationNumber: string;
+    registrationNumber?: string;
+    registeredAt?: string;
+    folioNumber?: string;
+    groupCode?: string;
+    subBookingNumber?: string;
     guestName: string;
     phone: string;
     email?: string;
@@ -43,7 +56,7 @@ export interface FrontDeskGuestRecord {
     totalAmount: number;
     paidAmount: number;
     dueAmount: number;
-    status: 'arriving' | 'in-house' | 'checked-out' | 'hold' | 'cancelled';
+    status: 'arriving' | 'confirmed' | 'in-house' | 'arrived' | 'checked-out' | 'hold' | 'cancelled';
     source: string;
     vip?: string;
     keyCard?: string;
@@ -60,255 +73,124 @@ export interface FrontDeskGuestRecord {
     addonCharges?: any;
 }
 
-const DEFAULT_FRONT_DESK_DATA: FrontDeskGuestRecord[] = [
-    {
-        id: 'RES-892101',
-        reservationNumber: 'RES-892101',
-        guestName: 'Mahmudul Hasan',
-        phone: '+880 1711-234567',
-        email: 'mahmud.hasan@gmail.com',
-        roomNumber: '102',
-        roomType: 'Deluxe Double',
-        roomStatus: 'clean',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-04',
-        eta: '10:30',
-        nights: 3,
-        adults: 2,
-        children: 1,
-        totalAmount: 9000,
-        paidAmount: 3000,
-        dueAmount: 6000,
-        status: 'arriving',
-        source: 'Booking.com',
-        vip: 'Gold VIP',
-        specialRequests: 'High floor, quiet room, baby cot required',
-        extraBed: {
-            enabled: true,
-            bedType: 'Baby Cot / Crib',
-            quantity: 1,
-            chargePerNight: 0,
-            includesBreakfast: true,
-            isComplimentary: true,
-            remarks: 'Baby cot placed near master bed with infant linens'
-        },
-        folioItems: [
-            { id: 1, desc: 'Room Tariff (3 Nights)', amount: 9000, time: '2026-07-01 08:00', type: 'Room' },
-            { id: 2, desc: 'Advance Deposit Received (Cash)', amount: -3000, time: '2026-07-01 08:05', type: 'Payment' }
-        ]
-    },
-    {
-        id: 'RES-892102',
-        reservationNumber: 'RES-892102',
-        guestName: 'Sara Islam',
-        phone: '+880 1819-876543',
-        email: 'sara.islam@corp.bd',
-        roomNumber: '201',
-        roomType: 'Superior King',
-        roomStatus: 'inspected',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-03',
-        eta: '11:15',
-        nights: 2,
-        adults: 1,
-        children: 0,
-        totalAmount: 8000,
-        paidAmount: 8000,
-        dueAmount: 0,
-        status: 'arriving',
-        source: 'Corporate (Grameenphone)',
-        vip: 'Corporate Diamond',
-        specialRequests: 'Late check-out request, airport pickup arranged',
-        pickup: {
-            enabled: true,
-            transferType: 'Airport Pickup',
-            flightNumber: 'BG-084',
-            airline: 'Biman Bangladesh Airlines',
-            pickupDateTime: '2026-07-01 11:15',
-            pickupLocation: 'T2 International Arrivals',
-            vehicleType: 'Executive Sedan (Premio/Allion)',
-            paxCount: 1,
-            luggageCount: 2,
-            chargeAmount: 1500,
-            isComplimentary: false,
-            driverInstructions: 'Placard: Ms. Sara Islam',
-            dropEnabled: true,
-            dropFlightNumber: 'BG-085',
-            dropAirline: 'Biman Bangladesh Airlines',
-            dropDateTime: '2026-07-03 15:30',
-            dropLocation: 'T2 International Departures',
-            dropVehicleType: 'Executive Sedan (Premio/Allion)',
-            dropPaxCount: 1,
-            dropLuggageCount: 2,
-            dropChargeAmount: 1500,
-            dropIsComplimentary: false,
-            dropDriverInstructions: 'Lobby departure pickup at 13:00'
-        },
-        folioItems: [
-            { id: 1, desc: 'Room Tariff (2 Nights)', amount: 8000, time: '2026-07-01 08:00', type: 'Room' },
-            { id: 2, desc: 'Company Direct Billing (Full)', amount: -8000, time: '2026-07-01 08:10', type: 'Payment' }
-        ]
-    },
-    {
-        id: 'RES-892103',
-        reservationNumber: 'RES-892103',
-        guestName: 'Farhana Chowdhury',
-        phone: '+880 1912-345678',
-        email: 'farhana.c@gmail.com',
-        roomNumber: '305',
-        roomType: 'Deluxe Double',
-        roomStatus: 'dirty',
-        checkIn: '2026-07-01',
-        checkOut: '2026-07-02',
-        eta: '14:00',
-        nights: 1,
-        adults: 2,
-        children: 0,
-        totalAmount: 3500,
-        paidAmount: 0,
-        dueAmount: 3500,
-        status: 'arriving',
-        source: 'Direct Walk-In',
-        vip: 'Regular',
-        specialRequests: 'Non-smoking floor',
-        folioItems: [
-            { id: 1, desc: 'Room Tariff (1 Night)', amount: 3500, time: '2026-07-01 09:00', type: 'Room' }
-        ]
-    },
-    {
-        id: 'RES-892104',
-        reservationNumber: 'RES-892104',
-        guestName: 'Zubair Ahmed',
-        phone: '+880 1611-987654',
-        email: 'zubair.ahmed@fintech.com',
-        roomNumber: '101',
-        roomType: 'Deluxe Double',
-        roomStatus: 'clean',
-        checkIn: '2026-06-29',
-        checkOut: '2026-07-02',
-        eta: '12:00',
-        nights: 3,
-        adults: 2,
-        children: 1,
-        totalAmount: 10500,
-        paidAmount: 10500,
-        dueAmount: 0,
-        status: 'in-house',
-        source: 'Agoda',
-        vip: 'VIP',
-        keyCard: 'KC-101A',
-        folioItems: [
-            { id: 1, desc: 'Room Tariff (3 Nights)', amount: 9000, time: '2026-06-29 14:00', type: 'Room' },
-            { id: 2, desc: 'Mini Bar Consumption', amount: 1500, time: '2026-06-30 20:30', type: 'Charge' },
-            { id: 3, desc: 'Settled via Credit Card', amount: -10500, time: '2026-06-29 14:10', type: 'Payment' }
-        ]
-    },
-    {
-        id: 'RES-892105',
-        reservationNumber: 'RES-892105',
-        guestName: 'Mim Akter',
-        phone: '+880 1733-456789',
-        email: 'mim.akter@dhaka.edu',
-        roomNumber: '410',
-        roomType: 'Executive Suite',
-        roomStatus: 'clean',
-        checkIn: '2026-06-28',
-        checkOut: '2026-07-01',
-        etd: '11:30',
-        nights: 3,
-        adults: 2,
-        children: 2,
-        totalAmount: 16500,
-        paidAmount: 12000,
-        dueAmount: 4500,
-        status: 'in-house',
-        source: 'Corporate',
-        vip: 'Platinum VIP',
-        keyCard: 'KC-410A',
-        folioItems: [
-            { id: 1, desc: 'Suite Tariff (3 Nights)', amount: 15000, time: '2026-06-28 15:00', type: 'Room' },
-            { id: 2, desc: 'Laundry Express Service', amount: 1500, time: '2026-06-30 11:00', type: 'Charge' },
-            { id: 3, desc: 'Advance Cash Paid', amount: -12000, time: '2026-06-28 15:15', type: 'Payment' }
-        ]
-    },
-    {
-        id: 'RES-892106',
-        reservationNumber: 'RES-892106',
-        guestName: 'Tanvir Hossain',
-        phone: '+880 1552-678901',
-        email: 'tanvir.h@bdmail.com',
-        roomNumber: '302',
-        roomType: 'Standard Single',
-        roomStatus: 'clean',
-        checkIn: '2026-06-30',
-        checkOut: '2026-07-01',
-        etd: '12:00',
-        nights: 1,
-        adults: 1,
-        children: 0,
-        totalAmount: 2800,
-        paidAmount: 2800,
-        dueAmount: 0,
-        status: 'checked-out',
-        source: 'Walk-In',
-        vip: 'Regular',
-        keyCard: 'Returned',
-        folioItems: [
-            { id: 1, desc: 'Single Room (1 Night)', amount: 2800, time: '2026-06-30 18:00', type: 'Room' },
-            { id: 2, desc: 'Settled via bKash', amount: -2800, time: '2026-07-01 10:15', type: 'Payment' }
-        ]
-    }
-];
+const DEFAULT_FRONT_DESK_DATA: FrontDeskGuestRecord[] = [];
+
+const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
+    if (!Array.isArray(rawList)) return [];
+    return rawList.flatMap((item: any) => {
+        const rooms = (item.roomsList && item.roomsList.length > 0)
+            ? item.roomsList
+            : (item.groupRoomsList && item.groupRoomsList.length > 0)
+                ? item.groupRoomsList
+                : null;
+
+        if (rooms && rooms.length > 1) {
+            return rooms.map((rm: any, subIdx: number) => {
+                const subNo = rm.subBookingNumber || `${item.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`;
+                const regNo = rm.registrationNumber || (item.status === 'in-house' || item.status === 'arrived' ? (rm.registrationNumber || `REG-${subNo.replace(/^RES-/, '')}`) : undefined);
+                const folioNo = rm.folioNumber || `FOL-${subNo.replace(/^RES-/, '')}`;
+                const rTariff = Number(rm.totalAmount || rm.amount || (Number(item.totalAmount) / rooms.length)) || 0;
+                const rIn = rm.checkInDate || rm.checkIn || item.checkIn || item.arrivalDate;
+                const rOut = rm.checkOutDate || rm.checkOut || item.checkOut || item.departureDate;
+                const rNights = Number(rm.nights || item.nights || 1);
+                const rStatus = (rm.status || item.status || 'confirmed');
+                const uiStatus = (rStatus === 'in-house' || rStatus === 'arrived' ? 'in-house' : rStatus === 'checked-out' ? 'checked-out' : rStatus === 'hold' ? 'hold' : 'confirmed');
+
+                return {
+                    id: `${item.id || item.reservationNumber}-${rm.roomNumber || subIdx}`,
+                    reservationNumber: item.reservationNumber,
+                    registrationNumber: regNo,
+                    registeredAt: rm.registeredAt || item.registeredAt || item.registrationDate,
+                    folioNumber: folioNo,
+                    groupCode: item.groupCode,
+                    subBookingNumber: subNo,
+                    guestName: rm.guestName || item.guestName,
+                    phone: item.phone,
+                    email: item.email,
+                    roomNumber: String(rm.roomNumber || 'Unassigned'),
+                    roomType: rm.roomType || item.roomType || 'Standard Room',
+                    roomStatus: 'clean' as const,
+                    checkIn: rIn,
+                    checkOut: rOut,
+                    eta: '12:00',
+                    nights: rNights,
+                    adults: Number(rm.adults || item.adults || 1),
+                    children: Number(rm.children || item.children || 0),
+                    totalAmount: rTariff,
+                    paidAmount: subIdx === 0 ? (Number(item.paidAmount) || 0) : 0,
+                    dueAmount: subIdx === 0 ? (Number(item.dueAmount) || 0) : 0,
+                    status: uiStatus,
+                    source: item.source || 'Direct',
+                    vip: item.vip || 'None',
+                    specialRequests: item.specialRequests || '',
+                    servicesBundle: rm.servicesBundle || item.servicesBundle,
+                    extraBed: rm.extraBed || item.extraBed,
+                    pickup: rm.pickup || item.pickup,
+                    mealPlan: rm.mealPlan || item.mealPlan,
+                    celebration: rm.celebration || item.celebration,
+                    spaWellness: rm.spaWellness || item.spaWellness,
+                    timingFlex: rm.timingFlex || item.timingFlex,
+                    customAddons: rm.customAddons || item.customAddons || []
+                };
+            });
+        }
+
+        const subNo = item.subBookingNumber || (item.reservationNumber ? `${item.reservationNumber}-01` : undefined);
+        const regNo = item.registrationNumber || (item.status === 'in-house' || item.status === 'arrived' ? (item.registrationNumber || `REG-${(subNo || item.reservationNumber || '').replace(/^RES-/, '')}`) : undefined);
+        const folioNo = item.folioNumber || `FOL-${(subNo || item.reservationNumber || '').replace(/^RES-/, '')}`;
+        const st = (item.status === 'in-house' || item.status === 'arrived' ? 'in-house' : item.status === 'checked-out' ? 'checked-out' : item.status === 'hold' ? 'hold' : 'confirmed');
+
+        return [{
+            id: item.id || `RES-${item.reservationNumber || Date.now()}`,
+            reservationNumber: item.reservationNumber || `RES-${Date.now()}`,
+            registrationNumber: regNo,
+            registeredAt: item.registeredAt || item.registrationDate,
+            folioNumber: folioNo,
+            groupCode: item.groupCode,
+            subBookingNumber: subNo,
+            guestName: item.guestName,
+            phone: item.phone,
+            email: item.email,
+            roomNumber: String(item.roomNumber || (item.allocatedRooms && item.allocatedRooms[0]) || 'Unassigned'),
+            roomType: item.roomType || 'Standard Single',
+            roomStatus: 'clean' as const,
+            checkIn: item.checkIn || item.arrivalDate,
+            checkOut: item.checkOut || item.departureDate,
+            eta: '12:00',
+            nights: Number(item.nights || 1),
+            adults: Number(item.adults || 1),
+            children: Number(item.children || 0),
+            totalAmount: Number(item.totalAmount) || 0,
+            paidAmount: Number(item.paidAmount) || 0,
+            dueAmount: Number(item.dueAmount) || 0,
+            status: st,
+            source: item.source || 'Direct',
+            vip: item.vip || 'None',
+            specialRequests: item.specialRequests || '',
+            servicesBundle: item.servicesBundle,
+            extraBed: item.extraBed || item.servicesBundle?.extraBed || null,
+            pickup: item.pickup || item.servicesBundle?.pickup || null,
+            mealPlan: item.mealPlan || item.servicesBundle?.mealPlan || null,
+            celebration: item.celebration || item.servicesBundle?.celebration || null,
+            spaWellness: item.spaWellness || item.servicesBundle?.spaWellness || null,
+            timingFlex: item.timingFlex || item.servicesBundle?.timingFlex || null,
+            customAddons: item.customAddons || item.servicesBundle?.customAddons || [],
+            addonCharges: item.addonCharges
+        }];
+    });
+};
 
 export const FrontDesk: React.FC = () => {
     const { setActivePage } = useNavigation();
 
-    // Data State (synced with localStorage)
+    // Data State (synced with localStorage & database)
     const [reservations, setReservations] = useState<FrontDeskGuestRecord[]>(() => {
         try {
             const stored = localStorage.getItem('hotel_reservations_v2');
-            if (stored) {
+            if (stored !== null) {
                 const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    // Merge parsed stored reservations with default front desk records
-                    const merged = [...DEFAULT_FRONT_DESK_DATA];
-                    parsed.forEach(item => {
-                        if (!merged.some(m => m.reservationNumber === item.reservationNumber)) {
-                            merged.unshift({
-                                id: item.id || `RES-${item.reservationNumber || Date.now()}`,
-                                reservationNumber: item.reservationNumber || `RES-${Date.now()}`,
-                                guestName: item.guestName || 'Valued Guest',
-                                phone: item.phone || '+880 1711-000000',
-                                email: item.email || '',
-                                roomNumber: item.roomNumber || '101',
-                                roomType: item.roomType || 'Deluxe Double',
-                                roomStatus: 'clean',
-                                checkIn: item.checkIn || '2026-07-01',
-                                checkOut: item.checkOut || '2026-07-02',
-                                eta: '12:00',
-                                nights: item.nights || 1,
-                                adults: item.adults || 1,
-                                children: item.children || 0,
-                                totalAmount: Number(item.totalAmount) || 3000,
-                                paidAmount: Number(item.paidAmount) || 0,
-                                dueAmount: Number(item.dueAmount) || Number(item.totalAmount) || 3000,
-                                status: item.status || 'arriving',
-                                source: item.source || 'Direct',
-                                vip: item.vip || 'None',
-                                specialRequests: item.specialRequests || '',
-                                servicesBundle: item.servicesBundle,
-                                extraBed: item.extraBed || item.servicesBundle?.extraBed || null,
-                                pickup: item.pickup || item.servicesBundle?.pickup || null,
-                                mealPlan: item.mealPlan || item.servicesBundle?.mealPlan || null,
-                                celebration: item.celebration || item.servicesBundle?.celebration || null,
-                                spaWellness: item.spaWellness || item.servicesBundle?.spaWellness || null,
-                                timingFlex: item.timingFlex || item.servicesBundle?.timingFlex || null,
-                                customAddons: item.customAddons || item.servicesBundle?.customAddons || [],
-                                addonCharges: item.addonCharges
-                            });
-                        }
-                    });
-                    return merged;
+                if (Array.isArray(parsed)) {
+                    return mapToFrontDeskRecords(parsed);
                 }
             }
         } catch (e) {
@@ -317,48 +199,13 @@ export const FrontDesk: React.FC = () => {
         return DEFAULT_FRONT_DESK_DATA;
     });
 
-    // Sync with SQLite Database on Mount and on Real-Time Events
+    // Sync with PostgreSQL Database on Mount and on Real-Time Events
     useEffect(() => {
         const fetchDB = async () => {
             try {
                 const dbList = await syncReservationsFromDB();
-                if (dbList && dbList.length > 0) {
-                    setReservations(prev => {
-                        const merged = [...prev];
-                        dbList.forEach((item: any) => {
-                            const idx = merged.findIndex(m => m.reservationNumber === item.reservationNumber || String(m.id) === String(item.id));
-                            const formattedItem: FrontDeskGuestRecord = {
-                                id: item.id || `RES-${item.reservationNumber}`,
-                                reservationNumber: item.reservationNumber,
-                                guestName: item.guestName || 'Valued Guest',
-                                phone: item.phone || '+880 1711-000000',
-                                email: item.email || '',
-                                roomNumber: item.roomNumber || '101',
-                                roomType: item.roomType || 'Deluxe Double',
-                                roomStatus: 'clean',
-                                checkIn: item.checkIn || item.arrivalDate || '2026-07-01',
-                                checkOut: item.checkOut || item.departureDate || '2026-07-02',
-                                eta: '12:00',
-                                nights: item.nights || 1,
-                                adults: item.adults || 1,
-                                children: item.children || 0,
-                                totalAmount: Number(item.totalAmount) || 3000,
-                                paidAmount: Number(item.paidAmount) || 0,
-                                dueAmount: Number(item.dueAmount) || 0,
-                                status: (item.status === 'in-house' ? 'in-house' : item.status === 'checked-out' ? 'checked-out' : item.status === 'hold' ? 'hold' : 'arriving'),
-                                source: item.source || 'Direct',
-                                vip: item.vip || 'None',
-                                specialRequests: item.specialRequests || '',
-                                servicesBundle: item.servicesBundle
-                            };
-                            if (idx !== -1) {
-                                merged[idx] = { ...merged[idx], ...formattedItem };
-                            } else {
-                                merged.unshift(formattedItem);
-                            }
-                        });
-                        return merged;
-                    });
+                if (Array.isArray(dbList)) {
+                    setReservations(mapToFrontDeskRecords(dbList));
                 }
             } catch (err) {
                 console.warn('FrontDesk DB sync fallback:', err);
@@ -372,12 +219,12 @@ export const FrontDesk: React.FC = () => {
         return () => window.removeEventListener('hotel_pms_sync_event', handleSyncEvent);
     }, []);
 
-    // Save back to localStorage and SQLite DB whenever reservations change
+    // Save back to localStorage and PostgreSQL DB whenever reservations change
     const persistReservations = (updated: FrontDeskGuestRecord[]) => {
         setReservations(updated);
         try {
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(updated));
-            // Sync status to SQLite database
+            // Sync status to PostgreSQL database
             updated.forEach(item => {
                 if (item.status && item.id) {
                     updateReservationStatusInDB(item.id, item.status);
@@ -414,7 +261,7 @@ export const FrontDesk: React.FC = () => {
         if (!serviceModalConfig.guestRecord) return;
         const targetRecord = serviceModalConfig.guestRecord;
         const nights = Math.max(1, targetRecord.nights || 1);
-        
+
         const newAddonsTotal = getRoomBundleTotal(bundle, nights);
         const oldAddonsTotal = getRoomBundleTotal(targetRecord.servicesBundle || {
             extraBed: targetRecord.extraBed || undefined,
@@ -485,13 +332,24 @@ export const FrontDesk: React.FC = () => {
         `[FIN] Float verified at BDT 15,000.00 cash drawer balance.`
     ]);
 
-    // System Date
-    const systemDate = localStorage.getItem('hotel_system_date') || '01 Jul 2026';
+    // System Date (realtime synchronized)
+    const [systemDateISO, setSystemDateISO] = useState<string>(() => getOperatingSystemDate());
+    const systemDate = formatToDisplayDate(systemDateISO);
+
+    useEffect(() => {
+        const handleSync = (e: any) => {
+            if (e?.detail?.type === 'SYSTEM_DATE_CHANGED' && e?.detail?.systemDate) {
+                setSystemDateISO(e.detail.systemDate);
+            }
+        };
+        window.addEventListener('hotel_pms_sync_event', handleSync);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
+    }, []);
 
     // Counts & KPIs
-    const arrivalsList = useMemo(() => reservations.filter(r => r.status === 'arriving'), [reservations]);
-    const inHouseList = useMemo(() => reservations.filter(r => r.status === 'in-house'), [reservations]);
-    const departuresList = useMemo(() => reservations.filter(r => r.status === 'in-house' && r.checkOut <= '2026-07-01'), [reservations]);
+    const arrivalsList = useMemo(() => reservations.filter(r => r.status === 'arriving' || r.status === 'confirmed'), [reservations]);
+    const inHouseList = useMemo(() => reservations.filter(r => r.status === 'in-house' || r.status === 'arrived'), [reservations]);
+    const departuresList = useMemo(() => reservations.filter(r => (r.status === 'in-house' || r.status === 'arrived') && r.checkOut <= systemDateISO), [reservations, systemDateISO]);
     const checkedOutToday = useMemo(() => reservations.filter(r => r.status === 'checked-out'), [reservations]);
 
     const canonicalRooms = useMemo(() => getCanonicalRooms(), [reservations]);
@@ -522,15 +380,15 @@ export const FrontDesk: React.FC = () => {
         }
 
         return base.filter(r => {
-            const matchesSearch = 
+            const matchesSearch =
                 r.guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 r.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 r.reservationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 r.phone.includes(searchTerm);
-            
+
             const matchesSource = filterSource === 'all' || r.source.toLowerCase().includes(filterSource.toLowerCase());
-            
-            const matchesPayment = 
+
+            const matchesPayment =
                 filterPayment === 'all' ||
                 (filterPayment === 'due' && r.dueAmount > 0) ||
                 (filterPayment === 'settled' && r.dueAmount <= 0);
@@ -580,9 +438,15 @@ export const FrontDesk: React.FC = () => {
                     });
                 }
 
+                const regNo = r.registrationNumber || generateRegistrationNumber(r.subBookingNumber || r.reservationNumber);
+                const folioNo = r.folioNumber || generateFolioNumber(r.subBookingNumber || r.reservationNumber);
+
                 return {
                     ...r,
                     status: 'in-house' as const,
+                    registrationNumber: regNo,
+                    folioNumber: folioNo,
+                    registeredAt: new Date().toISOString(),
                     keyCard: checkInKeyCard || `KC-${r.roomNumber}`,
                     totalAmount: newTotal,
                     paidAmount: newPaid,
@@ -593,9 +457,12 @@ export const FrontDesk: React.FC = () => {
             return r;
         });
 
+        const activeRegNo = checkInModalRecord.registrationNumber || generateRegistrationNumber(checkInModalRecord.subBookingNumber || checkInModalRecord.reservationNumber);
+        const activeFolioNo = checkInModalRecord.folioNumber || generateFolioNumber(checkInModalRecord.subBookingNumber || checkInModalRecord.reservationNumber);
+
         persistReservations(updated);
         setActionLog(prev => [
-            `[IN-HOUSE] Guest ${checkInModalRecord.guestName} successfully checked into Room ${checkInModalRecord.roomNumber}. KeyCard: ${checkInKeyCard}.`,
+            `[IN-HOUSE] Guest ${checkInModalRecord.guestName} checked into Room ${checkInModalRecord.roomNumber}. Reg #: ${activeRegNo} | KeyCard: ${checkInKeyCard} | Folio: ${activeFolioNo}.`,
             ...prev
         ]);
         setCheckInModalRecord(null);
@@ -670,27 +537,8 @@ export const FrontDesk: React.FC = () => {
         <div className="page-container select-none animate-in fade-in duration-150">
             {/* Standardized Thesis Page Header */}
             <PageHeader
-                title="Front Desk Operations Hub"
-                subtitle={
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 font-medium">
-                        <span className="flex items-center gap-1 font-semibold text-slate-700 whitespace-nowrap">
-                            <Calendar size={12} className="text-primary" /> {systemDate}
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1 whitespace-nowrap">
-                            <Clock size={12} className="text-amber-600" /> Morning Shift (07:00 - 15:00)
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="text-primary font-semibold whitespace-nowrap">Cashier Drawer #1</span>
-                    </div>
-                }
+                title="Front Desk Overview"
                 icon={<Monitor size={20} />}
-                badge={
-                    <span className="badge-status-active">
-                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Live Desk Active
-                    </span>
-                }
                 actions={
                     <>
                         <button
@@ -739,7 +587,7 @@ export const FrontDesk: React.FC = () => {
                 {/* 1. Occupancy */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
                     <div className="flex items-center justify-between text-slate-500">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Occupancy</span>
+                        <span className="text-[10px] uppercase tracking-wider">Occupancy</span>
                         <BedDouble size={13} className="text-blue-600" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1.5">
@@ -752,14 +600,13 @@ export const FrontDesk: React.FC = () => {
                 </div>
 
                 {/* 2. Arrivals Due */}
-                <div 
+                <div
                     onClick={() => setActiveTab('arrivals')}
-                    className={`bg-white p-3 rounded-xl border transition-all cursor-pointer shadow-2xs ${
-                        activeTab === 'arrivals' ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/20' : 'border-slate-200/90 hover:border-slate-300'
-                    }`}
+                    className={`bg-white p-3 rounded-xl border transition-all cursor-pointer shadow-2xs ${activeTab === 'arrivals' ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/20' : 'border-slate-200/90 hover:border-slate-300'
+                        }`}
                 >
                     <div className="flex items-center justify-between text-blue-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Arrivals (Due)</span>
+                        <span className="text-[10px] uppercase tracking-wider">Arrivals (Due)</span>
                         <LogIn size={13} className="text-blue-600" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1.5">
@@ -770,14 +617,13 @@ export const FrontDesk: React.FC = () => {
                 </div>
 
                 {/* 3. In-House Guests */}
-                <div 
+                <div
                     onClick={() => setActiveTab('in-house')}
-                    className={`bg-white p-3 rounded-xl border transition-all cursor-pointer shadow-2xs ${
-                        activeTab === 'in-house' ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20' : 'border-slate-200/90 hover:border-slate-300'
-                    }`}
+                    className={`bg-white p-3 rounded-xl border transition-all cursor-pointer shadow-2xs ${activeTab === 'in-house' ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20' : 'border-slate-200/90 hover:border-slate-300'
+                        }`}
                 >
                     <div className="flex items-center justify-between text-emerald-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">In-House Guests</span>
+                        <span className="text-[10px] uppercase tracking-wider">In-House Guests</span>
                         <User size={13} className="text-emerald-600" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1.5">
@@ -788,14 +634,13 @@ export const FrontDesk: React.FC = () => {
                 </div>
 
                 {/* 4. Departures Due */}
-                <div 
+                <div
                     onClick={() => setActiveTab('departures')}
-                    className={`bg-white p-3 rounded-xl border transition-all cursor-pointer shadow-2xs ${
-                        activeTab === 'departures' ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/20' : 'border-slate-200/90 hover:border-slate-300'
-                    }`}
+                    className={`bg-white p-3 rounded-xl border transition-all cursor-pointer shadow-2xs ${activeTab === 'departures' ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/20' : 'border-slate-200/90 hover:border-slate-300'
+                        }`}
                 >
                     <div className="flex items-center justify-between text-amber-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Departures (Due)</span>
+                        <span className="text-[10px] uppercase tracking-wider">Departures (Due)</span>
                         <LogOut size={13} className="text-amber-600" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1.5">
@@ -808,7 +653,7 @@ export const FrontDesk: React.FC = () => {
                 {/* 5. Clean Rooms Ready */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
                     <div className="flex items-center justify-between text-emerald-700">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Clean &amp; Ready</span>
+                        <span className="text-[10px] uppercase tracking-wider">Clean &amp; Ready</span>
                         <Sparkles size={13} className="text-emerald-600" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1.5">
@@ -821,11 +666,11 @@ export const FrontDesk: React.FC = () => {
                 {/* 6. Today's Collections */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
                     <div className="flex items-center justify-between text-slate-500">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Shift Collections</span>
+                        <span className="text-[10px] uppercase tracking-wider">Shift Collections</span>
                         <Wallet size={13} className="text-primary" />
                     </div>
                     <div className="mt-1 flex items-baseline gap-1">
-                        <span className="text-[11px] font-bold text-slate-400">BDT</span>
+                        <span className="text-[11px] text-slate-400">BDT</span>
                         <span className="text-lg font-black font-mono tracking-tight text-slate-900">{totalCollectionsToday.toLocaleString()}</span>
                     </div>
                     <p className="text-[10px] text-slate-500 mt-1.5 font-medium">Cash: ৳15k • Card: ৳18k</p>
@@ -840,17 +685,15 @@ export const FrontDesk: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setActiveTab('arrivals')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                activeTab === 'arrivals'
-                                    ? 'bg-primary text-white shadow-xs'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'arrivals'
+                                ? 'bg-primary text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                }`}
                         >
                             <LogIn size={13} />
                             <span>1. Arrivals / Due-In</span>
-                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                                activeTab === 'arrivals' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
-                            }`}>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${activeTab === 'arrivals' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
+                                }`}>
                                 {arrivalsList.length}
                             </span>
                         </button>
@@ -858,17 +701,15 @@ export const FrontDesk: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setActiveTab('in-house')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                activeTab === 'in-house'
-                                    ? 'bg-primary text-white shadow-xs'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'in-house'
+                                ? 'bg-primary text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                }`}
                         >
                             <User size={13} />
                             <span>2. In-House Guests</span>
-                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                                activeTab === 'in-house' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
-                            }`}>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${activeTab === 'in-house' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
+                                }`}>
                                 {inHouseList.length}
                             </span>
                         </button>
@@ -876,17 +717,15 @@ export const FrontDesk: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setActiveTab('departures')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                activeTab === 'departures'
-                                    ? 'bg-primary text-white shadow-xs'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'departures'
+                                ? 'bg-primary text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                }`}
                         >
                             <LogOut size={13} />
                             <span>3. Departures / Due-Out</span>
-                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                                activeTab === 'departures' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
-                            }`}>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${activeTab === 'departures' ? 'bg-primary-hover text-white' : 'bg-slate-100 text-slate-600'
+                                }`}>
                                 {departuresList.length}
                             </span>
                         </button>
@@ -894,11 +733,10 @@ export const FrontDesk: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setActiveTab('cashier')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                activeTab === 'cashier'
-                                    ? 'bg-primary text-white shadow-xs'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'cashier'
+                                ? 'bg-primary text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                }`}
                         >
                             <Wallet size={13} />
                             <span>4. Shift Cashier &amp; Float</span>
@@ -939,7 +777,7 @@ export const FrontDesk: React.FC = () => {
 
                         <div className="flex items-center gap-2 w-full md:w-auto">
                             <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Source:</span>
+                                <span className="text-[10px] text-slate-400 uppercase">Source:</span>
                                 <select
                                     value={filterSource}
                                     onChange={e => setFilterSource(e.target.value)}
@@ -954,7 +792,7 @@ export const FrontDesk: React.FC = () => {
                             </div>
 
                             <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Billing:</span>
+                                <span className="text-[10px] text-slate-400 uppercase">Billing:</span>
                                 <select
                                     value={filterPayment}
                                     onChange={e => setFilterPayment(e.target.value)}
@@ -974,7 +812,7 @@ export const FrontDesk: React.FC = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                     <th className="py-2.5 px-3.5">Guest &amp; Reference</th>
                                     <th className="py-2.5 px-3">Room &amp; Status</th>
                                     <th className="py-2.5 px-3">Stay Period</th>
@@ -996,26 +834,35 @@ export const FrontDesk: React.FC = () => {
                                                 {/* Guest & Reference */}
                                                 <td className="py-2.5 px-3.5">
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 ${
-                                                            item.status === 'in-house' 
-                                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                                                : isCheckedOut 
-                                                                    ? 'bg-slate-100 text-slate-600'
-                                                                    : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                                        }`}>
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs flex-shrink-0 ${item.status === 'in-house' || item.status === 'arrived'
+                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                                            : isCheckedOut
+                                                                ? 'bg-slate-100 text-slate-600'
+                                                                : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                            }`}>
                                                             {item.guestName.charAt(0)}
                                                         </div>
                                                         <div>
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="font-bold text-slate-900">{item.guestName}</span>
+                                                                <span className="text-slate-900">{item.guestName}</span>
                                                                 {item.vip && item.vip !== 'None' && item.vip !== 'Regular' && (
                                                                     <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300">
                                                                         {item.vip}
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-[10.5px] text-slate-500 mt-0.5">
+                                                            <div className="flex items-center gap-1.5 text-[10.5px] text-slate-500 mt-0.5 flex-wrap">
                                                                 <span className="font-mono text-blue-700 font-semibold">{item.reservationNumber}</span>
+                                                                {item.groupCode && (
+                                                                    <span className="font-mono text-purple-700 font-bold bg-purple-50 px-1 py-0.2 rounded border border-purple-200 text-[9.5px]" title="Group Booking Code">
+                                                                        {item.groupCode}
+                                                                    </span>
+                                                                )}
+                                                                {item.registrationNumber && (
+                                                                    <span className="font-mono text-emerald-700 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-300 text-[9.5px]" title="Guest Registration Number (GRC)">
+                                                                        {item.registrationNumber}
+                                                                    </span>
+                                                                )}
                                                                 <span>•</span>
                                                                 <span>{item.phone}</span>
                                                             </div>
@@ -1040,7 +887,7 @@ export const FrontDesk: React.FC = () => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'pickup' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer shadow-2xs"
                                                                                 title={`Inbound Airport Pickup: ${b.pickup.flightNumber || 'Arr'} (${b.pickup.pickupDateTime || ''})`}
                                                                             >
                                                                                 <Car size={9} />
@@ -1051,7 +898,7 @@ export const FrontDesk: React.FC = () => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'pickup' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer shadow-2xs"
                                                                                 title={`Outbound Airport Drop: ${b.pickup.dropFlightNumber || 'Dept'} (${b.pickup.dropDateTime || ''})`}
                                                                             >
                                                                                 <Plane size={9} />
@@ -1062,7 +909,7 @@ export const FrontDesk: React.FC = () => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'extrabed' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer shadow-2xs"
                                                                                 title="Extra Bed / Cot Assigned"
                                                                             >
                                                                                 <BedDouble size={9} />
@@ -1073,7 +920,7 @@ export const FrontDesk: React.FC = () => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'mealplan' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs"
                                                                                 title={`Meal Plan: ${b.mealPlan.planType || 'Meal Plan'}`}
                                                                             >
                                                                                 <Utensils size={9} />
@@ -1084,7 +931,7 @@ export const FrontDesk: React.FC = () => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'celebration' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer shadow-2xs"
                                                                                 title="Celebration Setup"
                                                                             >
                                                                                 <Gift size={9} />
@@ -1095,7 +942,7 @@ export const FrontDesk: React.FC = () => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'spa' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors cursor-pointer shadow-2xs"
                                                                                 title="Spa Treatment"
                                                                             >
                                                                                 <Sparkles size={9} />
@@ -1106,7 +953,7 @@ export const FrontDesk: React.FC = () => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setServiceModalConfig({ isOpen: true, guestRecord: item, initialTab: 'timing' })}
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs"
                                                                                 title="Early/Late Flex"
                                                                             >
                                                                                 <Clock size={9} />
@@ -1123,7 +970,7 @@ export const FrontDesk: React.FC = () => {
                                                 {/* Room & Status */}
                                                 <td className="py-2.5 px-3">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="w-10 h-7 rounded border border-blue-200 bg-blue-50 text-blue-900 font-mono font-bold flex items-center justify-center text-xs">
+                                                        <div className="w-10 h-7 rounded border border-blue-200 bg-blue-50 text-blue-900 font-mono flex items-center justify-center text-xs">
                                                             {item.roomNumber}
                                                         </div>
                                                         <div>
@@ -1132,17 +979,17 @@ export const FrontDesk: React.FC = () => {
                                                             </div>
                                                             <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
                                                                 {item.roomStatus === 'clean' && (
-                                                                    <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                                                                    <span className="text-emerald-700 flex items-center gap-0.5">
                                                                         <Sparkles size={9} /> Clean &amp; Ready
                                                                     </span>
                                                                 )}
                                                                 {item.roomStatus === 'inspected' && (
-                                                                    <span className="text-blue-700 font-bold flex items-center gap-0.5">
+                                                                    <span className="text-blue-700 flex items-center gap-0.5">
                                                                         <CheckCircle2 size={9} /> Inspected
                                                                     </span>
                                                                 )}
                                                                 {item.roomStatus === 'dirty' && (
-                                                                    <span className="text-rose-600 font-bold flex items-center gap-0.5">
+                                                                    <span className="text-rose-600 flex items-center gap-0.5">
                                                                         <AlertCircle size={9} /> Turnover Dirty
                                                                     </span>
                                                                 )}
@@ -1160,12 +1007,12 @@ export const FrontDesk: React.FC = () => {
                                                         <span>{item.checkIn}</span> ➔ <span>{item.checkOut}</span>
                                                     </div>
                                                     <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5">
-                                                        <span className="font-bold text-blue-700">{item.nights} Night{item.nights > 1 ? 's' : ''}</span>
+                                                        <span className="text-blue-700">{item.nights} Night{item.nights > 1 ? 's' : ''}</span>
                                                         {item.eta && (
                                                             <span>• ETA: <strong className="text-slate-700">{item.eta}</strong></span>
                                                         )}
                                                         {earlyEval.charge > 0 && item.status === 'arriving' && (
-                                                            <span className="px-1 py-0.2 rounded bg-amber-50 text-amber-800 font-bold text-[9px] border border-amber-200">
+                                                            <span className="px-1 py-0.2 rounded bg-amber-50 text-amber-800 text-[9px] border border-amber-200">
                                                                 Early In
                                                             </span>
                                                         )}
@@ -1174,7 +1021,7 @@ export const FrontDesk: React.FC = () => {
 
                                                 {/* Pax */}
                                                 <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
-                                                    <span className="font-bold text-slate-700 text-xs">
+                                                    <span className="text-slate-700 text-xs">
                                                         {item.adults}A {item.children > 0 ? `+ ${item.children}C` : ''}
                                                     </span>
                                                 </td>
@@ -1191,16 +1038,16 @@ export const FrontDesk: React.FC = () => {
 
                                                 {/* Tariff & Balance */}
                                                 <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                                                    <div className="font-mono font-bold text-slate-900 text-xs">
+                                                    <div className="font-mono text-slate-900 text-xs">
                                                         ৳{item.totalAmount.toLocaleString()}
                                                     </div>
                                                     <div className="mt-0.5">
                                                         {item.dueAmount > 0 ? (
-                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                                            <span className="px-1.5 py-0.2 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200">
                                                                 Due: ৳{item.dueAmount.toLocaleString()}
                                                             </span>
                                                         ) : (
-                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                                 Settled
                                                             </span>
                                                         )}
@@ -1210,11 +1057,11 @@ export const FrontDesk: React.FC = () => {
                                                 {/* Actions */}
                                                 <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                                                     <div className="flex items-center justify-end gap-1.5">
-                                                        {item.status === 'arriving' && (
+                                                        {(item.status === 'arriving' || item.status === 'confirmed') && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleOpenCheckInModal(item)}
-                                                                className="h-7 px-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                                                                className="h-7 px-3 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                                                             >
                                                                 <LogIn size={11} className="stroke-[2.5]" />
                                                                 <span>Check In</span>
@@ -1236,11 +1083,10 @@ export const FrontDesk: React.FC = () => {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleOpenCheckOutModal(item)}
-                                                                    className={`h-7 px-3 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap ${
-                                                                        isDueDeparture
-                                                                            ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                                                            : 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-800'
-                                                                    }`}
+                                                                    className={`h-7 px-3 rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap ${isDueDeparture
+                                                                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                                                        : 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-800'
+                                                                        }`}
                                                                 >
                                                                     <LogOut size={11} className="stroke-[2.5]" />
                                                                     <span>Check Out</span>
@@ -1249,7 +1095,7 @@ export const FrontDesk: React.FC = () => {
                                                         )}
 
                                                         {item.status === 'checked-out' && (
-                                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
                                                                 Departed
                                                             </span>
                                                         )}
@@ -1284,7 +1130,7 @@ export const FrontDesk: React.FC = () => {
                                         <td colSpan={7} className="py-10 text-center text-slate-400">
                                             <div className="flex flex-col items-center justify-center gap-1.5">
                                                 <BedDouble size={24} className="text-slate-300" />
-                                                <p className="text-xs font-bold text-slate-600">No records found matching criteria</p>
+                                                <p className="text-xs text-slate-600">No records found matching criteria</p>
                                                 <p className="text-[11px] text-slate-400">Try adjusting your search query or tab selection</p>
                                             </div>
                                         </td>
@@ -1298,19 +1144,19 @@ export const FrontDesk: React.FC = () => {
                     <div className="p-4 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Opening Float</span>
+                                <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Opening Float</span>
                                 <div className="text-xl font-black text-slate-900 font-mono">BDT 15,000.00</div>
                                 <p className="text-xs text-slate-500">Verified by Front Desk Cashier at 07:00 AM</p>
                             </div>
 
                             <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 space-y-2">
-                                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Collections Received</span>
+                                <span className="text-[10px] text-emerald-700 uppercase tracking-wider block">Collections Received</span>
                                 <div className="text-xl font-black text-emerald-900 font-mono">BDT {totalCollectionsToday.toLocaleString()}.00</div>
                                 <p className="text-xs text-emerald-700">Cash: BDT 42,000 • Card: BDT 76,500 • bKash: BDT 30,000</p>
                             </div>
 
                             <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-3.5 space-y-2">
-                                <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">Current Drawer Total</span>
+                                <span className="text-[10px] text-blue-700 uppercase tracking-wider block">Current Drawer Total</span>
                                 <div className="text-xl font-black text-blue-900 font-mono">BDT {(15000 + totalCollectionsToday).toLocaleString()}.00</div>
                                 <p className="text-xs text-blue-700">Audit in balance • Zero float variance</p>
                             </div>
@@ -1318,7 +1164,7 @@ export const FrontDesk: React.FC = () => {
 
                         {/* Recent Cashier Events */}
                         <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Session Audit Trail</h3>
+                            <h3 className="text-xs text-slate-800 uppercase tracking-wider">Session Audit Trail</h3>
                             <div className="space-y-1.5 max-h-48 overflow-y-auto">
                                 {actionLog.map((log, i) => (
                                     <div key={i} className="text-xs flex items-start gap-2 text-slate-600">
@@ -1352,7 +1198,7 @@ export const FrontDesk: React.FC = () => {
                                     <LogIn size={15} />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900">Check-In Registration</h3>
+                                    <h3 className="text-sm text-slate-900">Check-In Registration</h3>
                                     <p className="text-[11px] text-slate-500 font-mono">{checkInModalRecord.reservationNumber}</p>
                                 </div>
                             </div>
@@ -1403,7 +1249,7 @@ export const FrontDesk: React.FC = () => {
 
                             return (
                                 <div className="bg-blue-50/60 rounded-lg p-2.5 border border-blue-200/80 space-y-1 text-[11px]">
-                                    <div className="font-bold text-blue-900 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                                    <div className="text-blue-900 text-[10px] uppercase tracking-wider flex items-center gap-1">
                                         <Sparkles size={11} className="text-blue-600" />
                                         <span>Concierge &amp; Room Add-ons Briefing</span>
                                     </div>
@@ -1469,7 +1315,7 @@ export const FrontDesk: React.FC = () => {
                         {/* Key Card & Deposit Form */}
                         <div className="grid grid-cols-2 gap-2 text-xs">
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                                <label className="text-[10px] text-slate-600 uppercase flex items-center gap-1">
                                     <Key size={11} className="text-blue-600" /> Key Card ID
                                 </label>
                                 <input
@@ -1477,12 +1323,12 @@ export const FrontDesk: React.FC = () => {
                                     value={checkInKeyCard}
                                     onChange={e => setCheckInKeyCard(e.target.value)}
                                     placeholder="e.g. KC-102A"
-                                    className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono font-bold text-xs"
+                                    className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono text-xs"
                                 />
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                                <label className="text-[10px] text-slate-600 uppercase flex items-center gap-1">
                                     <DollarSign size={11} className="text-emerald-600" /> Collect Deposit
                                 </label>
                                 <div className="flex gap-1">
@@ -1490,7 +1336,7 @@ export const FrontDesk: React.FC = () => {
                                         type="number"
                                         value={checkInDepositAmount}
                                         onChange={e => setCheckInDepositAmount(Number(e.target.value))}
-                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono font-bold text-xs"
+                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono text-xs"
                                     />
                                     <select
                                         value={checkInDepositMethod}
@@ -1511,14 +1357,14 @@ export const FrontDesk: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setCheckInModalRecord(null)}
-                                className="h-8 px-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                className="h-8 px-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs cursor-pointer"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={handleConfirmCheckIn}
-                                className="h-8 px-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                className="h-8 px-4 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
                                 <Check size={14} className="stroke-[3]" />
                                 <span>Complete Check-In</span>
@@ -1538,7 +1384,7 @@ export const FrontDesk: React.FC = () => {
                                     <LogOut size={15} />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900">Check-Out &amp; Folio Settlement</h3>
+                                    <h3 className="text-sm text-slate-900">Check-Out &amp; Folio Settlement</h3>
                                     <p className="text-[11px] text-slate-500 font-mono">Room {checkOutModalRecord.roomNumber} • {checkOutModalRecord.guestName}</p>
                                 </div>
                             </div>
@@ -1555,14 +1401,14 @@ export const FrontDesk: React.FC = () => {
                         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200/80 space-y-2 text-xs">
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Gross Tariff &amp; Charges:</span>
-                                <span className="font-mono font-bold text-slate-900">BDT {checkOutModalRecord.totalAmount.toLocaleString()}</span>
+                                <span className="font-mono text-slate-900">BDT {checkOutModalRecord.totalAmount.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Paid to Date:</span>
                                 <span className="font-mono text-emerald-700 font-bold">BDT {checkOutModalRecord.paidAmount.toLocaleString()}</span>
                             </div>
                             <div className="border-t border-slate-200 pt-1.5 flex justify-between text-sm">
-                                <span className="font-bold text-slate-800">Final Balance Due:</span>
+                                <span className="text-slate-800">Final Balance Due:</span>
                                 <span className="font-mono font-black text-rose-700">BDT {checkOutModalRecord.dueAmount.toLocaleString()}</span>
                             </div>
                         </div>
@@ -1576,7 +1422,7 @@ export const FrontDesk: React.FC = () => {
                                 <div className="p-2.5 bg-sky-50 border border-sky-200 rounded-lg flex items-start gap-2 text-xs text-sky-900">
                                     <Plane size={15} className="text-sky-600 mt-0.5 flex-shrink-0" />
                                     <div>
-                                        <div className="font-bold flex items-center gap-1">
+                                        <div className="flex items-center gap-1">
                                             <span>Outbound Airport Drop Chauffeur Dispatched</span>
                                             <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-sky-100 text-sky-800 border border-sky-300 font-mono">
                                                 Flight {p.dropFlightNumber || 'N/A'}
@@ -1602,7 +1448,7 @@ export const FrontDesk: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleConfirmCheckOut('Cash')}
-                                    className="py-2 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/60 text-slate-800 font-bold rounded-lg text-xs flex flex-col items-center gap-0.5 cursor-pointer transition-all"
+                                    className="py-2 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/60 text-slate-800 rounded-lg text-xs flex flex-col items-center gap-0.5 cursor-pointer transition-all"
                                 >
                                     <DollarSign size={13} className="text-emerald-600" />
                                     <span>Cash</span>
@@ -1610,7 +1456,7 @@ export const FrontDesk: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleConfirmCheckOut('Card')}
-                                    className="py-2 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/60 text-slate-800 font-bold rounded-lg text-xs flex flex-col items-center gap-0.5 cursor-pointer transition-all"
+                                    className="py-2 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/60 text-slate-800 rounded-lg text-xs flex flex-col items-center gap-0.5 cursor-pointer transition-all"
                                 >
                                     <CreditCard size={13} className="text-blue-600" />
                                     <span>Credit Card</span>
@@ -1618,7 +1464,7 @@ export const FrontDesk: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleConfirmCheckOut('bKash')}
-                                    className="py-2 bg-white border border-slate-300 hover:border-pink-500 hover:bg-pink-50/60 text-slate-800 font-bold rounded-lg text-xs flex flex-col items-center gap-0.5 cursor-pointer transition-all"
+                                    className="py-2 bg-white border border-slate-300 hover:border-pink-500 hover:bg-pink-50/60 text-slate-800 rounded-lg text-xs flex flex-col items-center gap-0.5 cursor-pointer transition-all"
                                 >
                                     <Wallet size={13} className="text-pink-600" />
                                     <span>bKash / Nagad</span>
@@ -1635,8 +1481,10 @@ export const FrontDesk: React.FC = () => {
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[420px] w-full p-4 space-y-3.5 animate-in zoom-in-95 duration-150">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                             <div>
-                                <h3 className="text-sm font-bold text-slate-900">Post Charge to Room Folio</h3>
-                                <p className="text-[11px] text-slate-500 font-mono">Room {folioModalRecord.roomNumber} • {folioModalRecord.guestName}</p>
+                                <h3 className="text-sm text-slate-900 font-bold">Post Charge to Room Folio</h3>
+                                <p className="text-[11px] text-slate-500 font-mono">
+                                    Room {folioModalRecord.roomNumber} • {folioModalRecord.guestName} • Folio: {folioModalRecord.folioNumber || `FOL-${folioModalRecord.reservationNumber.replace(/^RES-/, '')}-1`}
+                                </p>
                             </div>
                             <button
                                 type="button"
@@ -1649,7 +1497,7 @@ export const FrontDesk: React.FC = () => {
 
                         <div className="space-y-2.5 text-xs">
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 uppercase">Charge Department</label>
+                                <label className="text-[10px] text-slate-600 uppercase">Charge Department</label>
                                 <select
                                     value={chargeType}
                                     onChange={e => setChargeType(e.target.value)}
@@ -1665,7 +1513,7 @@ export const FrontDesk: React.FC = () => {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 uppercase">Description</label>
+                                <label className="text-[10px] text-slate-600 uppercase">Description</label>
                                 <input
                                     type="text"
                                     value={chargeDesc}
@@ -1676,12 +1524,12 @@ export const FrontDesk: React.FC = () => {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 uppercase">Amount (BDT)</label>
+                                <label className="text-[10px] text-slate-600 uppercase">Amount (BDT)</label>
                                 <input
                                     type="number"
                                     value={chargeAmount}
                                     onChange={e => setChargeAmount(Number(e.target.value))}
-                                    className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono font-bold text-xs"
+                                    className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono text-xs"
                                 />
                             </div>
                         </div>
@@ -1690,7 +1538,7 @@ export const FrontDesk: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setFolioModalRecord(null)}
-                                className="h-8 px-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                className="h-8 px-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -1698,7 +1546,7 @@ export const FrontDesk: React.FC = () => {
                                 type="button"
                                 onClick={handlePostCharge}
                                 disabled={chargeAmount <= 0 || !chargeDesc.trim()}
-                                className="h-8 px-4 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer shadow-xs"
+                                className="h-8 px-4 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-lg text-xs cursor-pointer shadow-xs"
                             >
                                 Post to Folio
                             </button>
@@ -1719,23 +1567,29 @@ export const FrontDesk: React.FC = () => {
                                     <p className="text-[10px] text-slate-500">Dhaka, Bangladesh • Official Guest Registration Card</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="font-mono text-sm font-bold text-blue-700">{regCardRecord.reservationNumber}</span>
-                                    <p className="text-[9.5px] text-slate-400">Date: {systemDate}</p>
+                                    <div className="font-mono text-sm text-blue-700 font-bold">{regCardRecord.reservationNumber}</div>
+                                    <div className="font-mono text-xs text-emerald-700 font-bold">
+                                        Reg: {regCardRecord.registrationNumber || `REG-${regCardRecord.reservationNumber.replace(/^RES-/, '')}`}
+                                    </div>
+                                    <div className="font-mono text-[10px] text-slate-500">
+                                        Folio: {regCardRecord.folioNumber || `FOL-${regCardRecord.reservationNumber.replace(/^RES-/, '')}-1`}
+                                    </div>
+                                    <p className="text-[9.5px] text-slate-400 mt-0.5">Date: {systemDate}</p>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 text-xs">
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Guest Full Name</span>
-                                    <p className="font-bold text-slate-900">{regCardRecord.guestName}</p>
+                                    <p className="text-slate-900">{regCardRecord.guestName}</p>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Phone Number</span>
-                                    <p className="font-bold text-slate-900">{regCardRecord.phone}</p>
+                                    <p className="text-slate-900">{regCardRecord.phone}</p>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Assigned Room</span>
-                                    <p className="font-bold text-blue-800 font-mono">Room {regCardRecord.roomNumber} ({regCardRecord.roomType})</p>
+                                    <p className="text-blue-800 font-mono">Room {regCardRecord.roomNumber} ({regCardRecord.roomType})</p>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Period of Stay</span>
@@ -1761,14 +1615,14 @@ export const FrontDesk: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setRegCardRecord(null)}
-                                className="h-8 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                className="h-8 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs cursor-pointer"
                             >
                                 Close
                             </button>
                             <button
                                 type="button"
                                 onClick={() => window.print()}
-                                className="h-8 px-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                className="h-8 px-4 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
                                 <Printer size={13} />
                                 <span>Print Reg Card</span>

@@ -11,7 +11,7 @@ import {
     Calendar,
     ArrowRight
 } from 'lucide-react';
-import { getAvailableRoomsForStay } from '../../utils/roomInventoryEngine';
+import { getAvailableRoomsForStay, isMatchingRoomType } from '../../utils/roomInventoryEngine';
 import { getNextDayISO } from '../common/StayPeriodPicker';
 
 export interface RoomStayConfig {
@@ -66,11 +66,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
 
     // Matching rooms of this category
     const categoryRooms = useMemo(() => {
-        return report.allRoomsStatus.filter(st => {
-            const matches = st.room.roomTypeName.toLowerCase().includes(roomType.toLowerCase()) ||
-                            roomType.toLowerCase().includes(st.room.roomTypeName.toLowerCase());
-            return matches;
-        });
+        return report.allRoomsStatus.filter(st => isMatchingRoomType(st.room.roomTypeName, roomType));
     }, [report, roomType]);
 
     // Available rooms in this category (excluding other rows)
@@ -258,7 +254,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                     Multi-Room Assignment: {roomType}
                                 </h3>
                                 {isAutoMode && (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 flex items-center gap-1 border border-blue-200">
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 flex items-center gap-1 border border-blue-200">
                                         <Sparkles size={11} className="text-blue-600" /> Auto Mode
                                     </span>
                                 )}
@@ -286,7 +282,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                 {/* Status & Control Toolbar */}
                 <div className="px-6 py-3 bg-slate-50/80 border-b border-slate-200/90 flex flex-wrap items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-1.5 font-bold px-3 py-1 rounded-full border shadow-2xs transition-all ${
+                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border shadow-2xs transition-all ${
                             isComplete 
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
                                 : 'bg-amber-50 text-amber-800 border-amber-300'
@@ -306,7 +302,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                         <button
                             type="button"
                             onClick={() => handleToggleCustomDates(!customDatesEnabled)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border shadow-2xs cursor-pointer transition-all ${
+                            className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border shadow-2xs cursor-pointer transition-all ${
                                 customDatesEnabled
                                     ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
                                     : 'bg-white hover:bg-blue-50 text-blue-800 border-blue-300 hover:border-blue-400'
@@ -348,7 +344,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                    <span className="text-xs uppercase tracking-wider text-slate-700">
                                         Assigned Rooms ({selectedRooms.length} of {requiredCount})
                                     </span>
                                     <span className="text-[11px] text-slate-500 font-medium">
@@ -358,7 +354,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleToggleCustomDates(true)}
-                                    className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 cursor-pointer"
+                                    className="text-xs text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 cursor-pointer"
                                 >
                                     <span>Different dates per room?</span>
                                     <ArrowRight size={12} />
@@ -376,11 +372,11 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                             key={rm}
                                             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50/90 border border-blue-200 text-blue-950 shadow-2xs font-semibold text-xs transition-all hover:bg-blue-100 group"
                                         >
-                                            <span className="w-5 h-5 rounded bg-blue-600 text-white font-mono font-bold text-[10px] flex items-center justify-center">
+                                            <span className="w-5 h-5 rounded bg-blue-600 text-white font-mono text-[10px] flex items-center justify-center">
                                                 {idx + 1}
                                             </span>
-                                            <span className="font-mono font-bold text-sm tracking-tight">Rm {rm}</span>
-                                            <span className="text-[10px] font-bold text-blue-800 bg-white px-1.5 py-0.5 rounded border border-blue-200/80 font-mono">
+                                            <span className="font-mono text-sm tracking-tight">Rm {rm}</span>
+                                            <span className="text-[10px] text-blue-800 bg-white px-1.5 py-0.5 rounded border border-blue-200/80 font-mono">
                                                 {defaultGroupNights}N
                                             </span>
                                             <button
@@ -413,7 +409,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={handleSyncAllToMaster}
-                                        className="text-[11px] text-blue-700 hover:text-blue-900 font-bold bg-white hover:bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs flex items-center gap-1 cursor-pointer transition-all"
+                                        className="text-[11px] text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs flex items-center gap-1 cursor-pointer transition-all"
                                         title={`Reset all room dates to ${checkIn} ➔ ${checkOut}`}
                                     >
                                         <RotateCcw size={11} className="text-blue-600" />
@@ -430,7 +426,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                 <div className="overflow-x-auto max-h-52 overflow-y-auto">
                                     <table className="w-full text-left border-collapse text-xs">
                                         <thead>
-                                            <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-bold text-[10.5px] uppercase tracking-wider">
+                                            <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 text-[10.5px] uppercase tracking-wider">
                                                 <th className="py-2 px-3 w-32">Assigned Room</th>
                                                 <th className="py-2 px-3 text-center w-40">Check-In Date</th>
                                                 <th className="py-2 px-1 text-center w-6"></th>
@@ -452,11 +448,11 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                                     <tr key={rm} className={`hover:bg-blue-50/30 transition-colors ${isDifferentFromMaster ? 'bg-blue-50/20' : ''}`}>
                                                         <td className="py-2 px-3">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="w-5 h-5 rounded bg-blue-600 text-white font-mono font-bold text-[10px] flex items-center justify-center flex-shrink-0">
+                                                                <span className="w-5 h-5 rounded bg-blue-600 text-white font-mono text-[10px] flex items-center justify-center flex-shrink-0">
                                                                     #{idx + 1}
                                                                 </span>
                                                                 <div>
-                                                                    <span className="font-mono font-bold text-sm text-slate-900 block leading-tight">
+                                                                    <span className="font-mono text-sm text-slate-900 block leading-tight">
                                                                         Room {rm}
                                                                     </span>
                                                                     <span className="text-[9.5px] text-slate-500 font-medium">
@@ -470,7 +466,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                                                 type="date"
                                                                 value={conf.checkIn}
                                                                 onChange={e => handleRoomCheckInChange(rm, e.target.value)}
-                                                                className="w-36 h-8 px-2 text-xs font-mono font-bold border border-slate-200 rounded-md bg-white text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-400 shadow-2xs"
+                                                                className="w-36 h-8 px-2 text-xs font-mono border border-slate-200 rounded-md bg-white text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-400 shadow-2xs"
                                                                 title="Check-In Date"
                                                             />
                                                         </td>
@@ -483,12 +479,12 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                                                 value={conf.checkOut}
                                                                 min={getNextDayISO(conf.checkIn, 1)}
                                                                 onChange={e => handleRoomCheckOutChange(rm, e.target.value)}
-                                                                className="w-36 h-8 px-2 text-xs font-mono font-bold border border-slate-200 rounded-md bg-white text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-400 shadow-2xs"
+                                                                className="w-36 h-8 px-2 text-xs font-mono border border-slate-200 rounded-md bg-white text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-400 shadow-2xs"
                                                                 title="Check-Out Date"
                                                             />
                                                         </td>
                                                         <td className="py-2 px-3 text-center">
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold font-mono border shadow-2xs ${
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono border shadow-2xs ${
                                                                 isDifferentFromMaster
                                                                     ? 'bg-indigo-100 text-indigo-900 border-indigo-300'
                                                                     : 'bg-blue-100 text-blue-900 border-blue-200'
@@ -519,7 +515,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
 
                 {/* Bottom Section: Physical Room Cards Grid */}
                 <div className="p-6 overflow-y-auto flex-1 bg-slate-50/50">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center justify-between">
+                    <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3 flex items-center justify-between">
                         <span>Available Physical Rooms ({availableRooms.length} Available)</span>
                         <div className="flex items-center gap-3 text-[10px] font-semibold lowercase text-slate-500">
                             <span className="flex items-center gap-1.5">
@@ -562,7 +558,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                                 <Check size={14} strokeWidth={3} />
                                             </span>
                                         ) : (
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-md ${
                                                 isSelectable 
                                                     ? 'bg-emerald-100 text-emerald-800' 
                                                     : isTakenInOther 
@@ -578,7 +574,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                         <div className="text-slate-600 font-semibold">Floor {st.room.floorId || '1'}</div>
                                         <div className="text-slate-500 text-[10.5px] truncate">{st.room.name}</div>
                                         {!isSelectable && (
-                                            <div className="text-red-500 font-bold text-[10px] truncate mt-1">
+                                            <div className="text-red-500 text-[10px] truncate mt-1">
                                                 {isTakenInOther ? 'Used in another row' : (st.reason || 'Occupied')}
                                             </div>
                                         )}
@@ -594,7 +590,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                     <div className="text-xs">
                         {customDatesEnabled ? (
                             <div className="flex items-center gap-2">
-                                <span className="text-blue-900 font-bold bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1.5 font-mono">
+                                <span className="text-blue-900 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1.5 font-mono">
                                     <CalendarRange size={13} className="text-blue-600" />
                                     Horizon: <strong>{staySummary.minIn}</strong> ➔ <strong>{staySummary.maxOut}</strong> ({staySummary.totalRoomNights} Total Room-Nights)
                                 </span>
@@ -602,7 +598,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                         ) : (
                             <div className="flex items-center gap-1.5 text-slate-600">
                                 {isComplete ? (
-                                    <span className="text-emerald-700 font-bold flex items-center gap-1">
+                                    <span className="text-emerald-700 flex items-center gap-1">
                                         <CheckCircle2 size={15} /> All {requiredCount} rooms ready ({staySummary.totalRoomNights} Room-Nights)
                                     </span>
                                 ) : (
@@ -625,7 +621,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                         <button
                             type="button"
                             onClick={handleSave}
-                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
                         >
                             <Check size={15} />
                             <span>Confirm Assignment ({selectedRooms.length || requiredCount} Rooms)</span>

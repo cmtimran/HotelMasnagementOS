@@ -6,17 +6,20 @@ export interface ChildAgeSelectorProps {
     childrenAges?: number[];
     onChange: (count: number, ages: number[]) => void;
     compact?: boolean;
+    maxChildren?: number;
 }
 
 export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
     childrenCount,
     childrenAges = [],
     onChange,
-    compact = false
+    compact = false,
+    maxChildren = 4
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const triggerRef = useRef<HTMLDivElement>(null);
     const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+    const maxAllowed = Math.max(0, maxChildren ?? 4);
 
     // Calculate fixed viewport coordinates when opened so table overflow NEVER clips it
     useEffect(() => {
@@ -50,7 +53,7 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
     }, [isOpen]);
 
     const handleCountChange = (newCount: number) => {
-        const safeCount = Math.max(0, Math.min(6, newCount));
+        const safeCount = Math.max(0, Math.min(maxAllowed, newCount));
         let newAges = [...childrenAges];
         if (safeCount > newAges.length) {
             for (let i = newAges.length; i < safeCount; i++) {
@@ -83,7 +86,20 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
     return (
         <div ref={triggerRef} className="relative inline-block text-left select-none">
             {/* Table Cell Trigger Badge / Stepper */}
-            {childrenCount === 0 ? (
+            {maxAllowed === 0 ? (
+                <div className="flex items-center justify-center">
+                    <button
+                        type="button"
+                        disabled
+                        className={`h-7 px-2 rounded border border-slate-200 bg-slate-100 text-[10px] font-medium text-slate-400 flex items-center gap-1 cursor-not-allowed ${
+                            compact ? 'h-6 px-1.5 text-[9.5px]' : ''
+                        }`}
+                        title="Children not permitted for this room category"
+                    >
+                        <span>0 (N/A)</span>
+                    </button>
+                </div>
+            ) : childrenCount === 0 ? (
                 <div className="flex items-center justify-center">
                     <button
                         type="button"
@@ -91,7 +107,7 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                         className={`h-7 px-2.5 rounded border border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/50 text-[11px] font-semibold text-slate-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer transition-all ${
                             compact ? 'h-6 px-2 text-[10px]' : ''
                         }`}
-                        title="Click to add children"
+                        title={`Click to add children (Max: ${maxAllowed})`}
                     >
                         <span>0 Child</span>
                         <Plus size={10} className="text-slate-400" />
@@ -102,7 +118,7 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                     <button
                         type="button"
                         onClick={() => setIsOpen(!isOpen)}
-                        className={`h-7 px-2 rounded-md bg-blue-50/90 hover:bg-blue-100 border border-blue-200 text-blue-900 font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all whitespace-nowrap flex-nowrap ${
+                        className={`h-7 px-2 rounded-md bg-blue-50/90 hover:bg-blue-100 border border-blue-200 text-blue-900 text-[11px] inline-flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all whitespace-nowrap flex-nowrap ${
                             compact ? 'h-6 px-1.5 text-[10.5px]' : ''
                         } ${isOpen ? 'ring-2 ring-blue-500/30 border-blue-500' : ''}`}
                         title="Click to adjust child ages"
@@ -139,7 +155,7 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                                 <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                                     <Baby size={12} />
                                 </div>
-                                <span className="text-xs font-bold text-slate-800 tracking-tight">
+                                <span className="text-xs text-slate-800 tracking-tight">
                                     Children &amp; Ages
                                 </span>
                             </div>
@@ -154,12 +170,12 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
 
                         {/* Children Count Stepper */}
                         <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                            <span className="text-[11px] font-medium text-slate-600">Total Children</span>
+                            <span className="text-[11px] font-medium text-slate-600">Total Children (Max {maxAllowed})</span>
                             <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-md p-0.5">
                                 <button
                                     type="button"
                                     onClick={() => handleCountChange(childrenCount - 1)}
-                                    className="w-5 h-5 rounded bg-white text-slate-700 hover:text-blue-700 flex items-center justify-center font-bold text-xs shadow-2xs cursor-pointer"
+                                    className="w-5 h-5 rounded bg-white text-slate-700 hover:text-blue-700 flex items-center justify-center text-xs shadow-2xs cursor-pointer"
                                 >
                                     <Minus size={9} />
                                 </button>
@@ -169,8 +185,9 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleCountChange(childrenCount + 1)}
-                                    disabled={childrenCount >= 6}
-                                    className="w-5 h-5 rounded bg-white text-slate-700 hover:text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs shadow-2xs cursor-pointer"
+                                    disabled={childrenCount >= maxAllowed}
+                                    title={childrenCount >= maxAllowed ? `Maximum ${maxAllowed} child(ren) allowed` : undefined}
+                                    className="w-5 h-5 rounded bg-white text-slate-700 hover:text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xs shadow-2xs cursor-pointer"
                                 >
                                     <Plus size={9} />
                                 </button>
@@ -180,7 +197,7 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                         {/* Age Selectors for each child */}
                         {childrenCount > 0 && (
                             <div className="py-2 space-y-1.5 max-h-[160px] overflow-y-auto">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider">
                                     Specify Age for each Child:
                                 </p>
                                 {childrenAges.map((age, idx) => (
@@ -204,7 +221,7 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                                             <select
                                                 value={age}
                                                 onChange={e => handleAgeChange(idx, Number(e.target.value))}
-                                                className="h-6 px-1.5 border border-slate-200 rounded text-[11px] font-bold text-blue-900 bg-white outline-none cursor-pointer focus:border-blue-500"
+                                                className="h-6 px-1.5 border border-slate-200 rounded text-[11px] text-blue-900 bg-white outline-none cursor-pointer focus:border-blue-500"
                                             >
                                                 <option value={0}>&lt; 1 yr</option>
                                                 {Array.from({ length: 17 }, (_, i) => i + 1).map(y => (
@@ -224,7 +241,7 @@ export const ChildAgeSelector: React.FC<ChildAgeSelectorProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsOpen(false)}
-                                className="px-3 py-1 bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold text-[10.5px] rounded-md shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
+                                className="px-3 py-1 bg-[#1e3a8a] hover:bg-blue-900 text-white text-[10.5px] rounded-md shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
                             >
                                 <Check size={11} className="stroke-[3]" />
                                 <span>Done</span>

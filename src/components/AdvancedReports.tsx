@@ -140,8 +140,8 @@ const AdvancedReports = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</p>
-                        <p className="text-xl font-bold text-slate-900 mt-1">৳{totalRevenue.toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Revenue</p>
+                        <p className="text-xl text-slate-900 mt-1">৳{totalRevenue.toLocaleString()}</p>
                         <p className="text-[10px] text-slate-500 mt-0.5">{totalBookings} total bookings</p>
                     </div>
                     <div className="size-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -151,8 +151,8 @@ const AdvancedReports = () => {
 
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Commission</p>
-                        <p className="text-xl font-bold text-rose-600 mt-1">৳{totalCommission.toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Commission</p>
+                        <p className="text-xl text-rose-600 mt-1">৳{totalCommission.toLocaleString()}</p>
                         <p className="text-[10px] text-slate-500 mt-0.5">{totalRevenue > 0 ? ((totalCommission / totalRevenue) * 100).toFixed(1) : '0.0'}% OTA cost</p>
                     </div>
                     <div className="size-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
@@ -162,8 +162,8 @@ const AdvancedReports = () => {
 
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Net Revenue</p>
-                        <p className="text-xl font-bold text-emerald-600 mt-1">৳{totalNetRevenue.toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Net Revenue</p>
+                        <p className="text-xl text-emerald-600 mt-1">৳{totalNetRevenue.toLocaleString()}</p>
                         <p className="text-[10px] text-slate-500 mt-0.5">Retained earnings</p>
                     </div>
                     <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -173,8 +173,8 @@ const AdvancedReports = () => {
 
                 <div className="kpi-card">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg. Booking</p>
-                        <p className="text-xl font-bold text-slate-900 mt-1">৳{Math.round(totalRevenue / Math.max(1, totalBookings)).toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider">Avg. Booking</p>
+                        <p className="text-xl text-slate-900 mt-1">৳{Math.round(totalRevenue / Math.max(1, totalBookings)).toLocaleString()}</p>
                         <p className="text-[10px] text-slate-500 mt-0.5">Average revenue per stay</p>
                     </div>
                     <div className="size-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -188,7 +188,7 @@ const AdvancedReports = () => {
                 <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
                     <div className="flex items-center gap-1.5">
                         <BarChart3 size={14} className="text-primary" />
-                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Revenue Breakdown by Source & Channel</h2>
+                        <h2 className="text-xs text-slate-800 uppercase tracking-wider">Revenue Breakdown by Source & Channel</h2>
                     </div>
                     <span className="text-[10px] text-slate-400 font-mono">Sorted by Volume</span>
                 </div>
@@ -197,18 +197,18 @@ const AdvancedReports = () => {
                     <table className="w-full text-xs">
                         <thead className="bg-slate-50/90 border-b border-slate-200">
                             <tr>
-                                <th className="px-3 py-1.5 text-left text-[10px] font-bold text-slate-600 uppercase tracking-wider">Source</th>
-                                <th className="px-3 py-1.5 text-right text-[10px] font-bold text-slate-600 uppercase tracking-wider">Gross Rev</th>
-                                <th className="px-3 py-1.5 text-right text-[10px] font-bold text-slate-600 uppercase tracking-wider">Bookings</th>
-                                <th className="px-3 py-1.5 text-right text-[10px] font-bold text-slate-600 uppercase tracking-wider">Commission</th>
-                                <th className="px-3 py-1.5 text-right text-[10px] font-bold text-slate-600 uppercase tracking-wider">Net Rev</th>
-                                <th className="px-3 py-1.5 text-right text-[10px] font-bold text-slate-600 uppercase tracking-wider w-24">% Share</th>
+                                <th className="px-3 py-1.5 text-left text-[10px] text-slate-600 uppercase tracking-wider">Source</th>
+                                <th className="px-3 py-1.5 text-right text-[10px] text-slate-600 uppercase tracking-wider">Gross Rev</th>
+                                <th className="px-3 py-1.5 text-right text-[10px] text-slate-600 uppercase tracking-wider">Bookings</th>
+                                <th className="px-3 py-1.5 text-right text-[10px] text-slate-600 uppercase tracking-wider">Commission</th>
+                                <th className="px-3 py-1.5 text-right text-[10px] text-slate-600 uppercase tracking-wider">Net Rev</th>
+                                <th className="px-3 py-1.5 text-right text-[10px] text-slate-600 uppercase tracking-wider w-24">% Share</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {revenueBySource.map((item, index) => (
                                 <tr key={index} className="hover:bg-indigo-50/30 transition-colors">
-                                    <td className="px-3 py-1.5 font-bold text-slate-800">
+                                    <td className="px-3 py-1.5 text-slate-800">
                                         {item.source}
                                     </td>
                                     <td className="px-3 py-1.5 text-right font-semibold text-slate-800">
@@ -220,12 +220,12 @@ const AdvancedReports = () => {
                                     <td className="px-3 py-1.5 text-right font-semibold text-rose-600">
                                         ৳{item.commission.toLocaleString()}
                                     </td>
-                                    <td className="px-3 py-1.5 text-right font-bold text-emerald-700">
+                                    <td className="px-3 py-1.5 text-right text-emerald-700">
                                         ৳{item.netRevenue.toLocaleString()}
                                     </td>
                                     <td className="px-3 py-1.5 text-right">
                                         <div className="flex items-center justify-end gap-1.5">
-                                            <span className="text-[11px] font-bold text-slate-700 w-8 text-right">{item.percentage}%</span>
+                                            <span className="text-[11px] text-slate-700 w-8 text-right">{item.percentage}%</span>
                                             <div className="w-12 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                                 <div
                                                     className="bg-indigo-600 h-1.5 rounded-full"
@@ -237,7 +237,7 @@ const AdvancedReports = () => {
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-slate-100/90 border-t-2 border-slate-300 font-bold text-xs">
+                        <tfoot className="bg-slate-100/90 border-t-2 border-slate-300 text-xs">
                             <tr>
                                 <td className="px-3 py-1.5 text-slate-900">TOTAL</td>
                                 <td className="px-3 py-1.5 text-right text-slate-900">৳{totalRevenue.toLocaleString()}</td>
@@ -257,7 +257,7 @@ const AdvancedReports = () => {
                 <div className="bg-white rounded-lg border border-slate-200/80 shadow-2xs p-3">
                     <div className="flex items-center gap-1.5 mb-2.5 pb-1.5 border-b border-slate-100">
                         <PieChart size={13} className="text-purple-600" />
-                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Revenue by Market Segment</h2>
+                        <h2 className="text-xs text-slate-800 uppercase tracking-wider">Revenue by Market Segment</h2>
                     </div>
 
                     <div className="space-y-1.5">
@@ -266,18 +266,18 @@ const AdvancedReports = () => {
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2">
                                         <div
-                                            className="w-6 h-6 rounded flex items-center justify-center font-bold text-[10px]"
+                                            className="w-6 h-6 rounded flex items-center justify-center text-[10px]"
                                             style={{ backgroundColor: item.color + '20', color: item.color }}
                                         >
                                             {item.segment}
                                         </div>
                                         <div>
-                                            <p className="text-xs font-bold text-slate-800 leading-tight">{item.segment}</p>
+                                            <p className="text-xs text-slate-800 leading-tight">{item.segment}</p>
                                             <p className="text-[10px] text-slate-500 leading-tight">{item.bookings} reservations</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xs font-bold text-slate-900">৳{item.revenue.toLocaleString()}</p>
+                                        <p className="text-xs text-slate-900">৳{item.revenue.toLocaleString()}</p>
                                         <p className="text-[10px] text-slate-500">{item.percentage}% share</p>
                                     </div>
                                 </div>
@@ -296,7 +296,7 @@ const AdvancedReports = () => {
                 <div className="bg-white rounded-lg border border-slate-200/80 shadow-2xs p-3 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-100">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Segment ADR & Yield Metrics</h3>
+                            <h3 className="text-xs text-slate-800 uppercase tracking-wider">Segment ADR & Yield Metrics</h3>
                             <span className="text-[10px] text-slate-400 font-mono">Performance Index</span>
                         </div>
 
@@ -304,21 +304,21 @@ const AdvancedReports = () => {
                             {revenueBySegment.slice(0, 4).map((item, index) => (
                                 <div key={index} className="bg-slate-50/70 p-2 rounded-md border border-slate-100">
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-bold text-slate-800">{item.segment}</span>
-                                        <span className="text-xs font-bold text-blue-700">৳{item.avgRate.toLocaleString()} ADR</span>
+                                        <span className="text-xs text-slate-800">{item.segment}</span>
+                                        <span className="text-xs text-blue-700">৳{item.avgRate.toLocaleString()} ADR</span>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1.5 text-center">
                                         <div className="bg-white p-1 rounded border border-slate-200/60">
                                             <p className="text-[9px] text-slate-500 font-medium">Revenue</p>
-                                            <p className="text-[11px] font-bold text-blue-600">৳{item.revenue.toLocaleString()}</p>
+                                            <p className="text-[11px] text-blue-600">৳{item.revenue.toLocaleString()}</p>
                                         </div>
                                         <div className="bg-white p-1 rounded border border-slate-200/60">
                                             <p className="text-[9px] text-slate-500 font-medium">Bookings</p>
-                                            <p className="text-[11px] font-bold text-emerald-600">{item.bookings}</p>
+                                            <p className="text-[11px] text-emerald-600">{item.bookings}</p>
                                         </div>
                                         <div className="bg-white p-1 rounded border border-slate-200/60">
                                             <p className="text-[9px] text-slate-500 font-medium">Share</p>
-                                            <p className="text-[11px] font-bold text-purple-600">{item.percentage}%</p>
+                                            <p className="text-[11px] text-purple-600">{item.percentage}%</p>
                                         </div>
                                     </div>
                                 </div>
@@ -328,7 +328,7 @@ const AdvancedReports = () => {
 
                     {/* Key Strategic Insights */}
                     <div className="mt-2.5 pt-2 border-t border-slate-100">
-                        <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Executive Yield Insights</h4>
+                        <h4 className="text-[10px] text-slate-700 uppercase tracking-wider mb-1">Executive Yield Insights</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-600">
                             <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Active Folios:</span> {totalBookings} reservations</p>
                             <p className="flex items-center gap-1">• <span className="font-semibold text-slate-700">Net Retained:</span> ৳{totalNetRevenue.toLocaleString()}</p>

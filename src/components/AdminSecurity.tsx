@@ -886,15 +886,15 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
             <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                 <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
                     <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 font-bold text-sm shadow-2xs flex-shrink-0">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 text-sm shadow-2xs flex-shrink-0">
                             <ShieldCheck size={22} className="text-blue-600" />
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight leading-tight">
+                                <h1 className="text-base sm:text-lg text-gray-900 tracking-tight leading-tight">
                                     Staff Directory & Access Control
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
                                     Enterprise RBAC
                                 </span>
                             </div>
@@ -962,7 +962,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         >
                             <Users size={13} />
                             <span>Users & Staff</span>
-                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-50 text-blue-700 border border-blue-100">
                                 {staffList.length}
                             </span>
                         </button>
@@ -977,7 +977,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         >
                             <Shield size={13} />
                             <span>Roles & RBAC Matrix</span>
-                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-gray-100 text-gray-700 border border-gray-200">
                                 {rolesList.length}
                             </span>
                         </button>
@@ -992,7 +992,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         >
                             <Building2 size={13} />
                             <span>Departments</span>
-                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-50 text-blue-700 border border-blue-100">
                                 {departmentsList.length}
                             </span>
                         </button>
@@ -1007,7 +1007,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         >
                             <Clock size={13} />
                             <span>Work Shifts</span>
-                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-purple-50 text-purple-700 border border-purple-100">
                                 {shiftsList.length}
                             </span>
                         </button>
@@ -1022,7 +1022,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         >
                             <Sliders size={13} />
                             <span>POS & Financial Limits</span>
-                            <span className="hidden sm:inline-block ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+                            <span className="hidden sm:inline-block ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-50 text-amber-700 border border-amber-200/60">
                                 Guardrails Active
                             </span>
                         </button>
@@ -1037,7 +1037,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         >
                             <History size={13} />
                             <span>Audit Trail & Sessions</span>
-                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                                 {activeSessions.length} Live
                             </span>
                         </button>
@@ -1056,12 +1056,12 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     {/* Informative Guidance Banner for Hotel Staff Management */}
                     <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
                                 <Info size={16} />
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-bold text-gray-900">Hotel Staff & User Account Governance</span>
+                                    <span className="text-gray-900">Hotel Staff & User Account Governance</span>
                                     <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">PCI-DSS Audited</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-0.5">
@@ -1084,8 +1084,8 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 <Users size={16} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Staff</div>
-                                <div className="text-sm font-bold text-gray-900 leading-tight">
+                                <div className="text-[10px] uppercase text-gray-400 tracking-wider">Total Staff</div>
+                                <div className="text-sm text-gray-900 leading-tight">
                                     {staffList.length} <span className="text-[11px] font-normal text-emerald-600 font-medium">({staffList.filter(s => s.status === 'Active').length} Active)</span>
                                 </div>
                             </div>
@@ -1096,8 +1096,8 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 <Smartphone size={16} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">2FA Compliance</div>
-                                <div className="text-sm font-bold text-gray-900 leading-tight">
+                                <div className="text-[10px] uppercase text-gray-400 tracking-wider">2FA Compliance</div>
+                                <div className="text-sm text-gray-900 leading-tight">
                                     {Math.round((staffList.filter(s => s.twoFactorEnabled).length / staffList.length) * 100)}%
                                     <span className="text-[11px] font-normal text-gray-400 ml-1">Enforced</span>
                                 </div>
@@ -1109,8 +1109,8 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 <Clock size={16} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Shifts Scheduled</div>
-                                <div className="text-sm font-bold text-gray-900 leading-tight">
+                                <div className="text-[10px] uppercase text-gray-400 tracking-wider">Shifts Scheduled</div>
+                                <div className="text-sm text-gray-900 leading-tight">
                                     3 Shifts <span className="text-[11px] font-normal text-amber-600 font-medium">(24/7 Desk)</span>
                                 </div>
                             </div>
@@ -1121,8 +1121,8 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 <ShieldCheck size={16} />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Security Tiering</div>
-                                <div className="text-sm font-bold text-gray-900 leading-tight">
+                                <div className="text-[10px] uppercase text-gray-400 tracking-wider">Security Tiering</div>
+                                <div className="text-sm text-gray-900 leading-tight">
                                     4 Tiers <span className="text-[11px] font-normal text-purple-600 font-medium">(L1 to L4)</span>
                                 </div>
                             </div>
@@ -1222,7 +1222,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
 
                         {/* Status Pills Row */}
                         <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100 text-xs">
-                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">Status:</span>
+                            <span className="text-[11px] text-gray-400 uppercase tracking-wider mr-1">Status:</span>
                             {(['ALL', 'Active', 'On Leave', 'Suspended'] as const).map(st => (
                                 <button
                                     key={st}
@@ -1244,7 +1244,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         <div className="overflow-x-auto">
                             <table className="w-full text-left min-w-[980px] border-collapse">
                                 <thead>
-                                    <tr className="bg-gray-50/90 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/90 border-b border-gray-200 text-[11px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2.5">Employee</th>
                                         <th className="px-3 py-2.5">Department & Shift</th>
                                         <th className="px-3 py-2.5">Role & Tier</th>
@@ -1275,7 +1275,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-2.5">
                                                         <div className="relative">
-                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 border border-blue-200 text-blue-700 text-xs flex items-center justify-center flex-shrink-0">
                                                                 {staff.avatarInitials}
                                                             </div>
                                                             {staff.isOnline && (
@@ -1283,7 +1283,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                             )}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <div className="font-bold text-gray-900 leading-snug flex items-center gap-1.5">
+                                                            <div className="text-gray-900 leading-snug flex items-center gap-1.5">
                                                                 <span className="truncate">{staff.name}</span>
                                                                 <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1 py-0.2 rounded font-normal">
                                                                     {staff.staffCode}
@@ -1312,12 +1312,12 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                 {/* Role & Tier */}
                                                 <td className="px-3 py-2">
                                                     <div>
-                                                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 inline-block">
+                                                        <span className="px-2 py-0.5 rounded text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200/60 inline-block">
                                                             {staff.role}
                                                         </span>
                                                     </div>
                                                     <div className="mt-0.5">
-                                                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border inline-block ${staff.roleTier.startsWith('L1')
+                                                        <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border inline-block ${staff.roleTier.startsWith('L1')
                                                             ? 'bg-purple-50 text-purple-700 border-purple-200'
                                                             : staff.roleTier.startsWith('L2')
                                                                 ? 'bg-blue-50 text-blue-700 border-blue-200'
@@ -1334,11 +1334,11 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                 <td className="px-3 py-2">
                                                     <div>
                                                         {staff.twoFactorEnabled ? (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                                 <CheckCircle2 size={11} /> 2FA Active
                                                             </span>
                                                         ) : (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] bg-amber-50 text-amber-700 border border-amber-200">
                                                                 <AlertTriangle size={11} /> 2FA Off
                                                             </span>
                                                         )}
@@ -1371,7 +1371,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                     <button
                                                         type="button"
                                                         onClick={() => handleToggleStaffStatus(staff.id)}
-                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all cursor-pointer ${staff.status === 'Active'
+                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-tight transition-all cursor-pointer ${staff.status === 'Active'
                                                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                                             : staff.status === 'On Leave'
                                                                 ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
@@ -1438,12 +1438,12 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     {/* Informative Guidance Banner for Role-Based Access Control */}
                     <div className="bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-white p-3 rounded-xl border border-indigo-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
                                 <ShieldCheck size={16} />
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-bold text-gray-900">Role-Based Access Control (RBAC) Architecture</span>
+                                    <span className="text-gray-900">Role-Based Access Control (RBAC) Architecture</span>
                                     <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded">Granular Matrix</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-0.5">
@@ -1462,7 +1462,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     {/* Header info */}
                     <div className="bg-white rounded-xl border border-gray-200/90 p-3 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                            <h2 className="text-sm font-bold text-gray-900">Hospitality Security Role Profiles</h2>
+                            <h2 className="text-sm text-gray-900">Hospitality Security Role Profiles</h2>
                             <p className="text-xs text-gray-500 mt-0.5">
                                 Granular module permissions for Front Desk, Cashiering, Night Audit, POS, Housekeeping, and General Ledger.
                             </p>
@@ -1496,15 +1496,15 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 <div className="space-y-2">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold flex-shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                                 <Shield size={16} />
                                             </div>
                                             <div>
-                                                <h3 className="text-sm font-bold text-gray-900 leading-tight">{role.name}</h3>
+                                                <h3 className="text-sm text-gray-900 leading-tight">{role.name}</h3>
                                                 <div className="flex items-center gap-1.5 mt-0.5">
                                                     <span className="text-[10px] font-mono text-gray-400 font-semibold">{role.code}</span>
                                                     <span className="text-gray-300">•</span>
-                                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-gray-100 text-gray-600">
+                                                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600">
                                                         {role.tier}
                                                     </span>
                                                 </div>
@@ -1512,11 +1512,11 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                         </div>
 
                                         {role.isSystem ? (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
                                                 System Default
                                             </span>
                                         ) : (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <span className="px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
                                                 Custom Role
                                             </span>
                                         )}
@@ -1585,12 +1585,12 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                 <div className="space-y-3">
                     <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
                                 <Building2 size={16} />
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-bold text-gray-900">Hotel Organizational Departments & Cost Center Roster</span>
+                                    <span className="text-gray-900">Hotel Organizational Departments & Cost Center Roster</span>
                                     <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Master Org Structure</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-0.5">
@@ -1602,7 +1602,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
 
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                 <Building2 size={14} className="text-blue-600" />
                                 <span>Active Departments ({departmentsList.length})</span>
                             </h3>
@@ -1613,7 +1613,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left text-xs min-w-[700px]">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Code</th>
                                         <th className="px-3 py-2">Department Name</th>
                                         <th className="px-3 py-2">Head of Department (HOD)</th>
@@ -1627,21 +1627,21 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 <tbody className="divide-y divide-gray-100">
                                     {departmentsList.map((d: any) => (
                                         <tr key={d.id} className="hover:bg-blue-50/20">
-                                            <td className="px-3 py-2 font-mono font-bold text-blue-700">{d.code}</td>
-                                            <td className="px-3 py-2 font-bold text-gray-900">{d.name}</td>
+                                            <td className="px-3 py-2 font-mono text-blue-700">{d.code}</td>
+                                            <td className="px-3 py-2 text-gray-900">{d.name}</td>
                                             <td className="px-3 py-2 text-gray-700">{d.hodName}</td>
                                             <td className="px-3 py-2 font-mono text-[11px] text-gray-600 font-bold">{d.costCenterCode}</td>
                                             <td className="px-3 py-2">
-                                                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${d.type.includes('Operational') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                <span className={`px-1.5 py-0.2 rounded text-[10px] ${d.type.includes('Operational') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
                                                     {d.type.includes('Operational') ? 'Operational' : 'Support / Overhead'}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-2 font-bold text-gray-900">
+                                            <td className="px-3 py-2 text-gray-900">
                                                 {staffList.filter(s => s.department === d.name || s.department.toLowerCase().includes(d.code.toLowerCase())).length || d.staffCount} Staff
                                             </td>
                                             <td className="px-3 py-2 font-mono text-gray-700">৳ {d.monthlyBudgetBDT?.toLocaleString()}</td>
                                             <td className="px-3 py-2">
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                     {d.status}
                                                 </span>
                                             </td>
@@ -1659,12 +1659,12 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                 <div className="space-y-3">
                     <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-white p-3 rounded-xl border border-purple-200/60 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-2xs">
+                            <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
                                 <Clock size={16} />
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-bold text-gray-900">24/7 Hotel Operations Work Shift Configuration</span>
+                                    <span className="text-gray-900">24/7 Hotel Operations Work Shift Configuration</span>
                                     <span className="text-[10px] font-semibold bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded">Continuous Desk Protocol</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 mt-0.5">
@@ -1681,16 +1681,16 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 className={`bg-white p-3.5 rounded-xl border ${s.color} transition-all flex flex-col justify-between space-y-2 relative shadow-2xs`}
                             >
                                 <div className="flex items-center justify-between">
-                                    <span className="font-mono text-[10px] font-bold uppercase bg-white/90 px-1.5 py-0.2 rounded border border-current">
+                                    <span className="font-mono text-[10px] uppercase bg-white/90 px-1.5 py-0.2 rounded border border-current">
                                         {s.code}
                                     </span>
-                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         {s.status}
                                     </span>
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-sm text-gray-900">{s.name}</h4>
-                                    <div className="font-mono text-xs font-bold text-blue-700 mt-1">
+                                    <h4 className="text-sm text-gray-900">{s.name}</h4>
+                                    <div className="font-mono text-xs text-blue-700 mt-1">
                                         {s.startTime} - {s.endTime}
                                     </div>
                                     <div className="text-[10.5px] text-gray-500 mt-0.5">Clock-in Grace: {s.gracePeriodMinutes} mins</div>
@@ -1698,17 +1698,17 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                 <div className="pt-2 border-t border-gray-100 text-[10.5px] space-y-1 text-gray-600">
                                     <div className="flex items-center justify-between">
                                         <span>Cash Drawer Handover:</span>
-                                        <span className="font-bold text-gray-900">{s.mandatoryCashHandover ? 'Mandatory' : 'Optional'}</span>
+                                        <span className="text-gray-900">{s.mandatoryCashHandover ? 'Mandatory' : 'Optional'}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span>Night Audit EOD:</span>
-                                        <span className={`font-bold ${s.canTriggerNightAudit ? 'text-purple-700' : 'text-gray-400'}`}>
+                                        <span className={`${s.canTriggerNightAudit ? 'text-purple-700' : 'text-gray-400'}`}>
                                             {s.canTriggerNightAudit ? 'Authorized' : 'Restricted'}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between pt-1">
                                         <span>Staff Scheduled:</span>
-                                        <span className="font-bold text-gray-900">
+                                        <span className="text-gray-900">
                                             {staffList.filter(st => st.shift.includes(s.name.split(' ')[0])).length || s.assignedStaffCount} Personnel
                                         </span>
                                     </div>
@@ -1725,7 +1725,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     <div className="bg-white rounded-xl border border-gray-200/90 p-4 shadow-2xs space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
                             <div>
-                                <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                <h2 className="text-sm text-gray-900 flex items-center gap-2">
                                     <Sliders size={16} className="text-blue-600" />
                                     <span>Enterprise POS, Cashiering & Audit Guardrails</span>
                                 </h2>
@@ -1746,26 +1746,26 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {/* Card 1: Discount Authority */}
                             <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200/80 space-y-3">
-                                <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                                <div className="flex items-center gap-2 text-xs text-gray-900">
                                     <DollarSign size={14} className="text-emerald-600" />
                                     <span>Discount Approval Matrix</span>
                                 </div>
                                 <div className="space-y-2 text-xs">
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">Front Desk Receptionist</span>
-                                        <span className="font-bold text-gray-800">Max 10%</span>
+                                        <span className="text-gray-800">Max 10%</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">Front Office Manager (FOM)</span>
-                                        <span className="font-bold text-gray-800">Max 25%</span>
+                                        <span className="text-gray-800">Max 25%</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">General Manager (GM)</span>
-                                        <span className="font-bold text-gray-800">Max 50%</span>
+                                        <span className="text-gray-800">Max 50%</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">Managing Director / Owner</span>
-                                        <span className="font-bold text-blue-700">100% (Complimentary)</span>
+                                        <span className="text-blue-700">100% (Complimentary)</span>
                                     </div>
                                 </div>
                                 <div className="p-2 bg-blue-50/60 rounded-lg text-[11px] text-blue-800 border border-blue-100 flex items-start gap-1.5">
@@ -1776,7 +1776,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
 
                             {/* Card 2: Void & Cancellation Policy */}
                             <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200/80 space-y-3">
-                                <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                                <div className="flex items-center gap-2 text-xs text-gray-900">
                                     <Receipt size={14} className="text-rose-600" />
                                     <span>Bill Void & Refund Governance</span>
                                 </div>
@@ -1806,24 +1806,24 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
 
                             {/* Card 3: Session & LAN Restrictions */}
                             <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200/80 space-y-3">
-                                <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                                <div className="flex items-center gap-2 text-xs text-gray-900">
                                     <Wifi size={14} className="text-blue-600" />
                                     <span>Network & Session Security</span>
                                 </div>
                                 <div className="space-y-2 text-xs">
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">Front Desk IP Subnet</span>
-                                        <span className="font-mono text-gray-800 font-bold bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                                        <span className="font-mono text-gray-800 bg-white px-1.5 py-0.5 rounded border border-gray-200">
                                             192.168.1.0/24
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">Auto-Logout Inactivity Timer</span>
-                                        <span className="font-bold text-gray-800">15 Minutes</span>
+                                        <span className="text-gray-800">15 Minutes</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">Max Concurrent Logins</span>
-                                        <span className="font-bold text-gray-800">1 Terminal / User</span>
+                                        <span className="text-gray-800">1 Terminal / User</span>
                                     </div>
                                     <label className="flex items-center justify-between cursor-pointer">
                                         <span className="text-gray-600">Block Logins Outside Property LAN</span>
@@ -1848,7 +1848,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                                <h3 className="text-xs text-gray-900 uppercase tracking-wider">
                                     Live On-Premise Sessions ({activeSessions.length} Active)
                                 </h3>
                             </div>
@@ -1862,7 +1862,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                     className="p-2.5 bg-gray-50/70 border border-gray-200/70 rounded-lg flex items-center justify-between gap-2 text-xs"
                                 >
                                     <div className="min-w-0">
-                                        <div className="font-bold text-gray-900 truncate">{session.staffName}</div>
+                                        <div className="text-gray-900 truncate">{session.staffName}</div>
                                         <div className="text-[11px] text-gray-500 truncate">{session.role}</div>
                                         <div className="text-[10px] font-mono text-gray-400 mt-0.5 flex items-center gap-1.5">
                                             <span>{session.terminal}</span>
@@ -1873,7 +1873,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => handleTerminateSession(session.id, session.staffName)}
-                                        className="h-6 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-bold transition-colors cursor-pointer flex-shrink-0"
+                                        className="h-6 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] transition-colors cursor-pointer flex-shrink-0"
                                         title="Kill session immediately"
                                     >
                                         Kill
@@ -1886,7 +1886,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     {/* Security Audit Trail Table */}
                     <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
                         <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-xs text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                                 <History size={14} className="text-blue-600" />
                                 <span>Security Event & Override Audit Log</span>
                             </h3>
@@ -1902,7 +1902,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         <div className="overflow-x-auto no-scrollbar">
                             <table className="w-full text-left min-w-[850px] border-collapse text-xs">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-500 uppercase tracking-wider">
                                         <th className="px-3 py-2">Timestamp</th>
                                         <th className="px-3 py-2">Actor & Role</th>
                                         <th className="px-3 py-2">Module</th>
@@ -1918,7 +1918,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                 {log.timestamp}
                                             </td>
                                             <td className="px-3 py-2 whitespace-nowrap">
-                                                <div className="font-bold text-gray-800">{log.user}</div>
+                                                <div className="text-gray-800">{log.user}</div>
                                                 <div className="text-[10px] text-gray-400">{log.role}</div>
                                             </td>
                                             <td className="px-3 py-2 whitespace-nowrap">
@@ -1931,7 +1931,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                             </td>
                                             <td className="px-3 py-2 whitespace-nowrap">
                                                 <span
-                                                    className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-tight ${log.severity === 'critical'
+                                                    className={`px-1.5 py-0.2 rounded text-[10px] uppercase tracking-tight ${log.severity === 'critical'
                                                         ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                                         : log.severity === 'warning'
                                                             ? 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -1967,7 +1967,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                     <User size={16} />
                                 </div>
                                 <div>
-                                    <h2 className="text-sm font-bold text-gray-900">
+                                    <h2 className="text-sm text-gray-900">
                                         {editingStaff ? `Edit Staff: ${editingStaff.name}` : 'Register New Hotel Staff'}
                                     </h2>
                                     <p className="text-[11px] text-gray-500">
@@ -2194,7 +2194,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                             {staffModalTab === 'pos' && (
                                 <div className="space-y-3 text-xs">
                                     <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-200/80 space-y-2">
-                                        <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                                        <div className="text-amber-900 flex items-center gap-1.5">
                                             <DollarSign size={14} className="text-amber-700" />
                                             <span>Cashiering & Financial Authorization Limits</span>
                                         </div>
@@ -2231,7 +2231,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                     </div>
 
                                     <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-200/80 space-y-2">
-                                        <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                                        <div className="text-blue-900 flex items-center gap-1.5">
                                             <Shield size={14} className="text-blue-700" />
                                             <span>Two-Factor Authentication & Device Binding</span>
                                         </div>
@@ -2347,7 +2347,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                     <ShieldCheck size={16} />
                                 </div>
                                 <div>
-                                    <h2 className="text-sm font-bold text-gray-900">
+                                    <h2 className="text-sm text-gray-900">
                                         Configure Permissions Matrix: {editingRole.name}
                                     </h2>
                                     <p className="text-[11px] text-gray-500">
@@ -2419,7 +2419,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                             {/* Quick Presets Bar with Permission Search */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
                                 <div className="flex items-center gap-2">
-                                    <span className="font-bold text-gray-800 text-xs">
+                                    <span className="text-gray-800 text-xs">
                                         Functional Modules Matrix ({HOSPITALITY_PERMISSION_MODULES.length} Domains)
                                     </span>
                                 </div>
@@ -2485,7 +2485,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                 <div className="flex items-center gap-2">
                                                     <module.icon size={15} className="text-blue-600" />
                                                     <div>
-                                                        <span className="font-bold text-gray-900 text-xs">{module.name}</span>
+                                                        <span className="text-gray-900 text-xs">{module.name}</span>
                                                         <span className="text-[10.5px] text-gray-400 ml-2 hidden sm:inline">
                                                             {module.description}
                                                         </span>
@@ -2506,7 +2506,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                                                                 setRolePermissions(prev => [...new Set([...prev, ...ids])]);
                                                             }
                                                         }}
-                                                        className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                                                        className="text-[10px] text-blue-600 hover:underline cursor-pointer"
                                                     >
                                                         {allGranted ? 'Uncheck All' : 'Check All'}
                                                     </button>
@@ -2549,7 +2549,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
 
                             {/* Additional Security Rules */}
                             <div className="p-3 bg-gray-50/70 border border-gray-200/80 rounded-xl space-y-2">
-                                <span className="font-bold text-gray-800 text-xs block">Operational & POS Guardrails for this Role:</span>
+                                <span className="text-gray-800 text-xs block">Operational & POS Guardrails for this Role:</span>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input
@@ -2614,7 +2614,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-amber-50/70">
                             <div className="flex items-center gap-2">
                                 <KeyRound size={16} className="text-amber-700" />
-                                <h3 className="font-bold text-gray-900">Reset Credentials for {resetCredsStaff.name}</h3>
+                                <h3 className="text-gray-900">Reset Credentials for {resetCredsStaff.name}</h3>
                             </div>
                             <button
                                 type="button"

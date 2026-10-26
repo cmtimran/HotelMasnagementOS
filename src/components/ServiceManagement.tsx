@@ -213,14 +213,14 @@ export default function ServiceManagement() {
                                 <div className={`p-2 rounded-xl ${service.status === 'Active' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
                                     {getIcon(service.category)}
                                 </div>
-                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase border ${
+                                <span className={`text-[10px] px-2 py-1 rounded-full uppercase border ${
                                     service.status === 'Active' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-gray-50 text-gray-400 border-gray-100'
                                 }`}>
                                     {service.status}
                                 </span>
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{service.name}</h3>
+                                <h3 className="text-gray-900 group-hover:text-blue-600 transition-colors">{service.name}</h3>
                                 <p className="text-xs text-gray-400 font-mono mt-1">{service.shortCode}</p>
                                 <p className="text-xs text-gray-500 mt-3 line-clamp-2 leading-relaxed h-8">
                                     {service.description}
@@ -230,9 +230,9 @@ export default function ServiceManagement() {
                         
                         <div className="px-5 py-4 bg-gray-50/50 border-t border-gray-50 flex items-center justify-between mt-auto">
                             <div>
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Rate ({service.unitName})</div>
+                                <div className="text-[10px] text-gray-400 uppercase tracking-tighter">Rate ({service.unitName})</div>
                                 <div className="text-lg font-black text-gray-900">৳{service.sellingPrice}</div>
-                                <div className={`text-[10px] font-bold ${service.sellingPrice - service.internalCost >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                <div className={`text-[10px] ${service.sellingPrice - service.internalCost >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                     Margin: ৳{service.sellingPrice - service.internalCost}
                                 </div>
                             </div>
@@ -273,7 +273,7 @@ export default function ServiceManagement() {
                     </div>
                 </div>
                 <div className="flex gap-4">
-                    <button onClick={() => setView('list')} className="px-6 py-2.5 text-gray-500 font-bold hover:text-gray-900">Discard</button>
+                    <button onClick={() => setView('list')} className="px-6 py-2.5 text-gray-500 hover:text-gray-900">Discard</button>
                     <button onClick={handleSave} className="flex items-center gap-2 px-8 py-2.5 bg-gray-900 text-white rounded-2xl hover:bg-blue-600 transition-all shadow-lg font-bold">
                         <Save size={18} />
                         Save Service
@@ -290,7 +290,7 @@ export default function ServiceManagement() {
                                 <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
                                     <Info size={20} />
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-900 tracking-tight">Service Identity</h2>
+                                <h2 className="text-xl text-gray-900 tracking-tight">Service Identity</h2>
                             </div>
 
                             <div className="grid grid-cols-2 gap-8">
@@ -298,7 +298,7 @@ export default function ServiceManagement() {
                                     <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Official Service Name</label>
                                     <input
                                         type="text"
-                                        className="w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-base font-bold transition-all"
+                                        className="w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-base transition-all"
                                         placeholder="e.g. VIP Airport Transfer (Tesla Model S)"
                                         value={formData.name || ''}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -350,7 +350,7 @@ export default function ServiceManagement() {
                                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
                                     <DollarSign size={20} />
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-900 tracking-tight">Commercials & Accounting</h2>
+                                <h2 className="text-xl text-gray-900 tracking-tight">Commercials & Accounting</h2>
                             </div>
 
                             <div className="grid grid-cols-2 gap-8">
@@ -360,13 +360,13 @@ export default function ServiceManagement() {
                                         <span className="absolute left-5 top-4 text-gray-400 font-bold">৳</span>
                                         <input
                                             type="number"
-                                            className="w-full pl-10 pr-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-lg font-bold text-gray-600 shadow-inner"
+                                            className="w-full pl-10 pr-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-lg text-gray-600 shadow-inner"
                                             placeholder="Base cost..."
                                             value={formData.internalCost || ''}
                                             onChange={e => setFormData({ ...formData, internalCost: parseFloat(e.target.value) })}
                                         />
                                     </div>
-                                    <p className="text-[10px] text-gray-400 pl-1 uppercase font-bold tracking-tighter">Investment per unit of service</p>
+                                    <p className="text-[10px] text-gray-400 pl-1 uppercase tracking-tighter">Investment per unit of service</p>
                                 </div>
 
                                 <div className="space-y-3">
@@ -381,7 +381,7 @@ export default function ServiceManagement() {
                                             onChange={e => setFormData({ ...formData, sellingPrice: parseFloat(e.target.value) })}
                                         />
                                     </div>
-                                    <p className="text-[10px] text-emerald-600 pl-1 uppercase font-bold tracking-tighter">Standard retail price displayed to guests</p>
+                                    <p className="text-[10px] text-emerald-600 pl-1 uppercase tracking-tighter">Standard retail price displayed to guests</p>
                                 </div>
 
                                 <div className="space-y-3">
@@ -425,7 +425,7 @@ export default function ServiceManagement() {
                                             checked={formData.taxInclusive || false}
                                             onChange={e => setFormData({ ...formData, taxInclusive: e.target.checked })}
                                         />
-                                        <span className="text-sm font-bold text-gray-700">Price is Tax Inclusive</span>
+                                        <span className="text-sm text-gray-700">Price is Tax Inclusive</span>
                                     </div>
                                     <div className="grid grid-cols-3 gap-4">
                                         <div className="space-y-1">
@@ -468,7 +468,7 @@ export default function ServiceManagement() {
                                 <div className="p-2 bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-500/20">
                                     <Truck size={20} />
                                 </div>
-                                <h2 className="text-xl font-bold text-white tracking-tight">Operations</h2>
+                                <h2 className="text-xl text-white tracking-tight">Operations</h2>
                             </div>
 
                             <div className="space-y-6">
@@ -478,7 +478,7 @@ export default function ServiceManagement() {
                                             <div className="w-10 h-6 bg-gray-800 rounded-full relative transition-all group-hover:bg-gray-700">
                                                 <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${formData.isOutsourced ? 'left-5 bg-blue-500 shadow-lg shadow-blue-500/50' : 'left-1 bg-gray-500'}`} />
                                             </div>
-                                            <span className="text-sm font-bold text-gray-300">Outsourced</span>
+                                            <span className="text-sm text-gray-300">Outsourced</span>
                                         </div>
                                         <input
                                             type="checkbox"
@@ -495,7 +495,7 @@ export default function ServiceManagement() {
                                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1">Vendor Partner</label>
                                         <input
                                             type="text"
-                                            className="w-full px-4 py-3 bg-gray-800 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-white"
+                                            className="w-full px-4 py-3 bg-gray-800 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white"
                                             placeholder="e.g. Dhaka Car Rental Co."
                                             value={formData.vendorName || ''}
                                             onChange={e => setFormData({ ...formData, vendorName: e.target.value })}
@@ -510,7 +510,7 @@ export default function ServiceManagement() {
                                             <button
                                                 key={type}
                                                 onClick={() => setFormData({ ...formData, allowanceType: type as any })}
-                                                className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-xs font-bold ${
+                                                className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-xs ${
                                                     formData.allowanceType === type 
                                                     ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/20' 
                                                     : 'bg-gray-800 border-gray-800 text-gray-400 hover:border-gray-700'
@@ -529,7 +529,7 @@ export default function ServiceManagement() {
                         <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Smart Helper</span>
+                                <span className="text-[10px] text-gray-400 uppercase tracking-widest leading-none">Smart Helper</span>
                             </div>
                             <p className="text-xs text-gray-500 leading-relaxed">
                                 Defining clear <span className="text-gray-900 font-bold">Service Masters</span> allows the <span className="text-blue-600 font-bold">Allowance Engine</span> to automatically track guest consumption against their room package limits without manual staff override.

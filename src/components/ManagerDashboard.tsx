@@ -132,7 +132,7 @@ const ManagerDashboard: React.FC = () => {
                 {/* Sales vs Target (Gauge) */}
                 <div className="card-container p-4 flex flex-col items-center justify-between">
                     <div className="flex items-center justify-between w-full mb-1">
-                        <span className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Sales Achievement</span>
+                        <span className="text-slate-500 text-[11px] uppercase tracking-wider">Sales Achievement</span>
                         <span className="badge-status-active">{metrics.achievementPct}% Hit</span>
                     </div>
                     <div className="relative size-24 flex items-center justify-center my-2">
@@ -147,17 +147,17 @@ const ManagerDashboard: React.FC = () => {
                     </div>
                     <div className="w-full flex justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 font-medium">
                         <span>Goal: ৳{(metrics.targetGoal / 1000).toFixed(0)}k</span>
-                        <span className="font-bold text-slate-900 font-mono">Current: ৳{(metrics.grossRevenue / 1000).toFixed(0)}k</span>
+                        <span className="text-slate-900 font-mono">Current: ৳{(metrics.grossRevenue / 1000).toFixed(0)}k</span>
                     </div>
                 </div>
 
                 {/* Profit & Loss Estimate */}
                 <div className="card-container p-4 flex flex-col justify-between">
-                    <span className="text-slate-500 text-[11px] font-bold uppercase tracking-wider mb-1">P&L Estimate (Live)</span>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider mb-1">P&L Estimate (Live)</span>
                     <div className="space-y-2 text-xs">
                         <div className="flex justify-between">
                             <span className="text-slate-500">Gross Revenue</span>
-                            <span className="font-bold text-slate-900 font-mono">৳ {metrics.grossRevenue.toLocaleString()}</span>
+                            <span className="text-slate-900 font-mono">৳ {metrics.grossRevenue.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between">
                             <span className="text-slate-500">Direct Cost (28%)</span>
@@ -181,7 +181,7 @@ const ManagerDashboard: React.FC = () => {
                         <div className="size-8 bg-blue-50 text-primary rounded-xl flex items-center justify-center">
                             <Package size={16} />
                         </div>
-                        <span className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Asset & Room Capacity</span>
+                        <span className="text-slate-500 text-[11px] uppercase tracking-wider">Asset & Room Capacity</span>
                     </div>
                     <div className="my-2">
                         <h2 className="text-2xl font-black text-slate-900 leading-tight font-mono">৳ {metrics.inventoryValuation.toLocaleString()}</h2>
@@ -194,7 +194,7 @@ const ManagerDashboard: React.FC = () => {
 
                 {/* Customer Satisfaction */}
                 <div className="card-container p-4 flex flex-col items-center justify-between">
-                    <span className="text-slate-500 text-[11px] font-bold uppercase tracking-wider w-full text-left mb-1">Operational Health</span>
+                    <span className="text-slate-500 text-[11px] uppercase tracking-wider w-full text-left mb-1">Operational Health</span>
                     <div className="text-3xl font-black text-slate-900 leading-none">
                         {rooms.length > 0 ? Math.round((rooms.filter(r => r.housekeepingStatus === 'Clean' || r.housekeepingStatus === 'Inspected').length / rooms.length) * 50) / 10 : 4.8}
                     </div>
@@ -214,7 +214,7 @@ const ManagerDashboard: React.FC = () => {
                 <div className="lg:col-span-2 card-container p-4 sm:p-5">
                     <div className="flex justify-between items-center mb-3">
                         <div>
-                            <h3 className="text-slate-900 font-bold text-xs tracking-tight">Revenue vs Operating Outflow</h3>
+                            <h3 className="text-slate-900 text-xs tracking-tight">Revenue vs Operating Outflow</h3>
                             <p className="text-[11px] text-slate-500">Live pacing between reservation revenue and operational cost base</p>
                         </div>
                         <div className="flex gap-4 text-xs font-medium text-slate-600">
@@ -236,7 +236,7 @@ const ManagerDashboard: React.FC = () => {
                 {/* Expense Breakdown */}
                 <div className="card-container p-4 sm:p-5">
                     <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-slate-900 font-bold text-xs tracking-tight">Cost Allocation</h3>
+                        <h3 className="text-slate-900 text-xs tracking-tight">Cost Allocation</h3>
                         <span className="text-[10px] text-slate-400 uppercase font-mono">Live Split</span>
                     </div>
                     <div className="flex items-center gap-4">
@@ -245,10 +245,10 @@ const ManagerDashboard: React.FC = () => {
                             <div className="absolute inset-5 bg-white rounded-full"></div>
                         </div>
                         <div className="space-y-1.5 flex-1 text-xs">
-                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-rose-400 rounded-full"></span> Payroll</span> <span className="font-bold font-mono">45%</span></div>
-                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-amber-400 rounded-full"></span> Direct COGS</span> <span className="font-bold font-mono">28%</span></div>
-                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-blue-400 rounded-full"></span> Utilities</span> <span className="font-bold font-mono">15%</span></div>
-                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-slate-400 rounded-full"></span> Maint.</span> <span className="font-bold font-mono">12%</span></div>
+                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-rose-400 rounded-full"></span> Payroll</span> <span className="font-mono">45%</span></div>
+                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-amber-400 rounded-full"></span> Direct COGS</span> <span className="font-mono">28%</span></div>
+                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-blue-400 rounded-full"></span> Utilities</span> <span className="font-mono">15%</span></div>
+                            <div className="flex justify-between text-slate-700"><span className="flex items-center gap-1.5"><span className="size-2 bg-slate-400 rounded-full"></span> Maint.</span> <span className="font-mono">12%</span></div>
                         </div>
                     </div>
                 </div>
@@ -258,23 +258,23 @@ const ManagerDashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Staff Performance */}
                 <div className="card-container p-4">
-                    <h3 className="text-slate-900 font-bold text-xs mb-3 tracking-tight">Active Staff Allocation</h3>
+                    <h3 className="text-slate-900 text-xs mb-3 tracking-tight">Active Staff Allocation</h3>
                     <div className="space-y-2">
                         {topStaff.length === 0 ? (
                             <p className="text-xs text-slate-400 py-4 text-center">No staff records found in database.</p>
                         ) : topStaff.map((staff, idx) => (
                             <div key={staff.id} className="flex items-center justify-between p-2.5 bg-slate-50/80 rounded-xl border border-slate-100">
                                 <div className="flex items-center gap-2.5">
-                                    <span className="size-6 rounded-lg bg-blue-50 text-primary font-bold text-xs flex items-center justify-center border border-blue-100">
+                                    <span className="size-6 rounded-lg bg-blue-50 text-primary text-xs flex items-center justify-center border border-blue-100">
                                         {idx + 1}
                                     </span>
                                     <div>
-                                        <h4 className="text-xs font-bold text-slate-900 leading-tight">{staff.name}</h4>
+                                        <h4 className="text-xs text-slate-900 leading-tight">{staff.name}</h4>
                                         <p className="text-[10px] text-slate-400 mt-0.5">{staff.position}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-xs font-bold text-slate-900 font-mono leading-none">{staff.sales}</span>
+                                    <span className="text-xs text-slate-900 font-mono leading-none">{staff.sales}</span>
                                     <p className="text-[10px] text-slate-400 mt-0.5">{staff.orders} Folios</p>
                                 </div>
                             </div>
@@ -285,8 +285,8 @@ const ManagerDashboard: React.FC = () => {
                 {/* Loss Prevention */}
                 <div className="card-container p-4">
                     <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-slate-900 font-bold text-xs tracking-tight">Loss Prevention & Audit</h3>
-                        <span className="text-[10px] text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">{lossPrevention.length} Alerts</span>
+                        <h3 className="text-slate-900 text-xs tracking-tight">Loss Prevention & Audit</h3>
+                        <span className="text-[10px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">{lossPrevention.length} Alerts</span>
                     </div>
                     <div className="space-y-2">
                         {lossPrevention.length === 0 ? (
@@ -296,8 +296,8 @@ const ManagerDashboard: React.FC = () => {
                                 <AlertTriangle size={15} className="text-rose-500 mt-0.5 shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold text-slate-900 truncate">{item.type}: {item.item}</span>
-                                        <span className="text-xs font-bold text-rose-600 font-mono">{item.amount}</span>
+                                        <span className="text-xs text-slate-900 truncate">{item.type}: {item.item}</span>
+                                        <span className="text-xs text-rose-600 font-mono">{item.amount}</span>
                                     </div>
                                     <p className="text-[11px] text-slate-600 truncate mt-0.5">{item.reason}</p>
                                     <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{item.time}</p>
@@ -309,11 +309,11 @@ const ManagerDashboard: React.FC = () => {
 
                 {/* Departmental Payroll Volume */}
                 <div className="card-container p-4">
-                    <h3 className="text-slate-900 font-bold text-xs mb-3 tracking-tight">Departmental Payroll Volume</h3>
+                    <h3 className="text-slate-900 text-xs mb-3 tracking-tight">Departmental Payroll Volume</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                             <thead>
-                                <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                                <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase tracking-wider">
                                     <th className="pb-2">Department</th>
                                     <th className="pb-2">Lead Role</th>
                                     <th className="pb-2 text-right">Monthly Base</th>
@@ -324,7 +324,7 @@ const ManagerDashboard: React.FC = () => {
                                     <tr key={dept.id} className="hover:bg-slate-50/60 transition-colors">
                                         <td className="py-2.5 font-semibold text-slate-900">{dept.name}</td>
                                         <td className="py-2.5 text-slate-500">{dept.category}</td>
-                                        <td className="py-2.5 text-right font-bold text-slate-900 font-mono">{dept.volume}</td>
+                                        <td className="py-2.5 text-right text-slate-900 font-mono">{dept.volume}</td>
                                     </tr>
                                 ))}
                             </tbody>

@@ -205,13 +205,13 @@ export const ReservationSleepOut: React.FC = () => {
             {/* Metric KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Active Sleep-Outs</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Active Sleep-Outs</span>
                     <div className="text-2xl font-black text-slate-900 font-mono mt-1">{activeOutCount} Rooms</div>
                     <p className="text-[11px] text-slate-500 mt-1 font-medium">Currently away from hotel</p>
                 </div>
 
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Key Cards Secured</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Key Cards Secured</span>
                     <div className="text-2xl font-black text-primary font-mono mt-1">
                         {sleepOuts.filter(s => s.status === 'Sleeping Out' && s.keyCardLocation === 'Held at Front Desk').length} Keys
                     </div>
@@ -219,7 +219,7 @@ export const ReservationSleepOut: React.FC = () => {
                 </div>
 
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Returned &amp; Closed</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Returned &amp; Closed</span>
                     <div className="text-2xl font-black text-emerald-700 font-mono mt-1">
                         {sleepOuts.filter(s => s.status === 'Returned').length} Records
                     </div>
@@ -227,7 +227,7 @@ export const ReservationSleepOut: React.FC = () => {
                 </div>
 
                 <div className="card-container p-4">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Night Audit Policy</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Night Audit Policy</span>
                     <div className="text-2xl font-black text-slate-900 font-mono mt-1">Active Billing</div>
                     <p className="text-[11px] text-slate-500 mt-1 font-medium">Tariff posting continues as in-house</p>
                 </div>
@@ -248,7 +248,7 @@ export const ReservationSleepOut: React.FC = () => {
 
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status:</span>
+                        <span className="text-[10px] text-slate-400 uppercase">Status:</span>
                         <select
                             value={filterStatus}
                             onChange={e => setFilterStatus(e.target.value as any)}
@@ -279,7 +279,7 @@ export const ReservationSleepOut: React.FC = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs min-w-[1050px]">
                         <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                 <th className="py-2.5 px-3.5 w-64">Guest &amp; Room</th>
                                 <th className="py-2.5 px-3 w-52">Pass &amp; Dates</th>
                                 <th className="py-2.5 px-3 min-w-[200px]">Reason / Purpose</th>
@@ -299,13 +299,13 @@ export const ReservationSleepOut: React.FC = () => {
                                             {/* Guest & Room */}
                                             <td className="py-2.5 px-3.5">
                                                 <div className="flex items-center gap-2.5">
-                                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center justify-center text-xs flex-shrink-0">
                                                         {s.guestName.charAt(0)}
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="font-bold text-slate-900">{s.guestName}</span>
-                                                            <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 text-[10.5px]">
+                                                            <span className="text-slate-900">{s.guestName}</span>
+                                                            <span className="font-mono text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 text-[10.5px]">
                                                                 Room {s.roomNumber}
                                                             </span>
                                                         </div>
@@ -321,7 +321,7 @@ export const ReservationSleepOut: React.FC = () => {
                                             {/* Pass & Dates */}
                                             <td className="py-2.5 px-3">
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="font-mono font-bold text-indigo-700 text-xs">{s.securityPassNo}</span>
+                                                    <span className="font-mono text-indigo-700 text-xs">{s.securityPassNo}</span>
                                                 </div>
                                                 <p className="text-[10.5px] text-slate-600 mt-0.5">
                                                     {s.startDate} ➔ {s.endDate} ({s.expectedReturnTime || 'Morning'})
@@ -337,7 +337,7 @@ export const ReservationSleepOut: React.FC = () => {
 
                                             {/* Key Card Location */}
                                             <td className="py-2.5 px-3">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border inline-block ${
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] border inline-block ${
                                                     cardLocation === 'Held at Front Desk'
                                                         ? 'bg-blue-50 text-blue-700 border-blue-200'
                                                         : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -348,7 +348,7 @@ export const ReservationSleepOut: React.FC = () => {
 
                                             {/* Status */}
                                             <td className="py-2.5 px-3 text-center">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] border ${
                                                     isOut
                                                         ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                                                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -364,7 +364,7 @@ export const ReservationSleepOut: React.FC = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleMarkReturned(s.id)}
-                                                            className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                            className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                                             title="Mark Guest Returned to Room"
                                                         >
                                                             <Check size={11} className="stroke-[3]" />
@@ -399,7 +399,7 @@ export const ReservationSleepOut: React.FC = () => {
                                     <td colSpan={6} className="py-12 text-center text-slate-400">
                                         <div className="flex flex-col items-center justify-center gap-1.5">
                                             <Moon size={26} className="text-slate-300" />
-                                            <p className="text-xs font-bold text-slate-700">No sleep out records found</p>
+                                            <p className="text-xs text-slate-700">No sleep out records found</p>
                                             <p className="text-[11px] text-slate-400">All in-house guests are logged as staying on-property.</p>
                                         </div>
                                     </td>
@@ -412,100 +412,100 @@ export const ReservationSleepOut: React.FC = () => {
 
             {/* Create Sleep Out Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-[480px] w-full p-4.5 space-y-3.5 animate-in zoom-in-95 duration-150">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-700 text-white flex items-center justify-center font-bold">
-                                    <Moon size={16} />
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[500px] w-full overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
+                        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-700 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-indigo-100">
+                                    <Moon size={18} />
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-bold text-slate-900">Log Guest Sleep-Out Pass</h3>
-                                    <p className="text-[10.5px] text-slate-500">Official Front Desk &amp; Security Registry</p>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">Official Front Desk &amp; Security Registry</p>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center cursor-pointer transition-colors"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleCreateSleepOut} className="space-y-3 text-xs">
-                            <div className="grid grid-cols-2 gap-2">
+                        <form onSubmit={handleCreateSleepOut} className="p-6 space-y-4 text-xs">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Room Number</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Room Number</label>
                                     <input
                                         type="text"
                                         value={form.roomNumber}
                                         onChange={e => setForm({ ...form, roomNumber: e.target.value })}
-                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono font-bold text-xs"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:border-blue-500 shadow-2xs"
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Res #</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Res #</label>
                                     <input
                                         type="text"
                                         value={form.reservationNumber}
                                         onChange={e => setForm({ ...form, reservationNumber: e.target.value })}
-                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-mono text-xs"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:border-blue-500 shadow-2xs"
                                         required
                                     />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Guest Full Name</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Guest Full Name</label>
                                     <input
                                         type="text"
                                         value={form.guestName}
                                         onChange={e => setForm({ ...form, guestName: e.target.value })}
-                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 shadow-2xs"
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Emergency Mobile</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Emergency Mobile</label>
                                     <input
                                         type="text"
                                         value={form.contact}
                                         onChange={e => setForm({ ...form, contact: e.target.value })}
-                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 shadow-2xs"
                                     />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Away Start Date</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Away Start Date</label>
                                     <input
                                         type="date"
                                         value={form.startDate}
                                         onChange={e => setForm({ ...form, startDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 shadow-2xs"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Expected Return Date</label>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Expected Return Date</label>
                                     <input
                                         type="date"
                                         value={form.endDate}
                                         onChange={e => setForm({ ...form, endDate: e.target.value })}
-                                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 shadow-2xs"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Key Card Handling</label>
+                                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Key Card Handling</label>
                                 <select
                                     value={form.keyCardLocation}
                                     onChange={e => setForm({ ...form, keyCardLocation: e.target.value as any })}
-                                    className="w-full h-8 px-2 border border-slate-200 rounded-lg text-xs font-semibold bg-white"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                                 >
                                     <option value="Held at Front Desk">Held at Front Desk (Safe Storage)</option>
                                     <option value="With Guest">Guest Keeping Key Card</option>
@@ -513,30 +513,30 @@ export const ReservationSleepOut: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Reason / Purpose for Absence</label>
+                                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Reason / Purpose for Absence</label>
                                 <textarea
                                     rows={2}
                                     value={form.reason}
                                     onChange={e => setForm({ ...form, reason: e.target.value })}
                                     placeholder="e.g. Traveling to Chittagong for business, returning tomorrow morning."
-                                    className="w-full p-2 border border-slate-200 rounded-lg text-xs"
+                                    className="w-full p-3 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 shadow-2xs resize-none placeholder:text-slate-400"
                                     required
                                 />
                             </div>
 
-                            <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+                            <div className="pt-3 -mx-6 -mb-6 px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="h-8 px-3.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                    className="h-9 px-4 border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="btn-primary"
+                                    className="h-9 px-4.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all"
                                 >
-                                    <Check size={13} className="stroke-[3]" />
+                                    <Check size={14} className="stroke-[3]" />
                                     <span>Register Sleep-Out</span>
                                 </button>
                             </div>
@@ -555,17 +555,17 @@ export const ReservationSleepOut: React.FC = () => {
                                     <h3 className="font-black text-sm uppercase tracking-wider text-slate-900">HotelOS Security Gate Pass</h3>
                                     <p className="text-[10px] text-slate-500">Guest Sleep-Out Authorization Voucher</p>
                                 </div>
-                                <span className="font-mono font-bold text-indigo-700 text-xs">{printPassTarget.securityPassNo}</span>
+                                <span className="font-mono text-indigo-700 text-xs">{printPassTarget.securityPassNo}</span>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Guest Name</span>
-                                    <p className="font-bold text-slate-900">{printPassTarget.guestName}</p>
+                                    <p className="text-slate-900">{printPassTarget.guestName}</p>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Room &amp; Category</span>
-                                    <p className="font-bold text-blue-700 font-mono">Room {printPassTarget.roomNumber} ({printPassTarget.roomType})</p>
+                                    <p className="text-blue-700 font-mono">Room {printPassTarget.roomNumber} ({printPassTarget.roomType})</p>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Departure Date</span>
@@ -591,7 +591,7 @@ export const ReservationSleepOut: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setPrintPassTarget(null)}
-                                className="h-8 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                className="h-8 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs cursor-pointer"
                             >
                                 Close
                             </button>

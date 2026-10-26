@@ -13,15 +13,35 @@ import {
     X,
     CheckSquare,
     Square,
-    ArrowRight
+    ArrowRight,
+    Trash2,
+    ChevronUp,
+    ChevronDown,
+    ArrowUpDown,
+    ExternalLink
 } from 'lucide-react';
 import AddReservationModal from '../modals/AddReservationModal';
+import ReservationActionDrawer, { type DrawerMode } from '../modals/ReservationActionDrawer';
+import type { AmendBookingData } from '../modals/AmendStayModal';
 import { useNavigation } from '../../context/NavigationContext';
-import { syncReservationsFromDB, updateReservationStatusInDB } from '../../utils/roomInventoryEngine';
+import {
+    syncReservationsFromDB,
+    updateReservationStatusInDB,
+    linkBookingsInDB,
+    clearAllLocalReservationsAndInventory,
+    getAllStoredReservations,
+    getCanonicalRooms,
+    getOperatingSystemDate,
+    subscribeToPMSEvents
+} from '../../utils/roomInventoryEngine';
 
 export interface ReservationItem {
     id: number;
     reservationNumber: string;
+    groupCode?: string;
+    subBookingNumber?: string;
+    registrationNumber?: string;
+    folioNumber?: string;
     guestName: string;
     phone: string;
     email: string;
@@ -69,14 +89,179 @@ export const ReservationsView: React.FC = () => {
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // Hydrate state from localStorage, then immediately sync with SQLite DB
+    // Column Sorting State
+    type SortField = 'reservationNumber' | 'guestName' | 'roomNumber' | 'checkIn' | 'totalAmount' | 'dueAmount' | 'status';
+    const [sortField, setSortField] = useState<SortField>('checkIn');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+    // Advanced Source & VIP Filters
+    const [sourceFilter, setSourceFilter] = useState<string>('all');
+    const [vipFilter, setVipFilter] = useState<string>('all');
+
+    // Action Drawer State
+    const [isActionDrawerOpen, setIsActionDrawerOpen] = useState(false);
+    const [actionDrawerBooking, setActionDrawerBooking] = useState<AmendBookingData | null>(null);
+    const [actionDrawerMode, setActionDrawerMode] = useState<DrawerMode>('overview');
+
+    const allRooms = useMemo(() => {
+        return getCanonicalRooms().map(r => ({
+            id: String(r.id),
+            roomNumber: r.number,
+            type: r.roomTypeName || 'Standard Room',
+            status: r.status
+        }));
+    }, []);
+
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortOrder('asc');
+        }
+    };
+
+    const openDrawerForReservation = (r: ReservationItem) => {
+        const rawStored: any = getAllStoredReservations().find(x => 
+            x.reservationNumber === r.reservationNumber || String(x.id) === String(r.id)
+        ) || {};
+
+        const bookingData: AmendBookingData = {
+            id: String(r.id),
+            reservationNumber: r.reservationNumber,
+            groupCode: r.groupCode,
+            subBookingNumber: r.subBookingNumber,
+            registrationNumber: r.registrationNumber,
+            folioNumber: r.folioNumber,
+            guestName: r.guestName,
+            roomNumber: r.roomNumber,
+            roomType: r.roomType,
+            arrivalDate: r.checkIn,
+            departureDate: r.checkOut,
+            nights: r.nights,
+            adults: r.adults,
+            children: r.children,
+            status: r.status,
+            totalAmount: r.totalAmount,
+            paidAmount: r.paidAmount,
+            dueAmount: r.dueAmount,
+            ratePlan: rawStored.ratePlan || 'Standard Tariff',
+            allocatedRooms: rawStored.allocatedRooms || [r.roomNumber],
+            roomsList: rawStored.roomsList,
+            groupRoomsList: rawStored.groupRoomsList,
+            ...rawStored
+        };
+
+        setActionDrawerBooking(bookingData);
+        setActionDrawerMode('overview');
+        setIsActionDrawerOpen(true);
+    };
+
+    const resolveUiStatus = (rawStatus: string, checkIn: string, checkOut: string, opDate: string): ReservationItem['status'] => {
+        const s = String(rawStatus || 'confirmed').toLowerCase().replace(/_/g, '-');
+        if (s === 'checked-out' || s === 'completed') return 'checked-out';
+        if (s === 'hold' || s === 'tentative') return 'hold';
+        if (s === 'in-house' || s === 'arrived' || s === 'stayover' || s === 'checked-in') {
+            return checkOut === opDate ? 'departing' : 'in-house';
+        }
+        if (checkIn === opDate) {
+            return 'arriving';
+        }
+        return 'confirmed';
+    };
+
+    // Helper to expand multi-room reservations into individual sub-booking rows
+    const expandReservationsForView = (rawList: any[]): ReservationItem[] => {
+        if (!Array.isArray(rawList)) return [];
+        const opDate = getOperatingSystemDate();
+        return rawList.flatMap((r: any, idx: number) => {
+            const rooms = (r.roomsList && r.roomsList.length > 0)
+                ? r.roomsList
+                : (r.groupRoomsList && r.groupRoomsList.length > 0)
+                    ? r.groupRoomsList
+                    : null;
+
+            if (rooms && rooms.length > 1) {
+                return rooms.map((rm: any, subIdx: number) => {
+                    const subNum = rm.subBookingNumber || `${r.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`;
+                    const regNo = rm.registrationNumber || r.registrationNumber;
+                    const folioNo = rm.folioNumber || r.folioNumber || `FOL-${subNum.replace(/^RES-/, '')}`;
+                    const rIn = rm.checkInDate || rm.checkIn || r.checkIn;
+                    const rOut = rm.checkOutDate || rm.checkOut || r.checkOut;
+                    const rNights = Number(rm.nights) || Number(r.nights) || 1;
+                    const rTariff = Number(rm.totalAmount || rm.amount || (Number(r.totalAmount) / rooms.length)) || 0;
+                    const rawStatus = (rm.status && rm.status !== 'ASSIGNED' && rm.status !== 'UNASSIGNED') ? rm.status : (r.status || 'confirmed');
+                    const resolvedStatus = resolveUiStatus(rawStatus, rIn, rOut, opDate);
+
+                    return {
+                        id: Number(`${r.id || idx + 1}${subIdx + 1}`),
+                        reservationNumber: r.reservationNumber,
+                        subBookingNumber: subNum,
+                        groupCode: r.groupCode,
+                        registrationNumber: regNo,
+                        folioNumber: folioNo,
+                        guestName: rm.guestName || r.guestName || 'Valued Guest',
+                        phone: r.phone || '',
+                        email: r.email || '',
+                        roomNumber: String(rm.roomNumber || 'Unassigned'),
+                        roomType: rm.roomType || r.roomType || 'Standard Room',
+                        checkIn: rIn,
+                        checkOut: rOut,
+                        nights: rNights,
+                        adults: Number(rm.adults || r.adults || 1),
+                        children: Number(rm.children || r.children || 0),
+                        status: resolvedStatus,
+                        totalAmount: rTariff,
+                        paidAmount: subIdx === 0 ? (Number(r.paidAmount) || 0) : 0,
+                        dueAmount: subIdx === 0 ? (Number(r.dueAmount) || 0) : 0,
+                        source: r.source || 'Direct',
+                        vip: r.vip || 'None',
+                        isGroup: true,
+                        groupId: r.groupCode || r.groupId,
+                        groupName: r.groupCode ? `Group: ${r.groupCode}` : undefined,
+                        isMasterGuest: subIdx === 0
+                    };
+                });
+            }
+
+            const rawStatus = r.status || 'confirmed';
+            const resolvedStatus = resolveUiStatus(rawStatus, r.checkIn, r.checkOut, opDate);
+
+            return [{
+                id: r.id || idx + 1,
+                reservationNumber: r.reservationNumber,
+                subBookingNumber: r.subBookingNumber || `${r.reservationNumber}-01`,
+                groupCode: r.groupCode,
+                registrationNumber: r.registrationNumber,
+                folioNumber: r.folioNumber || `FOL-${(r.reservationNumber || '').replace(/^RES-/, '')}`,
+                guestName: r.guestName || 'Valued Guest',
+                phone: r.phone || '',
+                email: r.email || '',
+                roomNumber: String(r.roomNumber || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned'),
+                roomType: r.roomType || 'Standard Room',
+                checkIn: r.checkIn,
+                checkOut: r.checkOut,
+                nights: Number(r.nights) || 1,
+                adults: Number(r.adults) || 1,
+                children: Number(r.children) || 0,
+                status: resolvedStatus,
+                totalAmount: Number(r.totalAmount) || 0,
+                paidAmount: Number(r.paidAmount) || 0,
+                dueAmount: Number(r.dueAmount) || 0,
+                source: r.source || 'Direct',
+                vip: r.vip || 'None',
+                isGroup: Boolean(r.isGroup || r.groupCode),
+                groupId: r.groupCode || r.groupId,
+                groupName: r.groupCode ? `Group: ${r.groupCode}` : undefined,
+                isMasterGuest: true
+            }];
+        });
+    };
+
+    // Hydrate state from localStorage, then immediately sync with PostgreSQL DB
     const [reservations, setReservations] = useState<ReservationItem[]>(() => {
         try {
-            const saved = localStorage.getItem('hotel_reservations_v3');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            }
+            return expandReservationsForView(getAllStoredReservations());
         } catch {}
         return [];
     });
@@ -84,8 +269,8 @@ export const ReservationsView: React.FC = () => {
     const loadReservationsFromDB = async () => {
         try {
             const dbList = await syncReservationsFromDB();
-            if (dbList && dbList.length > 0) {
-                setReservations(dbList as any);
+            if (Array.isArray(dbList)) {
+                setReservations(expandReservationsForView(dbList));
             }
         } catch (e) {
             console.warn('Fallback to local cache:', e);
@@ -99,16 +284,14 @@ export const ReservationsView: React.FC = () => {
             loadReservationsFromDB();
         };
         window.addEventListener('hotel_pms_sync_event', handleSync);
-        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
+        const unsub = subscribeToPMSEvents(() => {
+            loadReservationsFromDB();
+        });
+        return () => {
+            window.removeEventListener('hotel_pms_sync_event', handleSync);
+            unsub();
+        };
     }, []);
-
-    useEffect(() => {
-        try {
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(reservations));
-        } catch (e) {
-            console.error(e);
-        }
-    }, [reservations]);
 
     // Handle Tab Change:
     // UX FIX: Instantly clears previous selections and turns off grouping mode so no ghost selection leaks across tabs!
@@ -118,7 +301,7 @@ export const ReservationsView: React.FC = () => {
         setIsGroupingMode(false);
     };
 
-    // Handle check in / check out actions with direct SQLite DB persistence
+    // Handle check in / check out actions with direct PostgreSQL DB persistence
     const handleStatusChange = (id: number, nextStatus: ReservationItem['status']) => {
         setReservations(prev =>
             prev.map(r => r.id === id ? { ...r, status: nextStatus } : r)
@@ -141,25 +324,20 @@ export const ReservationsView: React.FC = () => {
         }
     };
 
-    // Make Group Handler
-    const handleCreateGroup = () => {
-        if (!newGroupName.trim()) return;
+    // Make Group Handler - links reservations without renumbering confirmation codes
+    const handleCreateGroup = async () => {
+        if (!newGroupName.trim() || selectedIds.length === 0) return;
 
-        const generatedGroupId = `GRP-${Date.now().toString().slice(-6)}`;
-        setReservations(prev =>
-            prev.map(r => {
-                if (selectedIds.includes(r.id)) {
-                    return {
-                        ...r,
-                        isGroup: true,
-                        groupId: generatedGroupId,
-                        groupName: newGroupName.trim(),
-                        source: newGroupCompany.trim() ? `Corporate: ${newGroupCompany.trim()}` : r.source
-                    };
+        const selectedRes = reservations.filter(r => selectedIds.includes(r.id));
+        if (selectedRes.length > 0) {
+            const target = selectedRes[0];
+            for (let i = 1; i < selectedRes.length; i++) {
+                if (selectedRes[i].reservationNumber && target.reservationNumber) {
+                    await linkBookingsInDB(target.reservationNumber, selectedRes[i].reservationNumber);
                 }
-                return r;
-            })
-        );
+            }
+            await loadReservationsFromDB();
+        }
 
         setSelectedIds([]);
         setIsGroupingMode(false);
@@ -215,9 +393,38 @@ export const ReservationsView: React.FC = () => {
                 matchesDate = matchesDate && r.checkIn <= endDate;
             }
 
-            return matchesTab && matchesGuest && matchesQuery && matchesDate;
+            // 5. Source Filter
+            const matchesSource = sourceFilter === 'all' || (r.source || 'Direct').toLowerCase().includes(sourceFilter.toLowerCase());
+
+            // 6. VIP Filter
+            const matchesVip = vipFilter === 'all' ? true : vipFilter === 'vip' ? (r.vip && r.vip !== 'None') : (!r.vip || r.vip === 'None');
+
+            return matchesTab && matchesGuest && matchesQuery && matchesDate && matchesSource && matchesVip;
         });
-    }, [reservations, activeTab, guestFilter, searchQuery, startDate, endDate]);
+    }, [reservations, activeTab, guestFilter, searchQuery, startDate, endDate, sourceFilter, vipFilter]);
+
+    // Interactive Sorting Engine
+    const sortedReservations = useMemo(() => {
+        return [...filteredReservations].sort((a, b) => {
+            let comp = 0;
+            if (sortField === 'reservationNumber') {
+                comp = a.reservationNumber.localeCompare(b.reservationNumber);
+            } else if (sortField === 'guestName') {
+                comp = a.guestName.localeCompare(b.guestName);
+            } else if (sortField === 'roomNumber') {
+                comp = a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true });
+            } else if (sortField === 'checkIn') {
+                comp = a.checkIn.localeCompare(b.checkIn);
+            } else if (sortField === 'totalAmount') {
+                comp = a.totalAmount - b.totalAmount;
+            } else if (sortField === 'dueAmount') {
+                comp = a.dueAmount - b.dueAmount;
+            } else if (sortField === 'status') {
+                comp = a.status.localeCompare(b.status);
+            }
+            return sortOrder === 'asc' ? comp : -comp;
+        });
+    }, [filteredReservations, sortField, sortOrder]);
 
     // Precise Tab counts
     const countReservations = reservations.filter(r => r.status === 'confirmed' || r.status === 'arriving' || r.status === 'hold').length;
@@ -284,14 +491,30 @@ export const ReservationsView: React.FC = () => {
                 icon={<CalendarIcon size={20} />}
                 badge={`${reservations.length} Bookings`}
                 actions={
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('add-reservation')}
-                        className="btn-primary"
-                    >
-                        <Plus size={14} className="stroke-[2.5]" />
-                        <span>Add Reservation</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                if (window.confirm('Are you sure you want to clear all test reservations and reset room inventory to vacant/clean?')) {
+                                    await clearAllLocalReservationsAndInventory();
+                                    await loadReservationsFromDB();
+                                }
+                            }}
+                            className="px-2.5 py-1.5 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md font-medium transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            title="Reset all test reservations & empty inventory"
+                        >
+                            <Trash2 size={13} />
+                            <span>Reset Inventory</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('add-reservation')}
+                            className="btn-primary"
+                        >
+                            <Plus size={14} className="stroke-[2.5]" />
+                            <span>Add Reservation</span>
+                        </button>
+                    </div>
                 }
             />
 
@@ -319,7 +542,7 @@ export const ReservationsView: React.FC = () => {
                                     }`}
                                 >
                                     <span>{t.label}</span>
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-bold ${
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[11px] ${
                                         isActive ? 'bg-purple-100 text-[#6C5CE7]' : 'bg-slate-100 text-slate-600'
                                     }`}>
                                         {t.count}
@@ -380,7 +603,7 @@ export const ReservationsView: React.FC = () => {
                                 <>
                                     <div className="fixed inset-0 z-30" onClick={() => setIsDatePopoverOpen(false)}></div>
                                     <div className="absolute left-0 top-9 z-40 bg-white border border-gray-200 shadow-xl rounded-lg p-2 w-44 space-y-1 animate-in fade-in zoom-in-95 duration-100 text-xs">
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase px-2 py-0.5">Quick Presets</div>
+                                        <div className="text-[10px] text-gray-400 uppercase px-2 py-0.5">Quick Presets</div>
                                         <button
                                             type="button"
                                             onClick={() => setDatePreset('today')}
@@ -465,8 +688,34 @@ export const ReservationsView: React.FC = () => {
                             )}
                         </div>
 
+                        {/* Source Filter */}
+                        <select
+                            value={sourceFilter}
+                            onChange={e => setSourceFilter(e.target.value)}
+                            className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 shadow-2xs font-medium cursor-pointer text-gray-700"
+                        >
+                            <option value="all">All Channels</option>
+                            <option value="Direct">Direct</option>
+                            <option value="Booking.com">Booking.com</option>
+                            <option value="Agoda">Agoda</option>
+                            <option value="Expedia">Expedia</option>
+                            <option value="Corporate">Corporate</option>
+                            <option value="Walk-In">Walk-In</option>
+                        </select>
+
+                        {/* VIP Filter */}
+                        <select
+                            value={vipFilter}
+                            onChange={e => setVipFilter(e.target.value)}
+                            className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 shadow-2xs font-medium cursor-pointer text-gray-700"
+                        >
+                            <option value="all">All Tiers</option>
+                            <option value="vip">VIP Only</option>
+                            <option value="regular">Standard</option>
+                        </select>
+
                         {guestFilter !== 'all' && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
                                 <span>Filter: {guestFilter === 'single' ? 'Single Guests' : 'Group Bookings'}</span>
                                 <button type="button" onClick={() => setGuestFilter('all')} className="hover:text-red-500 cursor-pointer">
                                     <X size={11} />
@@ -565,7 +814,7 @@ export const ReservationsView: React.FC = () => {
                             type="button"
                             disabled={selectedIds.length === 0}
                             onClick={() => setIsMakeGroupModalOpen(true)}
-                            className={`px-3.5 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs ${
+                            className={`px-3.5 py-1 rounded text-xs flex items-center gap-1.5 transition-colors shadow-2xs ${
                                 selectedIds.length > 0
                                     ? 'bg-purple-700 hover:bg-purple-800 text-white cursor-pointer'
                                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -631,7 +880,7 @@ export const ReservationsView: React.FC = () => {
                     <div className="overflow-x-auto flex-1">
                         <table className="w-full text-left border-collapse text-xs min-w-[1120px]">
                             <thead>
-                                <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] font-bold text-gray-600 uppercase tracking-wider select-none">
+                                <tr className="bg-gray-50/80 border-b border-gray-200 text-[10.5px] text-gray-600 uppercase tracking-wider select-none">
                                     {isGroupingMode && (
                                         <th className="px-3.5 py-2.5 w-10 text-center animate-in fade-in duration-100">
                                             <button
@@ -648,31 +897,117 @@ export const ReservationsView: React.FC = () => {
                                             </button>
                                         </th>
                                     )}
-                                    <th className="px-3.5 py-2.5 w-28">Res #</th>
-                                    <th className="px-3.5 py-2.5 min-w-[190px]">Guest &amp; Group</th>
-                                    <th className="px-3.5 py-2.5 w-28">Room</th>
-                                    <th className="px-3.5 py-2.5 w-40">Stay Dates</th>
+                                    <th 
+                                        onClick={() => handleSort('reservationNumber')}
+                                        className="px-3.5 py-2.5 w-28 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span>Res #</span>
+                                            {sortField === 'reservationNumber' ? (
+                                                sortOrder === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                                            ) : (
+                                                <ArrowUpDown size={11} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th 
+                                        onClick={() => handleSort('guestName')}
+                                        className="px-3.5 py-2.5 min-w-[190px] cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span>Guest &amp; Group</span>
+                                            {sortField === 'guestName' ? (
+                                                sortOrder === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                                            ) : (
+                                                <ArrowUpDown size={11} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th 
+                                        onClick={() => handleSort('roomNumber')}
+                                        className="px-3.5 py-2.5 w-28 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span>Room</span>
+                                            {sortField === 'roomNumber' ? (
+                                                sortOrder === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                                            ) : (
+                                                <ArrowUpDown size={11} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th 
+                                        onClick={() => handleSort('checkIn')}
+                                        className="px-3.5 py-2.5 w-40 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span>Stay Dates</span>
+                                            {sortField === 'checkIn' ? (
+                                                sortOrder === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                                            ) : (
+                                                <ArrowUpDown size={11} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                    </th>
                                     <th className="px-3.5 py-2.5 w-28">Source</th>
-                                    <th className="px-3.5 py-2.5 w-32">Total Tariff</th>
-                                    <th className="px-3.5 py-2.5 w-32">Due Balance</th>
-                                    <th className="px-3.5 py-2.5 w-28">Status</th>
-                                    <th className="px-3.5 py-2.5 w-36 text-right pr-4">Actions</th>
+                                    <th 
+                                        onClick={() => handleSort('totalAmount')}
+                                        className="px-3.5 py-2.5 w-32 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span>Total Tariff</span>
+                                            {sortField === 'totalAmount' ? (
+                                                sortOrder === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                                            ) : (
+                                                <ArrowUpDown size={11} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th 
+                                        onClick={() => handleSort('dueAmount')}
+                                        className="px-3.5 py-2.5 w-32 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span>Due Balance</span>
+                                            {sortField === 'dueAmount' ? (
+                                                sortOrder === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                                            ) : (
+                                                <ArrowUpDown size={11} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th 
+                                        onClick={() => handleSort('status')}
+                                        className="px-3.5 py-2.5 w-28 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span>Status</span>
+                                            {sortField === 'status' ? (
+                                                sortOrder === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                                            ) : (
+                                                <ArrowUpDown size={11} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th className="px-3.5 py-2.5 w-44 text-right pr-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-[11.5px]">
-                                {filteredReservations.map(r => {
+                                {sortedReservations.map(r => {
                                     const isSelected = selectedIds.includes(r.id);
 
                                     return (
                                         <tr
                                             key={r.id}
                                             onClick={() => {
-                                                if (isGroupingMode) toggleSelectRow(r.id);
+                                                if (isGroupingMode) {
+                                                    toggleSelectRow(r.id);
+                                                } else {
+                                                    openDrawerForReservation(r);
+                                                }
                                             }}
-                                            className={`transition-colors ${
-                                                isGroupingMode ? 'cursor-pointer' : ''
-                                            } ${
-                                                isSelected ? 'bg-purple-50/60' : 'hover:bg-blue-50/20'
+                                            className={`transition-colors cursor-pointer ${
+                                                isSelected ? 'bg-purple-50/60' : 'hover:bg-blue-50/40'
                                             }`}
                                         >
                                             {/* Row Checkbox (Visible only when Grouping Mode is Active) */}
@@ -696,8 +1031,16 @@ export const ReservationsView: React.FC = () => {
                                             )}
 
                                             {/* Reservation Number */}
-                                            <td className="px-3 py-2 font-mono font-bold text-blue-700 whitespace-nowrap">
-                                                {r.reservationNumber}
+                                            <td className="px-3 py-2 font-mono whitespace-nowrap">
+                                                <div className="text-blue-700 font-semibold">{r.reservationNumber}</div>
+                                                {r.subBookingNumber && r.subBookingNumber !== r.reservationNumber && (
+                                                    <div className="text-[10px] text-slate-500 font-mono">{r.subBookingNumber}</div>
+                                                )}
+                                                {r.registrationNumber && (
+                                                    <div className="text-[10px] text-emerald-700 font-mono font-bold bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded inline-block mt-0.5" title="Registration Number (GRC)">
+                                                        {r.registrationNumber}
+                                                    </div>
+                                                )}
                                             </td>
 
                                             {/* Guest Name & Group Pill */}
@@ -705,14 +1048,14 @@ export const ReservationsView: React.FC = () => {
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="font-semibold text-gray-900">{r.guestName}</span>
                                                     {r.vip && r.vip !== 'None' && (
-                                                        <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                                        <span className="px-1 py-0.2 rounded text-[9px] bg-amber-100 text-amber-800 border border-amber-200">
                                                             {r.vip}
                                                         </span>
                                                     )}
-                                                    {r.isGroup && (
-                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-0.5">
+                                                    {(r.isGroup || r.groupCode) && (
+                                                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-0.5 font-bold" title="Group Booking Code">
                                                             <Users size={10} />
-                                                            <span>{r.groupName || 'Group'}</span>
+                                                            <span>{r.groupCode || r.groupName || 'Group'}</span>
                                                         </span>
                                                     )}
                                                 </div>
@@ -721,7 +1064,7 @@ export const ReservationsView: React.FC = () => {
 
                                             {/* Room Details */}
                                             <td className="px-3 py-2">
-                                                <span className="px-1.5 py-0.2 bg-blue-50 text-blue-800 rounded font-bold font-mono">
+                                                <span className="px-1.5 py-0.2 bg-blue-50 text-blue-800 rounded font-mono">
                                                     {r.roomNumber}
                                                 </span>
                                                 <div className="text-[10px] text-gray-500">{r.roomType}</div>
@@ -741,12 +1084,12 @@ export const ReservationsView: React.FC = () => {
                                             </td>
 
                                             {/* Total Tariff */}
-                                            <td className="px-3 py-2 font-bold text-gray-900 font-mono whitespace-nowrap">
+                                            <td className="px-3 py-2 text-gray-900 font-mono whitespace-nowrap">
                                                 ৳ {r.totalAmount.toLocaleString()}
                                             </td>
 
                                             {/* Due Balance */}
-                                            <td className="px-3 py-2 font-mono font-bold whitespace-nowrap">
+                                            <td className="px-3 py-2 font-mono whitespace-nowrap">
                                                 {r.dueAmount > 0 ? (
                                                     <span className="text-rose-600">৳ {r.dueAmount.toLocaleString()}</span>
                                                 ) : (
@@ -758,7 +1101,7 @@ export const ReservationsView: React.FC = () => {
 
                                             {/* Status Badge */}
                                             <td className="px-3 py-2">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap ${
+                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase whitespace-nowrap ${
                                                     r.status === 'in-house'
                                                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                         : r.status === 'confirmed'
@@ -778,11 +1121,20 @@ export const ReservationsView: React.FC = () => {
                                             {/* Actions */}
                                             <td className="px-3.5 py-2.5 text-right whitespace-nowrap pr-4" onClick={e => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openDrawerForReservation(r)}
+                                                        className="h-6 px-2 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                        title="Open Action Drawer & Guest Folio"
+                                                    >
+                                                        <span>Manage</span>
+                                                        <ExternalLink size={10} />
+                                                    </button>
                                                     {(r.status === 'arriving' || r.status === 'confirmed') && (
                                                         <button
                                                             type="button"
                                                             onClick={() => handleStatusChange(r.id, 'in-house')}
-                                                            className="h-6 px-2.5 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer shadow-2xs transition-colors"
+                                                            className="h-6 px-2.5 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer shadow-2xs transition-colors font-semibold"
                                                             title="Check In Guest"
                                                         >
                                                             Check In
@@ -792,7 +1144,7 @@ export const ReservationsView: React.FC = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleStatusChange(r.id, 'checked-out')}
-                                                            className="h-6 px-2.5 text-[10px] font-bold bg-blue-700 hover:bg-blue-800 text-white rounded cursor-pointer shadow-2xs transition-colors"
+                                                            className="h-6 px-2.5 text-[10px] bg-blue-700 hover:bg-blue-800 text-white rounded cursor-pointer shadow-2xs transition-colors font-semibold"
                                                             title="Check Out Guest"
                                                         >
                                                             Check Out
@@ -819,18 +1171,20 @@ export const ReservationsView: React.FC = () => {
                 ) : (
                     /* Card (Grid) View */
                     <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 overflow-y-auto flex-1">
-                        {filteredReservations.map(r => {
+                        {sortedReservations.map(r => {
                             const isSelected = selectedIds.includes(r.id);
 
                             return (
                                 <div
                                     key={r.id}
                                     onClick={() => {
-                                        if (isGroupingMode) toggleSelectRow(r.id);
+                                        if (isGroupingMode) {
+                                            toggleSelectRow(r.id);
+                                        } else {
+                                            openDrawerForReservation(r);
+                                        }
                                     }}
-                                    className={`border rounded-lg p-3.5 bg-white transition-all shadow-2xs space-y-2.5 relative ${
-                                        isGroupingMode ? 'cursor-pointer' : ''
-                                    } ${
+                                    className={`border rounded-lg p-3.5 bg-white transition-all shadow-2xs space-y-2.5 relative cursor-pointer ${
                                         isSelected
                                             ? 'border-purple-600 ring-2 ring-purple-500/20 bg-purple-50/10'
                                             : 'border-gray-200 hover:border-blue-300'
@@ -850,34 +1204,39 @@ export const ReservationsView: React.FC = () => {
                                                     {isSelected ? <CheckSquare size={15} /> : <Square size={15} className="text-gray-300" />}
                                                 </button>
                                             )}
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 text-[#1e3a8a] font-bold flex items-center justify-center flex-shrink-0 text-xs">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 text-[#1e3a8a] flex items-center justify-center flex-shrink-0 text-xs">
                                                 {r.guestName.slice(0, 2).toUpperCase()}
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5">
-                                                    <h4 className="font-bold text-gray-900 text-xs truncate">{r.guestName}</h4>
+                                                    <h4 className="text-gray-900 text-xs truncate">{r.guestName}</h4>
                                                     {r.vip && r.vip !== 'None' && (
-                                                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                                        <span className="px-1 py-0.2 rounded text-[8px] bg-amber-100 text-amber-800 border border-amber-200">
                                                             {r.vip}
                                                         </span>
                                                     )}
                                                 </div>
                                                 <div className="font-mono text-[10px] text-blue-700">{r.reservationNumber}</div>
+                                                {r.registrationNumber && (
+                                                    <div className="font-mono text-[9px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1 rounded inline-block mt-0.5">
+                                                        {r.registrationNumber}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
                                         <div className="flex flex-col items-end gap-1">
-                                            <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-blue-50 text-blue-800 border border-blue-200">
+                                            <span className="px-2 py-0.5 rounded font-mono text-xs bg-blue-50 text-blue-800 border border-blue-200">
                                                 Room {r.roomNumber}
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Group Tag if attached */}
-                                    {r.isGroup && (
+                                    {(r.isGroup || r.groupCode) && (
                                         <div className="bg-purple-50 text-purple-700 border border-purple-200 rounded px-2 py-1 text-[10px] font-semibold flex items-center gap-1.5">
                                             <Users size={12} className="text-purple-600" />
-                                            <span className="truncate">Group: <strong>{r.groupName}</strong></span>
+                                            <span className="truncate">Group: <strong>{r.groupCode || r.groupName || 'Group'}</strong></span>
                                         </div>
                                     )}
 
@@ -893,11 +1252,11 @@ export const ReservationsView: React.FC = () => {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Tariff:</span>
-                                            <span className="font-bold text-gray-900 font-mono">৳ {r.totalAmount.toLocaleString()}</span>
+                                            <span className="text-gray-900 font-mono">৳ {r.totalAmount.toLocaleString()}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Due:</span>
-                                            <span className={`font-mono font-bold ${r.dueAmount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                            <span className={`font-mono ${r.dueAmount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                                 {r.dueAmount > 0 ? `৳ ${r.dueAmount.toLocaleString()}` : 'Settled'}
                                             </span>
                                         </div>
@@ -905,7 +1264,7 @@ export const ReservationsView: React.FC = () => {
 
                                     {/* Card Footer Actions */}
                                     <div className="pt-1 flex items-center justify-between gap-2" onClick={e => e.stopPropagation()}>
-                                        <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold uppercase ${
+                                        <span className={`px-2 py-0.5 rounded text-[9.5px] uppercase ${
                                             r.status === 'in-house'
                                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                 : r.status === 'confirmed'
@@ -922,11 +1281,20 @@ export const ReservationsView: React.FC = () => {
                                         </span>
 
                                         <div className="flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => openDrawerForReservation(r)}
+                                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                title="Open Action Drawer & Guest Folio"
+                                            >
+                                                <span>Manage</span>
+                                                <ExternalLink size={10} />
+                                            </button>
                                             {(r.status === 'arriving' || r.status === 'confirmed') && (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleStatusChange(r.id, 'in-house')}
-                                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer shadow-2xs"
+                                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] cursor-pointer shadow-2xs font-semibold"
                                                 >
                                                     Check In
                                                 </button>
@@ -935,7 +1303,7 @@ export const ReservationsView: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleStatusChange(r.id, 'checked-out')}
-                                                    className="px-2.5 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded text-[10px] font-bold cursor-pointer shadow-2xs"
+                                                    className="px-2.5 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded text-[10px] cursor-pointer shadow-2xs font-semibold"
                                                 >
                                                     Check Out
                                                 </button>
@@ -959,7 +1327,7 @@ export const ReservationsView: React.FC = () => {
                                     <Users size={16} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-gray-900 text-sm">Create Group Reservation</h3>
+                                    <h3 className="text-gray-900 text-sm">Create Group Reservation</h3>
                                     <p className="text-[11px] text-gray-500">
                                         Bundle {selectedIds.length} selected reservation(s) into a unified corporate/event group
                                     </p>
@@ -1025,7 +1393,7 @@ export const ReservationsView: React.FC = () => {
                                     type="button"
                                     disabled={!newGroupName.trim()}
                                     onClick={handleCreateGroup}
-                                    className={`px-4 py-1.5 rounded text-xs font-bold transition-colors cursor-pointer shadow-2xs ${
+                                    className={`px-4 py-1.5 rounded text-xs transition-colors cursor-pointer shadow-2xs ${
                                         newGroupName.trim()
                                             ? 'bg-purple-700 hover:bg-purple-800 text-white'
                                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -1046,6 +1414,34 @@ export const ReservationsView: React.FC = () => {
                 onReservationCreated={(newRes) => {
                     setReservations(prev => [newRes, ...prev]);
                     setIsAddModalOpen(false);
+                }}
+            />
+
+            {/* Unified Enterprise Reservation Action Drawer */}
+            <ReservationActionDrawer
+                isOpen={isActionDrawerOpen}
+                onClose={() => {
+                    setIsActionDrawerOpen(false);
+                    setActionDrawerBooking(null);
+                    loadReservationsFromDB();
+                }}
+                booking={actionDrawerBooking}
+                initialMode={actionDrawerMode}
+                allRooms={allRooms}
+                systemDate={getOperatingSystemDate()}
+                onCheckIn={async (resNo) => {
+                    const target = reservations.find(r => r.reservationNumber === resNo);
+                    if (target) {
+                        handleStatusChange(target.id, 'in-house');
+                    }
+                    await loadReservationsFromDB();
+                }}
+                onCheckOut={async (resNo) => {
+                    const target = reservations.find(r => r.reservationNumber === resNo);
+                    if (target) {
+                        handleStatusChange(target.id, 'checked-out');
+                    }
+                    await loadReservationsFromDB();
                 }}
             />
         </div>

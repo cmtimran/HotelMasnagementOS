@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     ChevronLeft, ChevronRight,
     TrendingUp, Calendar,
-    Sparkles
+    Sparkles, ExternalLink, Plus
 } from 'lucide-react';
+import { useNavigation } from '../context/NavigationContext';
+import { 
+    getCanonicalRooms, 
+    getAllStoredReservations, 
+    syncRoomTypesAndRoomsFromDB, 
+    syncReservationsFromDB,
+    getOperatingSystemDate,
+    subscribeToPMSEvents
+} from '../utils/roomInventoryEngine';
 
 interface DayOccupancyData {
     dateStr: string; // YYYY-MM-DD
@@ -19,8 +28,14 @@ interface DayOccupancyData {
 }
 
 export const OccupancyHeatmap: React.FC = () => {
-    const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 5, 1)); // June 2026
+    const { setActivePage } = useNavigation();
+    const opDate = getOperatingSystemDate();
+    const opYear = parseInt(opDate.slice(0, 4), 10) || 2026;
+    const opMonth = (parseInt(opDate.slice(5, 7), 10) || 7) - 1;
+
+    const [currentDate, setCurrentDate] = useState<Date>(() => new Date(opYear, opMonth, 1));
     const [selectedDayData, setSelectedDayData] = useState<DayOccupancyData | null>(null);
+    const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -33,43 +48,97 @@ export const OccupancyHeatmap: React.FC = () => {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const startDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sunday
 
-    // Generate simulated high-fidelity telemetry data for all days in month
-    const monthDaysData: DayOccupancyData[] = Array.from({ length: daysInMonth }, (_, i) => {
-        const day = i + 1;
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
-        // Dynamic weekend & corporate surge simulation
-        const dayOfWeek = (startDayOfWeek + i) % 7;
-        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Fri, Sat in BD
+    // Fetch latest rooms and reservations from PostgreSQL on mount & subscribe to PMS events
+    useEffect(() => {
+        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+            setRefreshTrigger(prev => prev + 1);
+        });
 
-        let occupancyPct: number;
-        if (day >= 24 && day <= 28) {
-            occupancyPct = 92 + (day % 3) * 4; // Peak conference block
-        } else if (isWeekend) {
-            occupancyPct = 85 + (day % 4) * 3;
-        } else {
-            occupancyPct = 65 + (day % 5) * 5;
-        }
-        if (occupancyPct > 100) occupancyPct = 100;
+        const unsub = subscribeToPMSEvents(() => {
+            Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+                setRefreshTrigger(prev => prev + 1);
+            });
+        });
 
-        const totalRooms = 28;
-        const occupiedRooms = Math.round((occupancyPct / 100) * totalRooms);
-        const adrBDT = 7200 + (occupancyPct > 85 ? 1200 : 0);
-        const revenueBDT = occupiedRooms * adrBDT;
+        return () => unsub();
+    }, []);
 
-        return {
-            dateStr,
-            dayNumber: day,
-            occupancyPct,
-            occupiedRooms,
-            totalRooms,
-            revenueBDT,
-            adrBDT,
-            arrivals: Math.round(occupiedRooms * 0.35) + 1,
-            departures: Math.round(occupiedRooms * 0.3) + 1,
-            pricingSurge: occupancyPct >= 90 ? '+20% Peak Demand Surge' : occupancyPct >= 75 ? '+10% Dynamic Yield' : 'Standard Base Rate'
-        };
-    });
+    // Calculate real dynamic telemetry data for all days in month
+    const monthDaysData: DayOccupancyData[] = useMemo(() => {
+        const canonicalRooms = getCanonicalRooms();
+        const storedRes = getAllStoredReservations();
+        const activeRooms = canonicalRooms.filter(r => r.status !== 'Out of Order');
+        const totalRooms = activeRooms.length > 0 ? activeRooms.length : (canonicalRooms.length || 34);
+
+        return Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+            let dailyRevenue = 0;
+            let arrivalsCount = 0;
+            let departuresCount = 0;
+            const bookedRoomsToday = new Set<string>();
+
+            storedRes.forEach(res => {
+                const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+                if (rawStatus === 'cancelled' || rawStatus === 'void') return;
+
+                const checkIn = String(res.checkIn || res.arrivalDate || '');
+                const checkOut = String(res.checkOut || res.departureDate || '');
+
+                if (checkIn === dateStr) arrivalsCount++;
+                if (checkOut === dateStr) departuresCount++;
+
+                // Active stay overlapping today
+                if (checkIn <= dateStr && checkOut > dateStr) {
+                    const rooms: string[] = [];
+                    if (Array.isArray(res.roomsList) && res.roomsList.length > 0) {
+                        res.roomsList.forEach((rm: any) => rooms.push(String(rm.roomNumber)));
+                    } else if (Array.isArray(res.allocatedRooms) && res.allocatedRooms.length > 0) {
+                        res.allocatedRooms.forEach((rm: any) => rooms.push(String(rm)));
+                    } else if (res.roomNumber || res.roomNo) {
+                        rooms.push(String(res.roomNumber || res.roomNo));
+                    }
+
+                    rooms.forEach(rm => bookedRoomsToday.add(rm));
+
+                    const dailyRate = (Number(res.rateAmount) || Number(res.totalAmount) || 3500) / Math.max(1, Number(res.nights) || 1);
+                    dailyRevenue += dailyRate;
+                }
+            });
+
+            const occupiedCount = Math.min(totalRooms, bookedRoomsToday.size);
+            const occupancyPct = totalRooms > 0 ? Math.round((occupiedCount / totalRooms) * 100) : 0;
+            const adrBDT = occupiedCount > 0 ? Math.round(dailyRevenue / occupiedCount) : 3500;
+
+            return {
+                dateStr,
+                dayNumber: day,
+                occupancyPct,
+                occupiedRooms: occupiedCount,
+                totalRooms,
+                revenueBDT: Math.round(dailyRevenue),
+                adrBDT,
+                arrivals: arrivalsCount,
+                departures: departuresCount,
+                pricingSurge: occupancyPct >= 90 ? '+20% Peak Demand Surge' : occupancyPct >= 75 ? '+10% Dynamic Yield' : occupancyPct > 0 ? 'Standard Rate Yield' : 'Base Rate Available'
+            };
+        });
+    }, [year, month, daysInMonth, refreshTrigger]);
+
+    // Active reservations overlapping the selected day
+    const selectedDayReservations = useMemo(() => {
+        if (!selectedDayData) return [];
+        const allRes = getAllStoredReservations();
+        const dStr = selectedDayData.dateStr;
+        return allRes.filter(res => {
+            const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+            if (rawStatus === 'cancelled' || rawStatus === 'void') return false;
+            const checkIn = String(res.checkIn || res.arrivalDate || '');
+            const checkOut = String(res.checkOut || res.departureDate || '');
+            return (checkIn <= dStr && checkOut >= dStr);
+        });
+    }, [selectedDayData, refreshTrigger]);
 
     const prevMonth = () => {
         setCurrentDate(new Date(year, month - 1, 1));
@@ -114,7 +183,7 @@ export const OccupancyHeatmap: React.FC = () => {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+                            <h1 className="text-base text-slate-900 tracking-tight">
                                 Occupancy Heatmap & Revenue Forecast
                             </h1>
                             <span className="badge-status-active">
@@ -136,7 +205,7 @@ export const OccupancyHeatmap: React.FC = () => {
                         >
                             <ChevronLeft size={14} />
                         </button>
-                        <span className="font-bold text-slate-900 px-3 text-xs">
+                        <span className="text-slate-900 px-3 text-xs">
                             {monthNames[month]} {year}
                         </span>
                         <button
@@ -153,7 +222,7 @@ export const OccupancyHeatmap: React.FC = () => {
             <div className="bg-white border-b border-slate-200 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Occupancy</span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Avg Occupancy</span>
                         <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{avgOccupancy}%</p>
                     </div>
                     <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -163,7 +232,7 @@ export const OccupancyHeatmap: React.FC = () => {
 
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Forecast Revenue</span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Forecast Revenue</span>
                         <p className="text-lg font-black text-primary font-mono mt-0.5">৳ {(totalMonthRevenue / 100000).toFixed(2)}L</p>
                     </div>
                     <span className="text-[10.5px] font-mono font-semibold text-slate-500">
@@ -173,7 +242,7 @@ export const OccupancyHeatmap: React.FC = () => {
 
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Daily Rate (ADR)</span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Avg Daily Rate (ADR)</span>
                         <p className="text-lg font-black text-slate-900 font-mono mt-0.5">৳ {avgADR.toLocaleString()}</p>
                     </div>
                     <span className="text-[10px] text-slate-400 uppercase font-semibold">Per Room</span>
@@ -181,10 +250,10 @@ export const OccupancyHeatmap: React.FC = () => {
 
                 <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-200/90 flex justify-between items-center">
                     <div>
-                        <span className="text-[9.5px] font-bold text-gray-400 uppercase">RevPAR</span>
-                        <p className="text-base font-bold text-emerald-700 font-mono mt-0.5">৳ {revPAR.toLocaleString()}</p>
+                        <span className="text-[9.5px] text-gray-400 uppercase">RevPAR</span>
+                        <p className="text-base text-emerald-700 font-mono mt-0.5">৳ {revPAR.toLocaleString()}</p>
                     </div>
-                    <span className="text-[9.5px] font-bold text-emerald-600">Optimal Yield</span>
+                    <span className="text-[9.5px] text-emerald-600">Optimal Yield</span>
                 </div>
             </div>
 
@@ -220,7 +289,7 @@ export const OccupancyHeatmap: React.FC = () => {
                 {/* 7-column Calendar Matrix */}
                 <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-2xs p-3 overflow-y-auto">
                     {/* Weekday Headers */}
-                    <div className="grid grid-cols-7 gap-2 mb-2 text-center text-[10.5px] font-bold text-gray-500 uppercase">
+                    <div className="grid grid-cols-7 gap-2 mb-2 text-center text-[10.5px] text-gray-500 uppercase">
                         <div>Sun</div>
                         <div>Mon</div>
                         <div>Tue</div>
@@ -252,10 +321,10 @@ export const OccupancyHeatmap: React.FC = () => {
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <span className="font-bold text-gray-900 text-xs">
+                                        <span className="text-gray-900 text-xs">
                                             {day.dayNumber}
                                         </span>
-                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold font-mono ${badgeStyle}`}>
+                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono ${badgeStyle}`}>
                                             {day.occupancyPct}%
                                         </span>
                                     </div>
@@ -263,11 +332,11 @@ export const OccupancyHeatmap: React.FC = () => {
                                     <div className="space-y-0.5">
                                         <div className="flex justify-between items-center text-[10px] text-gray-600">
                                             <span>Rooms:</span>
-                                            <span className="font-bold font-mono text-gray-800">{day.occupiedRooms}/{day.totalRooms}</span>
+                                            <span className="font-mono text-gray-800">{day.occupiedRooms}/{day.totalRooms}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-[10px] text-gray-600">
                                             <span>Revenue:</span>
-                                            <span className="font-bold font-mono text-gray-900">৳{(day.revenueBDT / 1000).toFixed(0)}k</span>
+                                            <span className="font-mono text-gray-900">৳{(day.revenueBDT / 1000).toFixed(0)}k</span>
                                         </div>
                                     </div>
                                 </button>
@@ -282,12 +351,12 @@ export const OccupancyHeatmap: React.FC = () => {
                         <div className="space-y-3.5">
                             <div className="flex items-center justify-between pb-2 border-b border-gray-200">
                                 <div>
-                                    <h3 className="text-sm font-bold text-gray-900">
+                                    <h3 className="text-sm text-gray-900">
                                         {selectedDayData.dateStr}
                                     </h3>
                                     <p className="text-[10.5px] text-gray-500">Day {selectedDayData.dayNumber} Performance</p>
                                 </div>
-                                <span className={`px-2 py-0.5 rounded text-[10.5px] font-bold font-mono ${getBadgeStyle(selectedDayData.occupancyPct)}`}>
+                                <span className={`px-2 py-0.5 rounded text-[10.5px] font-mono ${getBadgeStyle(selectedDayData.occupancyPct)}`}>
                                     {selectedDayData.occupancyPct}% Occupancy
                                 </span>
                             </div>
@@ -295,25 +364,25 @@ export const OccupancyHeatmap: React.FC = () => {
                             <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 space-y-2">
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-gray-500">Rooms Occupied:</span>
-                                    <span className="font-bold font-mono text-gray-900">{selectedDayData.occupiedRooms} / {selectedDayData.totalRooms}</span>
+                                    <span className="font-mono text-gray-900">{selectedDayData.occupiedRooms} / {selectedDayData.totalRooms}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-gray-500">Unsold Rooms:</span>
-                                    <span className="font-bold font-mono text-rose-700">{selectedDayData.totalRooms - selectedDayData.occupiedRooms} Available</span>
+                                    <span className="font-mono text-rose-700">{selectedDayData.totalRooms - selectedDayData.occupiedRooms} Available</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-gray-500">Arrivals Due:</span>
-                                    <span className="font-bold font-mono text-blue-700">{selectedDayData.arrivals} Check-ins</span>
+                                    <span className="font-mono text-blue-700">{selectedDayData.arrivals} Check-ins</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-gray-500">Departures Due:</span>
-                                    <span className="font-bold font-mono text-gray-700">{selectedDayData.departures} Check-outs</span>
+                                    <span className="font-mono text-gray-700">{selectedDayData.departures} Check-outs</span>
                                 </div>
                             </div>
 
                             <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 space-y-1">
-                                <span className="text-[9.5px] font-bold text-blue-800 uppercase">Daily Revenue Yield</span>
-                                <p className="text-lg font-bold font-mono text-blue-900">
+                                <span className="text-[9.5px] text-blue-800 uppercase">Daily Revenue Yield</span>
+                                <p className="text-lg font-mono text-blue-900">
                                     ৳ {selectedDayData.revenueBDT.toLocaleString()}
                                 </p>
                                 <p className="text-[10px] text-blue-700">Average Daily Rate (ADR): ৳ {selectedDayData.adrBDT.toLocaleString()}</p>
@@ -322,7 +391,7 @@ export const OccupancyHeatmap: React.FC = () => {
                             <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200 flex items-start gap-2">
                                 <Sparkles size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
                                 <div>
-                                    <span className="text-[10px] font-bold text-amber-900 uppercase">AI Revenue Optimizer</span>
+                                    <span className="text-[10px] text-amber-900 uppercase">AI Revenue Optimizer</span>
                                     <p className="text-[10.5px] text-amber-800 mt-0.5 font-semibold">
                                         {selectedDayData.pricingSurge}
                                     </p>
@@ -330,6 +399,58 @@ export const OccupancyHeatmap: React.FC = () => {
                                         Recommended base rack adjustment to maximize yield and RevPAR for this date.
                                     </p>
                                 </div>
+                            </div>
+
+                            {/* Active Bookings Drill-Down */}
+                            <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                                <span className="text-[10px] text-gray-500 uppercase font-bold block">
+                                    Bookings on this Date ({selectedDayReservations.length})
+                                </span>
+                                {selectedDayReservations.length > 0 ? (
+                                    <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                                        {selectedDayReservations.map((res: any, idx: number) => {
+                                            const isArrival = (res.checkIn || res.arrivalDate) === selectedDayData.dateStr;
+                                            const isDeparture = (res.checkOut || res.departureDate) === selectedDayData.dateStr;
+                                            return (
+                                                <div key={res.id || idx} className="p-1.5 bg-slate-50 border border-slate-200/80 rounded text-[11px] flex items-center justify-between">
+                                                    <div className="min-w-0 pr-1">
+                                                        <div className="font-semibold text-slate-800 truncate">{res.guestName || 'Valued Guest'}</div>
+                                                        <div className="text-[9.5px] text-slate-500 font-mono truncate">
+                                                            Room {res.roomNumber || (res.allocatedRooms && res.allocatedRooms[0]) || 'Auto'} • {res.roomType}
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase shrink-0 ${
+                                                        isArrival ? 'bg-blue-100 text-blue-700' : isDeparture ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                                                    }`}>
+                                                        {isArrival ? 'Arrival' : isDeparture ? 'Departure' : 'In-House'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-[10px] text-gray-400 italic">No bookings recorded for this date</p>
+                                )}
+                            </div>
+
+                            {/* Fast Action Buttons */}
+                            <div className="pt-2 flex flex-col gap-1.5 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePage('stay-view')}
+                                    className="w-full py-1.5 px-3 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                                >
+                                    <span>Open Stay View</span>
+                                    <ExternalLink size={12} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePage('add-reservation')}
+                                    className="w-full py-1.5 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                                >
+                                    <Plus size={12} />
+                                    <span>+ New Booking for this Date</span>
+                                </button>
                             </div>
                         </div>
                     ) : (

@@ -1,13 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database/db.js';
-import { pgPool, isPostgresConnected } from '../database/postgres.js';
 
 const router = Router();
 
 // GET /api/properties - List all hotel properties in the chain
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
     try {
-        const properties = db.prepare(`
+        const properties = await db.prepare(`
             SELECT 
                 p.*,
                 o.name as organization_name,
@@ -30,38 +29,38 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // GET /api/properties/chain/overview - Global hotel group consolidated KPIs
-router.get('/chain/overview', (req: Request, res: Response) => {
+router.get('/chain/overview', async (req: Request, res: Response) => {
     try {
         let org: any = null;
         try {
-            org = db.prepare('SELECT * FROM organizations LIMIT 1').get();
+            org = await db.prepare('SELECT * FROM organizations LIMIT 1').get();
         } catch (err) {
             console.warn('Chain overview org fetch warning:', err);
         }
 
-        const getSafeCount = (sql: string): number => {
+        const getSafeCount = async (sql: string): Promise<number> => {
             try {
-                const res = db.prepare(sql).get() as any;
+                const res = await db.prepare(sql).get() as any;
                 return Number(res?.c) || 0;
             } catch {
                 return 0;
             }
         };
 
-        const getSafeSum = (sql: string): number => {
+        const getSafeSum = async (sql: string): Promise<number> => {
             try {
-                const res = db.prepare(sql).get() as any;
+                const res = await db.prepare(sql).get() as any;
                 return Number(res?.s) || 0;
             } catch {
                 return 0;
             }
         };
 
-        const totalProperties = getSafeCount('SELECT COUNT(*) as c FROM properties') || 2;
-        const totalRooms = getSafeCount('SELECT COUNT(*) as c FROM rooms') || 34;
-        const totalStaff = getSafeCount("SELECT COUNT(*) as c FROM employees WHERE status = 'ACTIVE'") || 6;
-        const totalReservations = getSafeCount('SELECT COUNT(*) as c FROM reservations') || 7;
-        const totalRevenue = getSafeSum('SELECT SUM(total_amount) as s FROM reservations') || 180600;
+        const totalProperties = (await getSafeCount('SELECT COUNT(*) as c FROM properties')) || 2;
+        const totalRooms = (await getSafeCount('SELECT COUNT(*) as c FROM rooms')) || 34;
+        const totalStaff = (await getSafeCount("SELECT COUNT(*) as c FROM employees WHERE status = 'ACTIVE'")) || 6;
+        const totalReservations = (await getSafeCount('SELECT COUNT(*) as c FROM reservations')) || 7;
+        const totalRevenue = (await getSafeSum('SELECT SUM(total_amount) as s FROM reservations')) || 180600;
 
         res.json({
             success: true,
@@ -93,24 +92,24 @@ router.get('/chain/overview', (req: Request, res: Response) => {
 });
 
 // GET /api/properties/:id - Get property details with buildings, floors & rooms
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
     try {
         const propertyId = Number(req.params.id);
-        const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+        const property = await db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
         if (!property) {
             return res.status(404).json({ success: false, error: 'Property not found' });
         }
 
-        const buildings = db.prepare('SELECT * FROM buildings WHERE property_id = ? ORDER BY sort_order').all(propertyId);
-        const floors = db.prepare(`
+        const buildings = await db.prepare('SELECT * FROM buildings WHERE property_id = ? ORDER BY sort_order').all(propertyId);
+        const floors = await db.prepare(`
             SELECT f.*
             FROM floors f
             JOIN buildings b ON b.id = f.building_id
             WHERE b.property_id = ?
             ORDER BY f.floor_number ASC
         `).all(propertyId);
-        const roomTypes = db.prepare('SELECT * FROM room_types WHERE property_id = ?').all(propertyId);
-        const rooms = db.prepare(`
+        const roomTypes = await db.prepare('SELECT * FROM room_types WHERE property_id = ?').all(propertyId);
+        const rooms = await db.prepare(`
             SELECT r.*, rt.name as room_type_name, f.name as floor_name, b.name as building_name
             FROM rooms r
             JOIN room_types rt ON rt.id = r.room_type_id
@@ -145,95 +144,103 @@ router.post('/', async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
         const name = body.name || body.propertyName || 'New Luxury Hotel';
-        const code = (body.code || body.shortCode || name.slice(0, 3).toUpperCase()).toUpperCase();
-        const slug = (body.slug || name.toLowerCase().replace(/[^a-z0-9]/g, '-')).slice(0, 50);
-        const propertyType = body.propertyType || body.type || 'RESORT';
-        const starRating = Number(body.starRating) || 5;
+        const code = (body.code || body.shortCode || `${name.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-2)}`).toUpperCase();
+        const starRating = Math.min(5, Math.max(1, Number(body.starRating) || 5));
         const email = body.email || 'info@hotel.com';
         const phone = body.phone || '+880 1711-000000';
         const address = body.address || body.addressLine1 || 'Dhaka, Bangladesh';
         const city = body.city || 'Dhaka';
         const country = body.country || 'Bangladesh';
-        const currency = body.currency || 'BDT';
+        const currency = (body.currency || 'BDT').slice(0, 3).toUpperCase();
+        const timeZone = body.timeZone || 'Asia/Dhaka';
+        const checkInTime = body.checkInTime || '14:00';
+        const checkOutTime = body.checkOutTime || '12:00';
 
-        const insertResult = db.prepare(`
+        const insertResult = await db.prepare(`
             INSERT INTO properties (
-                organization_id, name, code, slug, property_type, star_rating,
-                email, phone, address_line1, city, country, currency_code, status
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
-        `).run(name, code, slug, propertyType, starRating, email, phone, address, city, country, currency);
+                organization_id, name, code, star_rating,
+                email, phone, address, city, country, currency,
+                time_zone, check_in_time, check_out_time
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(name, code, starRating, email, phone, address, city, country, currency, timeZone, checkInTime, checkOutTime);
 
         const newPropId = Number(insertResult.lastInsertRowid);
 
         // Bootstrap default building, floors, room types, and initial rooms
         try {
-            const bldInsert = db.prepare(`
-                INSERT INTO buildings (property_id, code, name, total_floors, sort_order)
-                VALUES (?, 'MAIN', 'Main Wing', 3, 1)
+            const bldInsert = await db.prepare(`
+                INSERT INTO buildings (property_id, code, name, sort_order)
+                VALUES (?, 'MAIN', 'Main Wing', 1)
             `).run(newPropId);
             const bldId = Number(bldInsert.lastInsertRowid);
 
-            const f1 = db.prepare(`INSERT INTO floors (property_id, building_id, floor_number, name) VALUES (?, ?, 1, 'Floor 1')`).run(newPropId, bldId);
-            const f2 = db.prepare(`INSERT INTO floors (property_id, building_id, floor_number, name) VALUES (?, ?, 2, 'Floor 2')`).run(newPropId, bldId);
+            const f1 = await db.prepare(`INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES (?, 1, 'Floor 1', 1)`).run(bldId);
+            const f2 = await db.prepare(`INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES (?, 2, 'Floor 2', 2)`).run(bldId);
 
-            const rt1 = db.prepare(`INSERT INTO room_types (property_id, code, name, category, base_occupancy, max_occupancy, base_rate) VALUES (?, 'DLX', 'Deluxe Double', 'ROOM', 2, 3, 4000)`).run(newPropId);
-            const rt2 = db.prepare(`INSERT INTO room_types (property_id, code, name, category, base_occupancy, max_occupancy, base_rate) VALUES (?, 'SUPK', 'Superior King', 'ROOM', 2, 3, 5500)`).run(newPropId);
+            const rt1 = await db.prepare(`INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate) VALUES (?, 'DLX', 'Deluxe Double', 2, 2, 1, 4000, 1000)`).run(newPropId);
+            const rt2 = await db.prepare(`INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate) VALUES (?, 'SUPK', 'Superior King', 2, 2, 1, 5500, 1200)`).run(newPropId);
 
             const rt1Id = Number(rt1.lastInsertRowid);
             const rt2Id = Number(rt2.lastInsertRowid);
             const f1Id = Number(f1.lastInsertRowid);
             const f2Id = Number(f2.lastInsertRowid);
 
-            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '101', 'Deluxe 101')`).run(newPropId, bldId, f1Id, rt1Id);
-            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '102', 'Deluxe 102')`).run(newPropId, bldId, f1Id, rt1Id);
-            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '201', 'Superior 201')`).run(newPropId, bldId, f2Id, rt2Id);
-            db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '202', 'Superior 202')`).run(newPropId, bldId, f2Id, rt2Id);
+            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '101', 'Deluxe 101')`).run(newPropId, bldId, f1Id, rt1Id);
+            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '102', 'Deluxe 102')`).run(newPropId, bldId, f1Id, rt1Id);
+            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '201', 'Superior 201')`).run(newPropId, bldId, f2Id, rt2Id);
+            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '202', 'Superior 202')`).run(newPropId, bldId, f2Id, rt2Id);
         } catch (bootErr) {
             console.warn('Property bootstrap assets notice:', bootErr);
         }
 
-        // Mirror to PostgreSQL if connected
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query(`
-                    INSERT INTO properties (
-                        id, organization_id, name, code, slug, property_type, star_rating,
-                        email, phone, address_line1, city, country, currency_code, status
-                    ) VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'ACTIVE')
-                    ON CONFLICT (id) DO NOTHING
-                `, [newPropId, name, code, slug, propertyType, starRating, email, phone, address, city, country, currency]);
-            } catch (pgErr: any) {
-                console.warn('PG property mirror sync warning:', pgErr.message);
-            }
-        }
-
-        const created = db.prepare('SELECT * FROM properties WHERE id = ?').get(newPropId);
+        const created = await db.prepare('SELECT * FROM properties WHERE id = ?').get(newPropId);
         res.status(201).json({ success: true, data: created, message: 'Property created successfully' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create property' });
     }
 });
 
-// PUT /api/properties/:id - Update property details
+// PUT /api/properties/:id - Update property details & general operational settings
 router.put('/:id', async (req: Request, res: Response) => {
     try {
         const propertyId = Number(req.params.id);
         const body = req.body || {};
+        const starRating = body.starRating ? Math.min(5, Math.max(1, Number(body.starRating))) : null;
+        const currency = body.currency ? String(body.currency).slice(0, 3).toUpperCase() : null;
 
-        db.prepare(`
+        await db.prepare(`
             UPDATE properties
             SET name = COALESCE(?, name),
                 code = COALESCE(?, code),
-                property_type = COALESCE(?, property_type),
+                star_rating = COALESCE(?, star_rating),
                 email = COALESCE(?, email),
                 phone = COALESCE(?, phone),
-                address_line1 = COALESCE(?, address_line1),
+                address = COALESCE(?, address),
                 city = COALESCE(?, city),
+                country = COALESCE(?, country),
+                currency = COALESCE(?, currency),
+                time_zone = COALESCE(?, time_zone),
+                check_in_time = COALESCE(?, check_in_time),
+                check_out_time = COALESCE(?, check_out_time),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(body.name || null, body.code || null, body.propertyType || null, body.email || null, body.phone || null, body.address || null, body.city || null, propertyId);
+        `).run(
+            body.name || null,
+            body.code || null,
+            starRating,
+            body.email || null,
+            body.phone || null,
+            body.address || null,
+            body.city || null,
+            body.country || null,
+            currency,
+            body.timeZone || null,
+            body.checkInTime || null,
+            body.checkOutTime || null,
+            propertyId
+        );
 
-        const updated = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+        const updated = await db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
         res.json({ success: true, data: updated, message: 'Property updated successfully' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to update property' });
@@ -244,22 +251,24 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.post('/:id/buildings', async (req: Request, res: Response) => {
     try {
         const propertyId = Number(req.params.id) || 1;
-        const { code, name, sortOrder } = req.body;
+        const { code, name, sortOrder, totalFloors, type, description, status, amenityIds } = req.body;
         const bCode = (code || 'BLD').toUpperCase();
         const bName = name || 'New Wing';
-        const result = db.prepare(`
-            INSERT INTO buildings (property_id, code, name, sort_order)
-            VALUES (?, ?, ?, ?)
-        `).run(propertyId, bCode, bName, Number(sortOrder) || 1);
+        const result = await db.prepare(`
+            INSERT INTO buildings (property_id, code, name, sort_order, total_floors, type, description, status, amenity_ids_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            propertyId,
+            bCode,
+            bName,
+            Number(sortOrder) || 1,
+            Number(totalFloors) || 5,
+            type || 'Main Tower',
+            description || '',
+            status || 'Active',
+            amenityIds ? JSON.stringify(amenityIds) : null
+        );
         const newId = Number(result.lastInsertRowid);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query(
-                    `INSERT INTO buildings (id, property_id, code, name, sort_order) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
-                    [newId, propertyId, bCode, bName, Number(sortOrder) || 1]
-                );
-            } catch {}
-        }
         res.status(201).json({ success: true, data: { id: newId, code: bCode, name: bName } });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create building' });
@@ -270,22 +279,29 @@ router.post('/:id/buildings', async (req: Request, res: Response) => {
 router.put('/:id/buildings/:buildingId', async (req: Request, res: Response) => {
     try {
         const buildingId = Number(req.params.buildingId);
-        const { code, name, sortOrder } = req.body;
-        db.prepare(`
+        const { code, name, sortOrder, totalFloors, type, description, status, amenityIds } = req.body;
+        await db.prepare(`
             UPDATE buildings
             SET code = COALESCE(?, code),
                 name = COALESCE(?, name),
-                sort_order = COALESCE(?, sort_order)
+                sort_order = COALESCE(?, sort_order),
+                total_floors = COALESCE(?, total_floors),
+                type = COALESCE(?, type),
+                description = COALESCE(?, description),
+                status = COALESCE(?, status),
+                amenity_ids_json = COALESCE(?, amenity_ids_json)
             WHERE id = ?
-        `).run(code ? code.toUpperCase() : null, name || null, sortOrder ? Number(sortOrder) : null, buildingId);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query(
-                    `UPDATE buildings SET code = COALESCE($1, code), name = COALESCE($2, name), sort_order = COALESCE($3, sort_order) WHERE id = $4`,
-                    [code ? code.toUpperCase() : null, name || null, sortOrder ? Number(sortOrder) : null, buildingId]
-                );
-            } catch {}
-        }
+        `).run(
+            code ? code.toUpperCase() : null,
+            name || null,
+            sortOrder ? Number(sortOrder) : null,
+            totalFloors ? Number(totalFloors) : null,
+            type || null,
+            description || null,
+            status || null,
+            amenityIds ? JSON.stringify(amenityIds) : null,
+            buildingId
+        );
         res.json({ success: true, message: 'Building updated' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to update building' });
@@ -296,12 +312,7 @@ router.put('/:id/buildings/:buildingId', async (req: Request, res: Response) => 
 router.delete('/:id/buildings/:buildingId', async (req: Request, res: Response) => {
     try {
         const buildingId = Number(req.params.buildingId);
-        db.prepare('DELETE FROM buildings WHERE id = ?').run(buildingId);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query('DELETE FROM buildings WHERE id = $1', [buildingId]);
-            } catch {}
-        }
+        await db.prepare('DELETE FROM buildings WHERE id = ?').run(buildingId);
         res.json({ success: true, message: 'Building deleted' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to delete building' });
@@ -311,20 +322,22 @@ router.delete('/:id/buildings/:buildingId', async (req: Request, res: Response) 
 // POST /api/properties/:id/floors - Create floor
 router.post('/:id/floors', async (req: Request, res: Response) => {
     try {
-        const { buildingId, floorNumber, name } = req.body;
-        const result = db.prepare(`
-            INSERT INTO floors (building_id, floor_number, name, sort_order)
-            VALUES (?, ?, ?, ?)
-        `).run(Number(buildingId) || 1, Number(floorNumber) || 1, name || 'Floor', Number(floorNumber) || 1);
+        const { buildingId, floorNumber, name, category, roomCapacity, description, status, amenityIds } = req.body;
+        const result = await db.prepare(`
+            INSERT INTO floors (building_id, floor_number, name, sort_order, category, room_capacity, description, status, amenity_ids_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            Number(buildingId) || 1,
+            Number(floorNumber) || 1,
+            name || 'Floor',
+            Number(floorNumber) || 1,
+            category || 'Guest Rooms',
+            Number(roomCapacity) || 8,
+            description || '',
+            status || 'Open',
+            amenityIds ? JSON.stringify(amenityIds) : null
+        );
         const newId = Number(result.lastInsertRowid);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query(
-                    `INSERT INTO floors (id, building_id, floor_number, name, sort_order) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
-                    [newId, Number(buildingId) || 1, Number(floorNumber) || 1, name || 'Floor', Number(floorNumber) || 1]
-                );
-            } catch {}
-        }
         res.status(201).json({ success: true, data: { id: newId } });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create floor' });
@@ -335,22 +348,29 @@ router.post('/:id/floors', async (req: Request, res: Response) => {
 router.put('/:id/floors/:floorId', async (req: Request, res: Response) => {
     try {
         const floorId = Number(req.params.floorId);
-        const { buildingId, floorNumber, name } = req.body;
-        db.prepare(`
+        const { buildingId, floorNumber, name, category, roomCapacity, description, status, amenityIds } = req.body;
+        await db.prepare(`
             UPDATE floors
             SET building_id = COALESCE(?, building_id),
                 floor_number = COALESCE(?, floor_number),
-                name = COALESCE(?, name)
+                name = COALESCE(?, name),
+                category = COALESCE(?, category),
+                room_capacity = COALESCE(?, room_capacity),
+                description = COALESCE(?, description),
+                status = COALESCE(?, status),
+                amenity_ids_json = COALESCE(?, amenity_ids_json)
             WHERE id = ?
-        `).run(buildingId ? Number(buildingId) : null, floorNumber ? Number(floorNumber) : null, name || null, floorId);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query(
-                    `UPDATE floors SET building_id = COALESCE($1, building_id), floor_number = COALESCE($2, floor_number), name = COALESCE($3, name) WHERE id = $4`,
-                    [buildingId ? Number(buildingId) : null, floorNumber ? Number(floorNumber) : null, name || null, floorId]
-                );
-            } catch {}
-        }
+        `).run(
+            buildingId ? Number(buildingId) : null,
+            floorNumber ? Number(floorNumber) : null,
+            name || null,
+            category || null,
+            roomCapacity ? Number(roomCapacity) : null,
+            description || null,
+            status || null,
+            amenityIds ? JSON.stringify(amenityIds) : null,
+            floorId
+        );
         res.json({ success: true, message: 'Floor updated' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to update floor' });
@@ -361,12 +381,7 @@ router.put('/:id/floors/:floorId', async (req: Request, res: Response) => {
 router.delete('/:id/floors/:floorId', async (req: Request, res: Response) => {
     try {
         const floorId = Number(req.params.floorId);
-        db.prepare('DELETE FROM floors WHERE id = ?').run(floorId);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query('DELETE FROM floors WHERE id = $1', [floorId]);
-            } catch {}
-        }
+        await db.prepare('DELETE FROM floors WHERE id = ?').run(floorId);
         res.json({ success: true, message: 'Floor deleted' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to delete floor' });
@@ -377,23 +392,51 @@ router.delete('/:id/floors/:floorId', async (req: Request, res: Response) => {
 router.post('/:id/room-types', async (req: Request, res: Response) => {
     try {
         const propertyId = Number(req.params.id) || 1;
-        const { code, name, baseOccupancy, maxOccupancy, baseRate, description } = req.body;
-        const rtCode = (code || 'RT').toUpperCase();
+        const body = req.body || {};
+        const { code, name, baseOccupancy, maxOccupancy, baseRate, description } = body;
+        const rtCode = (code || body.shortCode || 'RT').toUpperCase();
         const rtName = name || 'New Room Type';
-        const result = db.prepare(`
-            INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, description)
-            VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-        `).run(propertyId, rtCode, rtName, Number(baseOccupancy) || 2, Number(maxOccupancy) || 3, Number(baseRate) || 3500, description || null);
+        const baseOcc = Number(baseOccupancy || body.baseAdult) || 2;
+        const maxOcc = Number(maxOccupancy || body.maxAdult) || 3;
+        const maxChild = Number(body.maxChild) || 1;
+        const rate = Number(baseRate || body.basePrice) || 3500;
+        const extraAdult = Number(body.extraAdultPrice) || 1000;
+        const extraChild = Number(body.extraChildPrice) || 500;
+        const size = Number(body.size) || 350;
+
+        const result = await db.prepare(`
+            INSERT INTO room_types (
+                property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate,
+                description, size, extra_adult_price, extra_child_price, pricing_unit, bed_type, view_type,
+                smoking_policy, amenities_json, photos_json, is_connecting, show_on_website, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            propertyId,
+            rtCode,
+            rtName,
+            baseOcc,
+            maxOcc,
+            maxChild,
+            rate,
+            extraAdult,
+            description || body.description || null,
+            size,
+            extraAdult,
+            extraChild,
+            body.pricingUnit || 'Per Room',
+            body.bedType || 'King',
+            body.viewType || 'City View',
+            body.smokingPolicy || 'Non-Smoking',
+            body.amenities ? JSON.stringify(body.amenities) : null,
+            body.photos ? JSON.stringify(body.photos) : null,
+            body.isConnecting ? 1 : 0,
+            body.showOnWebsite !== undefined ? (body.showOnWebsite ? 1 : 0) : 1,
+            body.status || 'Active'
+        );
+
         const newId = Number(result.lastInsertRowid);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query(
-                    `INSERT INTO room_types (id, property_id, code, name, base_occupancy, max_adults, max_children, base_rate, description) VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8) ON CONFLICT (id) DO NOTHING`,
-                    [newId, propertyId, rtCode, rtName, Number(baseOccupancy) || 2, Number(maxOccupancy) || 3, Number(baseRate) || 3500, description || null]
-                );
-            } catch {}
-        }
-        res.status(201).json({ success: true, data: { id: newId, code: rtCode, name: rtName } });
+        res.status(201).json({ success: true, data: { ...body, id: newId, code: rtCode, name: rtName } });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create room type' });
     }
@@ -403,25 +446,59 @@ router.post('/:id/room-types', async (req: Request, res: Response) => {
 router.put('/:id/room-types/:roomTypeId', async (req: Request, res: Response) => {
     try {
         const roomTypeId = Number(req.params.roomTypeId);
-        const { code, name, baseOccupancy, maxOccupancy, baseRate, description } = req.body;
-        db.prepare(`
+        const body = req.body || {};
+        const { code, name, baseOccupancy, maxOccupancy, baseRate, description } = body;
+        const rtCode = code || body.shortCode;
+        const baseOcc = baseOccupancy || body.baseAdult;
+        const maxOcc = maxOccupancy || body.maxAdult;
+        const rate = baseRate || body.basePrice;
+
+        await db.prepare(`
             UPDATE room_types
             SET code = COALESCE(?, code),
                 name = COALESCE(?, name),
                 base_occupancy = COALESCE(?, base_occupancy),
                 max_adults = COALESCE(?, max_adults),
+                max_children = COALESCE(?, max_children),
                 base_rate = COALESCE(?, base_rate),
-                description = COALESCE(?, description)
+                extra_bed_rate = COALESCE(?, extra_bed_rate),
+                description = COALESCE(?, description),
+                size = COALESCE(?, size),
+                extra_adult_price = COALESCE(?, extra_adult_price),
+                extra_child_price = COALESCE(?, extra_child_price),
+                pricing_unit = COALESCE(?, pricing_unit),
+                bed_type = COALESCE(?, bed_type),
+                view_type = COALESCE(?, view_type),
+                smoking_policy = COALESCE(?, smoking_policy),
+                amenities_json = COALESCE(?, amenities_json),
+                photos_json = COALESCE(?, photos_json),
+                is_connecting = COALESCE(?, is_connecting),
+                show_on_website = COALESCE(?, show_on_website),
+                status = COALESCE(?, status)
             WHERE id = ?
-        `).run(code ? code.toUpperCase() : null, name || null, baseOccupancy ? Number(baseOccupancy) : null, maxOccupancy ? Number(maxOccupancy) : null, baseRate ? Number(baseRate) : null, description || null, roomTypeId);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query(
-                    `UPDATE room_types SET code = COALESCE($1, code), name = COALESCE($2, name), base_occupancy = COALESCE($3, base_occupancy), max_adults = COALESCE($4, max_adults), base_rate = COALESCE($5, base_rate), description = COALESCE($6, description) WHERE id = $7`,
-                    [code ? code.toUpperCase() : null, name || null, baseOccupancy ? Number(baseOccupancy) : null, maxOccupancy ? Number(maxOccupancy) : null, baseRate ? Number(baseRate) : null, description || null, roomTypeId]
-                );
-            } catch {}
-        }
+        `).run(
+            rtCode ? rtCode.toUpperCase() : null,
+            name || null,
+            baseOcc ? Number(baseOcc) : null,
+            maxOcc ? Number(maxOcc) : null,
+            body.maxChild !== undefined ? Number(body.maxChild) : null,
+            rate ? Number(rate) : null,
+            body.extraAdultPrice ? Number(body.extraAdultPrice) : null,
+            description || body.description || null,
+            body.size ? Number(body.size) : null,
+            body.extraAdultPrice ? Number(body.extraAdultPrice) : null,
+            body.extraChildPrice ? Number(body.extraChildPrice) : null,
+            body.pricingUnit || null,
+            body.bedType || null,
+            body.viewType || null,
+            body.smokingPolicy || null,
+            body.amenities ? JSON.stringify(body.amenities) : null,
+            body.photos ? JSON.stringify(body.photos) : null,
+            body.isConnecting !== undefined ? (body.isConnecting ? 1 : 0) : null,
+            body.showOnWebsite !== undefined ? (body.showOnWebsite ? 1 : 0) : null,
+            body.status || null,
+            roomTypeId
+        );
         res.json({ success: true, message: 'Room type updated' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to update room type' });
@@ -432,12 +509,7 @@ router.put('/:id/room-types/:roomTypeId', async (req: Request, res: Response) =>
 router.delete('/:id/room-types/:roomTypeId', async (req: Request, res: Response) => {
     try {
         const roomTypeId = Number(req.params.roomTypeId);
-        db.prepare('DELETE FROM room_types WHERE id = ?').run(roomTypeId);
-        if (isPostgresConnected()) {
-            try {
-                await pgPool.query('DELETE FROM room_types WHERE id = $1', [roomTypeId]);
-            } catch {}
-        }
+        await db.prepare('DELETE FROM room_types WHERE id = ?').run(roomTypeId);
         res.json({ success: true, message: 'Room type deleted' });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to delete room type' });

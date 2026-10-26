@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, Calendar, DollarSign,
     Shield, Percent, Star, Calendar as CalendarIcon,
@@ -7,6 +7,8 @@ import {
     RefreshCw, AlertTriangle, CheckCircle2, Tags
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
 interface RatePlan {
@@ -62,13 +64,6 @@ interface RatePricing {
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const SAMPLE_PACKAGES_L2 = [
-    { id: 1, name: 'Honeymoon Delight', code: 'HONEY' },
-    { id: 2, name: 'Family Adventure', code: 'FAMADV' },
-    { id: 3, name: 'Corporate Executive', code: 'BIZEXEC' },
-    { id: 4, name: 'Wellness & Spa Retreat', code: 'SPA-REL' }
-];
-
 export default function RatePlanManagement() {
     const [view, setView] = useState<'list' | 'form' | 'calendar'>('list');
     const [ratePlans, setRatePlans] = useState<RatePlan[]>(() => {
@@ -78,141 +73,49 @@ export default function RatePlanManagement() {
         } catch {
             // fallback
         }
-        return [
-        {
-            id: 1,
-            name: 'Best Available Rate (BAR)',
-            shortCode: 'BAR-01',
-            marketSegment: 'FIT / Direct',
-            currency: 'BDT',
-            description: 'Standard flexible rate for all direct bookings. No advance payment required.',
-            status: 'Active',
-            mealPlan: 'EP',
-            taxIncluded: false,
-            policies: {
-                depositRequired: false,
-                depositAmount: 0,
-                depositType: 'Percentage',
-                cancellationType: 'Flexible',
-                cancellationDeadline: 24,
-                refundPercentage: 100
-            },
-            activationDate: '2024-01-01',
-            expirationDate: '2025-12-31',
-            isSeasonal: false,
-            validDays: DAYS_OF_WEEK,
-            minNights: 1,
-            cutOffDays: 0,
-            closedToArrival: false,
-            closedToDeparture: false,
-            stopSell: false,
-            pricing: [
-                { roomTypeId: 'Deluxe Suite', structure: 'Flat', operatingCost: 4500, baseRate: 14500, doubleRate: 14500, tripleRate: 18000, extraAdult: 3500, extraChild: 1500, baseOccupancy: 2, maxOccupancy: 3 }
-            ]
-        },
-        {
-            id: 2,
-            name: 'Corporate Negotiated (Standard)',
-            shortCode: 'CORP-A1',
-            marketSegment: 'Corporate',
-            currency: 'BDT',
-            description: 'Negotiated flat rate for Tier-1 Corporate partners. Priority check-in included.',
-            status: 'Active',
-            mealPlan: 'CP',
-            packageId: 3, // Linked to Corporate Executive
-            taxIncluded: true,
-            policies: {
-                depositRequired: true,
-                depositAmount: 0,
-                depositType: 'Fixed',
-                cancellationType: 'Moderate',
-                cancellationDeadline: 48,
-                refundPercentage: 100
-            },
-            activationDate: '2024-01-01',
-            expirationDate: '2025-12-31',
-            isSeasonal: false,
-            validDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-            minNights: 1,
-            cutOffDays: 0,
-            closedToArrival: false,
-            closedToDeparture: false,
-            stopSell: false,
-            pricing: [
-                { roomTypeId: 'Premium King', structure: 'Flat', operatingCost: 3800, baseRate: 11000, doubleRate: 11000, tripleRate: 14000, extraAdult: 2500, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 3 }
-            ]
-        },
-        {
-            id: 3,
-            name: 'Honeymoon Bliss Experience',
-            shortCode: 'HON-PKG',
-            marketSegment: 'Promotional',
-            currency: 'BDT',
-            description: 'Premium romantic getaway including flower bed decoration and candlelight dinner.',
-            status: 'Active',
-            mealPlan: 'MAP',
-            packageId: 1, // Linked to Honeymoon Delight
-            taxIncluded: false,
-            policies: {
-                depositRequired: true,
-                depositAmount: 50,
-                depositType: 'Percentage',
-                cancellationType: 'Strict',
-                cancellationDeadline: 72,
-                refundPercentage: 50
-            },
-            activationDate: '2024-02-01',
-            expirationDate: '2025-06-30',
-            isSeasonal: true,
-            seasonName: 'Summer Season',
-            validDays: DAYS_OF_WEEK,
-            minNights: 2,
-            cutOffDays: 48,
-            closedToArrival: false,
-            closedToDeparture: false,
-            stopSell: false,
-            pricing: [
-                { roomTypeId: 'Junior Suite', structure: 'Flat', operatingCost: 5500, baseRate: 18500, doubleRate: 18500, tripleRate: 22000, extraAdult: 4500, extraChild: 2000, baseOccupancy: 2, maxOccupancy: 3 }
-            ]
-        },
-        {
-            id: 4,
-            name: 'Long Stay Weekly (7+ Nights)',
-            shortCode: 'LSTAY-7',
-            marketSegment: 'Wholesale',
-            currency: 'BDT',
-            description: 'Heavy discount for stays of 7 days or more. Housekeeping every 2nd day.',
-            status: 'Active',
-            mealPlan: 'EP',
-            taxIncluded: true,
-            policies: {
-                depositRequired: true,
-                depositAmount: 100,
-                depositType: 'Fixed',
-                cancellationType: 'Non-Refundable',
-                cancellationDeadline: 0,
-                refundPercentage: 0
-            },
-            activationDate: '2024-01-01',
-            expirationDate: '2025-12-31',
-            isSeasonal: false,
-            validDays: DAYS_OF_WEEK,
-            minNights: 7,
-            cutOffDays: 24,
-            closedToArrival: false,
-            closedToDeparture: false,
-            stopSell: false,
-            pricing: [
-                { roomTypeId: 'Standard Room', structure: 'Flat', operatingCost: 2500, baseRate: 8500, doubleRate: 8500, tripleRate: 10500, extraAdult: 2000, extraChild: 1000, baseOccupancy: 2, maxOccupancy: 2 }
-            ]
-        }
-        ];
+        return [];
     });
     const [formData, setFormData] = useState<Partial<RatePlan>>({});
     const [activeTab, setActiveTab] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [editingPlan, setEditingPlan] = useState<RatePlan | null>(null);
     const [isCodeManual, setIsCodeManual] = useState(false);
+    const [availablePackages, setAvailablePackages] = useState<{ id: number; name: string; shortCode?: string }[]>([]);
+    const [availableMealPlans, setAvailableMealPlans] = useState<{ id: number; shortCode: string; name: string; sellingPriceAdult: number }[]>([]);
+
+    useEffect(() => {
+        const API_BASE = getApiBaseUrl();
+        // Load rate plans from database
+        fetch(`${API_BASE}/api/rates/plans?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setRatePlans(json.data);
+                    localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
+                }
+            })
+            .catch(() => {});
+
+        // Load packages dynamically from database
+        fetch(`${API_BASE}/api/rates/packages?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data)) {
+                    setAvailablePackages(json.data);
+                }
+            })
+            .catch(() => {});
+
+        // Load meal plans dynamically from database
+        fetch(`${API_BASE}/api/rates/meal-plans?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data)) {
+                    setAvailableMealPlans(json.data);
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     const existingCodes = useMemo(() => ratePlans.map(p => p.shortCode), [ratePlans]);
 
@@ -282,14 +185,20 @@ export default function RatePlanManagement() {
         }
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this rate plan?')) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/rates/plans/${id}`, { method: 'DELETE' });
+            } catch {}
             const updated = ratePlans.filter(p => p.id !== id);
             persistRatePlans(updated);
+            try {
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            } catch {}
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData.name || !formData.shortCode) {
             alert('Please provide Plan Name and Short Code.');
             return;
@@ -301,7 +210,31 @@ export default function RatePlanManagement() {
             return;
         }
 
-        const finalData = { ...formData, id: editingPlan?.id || Date.now() } as RatePlan;
+        let finalData = { ...formData, id: editingPlan?.id || Date.now() } as RatePlan;
+        const API_BASE = getApiBaseUrl();
+
+        if (editingPlan) {
+            try {
+                await fetch(`${API_BASE}/api/rates/plans/${editingPlan.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+            } catch {}
+        } else {
+            try {
+                const res = await fetch(`${API_BASE}/api/rates/plans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const json = await res.json();
+                if (json.success && json.data?.id) {
+                    finalData = { ...finalData, id: json.data.id };
+                }
+            } catch {}
+        }
+
         let updated: RatePlan[];
         if (editingPlan) {
             updated = ratePlans.map((p: RatePlan) => p.id === editingPlan.id ? finalData : p);
@@ -309,6 +242,9 @@ export default function RatePlanManagement() {
             updated = [...ratePlans, finalData];
         }
         persistRatePlans(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         setView('list');
         setFormData({});
         setEditingPlan(null);
@@ -428,7 +364,7 @@ export default function RatePlanManagement() {
                     />
                 </div>
                 <div className="text-xs text-slate-500 font-medium self-end md:self-auto">
-                    Showing <span className="font-bold text-slate-900">{ratePlans.filter((plan: RatePlan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase())).length}</span> strategies
+                    Showing <span className="text-slate-900">{ratePlans.filter((plan: RatePlan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || plan.shortCode.toLowerCase().includes(searchQuery.toLowerCase())).length}</span> strategies
                 </div>
             </div>
 
@@ -452,10 +388,10 @@ export default function RatePlanManagement() {
                                 .map((plan: RatePlan) => (
                                 <tr key={plan.id} className="hover:bg-slate-50/70 transition-colors">
                                     <td className="py-3.5 px-4">
-                                        <div className="font-bold text-slate-900">{plan.name}</div>
+                                        <div className="text-slate-900">{plan.name}</div>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="badge-code">{plan.shortCode}</span>
-                                            <span className="text-[10px] text-primary font-bold uppercase tracking-tight">{plan.marketSegment}</span>
+                                            <span className="text-[10px] text-primary uppercase tracking-tight">{plan.marketSegment}</span>
                                         </div>
                                     </td>
                                     <td className="py-3.5 px-4">
@@ -470,7 +406,7 @@ export default function RatePlanManagement() {
                                         )}
                                     </td>
                                     <td className="py-3.5 px-4">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${plan.policies.cancellationType === 'Non-Refundable' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] border ${plan.policies.cancellationType === 'Non-Refundable' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                                             {plan.policies.cancellationType}
                                         </span>
                                     </td>
@@ -480,14 +416,14 @@ export default function RatePlanManagement() {
                                                 <Clock size={11} className="text-slate-400"/> Min {plan.minNights} Nights
                                             </div>
                                             {plan.stopSell && (
-                                                <div className="text-[10px] text-rose-600 font-bold flex items-center gap-1">
+                                                <div className="text-[10px] text-rose-600 flex items-center gap-1">
                                                     <AlertCircle size={11}/> STOP SELL
                                                 </div>
                                             )}
                                         </div>
                                     </td>
                                     <td className="py-3.5 px-4 text-right">
-                                        <div className="font-bold text-slate-900 font-mono text-sm">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
+                                        <div className="text-slate-900 font-mono text-sm">৳{plan.pricing[0]?.baseRate.toLocaleString()}</div>
                                         <div className="text-[10px] text-slate-400 font-medium">Exc. Tax</div>
                                     </td>
                                     <td className="py-3.5 px-4 text-right">
@@ -532,7 +468,7 @@ export default function RatePlanManagement() {
                         <X size={20} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                        <h1 className="text-xl text-slate-900 tracking-tight">
                             {editingPlan ? `Edit Rate Plan: ${editingPlan.shortCode}` : 'Define New Rate Strategy'}
                         </h1>
                         <p className="text-xs text-slate-500">Configure inclusions, seasonal validity, room pricing matrix & yield fences</p>
@@ -571,7 +507,7 @@ export default function RatePlanManagement() {
                         onClick={() => setActiveTab(tab.id)}
                         className={`flex items-center gap-2 px-5 py-3.5 text-xs font-semibold border-b-2 transition ${
                             activeTab === tab.id
-                                ? 'border-primary text-primary font-bold bg-primary-subtle/50 rounded-t-xl'
+                                ? 'border-primary text-primary bg-primary-subtle/50 rounded-t-xl'
                                 : 'border-transparent text-slate-500 hover:text-slate-800'
                         }`}
                     >
@@ -587,7 +523,7 @@ export default function RatePlanManagement() {
                         <div className="bg-white rounded-xl shadow-sm border p-8 space-y-8">
                             <div className="flex items-center gap-2 border-b pb-4">
                                 <FileText size={18} className="text-blue-600" />
-                                <h3 className="text-lg font-bold text-gray-900">Basic Information</h3>
+                                <h3 className="text-lg text-gray-900">Basic Information</h3>
                             </div>
                             <div className="grid grid-cols-2 gap-8">
                                 <div className="space-y-2 text-xs">
@@ -607,14 +543,14 @@ export default function RatePlanManagement() {
                                                 setFormData(prev => ({ ...prev, shortCode: auto }));
                                                 setIsCodeManual(false);
                                             }}
-                                            className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                                            className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
                                         >
                                             <RefreshCw size={10} /> Auto-Generate
                                         </button>
                                     </div>
                                     <div className="relative">
                                         <input
-                                            className={`w-full px-4 py-3 pr-9 border rounded-lg outline-none text-sm font-mono tracking-widest font-bold uppercase transition-all ${
+                                            className={`w-full px-4 py-3 pr-9 border rounded-lg outline-none text-sm font-mono tracking-widest uppercase transition-all ${
                                                 isShortCodeDuplicate(formData.shortCode || '', existingCodes, editingPlan?.shortCode)
                                                     ? 'border-rose-500 bg-rose-50 text-rose-700'
                                                     : 'border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500'
@@ -668,35 +604,40 @@ export default function RatePlanManagement() {
                         <div className="bg-white rounded-xl shadow-sm border p-8 space-y-10">
                             <div className="flex items-center gap-2 border-b pb-4">
                                 <Utensils size={18} className="text-blue-600" />
-                                <h3 className="text-lg font-bold text-gray-900">Meal Plan & Packages</h3>
+                                <h3 className="text-lg text-gray-900">Meal Plan & Packages</h3>
                             </div>
                             <div className="grid grid-cols-2 gap-10">
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-1">Meal Plan Selection</label>
                                     <div className="grid grid-cols-2 gap-3">
-                                        {[
-                                            { id: 'EP', label: 'EP', detail: 'European Plan (Room Only/No Meals)' },
-                                            { id: 'CP', label: 'CP', detail: 'Continental Plan: Buffet Breakfast (৳850)' },
-                                            { id: 'MAP', label: 'MAP', detail: 'Modified American Plan: Breakfast + Lunch/Dinner (৳2200)' },
-                                            { id: 'AP', label: 'AP', detail: 'American Plan: All Inclusive Full Board (৳3500)' },
-                                            { id: 'CORP-LUNCH', label: 'CORP-LUNCH', detail: 'Corporate Executive Lunch: Box Menu (৳1200)' }
-                                        ].map((item: { id: string; label: string; detail: string }) => (
-                                            <button 
-                                                key={item.id} 
-                                                onClick={() => setFormData({ ...formData, mealPlan: item.id })}
-                                                className={`p-4 rounded-xl border-2 text-left transition-all ${formData.mealPlan === item.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-gray-50 border-gray-100 hover:border-blue-200 hover:bg-white text-gray-600'}`}
-                                            >
-                                                <div className="text-sm font-bold">{item.id}</div>
-                                                <div className={`text-[10px] leading-tight mt-1 ${formData.mealPlan === item.id ? 'text-blue-100' : 'text-gray-400'}`}>{item.detail}</div>
-                                            </button>
-                                        ))}
+                                        {(availableMealPlans.length > 0 ? availableMealPlans : [
+                                            { id: 1, shortCode: 'EP', name: 'European Plan (Room Only/No Meals)', sellingPriceAdult: 0 },
+                                            { id: 2, shortCode: 'CP', name: 'Continental Plan: Buffet Breakfast', sellingPriceAdult: 850 },
+                                            { id: 3, shortCode: 'MAP', name: 'Modified American Plan: Breakfast + Lunch/Dinner', sellingPriceAdult: 2200 },
+                                            { id: 4, shortCode: 'AP', name: 'American Plan: All Inclusive Full Board', sellingPriceAdult: 3500 }
+                                        ]).map((item: any) => {
+                                            const code = item.shortCode || item.code || item.id;
+                                            return (
+                                                <button 
+                                                    type="button"
+                                                    key={code} 
+                                                    onClick={() => setFormData({ ...formData, mealPlan: code })}
+                                                    className={`p-4 rounded-xl border-2 text-left transition-all ${formData.mealPlan === code ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-gray-50 border-gray-100 hover:border-blue-200 hover:bg-white text-gray-600'}`}
+                                                >
+                                                    <div className="text-sm font-bold">{code}</div>
+                                                    <div className={`text-[10px] leading-tight mt-1 ${formData.mealPlan === code ? 'text-blue-100' : 'text-gray-400'}`}>
+                                                        {item.name} {Number(item.sellingPriceAdult) > 0 ? `(৳${item.sellingPriceAdult})` : ''}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-1">Linked Package (Layer 2)</label>
-                                    <select className="w-full px-4 py-3 border-2 border-blue-100 rounded-xl bg-blue-50 text-blue-900 font-bold text-sm" value={formData.packageId || ''} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, packageId: parseInt(e.target.value) || undefined })}>
+                                    <select className="w-full px-4 py-3 border-2 border-blue-100 rounded-xl bg-blue-50 text-blue-900 text-sm" value={formData.packageId || ''} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, packageId: parseInt(e.target.value) || undefined })}>
                                         <option value="">None (Standalone Plan)</option>
-                                        {SAMPLE_PACKAGES_L2.map((pkg: { id: number; name: string; code: string }) => (
+                                        {availablePackages.map(pkg => (
                                             <option key={pkg.id} value={pkg.id}>{pkg.name}</option>
                                         ))}
                                     </select>
@@ -707,7 +648,7 @@ export default function RatePlanManagement() {
                                 <div className="flex items-center gap-4">
                                     <div className="p-3 bg-white rounded-lg shadow-sm text-amber-600"><Percent size={20} /></div>
                                     <div>
-                                        <h4 className="font-bold text-gray-900 text-sm">Tax Policy</h4>
+                                        <h4 className="text-gray-900 text-sm">Tax Policy</h4>
                                         <p className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">Pricing inclusive/exclusive tax rule</p>
                                     </div>
                                 </div>
@@ -723,7 +664,7 @@ export default function RatePlanManagement() {
                         <div className="bg-white rounded-xl shadow-sm border p-8 space-y-10">
                             <div className="flex items-center gap-2 border-b pb-4">
                                 <Calendar size={18} className="text-blue-600" />
-                                <h3 className="text-lg font-bold text-gray-900">Validity & Seasonality</h3>
+                                <h3 className="text-lg text-gray-900">Validity & Seasonality</h3>
                             </div>
                             <div className="grid grid-cols-2 gap-8">
                                 <div className="space-y-2 text-xs">
@@ -754,7 +695,7 @@ export default function RatePlanManagement() {
                                     <div className="flex items-center gap-4">
                                         <div className={`p-3 rounded-lg ${formData.isSeasonal ? 'bg-amber-500 text-white' : 'bg-white text-gray-300'}`}><Star size={24} /></div>
                                         <div>
-                                            <h4 className="font-bold text-gray-900 text-sm">Seasonal Rate marking</h4>
+                                            <h4 className="text-gray-900 text-sm">Seasonal Rate marking</h4>
                                             <p className="text-[10px] text-gray-500 font-medium">Markup strategy based on high-demand periods</p>
                                         </div>
                                     </div>
@@ -787,7 +728,7 @@ export default function RatePlanManagement() {
                         <div className="bg-white rounded-xl shadow-sm border p-8 space-y-10">
                             <div className="flex items-center gap-2 border-b pb-4">
                                 <Shield size={18} className="text-blue-600" />
-                                <h3 className="text-lg font-bold text-gray-900">Yield Fences & Controls</h3>
+                                <h3 className="text-lg text-gray-900">Yield Fences & Controls</h3>
                             </div>
                             <div className="grid grid-cols-2 gap-8">
                                 <div className="space-y-2 text-xs">
@@ -810,7 +751,7 @@ export default function RatePlanManagement() {
                                         className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${formData[item.key] ? 'bg-white border-blue-500 shadow-md' : 'bg-gray-50 border-gray-100 hover:border-gray-200'}`}
                                     >
                                         <div className={`p-3 rounded-full ${formData[item.key] ? 'bg-blue-600 text-white' : 'bg-white text-gray-300'}`}>{item.icon}</div>
-                                        <div className="text-center font-bold text-xs uppercase tracking-tighter text-gray-700">{item.label}</div>
+                                        <div className="text-center text-xs uppercase tracking-tighter text-gray-700">{item.label}</div>
                                         <div className={`text-[10px] font-black uppercase ${formData[item.key] ? 'text-blue-600' : 'text-gray-300'}`}>
                                             {formData[item.key] ? 'Enabled' : 'Disabled'}
                                         </div>
@@ -838,10 +779,10 @@ export default function RatePlanManagement() {
                                         <Trash2 size={16} />
                                     </button>
                                     <div className="flex items-center gap-4 border-b pb-6 mb-2">
-                                        <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-lg italic">#{idx + 1}</div>
+                                        <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-white text-lg italic">#{idx + 1}</div>
                                         <div className="flex-1">
                                             <input 
-                                                className="w-full text-xl font-bold bg-transparent border-none outline-none focus:ring-0 p-0 text-gray-900 placeholder:text-gray-200" 
+                                                className="w-full text-xl bg-transparent border-none outline-none focus:ring-0 p-0 text-gray-900 placeholder:text-gray-200" 
                                                 placeholder="Enter Room Category Name..." 
                                                 value={price.roomTypeId}
                                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -852,7 +793,7 @@ export default function RatePlanManagement() {
                                             />
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tier-Wise Revenue Grid</div>
-                                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded ${price.baseRate >= price.operatingCost ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                <div className={`text-[10px] px-2 py-0.5 rounded ${price.baseRate >= price.operatingCost ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                                                     GOP: ৳{(price.baseRate - price.operatingCost).toLocaleString()}
                                                 </div>
                                             </div>
@@ -860,10 +801,10 @@ export default function RatePlanManagement() {
                                         <div className="text-right">
                                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Internal Operating Cost (OPEX)</label>
                                             <div className="relative inline-block">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">৳</span>
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
                                                 <input 
                                                     type="number"
-                                                    className="w-32 pl-7 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm font-bold text-gray-500 text-right focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                    className="w-32 pl-7 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm text-gray-500 text-right focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                                     value={price.operatingCost}
                                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                                         const newPricing = [...(formData.pricing || [])];
@@ -888,7 +829,7 @@ export default function RatePlanManagement() {
                                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 font-bold">৳</span>
                                                     <input 
                                                         type="number" 
-                                                        className="w-full pl-7 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-800"
+                                                        className="w-full pl-7 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-800"
                                                         value={(price as any)[field.key]}
                                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                                             const newPricing = [...(formData.pricing || [])];
@@ -904,7 +845,7 @@ export default function RatePlanManagement() {
                             ))}
                             <button 
                                 onClick={() => setFormData({ ...formData, pricing: [...(formData.pricing || []), { roomTypeId: 'New Tier Strategy', structure: 'Flat', operatingCost: 0, baseRate: 0, doubleRate: 0, tripleRate: 0, extraAdult: 0, extraChild: 0, baseOccupancy: 2, maxOccupancy: 4 }] as any })}
-                                className="w-full py-12 border-2 border-dashed border-gray-200 rounded-2xl text-gray-300 font-bold text-lg uppercase tracking-widest hover:border-blue-400 hover:text-blue-500 transition-all hover:bg-blue-50/50 flex flex-col items-center gap-3"
+                                className="w-full py-12 border-2 border-dashed border-gray-200 rounded-2xl text-gray-300 text-lg uppercase tracking-widest hover:border-blue-400 hover:text-blue-500 transition-all hover:bg-blue-50/50 flex flex-col items-center gap-3"
                             >
                                 <Plus size={32} />
                                 Add Inventory Tier Configuration
@@ -920,18 +861,18 @@ export default function RatePlanManagement() {
         <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in zoom-in duration-300">
             <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-xs">
                 <div>
-                    <h2 className="text-xl font-bold flex items-center gap-3 text-gray-900">
+                    <h2 className="text-xl flex items-center gap-3 text-gray-900">
                         <TrendingUp className="text-blue-600" /> Yield Operations Grid (July 2026)
                     </h2>
                     <p className="text-xs text-gray-500">Live multi-tier BAR and Corporate distribution rates</p>
                 </div>
-                <button onClick={() => setView('list')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold uppercase tracking-wider text-gray-700 transition-colors">
+                <button onClick={() => setView('list')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs uppercase tracking-wider text-gray-700 transition-colors">
                     <X size={15} className="inline mr-1.5"/> Close Console
                 </button>
             </div>
             <div className="grid grid-cols-7 gap-3">
                 {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d: string) => (
-                    <div key={d} className="text-center font-bold text-gray-400 text-[11px] uppercase tracking-wider py-1">{d}</div>
+                    <div key={d} className="text-center text-gray-400 text-[11px] uppercase tracking-wider py-1">{d}</div>
                 ))}
                 {/* 3 leading empty cells for July 1 2026 (Wednesday) */}
                 <div className="h-28 bg-gray-50/50 border border-transparent rounded-xl" />
@@ -944,15 +885,15 @@ export default function RatePlanManagement() {
                     return (
                         <div key={i} className="h-28 bg-white border border-gray-200/90 rounded-xl p-2.5 hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between shadow-2xs">
                             <div className="flex justify-between items-start">
-                                <span className="font-bold text-gray-800 text-xs">{dayNum}</span>
+                                <span className="text-gray-800 text-xs">{dayNum}</span>
                                 <div className={`w-2 h-2 rounded-full ${isFriOrSat ? 'bg-purple-500' : 'bg-emerald-500'}`} title={isFriOrSat ? 'Weekend Surcharge' : 'Standard Demand'} />
                             </div>
                             <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] bg-blue-50/80 px-1.5 py-0.5 rounded font-bold text-blue-700">
+                                <div className="flex justify-between text-[10px] bg-blue-50/80 px-1.5 py-0.5 rounded text-blue-700">
                                     <span>BAR</span>
                                     <span>৳{(baseRate / 1000).toFixed(1)}k</span>
                                 </div>
-                                <div className="flex justify-between text-[10px] bg-purple-50/80 px-1.5 py-0.5 rounded font-bold text-purple-700">
+                                <div className="flex justify-between text-[10px] bg-purple-50/80 px-1.5 py-0.5 rounded text-purple-700">
                                     <span>CORP</span>
                                     <span>৳4.0k</span>
                                 </div>

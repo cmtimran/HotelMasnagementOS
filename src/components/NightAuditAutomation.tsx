@@ -5,7 +5,7 @@ import {
     RefreshCw, Printer,
     Landmark, Play
 } from 'lucide-react';
-import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB } from '../utils/roomInventoryEngine';
+import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB, getOperatingSystemDate, setOperatingSystemDate } from '../utils/roomInventoryEngine';
 
 interface AuditStep {
     id: number;
@@ -93,7 +93,7 @@ export const NightAuditAutomation: React.FC = () => {
         ];
     }, [reservations]);
 
-    const [businessDate, setBusinessDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [businessDate, setBusinessDate] = useState<string>(() => getOperatingSystemDate());
     const [steps, setSteps] = useState<AuditStep[]>(INITIAL_STEPS);
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [auditCompleted, setAuditCompleted] = useState<boolean>(false);
@@ -146,9 +146,15 @@ export const NightAuditAutomation: React.FC = () => {
         // Step 5
         setSteps(prev => prev.map(s => s.id === 5 ? { ...s, status: 'RUNNING' } : s));
         await new Promise(r => setTimeout(r, 800));
-        const nextDay = new Date(new Date(businessDate).getTime() + 86400000).toISOString().slice(0, 10);
+        const parts = businessDate.split('-').map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2] + 1, 12, 0, 0);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const nextDay = `${y}-${m}-${day}`;
         setBusinessDate(nextDay);
-        setSteps(prev => prev.map(s => s.id === 5 ? { ...s, status: 'COMPLETED', resultSummary: `System date rolled from 2026-06-25 to ${nextDay}. Flash report compiled.` } : s));
+        setOperatingSystemDate(nextDay);
+        setSteps(prev => prev.map(s => s.id === 5 ? { ...s, status: 'COMPLETED', resultSummary: `System date rolled from ${businessDate} to ${nextDay}. Flash report compiled.` } : s));
         addLog(`Step 5 complete: Business date rolled to ${nextDay}. General Ledger balanced.`);
 
         setIsRunning(false);
@@ -159,11 +165,12 @@ export const NightAuditAutomation: React.FC = () => {
     const handleResetAudit = () => {
         setSteps(INITIAL_STEPS);
         setAuditCompleted(false);
-        setBusinessDate('2026-06-25');
+        setBusinessDate('2026-07-01');
+        setOperatingSystemDate('2026-07-01');
         setAuditLogs([
-            'Audit sequence reset to pre-audit business date (2026-06-25).'
+            'Audit sequence reset to baseline business date (2026-07-01).'
         ]);
-        showToast('Night Audit reset to pre-audit mode.');
+        showToast('Night Audit reset to baseline mode.');
     };
 
     const totalDebits = glPostings.reduce((acc, p) => acc + p.debitBDT, 0);
@@ -186,8 +193,8 @@ export const NightAuditAutomation: React.FC = () => {
                 actions={
                     <div className="flex items-center gap-3">
                         <div className="text-right hidden sm:block">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-none">System Business Date</span>
-                            <span className="text-sm font-mono font-bold text-[#6C5CE7] mt-1 block leading-tight">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider block leading-none">System Business Date</span>
+                            <span className="text-sm font-mono text-[#6C5CE7] mt-1 block leading-tight">
                                 {businessDate}
                             </span>
                         </div>
@@ -249,7 +256,7 @@ export const NightAuditAutomation: React.FC = () => {
 
                 <div className="flex items-center gap-2 text-xs px-2">
                     <span className="text-slate-500">Total Audit Revenue:</span>
-                    <span className="font-mono font-bold text-slate-900">৳ {totalCredits.toLocaleString()} BDT</span>
+                    <span className="font-mono text-slate-900">৳ {totalCredits.toLocaleString()} BDT</span>
                 </div>
             </div>
 
@@ -262,8 +269,8 @@ export const NightAuditAutomation: React.FC = () => {
                         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-2xs p-3.5 flex flex-col justify-between overflow-y-auto">
                             <div className="space-y-2.5">
                                 <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                                    <h3 className="font-bold text-gray-900 text-xs">Automated Night Audit Verification Checklist</h3>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    <h3 className="text-gray-900 text-xs">Automated Night Audit Verification Checklist</h3>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] ${
                                         auditCompleted
                                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                             : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -285,7 +292,7 @@ export const NightAuditAutomation: React.FC = () => {
                                     >
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-start gap-2.5">
-                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5 ${
+                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5 ${
                                                     s.status === 'COMPLETED'
                                                         ? 'bg-emerald-600 text-white'
                                                         : s.status === 'RUNNING'
@@ -295,7 +302,7 @@ export const NightAuditAutomation: React.FC = () => {
                                                     {s.status === 'COMPLETED' ? '✓' : idx + 1}
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-gray-900 text-xs">{s.title}</h4>
+                                                    <h4 className="text-gray-900 text-xs">{s.title}</h4>
                                                     <p className="text-[10.5px] text-gray-500 mt-0.5">{s.description}</p>
                                                     {s.resultSummary && (
                                                         <p className="text-[10.5px] text-emerald-800 font-semibold mt-1 bg-white p-1.5 rounded border border-emerald-200">
@@ -305,7 +312,7 @@ export const NightAuditAutomation: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold whitespace-nowrap ml-2 ${
+                                            <span className={`px-2 py-0.5 rounded text-[9.5px] whitespace-nowrap ml-2 ${
                                                 s.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
                                                 s.status === 'RUNNING' ? 'bg-purple-100 text-purple-800 animate-pulse' :
                                                 'bg-gray-100 text-gray-500'
@@ -329,7 +336,7 @@ export const NightAuditAutomation: React.FC = () => {
                                 <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                                     <div className="flex items-center gap-1.5">
                                         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                        <span className="font-mono font-bold text-[11px] text-slate-300">Live Audit Console</span>
+                                        <span className="font-mono text-[11px] text-slate-300">Live Audit Console</span>
                                     </div>
                                     <span className="text-[9.5px] text-slate-400 font-mono">STDOUT</span>
                                 </div>
@@ -355,17 +362,17 @@ export const NightAuditAutomation: React.FC = () => {
                     <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-2xs p-3.5 flex flex-col overflow-auto">
                         <div className="flex justify-between items-center pb-2 border-b border-gray-200 mb-2">
                             <div>
-                                <h3 className="font-bold text-gray-900 text-xs">Automated General Ledger (GL) Journal Entries</h3>
+                                <h3 className="text-gray-900 text-xs">Automated General Ledger (GL) Journal Entries</h3>
                                 <p className="text-[10.5px] text-gray-500">Double-entry accounting postings routed by night audit engine.</p>
                             </div>
-                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px]">
+                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px]">
                                 Zero-Variance Balanced
                             </span>
                         </div>
 
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                <tr className="bg-gray-50 border-b border-gray-200 text-[10px] text-gray-500 uppercase tracking-wider">
                                     <th className="px-3 py-2">Account Code</th>
                                     <th className="px-3 py-2">General Ledger Description</th>
                                     <th className="px-3 py-2">Department</th>
@@ -376,7 +383,7 @@ export const NightAuditAutomation: React.FC = () => {
                             <tbody className="divide-y divide-gray-100 text-[11.5px]">
                                 {glPostings.map(gl => (
                                     <tr key={gl.id} className="hover:bg-gray-50/70 transition-colors">
-                                        <td className="px-3 py-2 font-mono font-bold text-purple-700">
+                                        <td className="px-3 py-2 font-mono text-purple-700">
                                             {gl.accountCode}
                                         </td>
                                         <td className="px-3 py-2 font-semibold text-gray-900">
@@ -385,17 +392,17 @@ export const NightAuditAutomation: React.FC = () => {
                                         <td className="px-3 py-2 text-gray-600">
                                             {gl.department}
                                         </td>
-                                        <td className="px-3 py-2 text-right font-mono font-bold text-gray-900">
+                                        <td className="px-3 py-2 text-right font-mono text-gray-900">
                                             {gl.debitBDT > 0 ? `৳ ${gl.debitBDT.toLocaleString()}` : '-'}
                                         </td>
-                                        <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">
+                                        <td className="px-3 py-2 text-right font-mono text-emerald-700">
                                             {gl.creditBDT > 0 ? `৳ ${gl.creditBDT.toLocaleString()}` : '-'}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                             <tfoot>
-                                <tr className="bg-gray-50/90 font-bold border-t-2 border-gray-300 text-xs">
+                                <tr className="bg-gray-50/90 border-t-2 border-gray-300 text-xs">
                                     <td colSpan={3} className="px-3 py-2 text-gray-900">
                                         Trial Balance Net Summary
                                     </td>
@@ -417,12 +424,12 @@ export const NightAuditAutomation: React.FC = () => {
                         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 max-w-2xl w-full text-xs space-y-4">
                             <div className="flex justify-between items-start border-b border-gray-200 pb-3">
                                 <div>
-                                    <h2 className="text-base font-bold text-gray-900">GENERAL MANAGER'S DAILY FLASH REPORT</h2>
+                                    <h2 className="text-base text-gray-900">GENERAL MANAGER'S DAILY FLASH REPORT</h2>
                                     <p className="text-[10px] text-gray-500">Night Audit Day-End Settlement Summary</p>
                                     <p className="text-[10px] text-gray-500 font-mono">Business Date: {businessDate}</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10px]">
+                                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px]">
                                         AUDIT CERTIFIED
                                     </span>
                                     <p className="text-[10px] text-gray-400 mt-1">Generated: 02:00 AM</p>
@@ -431,37 +438,37 @@ export const NightAuditAutomation: React.FC = () => {
 
                             <div className="grid grid-cols-3 gap-3 bg-gray-50 p-3 rounded border border-gray-200">
                                 <div>
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Occupancy</span>
-                                    <p className="text-sm font-bold text-gray-900 mt-0.5">85.7% (24 / 28 Rooms)</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Occupancy</span>
+                                    <p className="text-sm text-gray-900 mt-0.5">85.7% (24 / 28 Rooms)</p>
                                 </div>
                                 <div>
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">Average Daily Rate (ADR)</span>
-                                    <p className="text-sm font-bold text-gray-900 font-mono mt-0.5">৳ 6,500 BDT</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Average Daily Rate (ADR)</span>
+                                    <p className="text-sm text-gray-900 font-mono mt-0.5">৳ 6,500 BDT</p>
                                 </div>
                                 <div>
-                                    <span className="text-[9.5px] font-bold text-gray-400 uppercase">RevPAR</span>
-                                    <p className="text-sm font-bold text-emerald-700 font-mono mt-0.5">৳ 5,571 BDT</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">RevPAR</span>
+                                    <p className="text-sm text-emerald-700 font-mono mt-0.5">৳ 5,571 BDT</p>
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
-                                <h4 className="font-bold text-gray-900 text-xs">Revenue Breakdown</h4>
+                                <h4 className="text-gray-900 text-xs">Revenue Breakdown</h4>
                                 <div className="border border-gray-200 rounded divide-y divide-gray-100 text-xs">
                                     <div className="p-2 flex justify-between">
                                         <span className="text-gray-700">Room Rent (24 Rooms)</span>
-                                        <span className="font-mono font-bold text-gray-900">৳ 156,000</span>
+                                        <span className="font-mono text-gray-900">৳ 156,000</span>
                                     </div>
                                     <div className="p-2 flex justify-between">
                                         <span className="text-gray-700">Food & Beverage (Breakfast & Restaurant)</span>
-                                        <span className="font-mono font-bold text-gray-900">৳ 42,500</span>
+                                        <span className="font-mono text-gray-900">৳ 42,500</span>
                                     </div>
                                     <div className="p-2 flex justify-between">
                                         <span className="text-gray-700">Laundry & Valet Service</span>
-                                        <span className="font-mono font-bold text-gray-900">৳ 6,800</span>
+                                        <span className="font-mono text-gray-900">৳ 6,800</span>
                                     </div>
                                     <div className="p-2 flex justify-between">
                                         <span className="text-gray-700">Airport & Transportation</span>
-                                        <span className="font-mono font-bold text-gray-900">৳ 4,500</span>
+                                        <span className="font-mono text-gray-900">৳ 4,500</span>
                                     </div>
                                     <div className="p-2 flex justify-between bg-gray-50 font-bold">
                                         <span className="text-gray-900">Total Operational Revenue</span>

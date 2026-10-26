@@ -12,7 +12,10 @@ import {
     Users,
     DollarSign,
     Star,
-    Lock
+    Lock,
+    Home,
+    Printer,
+    Wallet
 } from 'lucide-react';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
@@ -23,6 +26,7 @@ import {
     subscribeToPMSEvents,
     broadcastPMSEvent,
     getAllStoredReservations,
+    saveStoredReservations,
     getActiveLocks,
     getCanonicalRooms,
     validateAndCommitReservation,
@@ -30,6 +34,7 @@ import {
     syncRoomTypesAndRoomsFromDB,
     getStandardDailyRateForRoom,
     resolveReservationDailyBaseRate,
+    calculateTariffForRatePlan,
     amendStayInDB,
     moveRoomInDB,
     recordPaymentInDB,
@@ -40,6 +45,12 @@ import {
     ungroupReservationInDB,
     changeGroupOwnerInDB,
     deleteReservationInDB,
+    getOperatingSystemDate,
+    formatToISODate,
+    updateReservationStatusInDB,
+    updateRoomHousekeepingInDB,
+    generateRegistrationNumber,
+    generateFolioNumber,
     type RoomLock,
     type StoredReservation
 } from '../utils/roomInventoryEngine';
@@ -55,8 +66,16 @@ import {
 interface TimelineBooking {
     id: string;
     reservationNumber: string;
+    subBookingNumber?: string;
+    groupCode?: string;
+    registrationNumber?: string;
+    registeredAt?: string;
+    folioNumber?: string;
     guestName: string;
     roomNumber: string;
+    roomType?: string;
+    ratePlan?: string;
+    rate?: number;
     startIndex: number;
     endIndex: number;
     checkInDate?: string;        // Exact ISO check-in
@@ -78,6 +97,8 @@ interface TimelineBooking {
     totalTaxAmount?: number;
     taxConfigCode?: string;
     taxApplicable?: boolean;
+    adults?: number;
+    children?: number;
 }
 
 export interface RoomNode {
@@ -147,18 +168,29 @@ const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBook
     return list;
 };
 
+/**
+ * Calculates start date of Stay View grid (exactly 3 days before system operating date)
+ * using local midday date objects to avoid timezone shifts.
+ */
+const calculateStayViewStartDate = (sysDateISO: string): string => {
+    const iso = formatToISODate(sysDateISO);
+    const parts = iso.split('-').map(Number);
+    if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2] - 3, 12, 0, 0);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    return '2026-06-28';
+};
+
 export const StayView: React.FC = () => {
+    // Current System Operating Date state (realtime synchronized with Header & Night Audit)
+    const [operatingDateStr, setOperatingDateStr] = useState<string>(() => getOperatingSystemDate());
+
     // Current date state - starts 3 days before system date to show backdates (historical) like WingsCRM
-    const [startDate, setStartDate] = useState<string>(() => {
-        const sys = localStorage.getItem('hotel_system_date');
-        const base = sys ? new Date(sys) : new Date('2026-07-01');
-        if (!isNaN(base.getTime())) {
-            const d = new Date(base);
-            d.setDate(d.getDate() - 3);
-            return d.toISOString().split('T')[0];
-        }
-        return '2026-06-28';
-    });
+    const [startDate, setStartDate] = useState<string>(() => calculateStayViewStartDate(getOperatingSystemDate()));
     const [daysWindow, setDaysWindow] = useState<number>(15);
 
     // Tree Expansion State - All floors 1-5 across Buildings 1 & 2 expanded by default
@@ -233,6 +265,14 @@ export const StayView: React.FC = () => {
         targetEndIndex: number;
     } | null>(null);
 
+    // Active drag indicator for suppressing hover popovers and unwanted interactions
+    const isAnyDragActive = Boolean(dragState || extendDrag || (moveDrag && moveDrag.isDragging));
+
+    // Helper: Identify in-house checked-in guests whose stay dates are historical fact and cannot be moved across dates
+    const isInHouseBooking = React.useCallback((b: TimelineBooking) => {
+        return b.status === 'arrived' || b.status === 'stayover' || (b as any).status === 'in-house';
+    }, []);
+
     // =========================================================================
     // ASSIGN ROOMS DRAWER STATE (SLIM & COMPACT)
     // =========================================================================
@@ -285,14 +325,17 @@ export const StayView: React.FC = () => {
     // Generate days array based on startDate and daysWindow
     const days = useMemo(() => {
         const list = [];
-        const base = new Date(startDate);
-        const sys = localStorage.getItem('hotel_system_date');
-        const operatingDateStr = sys ? new Date(sys).toISOString().split('T')[0] : '2026-07-01';
+        const parts = startDate.split('-').map(Number);
+        const startY = parts[0] || 2026;
+        const startM = (parts[1] || 7) - 1;
+        const startD = parts[2] || 1;
 
         for (let i = 0; i < daysWindow; i++) {
-            const current = new Date(base);
-            current.setDate(base.getDate() + i);
-            const iso = current.toISOString().split('T')[0];
+            const current = new Date(startY, startM, startD + i, 12, 0, 0);
+            const y = current.getFullYear();
+            const m = String(current.getMonth() + 1).padStart(2, '0');
+            const d = String(current.getDate()).padStart(2, '0');
+            const iso = `${y}-${m}-${d}`;
             const dayOfWeek = current.toLocaleDateString('en-US', { weekday: 'short' });
             const dayNum = current.getDate();
             const isWeekend = current.getDay() === 5 || current.getDay() === 6; // Friday or Saturday (Holiday/Weekend)
@@ -313,7 +356,7 @@ export const StayView: React.FC = () => {
             });
         }
         return list;
-    }, [startDate, daysWindow]);
+    }, [startDate, daysWindow, operatingDateStr]);
 
     // =========================================================================
     // DYNAMIC TIMELINE GRID RESPONSIVENESS (15 DAYS FIT ON SCREEN WITHOUT SCROLL)
@@ -484,7 +527,8 @@ export const StayView: React.FC = () => {
         const syncedList: TimelineBooking[] = [];
 
         for (const res of stored) {
-            if (res.status === 'cancelled' || res.status === 'voided') {
+            const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+            if (rawStatus === 'cancelled' || rawStatus === 'voided') {
                 continue;
             }
 
@@ -496,7 +540,12 @@ export const StayView: React.FC = () => {
             const baseAmt = Number(res.baseAmount || Math.max(0, totalAmt - totalTax));
             const taxCode = res.taxConfigCode || res.taxDetails?.configCode || 'HOSP-STD';
             const isTaxApp = res.taxApplicable !== false;
-            const isPastBooking = Boolean(res.isPast || res.status === 'completed' || res.status === 'checked-out');
+            const isPastBooking = Boolean(res.isPast || rawStatus === 'completed' || rawStatus === 'checked-out');
+            const isInHouse = rawStatus === 'in-house' || rawStatus === 'arrived' || rawStatus === 'checked-in';
+            const isHold = rawStatus === 'hold' || rawStatus === 'tentative';
+            const timelineStatus: TimelineBooking['status'] = isPastBooking ? 'checked-out' : isInHouse ? 'arrived' : isHold ? 'hold' : 'confirmed';
+            const regNo = res.registrationNumber || (isInHouse ? `REG-${res.reservationNumber.replace(/^RES-/, '')}` : undefined);
+            const folioNo = res.folioNumber || `FOL-${res.reservationNumber.replace(/^RES-/, '')}-1`;
 
             if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.length > 0) {
                 res.roomsList.forEach((r: any, idx: number) => {
@@ -504,6 +553,8 @@ export const StayView: React.FC = () => {
                     const rIn = r.checkInDate || r.checkIn || res.checkIn;
                     const rOut = r.checkOutDate || r.checkOut || res.checkOut;
                     const rNights = Number(r.nights || res.nights || 1);
+                    const rAdults = Number(r.adults !== undefined ? r.adults : (res.adults !== undefined ? res.adults : 2));
+                    const rChildren = Number(r.children !== undefined ? r.children : (res.children !== undefined ? res.children : 0));
 
                     const sIdx = days.findIndex(d => d.date === rIn);
                     const curInDate = new Date(rIn);
@@ -514,14 +565,22 @@ export const StayView: React.FC = () => {
                     syncedList.push({
                         id: `res-${res.id}-${r.id || idx}-${rNum}`,
                         reservationNumber: res.reservationNumber,
+                        subBookingNumber: r.subBookingNumber || ((res.roomsList?.length || 0) > 1 ? `${res.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : res.reservationNumber),
+                        groupCode: res.groupCode,
+                        registrationNumber: r.registrationNumber || regNo,
+                        registeredAt: res.registeredAt,
+                        folioNumber: r.folioNumber || folioNo,
                         guestName: isGroup ? `${res.guestName} (${rNum})` : res.guestName,
                         roomNumber: rNum,
+                        roomType: r.roomType || res.roomType || 'Standard Room',
+                        ratePlan: r.ratePlan || res.ratePlan || 'Standard Rate',
+                        rate: Number(r.rate || r.price || res.rateAmount || 0),
                         startIndex: start,
                         endIndex: end,
                         checkInDate: rIn,
                         checkOutDate: rOut,
                         nights: rNights,
-                        status: isPastBooking ? 'checked-out' : (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
+                        status: timelineStatus,
                         isPast: isPastBooking,
                         isGroupOwner: isGroup && idx === 0,
                         isGroupBooking: isGroup,
@@ -533,7 +592,9 @@ export const StayView: React.FC = () => {
                         baseAmount: baseAmt,
                         totalTaxAmount: totalTax,
                         taxConfigCode: taxCode,
-                        taxApplicable: isTaxApp
+                        taxApplicable: isTaxApp,
+                        adults: rAdults,
+                        children: rChildren
                     });
                 });
             } else {
@@ -541,6 +602,8 @@ export const StayView: React.FC = () => {
                 const rIn = res.checkIn;
                 const rOut = res.checkOut;
                 const rNights = Number(res.nights || 1);
+                const rAdults = Number(res.adults !== undefined ? res.adults : 2);
+                const rChildren = Number(res.children !== undefined ? res.children : 0);
 
                 const sIdx = days.findIndex(d => d.date === rIn);
                 const curInDate = new Date(rIn);
@@ -551,14 +614,22 @@ export const StayView: React.FC = () => {
                 syncedList.push({
                     id: `res-${res.id}-${rNum}`,
                     reservationNumber: res.reservationNumber,
+                    subBookingNumber: res.subBookingNumber || `${res.reservationNumber}-01`,
+                    groupCode: res.groupCode,
+                    registrationNumber: regNo,
+                    registeredAt: res.registeredAt,
+                    folioNumber: folioNo,
                     guestName: res.guestName,
                     roomNumber: rNum,
+                    roomType: res.roomType || 'Standard Room',
+                    ratePlan: res.ratePlan || 'Standard Rate',
+                    rate: Number(res.rateAmount || res.totalAmount || 0),
                     startIndex: start,
                     endIndex: end,
                     checkInDate: rIn,
                     checkOutDate: rOut,
                     nights: rNights,
-                    status: isPastBooking ? 'checked-out' : (res.status === 'in-house' || res.status === 'arrived') ? 'arrived' : res.status === 'hold' ? 'hold' : 'confirmed',
+                    status: timelineStatus,
                     isPast: isPastBooking,
                     isGroupOwner: isGroup,
                     isGroupBooking: isGroup,
@@ -570,7 +641,9 @@ export const StayView: React.FC = () => {
                     baseAmount: baseAmt,
                     totalTaxAmount: totalTax,
                     taxConfigCode: taxCode,
-                    taxApplicable: isTaxApp
+                    taxApplicable: isTaxApp,
+                    adults: rAdults,
+                    children: rChildren
                 });
             }
         }
@@ -580,7 +653,7 @@ export const StayView: React.FC = () => {
 
     // Subscribe to cross-tab PMS real-time synchronization events
     useEffect(() => {
-        // Sync initially on mount from local cache and live DB (PostgreSQL / SQLite)
+        // Sync initially on mount from local cache and live DB (PostgreSQL)
         syncStoredReservations();
         Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
             setRoomsVersion(v => v + 1);
@@ -590,11 +663,26 @@ export const StayView: React.FC = () => {
         const unsubscribe = subscribeToPMSEvents((event) => {
             setActiveLocks(getActiveLocks());
 
-            if (event.type === 'RESERVATION_COMMITTED' || event.type === 'INVENTORY_REFRESH') {
+            if (event.type === 'SYSTEM_DATE_CHANGED') {
+                const newSys = (event as any).systemDate || getOperatingSystemDate();
+                setOperatingDateStr(newSys);
+                setStartDate(calculateStayViewStartDate(newSys));
+            }
+
+            if (event.type === 'RESERVATION_COMMITTED' || event.type === 'RESERVATION_UPDATED' || event.type === 'INVENTORY_REFRESH') {
                 setRoomsVersion(v => v + 1);
                 syncStoredReservations();
             }
         });
+
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'hotel_system_date' || e.key === 'hotel_system_date_iso') {
+                const newSys = getOperatingSystemDate();
+                setOperatingDateStr(newSys);
+                setStartDate(calculateStayViewStartDate(newSys));
+            }
+        };
+        window.addEventListener('storage', handleStorage);
 
         const timer = setInterval(() => {
             setActiveLocks(getActiveLocks());
@@ -602,6 +690,7 @@ export const StayView: React.FC = () => {
 
         return () => {
             unsubscribe();
+            window.removeEventListener('storage', handleStorage);
             clearInterval(timer);
         };
     }, [syncStoredReservations]);
@@ -654,7 +743,7 @@ export const StayView: React.FC = () => {
                 const roomNumbersSet = new Set(floorRooms.map((r: RoomNode) => r.roomNumber));
 
                 breakdown[floor.id] = days.map(d => {
-                    const assignedCount = bookings.filter(b => 
+                    const assignedCount = bookings.filter(b =>
                         roomNumbersSet.has(b.roomNumber) && d.index >= b.startIndex && d.index <= b.endIndex
                     ).length;
                     const availableCount = Math.max(0, floorRooms.length - assignedCount);
@@ -802,8 +891,8 @@ export const StayView: React.FC = () => {
         return dailyOccupancy[targetIdx]?.available ?? totalRoomsCount;
     }, [dailyOccupancy, days, totalRoomsCount]);
 
-    // Open Unified Reservation Action Drawer on Normal Click
-    const handleOpenDetailsDrawer = (booking: TimelineBooking) => {
+    // Helper to enrich a timeline booking with live folio and financial calculations
+    const getEnrichedBookingDetails = (booking: TimelineBooking): AmendBookingData => {
         let arrivalDateStr = booking.checkInDate || days[booking.startIndex]?.date || '2026-07-01';
         let currentDepDateStr = booking.checkOutDate;
         let currentNights = booking.nights;
@@ -834,9 +923,64 @@ export const StayView: React.FC = () => {
         const baseAmt = originalRes && originalRes.baseAmount ? Number(originalRes.baseAmount) : taxCalc.baseAmount;
         const taxCode = originalRes?.taxConfigCode || originalRes?.taxDetails?.configCode || 'HOSP-STD';
 
-        const bData: AmendBookingData = {
+        const matchingRoomRow = originalRes?.roomsList?.find((r: any) => String(r.roomNumber) === String(booking.roomNumber));
+        const resolvedAdults = Number(matchingRoomRow?.adults ?? originalRes?.adults ?? booking.adults ?? 2);
+        const resolvedChildren = Number(matchingRoomRow?.children ?? originalRes?.children ?? booking.children ?? 0);
+        const resolvedChildrenAges = matchingRoomRow?.childrenAges || originalRes?.childrenAges || [];
+
+        const subBookingNo = matchingRoomRow?.subBookingNumber || originalRes?.subBookingNumber || (originalRes?.roomsList && originalRes.roomsList.length > 1 ? `${booking.reservationNumber}-01` : booking.reservationNumber);
+        const regNo = matchingRoomRow?.registrationNumber || booking.registrationNumber || originalRes?.registrationNumber || (booking.status === 'arrived' ? `REG-${subBookingNo.replace(/^RES-/, '')}` : undefined);
+        const folioNo = matchingRoomRow?.folioNumber || booking.folioNumber || originalRes?.folioNumber || `FOL-${subBookingNo.replace(/^RES-/, '')}`;
+
+        // Build dynamic groupRoomsList if present on originalRes or by cross-referencing stored reservations
+        let groupRoomsList = originalRes?.groupRoomsList;
+        if (!groupRoomsList || groupRoomsList.length === 0) {
+            if (originalRes?.groupCode) {
+                const linkedRes = stored.filter(r => r.groupCode === originalRes.groupCode);
+                groupRoomsList = linkedRes.flatMap((lr, lIdx) => {
+                    const rooms = lr.roomsList && lr.roomsList.length > 0 ? lr.roomsList : [{
+                        roomNumber: lr.roomNumber,
+                        roomType: lr.roomType,
+                        ratePlan: lr.ratePlan || 'Standard Rate',
+                        guestName: lr.guestName,
+                        adults: lr.adults,
+                        children: lr.children,
+                        status: lr.status,
+                        subBookingNumber: lr.subBookingNumber || lr.reservationNumber,
+                        registrationNumber: lr.registrationNumber,
+                        folioNumber: lr.folioNumber,
+                        isPrimary: lIdx === 0
+                    }];
+                    return rooms.map((rm: any, rIdx: number) => ({
+                        ...rm,
+                        reservationNumber: rm.subBookingNumber || lr.reservationNumber,
+                        guestName: rm.guestName || lr.guestName,
+                        ratePlan: lr.ratePlan || 'Standard Rate',
+                        isPrimary: lIdx === 0 && rIdx === 0
+                    }));
+                });
+            } else if (originalRes?.roomsList && originalRes.roomsList.length > 1) {
+                groupRoomsList = originalRes.roomsList.map((rm: any, idx: number) => ({
+                    ...rm,
+                    reservationNumber: rm.subBookingNumber || `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}`,
+                    guestName: originalRes.guestName,
+                    ratePlan: originalRes.ratePlan || 'Standard Rate',
+                    isPrimary: idx === 0
+                }));
+            }
+        }
+
+        return {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
+            groupCode: originalRes?.groupCode,
+            subBookingNumber: subBookingNo,
+            registrationNumber: regNo,
+            registeredAt: booking.registeredAt || originalRes?.registeredAt,
+            folioNumber: folioNo,
+            groupRoomsList,
+            roomsList: originalRes?.roomsList,
+            allocatedRooms: originalRes?.allocatedRooms,
             guestName: booking.guestName,
             roomNumber: booking.roomNumber,
             roomType: originalRes?.roomType || 'Deluxe Double',
@@ -863,8 +1007,39 @@ export const StayView: React.FC = () => {
             phone: originalRes?.phone,
             email: originalRes?.email,
             vip: originalRes?.vip,
-            source: originalRes?.source
+            source: originalRes?.source,
+            adults: resolvedAdults,
+            children: resolvedChildren,
+            childrenAges: resolvedChildrenAges
         };
+    };
+
+    // Hover tooltip state for StayView booking bars
+    const [hoveredBooking, setHoveredBooking] = useState<{
+        booking: TimelineBooking;
+        enriched: AmendBookingData;
+        rect: { top: number; left: number; right: number; bottom: number; width: number; height: number };
+    } | null>(null);
+    const hoverTimerRef = useRef<any>(null);
+
+    // Dismiss hover tooltip on window scroll or resize
+    useEffect(() => {
+        const handleDismissHover = () => {
+            if (hoveredBooking) setHoveredBooking(null);
+        };
+        window.addEventListener('scroll', handleDismissHover, true);
+        window.addEventListener('resize', handleDismissHover);
+        return () => {
+            window.removeEventListener('scroll', handleDismissHover, true);
+            window.removeEventListener('resize', handleDismissHover);
+        };
+    }, [hoveredBooking]);
+
+    // Open Unified Reservation Action Drawer on Normal Click
+    const handleOpenDetailsDrawer = (booking: TimelineBooking) => {
+        if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+        setHoveredBooking(null);
+        const bData = getEnrichedBookingDetails(booking);
         setActionDrawerBooking(bData);
         setActionDrawerMode('overview');
         setIsActionDrawerOpen(true);
@@ -922,6 +1097,11 @@ export const StayView: React.FC = () => {
         const baseAmt = originalRes && originalRes.baseAmount ? Number(originalRes.baseAmount) : taxCalc.baseAmount;
         const taxCode = originalRes?.taxConfigCode || originalRes?.taxDetails?.configCode || 'HOSP-STD';
 
+        const matchingRoomRow = originalRes?.roomsList?.find((r: any) => String(r.roomNumber) === String(booking.roomNumber));
+        const resolvedAdults = Number(matchingRoomRow?.adults ?? originalRes?.adults ?? booking.adults ?? 2);
+        const resolvedChildren = Number(matchingRoomRow?.children ?? originalRes?.children ?? booking.children ?? 0);
+        const resolvedChildrenAges = matchingRoomRow?.childrenAges || originalRes?.childrenAges || [];
+
         const bData: AmendBookingData = {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
@@ -950,7 +1130,10 @@ export const StayView: React.FC = () => {
             phone: originalRes?.phone,
             email: originalRes?.email,
             vip: originalRes?.vip,
-            source: originalRes?.source
+            source: originalRes?.source,
+            adults: resolvedAdults,
+            children: resolvedChildren,
+            childrenAges: resolvedChildrenAges
         };
 
         setActionDrawerBooking(bData);
@@ -961,7 +1144,7 @@ export const StayView: React.FC = () => {
     };
 
     // Save Extended / Shortened Stay to Central PMS Storage & Database
-    const handleSaveAmendStay = (bookingId: string, _newDeparture: string, newNights: number) => {
+    const handleSaveAmendStay = (bookingId: string, _newDeparture: string, newNights: number, newAdults?: number, newChildren?: number) => {
         const targetB = bookings.find(b => b.id === bookingId);
         if (!targetB) return;
 
@@ -988,23 +1171,33 @@ export const StayView: React.FC = () => {
             const updated = { ...res };
             updated.checkOut = canonicalDeparture;
             updated.nights = canonicalNights;
+            if (newAdults !== undefined) updated.adults = newAdults;
+            if (newChildren !== undefined) updated.children = newChildren;
 
             if (updated.roomsList && Array.isArray(updated.roomsList)) {
                 updated.roomsList = updated.roomsList.map((r: any) => {
                     if (String(r.roomNumber) === String(targetB.roomNumber)) {
+                        const rowAdults = newAdults !== undefined ? newAdults : (r.adults ?? 2);
+                        const rowChildren = newChildren !== undefined ? newChildren : (r.children ?? 0);
+                        const standardRate = getStandardDailyRateForRoom(targetB.roomNumber, r.roomType || res.roomType);
+                        const updatedRate = calculateTariffForRatePlan(r.ratePlan || res.ratePlan, r.roomType || res.roomType, standardRate, rowAdults, rowChildren);
                         return {
                             ...r,
                             checkOut: canonicalDeparture,
                             checkOutDate: canonicalDeparture,
-                            nights: canonicalNights
+                            nights: canonicalNights,
+                            adults: rowAdults,
+                            children: rowChildren,
+                            rate: updatedRate
                         };
                     }
                     return r;
                 });
             }
 
-            // Calculate base daily rate without taxes
-            const dailyBase = resolveReservationDailyBaseRate(res, targetB.roomNumber);
+            // Calculate base daily rate with updated occupancy
+            const matchingRow = updated.roomsList?.find((r: any) => String(r.roomNumber) === String(targetB.roomNumber));
+            const dailyBase = matchingRow?.rate || resolveReservationDailyBaseRate(updated, targetB.roomNumber);
             const newBaseAmount = dailyBase * canonicalNights;
 
             // Recalculate multi-tier taxes & VAT with central engine (/taxes-vat)
@@ -1023,9 +1216,7 @@ export const StayView: React.FC = () => {
             updated.dueAmount = Math.max(0, newTaxCalc.grandTotal - (updated.paidAmount || 0));
 
             stored[resIdx] = updated;
-            localStorage.setItem('hotel_reservations_v10', JSON.stringify(stored));
-            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+            saveStoredReservations(stored);
 
             // Persist to Relational Database via API
             amendStayInDB(targetB.reservationNumber, canonicalDeparture, canonicalNights, {
@@ -1062,14 +1253,20 @@ export const StayView: React.FC = () => {
         const targetB = bookings.find(b => b.id === bookingId);
         if (!targetB) return;
 
+        const isGuestInHouse = isInHouseBooking(targetB);
+        // For in-house bookings, move cannot be backdated before System Date!
+        const validatedFromDate = isGuestInHouse && newFromDate < operatingDateStr
+            ? operatingDateStr
+            : newFromDate;
+
         const baseDate = new Date(days[0]?.date || '2026-06-28');
-        const fromIdx = days.findIndex(d => d.date === newFromDate);
-        const startCol = fromIdx >= 0 ? fromIdx : Math.round((new Date(newFromDate).getTime() - baseDate.getTime()) / 86400000);
-        const stayNights = Math.max(1, Math.round((new Date(newToDate).getTime() - new Date(newFromDate).getTime()) / 86400000) || (targetB.endIndex - targetB.startIndex + 1));
-        const endCol = startCol + stayNights - 1;
+        const fromIdx = days.findIndex(d => d.date === validatedFromDate);
+        const startCol = fromIdx >= 0 ? fromIdx : Math.round((new Date(validatedFromDate).getTime() - baseDate.getTime()) / 86400000);
+        const stayNights = Math.max(1, Math.round((new Date(newToDate).getTime() - new Date(validatedFromDate).getTime()) / 86400000) || (targetB.endIndex - targetB.startIndex + 1));
+        const endCol = isGuestInHouse ? targetB.endIndex : (startCol + stayNights - 1);
 
         // Strict Double-Booking Collision Check on target room before moving
-        const conflict = findRoomConflict(newRoomNumber, startCol, endCol, targetB.id);
+        const conflict = findRoomConflict(newRoomNumber, isGuestInHouse ? targetB.startIndex : startCol, endCol, targetB.id);
         if (conflict) {
             toast.error(`Cannot move to Room ${newRoomNumber}: Already booked by ${conflict.guestName} (${conflict.reservationNumber}) from ${conflict.checkInDate} to ${conflict.checkOutDate}!`);
             return;
@@ -1088,11 +1285,11 @@ export const StayView: React.FC = () => {
                             ...r,
                             roomNumber: newRoomNumber,
                             assignedRooms: [newRoomNumber],
-                            checkIn: newFromDate,
+                            checkIn: isGuestInHouse ? (r.checkIn || r.checkInDate || res.checkIn) : validatedFromDate,
                             checkOut: newToDate,
-                            checkInDate: newFromDate,
+                            checkInDate: isGuestInHouse ? (r.checkIn || r.checkInDate || res.checkIn) : validatedFromDate,
                             checkOutDate: newToDate,
-                            nights: stayNights
+                            nights: isGuestInHouse ? (r.nights || res.nights || stayNights) : stayNights
                         };
                     }
                     return r;
@@ -1101,25 +1298,27 @@ export const StayView: React.FC = () => {
 
             if (String(updated.roomNumber) === String(targetB.roomNumber)) {
                 updated.roomNumber = newRoomNumber;
-                updated.checkIn = newFromDate;
+                if (!isGuestInHouse) {
+                    updated.checkIn = validatedFromDate;
+                }
                 updated.checkOut = newToDate;
-                updated.nights = stayNights;
+                if (!isGuestInHouse) {
+                    updated.nights = stayNights;
+                }
             }
             if (updated.allocatedRooms && Array.isArray(updated.allocatedRooms)) {
                 updated.allocatedRooms = updated.allocatedRooms.map((rm: string) => rm === targetB.roomNumber ? newRoomNumber : rm);
             }
 
             stored[resIdx] = updated;
-            localStorage.setItem('hotel_reservations_v10', JSON.stringify(stored));
-            localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
-            localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+            saveStoredReservations(stored);
 
             // Persist to Relational Database via API
-            moveRoomInDB(targetB.reservationNumber, newRoomNumber, newFromDate, newToDate, targetB.roomNumber);
+            moveRoomInDB(targetB.reservationNumber, newRoomNumber, validatedFromDate, newToDate, targetB.roomNumber);
 
             broadcastPMSEvent({ type: 'RESERVATION_COMMITTED', reservation: updated });
         } else {
-            moveRoomInDB(targetB.reservationNumber || bookingId, newRoomNumber, newFromDate, newToDate, targetB.roomNumber);
+            moveRoomInDB(targetB.reservationNumber || bookingId, newRoomNumber, validatedFromDate, newToDate, targetB.roomNumber);
         }
 
         setBookings(prev => prev.map(b => {
@@ -1127,11 +1326,11 @@ export const StayView: React.FC = () => {
             return {
                 ...b,
                 roomNumber: newRoomNumber,
-                startIndex: startCol,
-                endIndex: endCol,
-                checkInDate: newFromDate,
+                startIndex: isGuestInHouse ? b.startIndex : startCol,
+                endIndex: isGuestInHouse ? b.endIndex : endCol,
+                checkInDate: isGuestInHouse ? b.checkInDate : validatedFromDate,
                 checkOutDate: newToDate,
-                nights: stayNights
+                nights: isGuestInHouse ? b.nights : stayNights
             };
         }));
 
@@ -1232,9 +1431,7 @@ export const StayView: React.FC = () => {
         };
 
         stored[resIdx] = updated;
-        localStorage.setItem('hotel_reservations_v10', JSON.stringify(stored));
-        localStorage.setItem('hotel_reservations_v2', JSON.stringify(stored));
-        localStorage.setItem('hotel_reservations_v3', JSON.stringify(stored));
+        saveStoredReservations(stored);
 
         // Persist to Database via API
         splitStayInDB(target.reservationNumber, targetRoomNumber, effectiveSplitDate, checkIn, checkOut);
@@ -1350,7 +1547,7 @@ export const StayView: React.FC = () => {
                     estimatedAmount: res.totalAmount
                 });
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(existingHolds));
-            } catch {}
+            } catch { }
 
             // Persist to Database via API
             holdReservationInDB(target.reservationNumber, res.checkIn, endDate, reason);
@@ -1430,6 +1627,46 @@ export const StayView: React.FC = () => {
         showToast(`Group owner changed to ${newOwner}!`);
     };
 
+    const handleDrawerCheckIn = async (reservationNumber: string) => {
+        try {
+            const regNo = generateRegistrationNumber(reservationNumber);
+            const folioNo = generateFolioNumber(reservationNumber);
+            await updateReservationStatusInDB(reservationNumber, 'in-house');
+            // Direct optimistic in-memory booking update for 0-latency instant feedback
+            setBookings(prev => prev.map(b => (b.reservationNumber === reservationNumber || b.id.includes(reservationNumber) || reservationNumber.startsWith(b.reservationNumber)) ? {
+                ...b,
+                status: 'arrived',
+                registrationNumber: regNo,
+                folioNumber: folioNo
+            } : b));
+            toast.success(`Guest Checked In! Reg: ${regNo} | Folio: ${folioNo}`);
+            setIsActionDrawerOpen(false);
+            syncStoredReservations();
+            await syncReservationsFromDB();
+            syncStoredReservations();
+        } catch {
+            toast.error('Failed to check in reservation');
+        }
+    };
+
+    const handleDrawerCheckOut = async (reservationNumber: string) => {
+        try {
+            await updateReservationStatusInDB(reservationNumber, 'completed');
+            setBookings(prev => prev.map(b => (b.reservationNumber === reservationNumber || b.id.includes(reservationNumber) || reservationNumber.startsWith(b.reservationNumber)) ? { ...b, status: 'checked-out', isPast: true } : b));
+            const targetB = bookings.find(b => b.reservationNumber === reservationNumber || b.id.includes(reservationNumber));
+            if (targetB) {
+                await updateRoomHousekeepingInDB(targetB.roomNumber, 'Dirty');
+            }
+            toast.success(`Reservation ${reservationNumber} checked out successfully!`);
+            setIsActionDrawerOpen(false);
+            syncStoredReservations();
+            await syncReservationsFromDB();
+            syncStoredReservations();
+        } catch {
+            toast.error('Failed to check out reservation');
+        }
+    };
+
     // Global mousemove and mouseup listeners for drag-to-select, extend/shorten drag, and move drag
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
@@ -1468,9 +1705,13 @@ export const StayView: React.FC = () => {
             if (moveDrag) {
                 const dist = Math.hypot(e.clientX - moveDrag.startX, e.clientY - moveDrag.startY);
                 if (!moveDrag.isDragging && dist > 5) {
+                    const isGuestInHouse = isInHouseBooking(moveDrag.booking);
                     const deltaCols = Math.round((e.clientX - moveDrag.startX) / colWidth);
                     const stayDuration = moveDrag.booking.endIndex - moveDrag.booking.startIndex;
-                    const newStart = Math.max(0, Math.min(daysWindow - 1 - stayDuration, moveDrag.booking.startIndex + deltaCols));
+                    // Checked-in/In-house guests cannot change dates! Keep targetStartIndex locked to booking.startIndex
+                    const newStart = isGuestInHouse
+                        ? moveDrag.booking.startIndex
+                        : Math.max(0, Math.min(daysWindow - 1 - stayDuration, moveDrag.booking.startIndex + deltaCols));
                     setMoveDrag(prev => prev ? ({
                         ...prev,
                         isDragging: true,
@@ -1478,6 +1719,12 @@ export const StayView: React.FC = () => {
                         currentY: e.clientY,
                         targetStartIndex: newStart,
                         targetEndIndex: newStart + stayDuration
+                    }) : null);
+                } else if (moveDrag.isDragging) {
+                    setMoveDrag(prev => prev ? ({
+                        ...prev,
+                        currentX: e.clientX,
+                        currentY: e.clientY
                     }) : null);
                 }
             }
@@ -1571,9 +1818,10 @@ export const StayView: React.FC = () => {
             // Handle Move Reservation Drag Release
             if (moveDrag) {
                 const b = moveDrag.booking;
+                const isGuestInHouse = isInHouseBooking(b);
                 const actuallyMovedCell =
                     moveDrag.isDragging &&
-                    (moveDrag.targetRoomNumber !== b.roomNumber || moveDrag.targetStartIndex !== b.startIndex);
+                    (moveDrag.targetRoomNumber !== b.roomNumber || (!isGuestInHouse && moveDrag.targetStartIndex !== b.startIndex));
 
                 if (actuallyMovedCell) {
                     if (b.isPast) {
@@ -1582,8 +1830,15 @@ export const StayView: React.FC = () => {
                         return;
                     }
 
+                    // For in-house bookings, dragging horizontally to other dates is strictly prevented
+                    if (isGuestInHouse && moveDrag.targetRoomNumber === b.roomNumber) {
+                        handleOpenDetailsDrawer(b);
+                        setMoveDrag(null);
+                        return;
+                    }
+
                     const targetStartDay = days[moveDrag.targetStartIndex];
-                    if (targetStartDay?.isPast) {
+                    if (targetStartDay?.isPast && !isGuestInHouse) {
                         showToast('🔒 Cannot move reservations into past audit-locked dates.');
                         setMoveDrag(null);
                         return;
@@ -1603,11 +1858,17 @@ export const StayView: React.FC = () => {
                     }
 
                     const bNights = Math.max(1, (moveDrag.targetEndIndex - moveDrag.targetStartIndex + 1) || (b.endIndex - b.startIndex + 1));
-                    const targetFromDate = targetStartDay?.date || b.checkInDate || days[b.startIndex]?.date || '2026-07-04';
+                    // For in-house guests, Room Move applies from current System Date onwards
+                    const targetFromDate = isGuestInHouse
+                        ? (b.checkInDate && b.checkInDate > operatingDateStr ? b.checkInDate : operatingDateStr)
+                        : (targetStartDay?.date || b.checkInDate || days[b.startIndex]?.date || '2026-07-01');
                     const toDateObj = new Date(targetFromDate);
                     toDateObj.setDate(toDateObj.getDate() + bNights);
-                    const targetToDate = toDateObj.toISOString().split('T')[0];
+                    const targetToDate = b.checkOutDate || toDateObj.toISOString().split('T')[0];
                     const originalRes = getAllStoredReservations().find(r => r.reservationNumber === b.reservationNumber);
+                    const matchingRoomRow = originalRes?.roomsList?.find((r: any) => String(r.roomNumber) === String(b.roomNumber));
+                    const resolvedAdults = Number(matchingRoomRow?.adults ?? originalRes?.adults ?? b.adults ?? 2);
+                    const resolvedChildren = Number(matchingRoomRow?.children ?? originalRes?.children ?? b.children ?? 0);
                     const dailyBase = resolveReservationDailyBaseRate(originalRes, b.roomNumber);
 
                     const bData: AmendBookingData = {
@@ -1630,7 +1891,9 @@ export const StayView: React.FC = () => {
                         taxApplicable: originalRes?.taxApplicable,
                         taxConfigId: originalRes?.taxConfigId,
                         taxConfigCode: originalRes?.taxConfigCode,
-                        totalTaxAmount: originalRes?.totalTaxAmount
+                        totalTaxAmount: originalRes?.totalTaxAmount,
+                        adults: resolvedAdults,
+                        children: resolvedChildren
                     };
 
                     setActionDrawerBooking(bData);
@@ -1655,27 +1918,32 @@ export const StayView: React.FC = () => {
 
     const handleDateJump = (direction: 'prev' | 'next' | 'today') => {
         if (direction === 'today') {
-            setStartDate('2026-07-01');
+            const sysIso = getOperatingSystemDate();
+            setOperatingDateStr(sysIso);
+            setStartDate(calculateStayViewStartDate(sysIso));
             return;
         }
-        const cur = new Date(startDate);
+        const parts = startDate.split('-').map(Number);
         const shift = direction === 'next' ? 7 : -7;
-        cur.setDate(cur.getDate() + shift);
-        setStartDate(cur.toISOString().split('T')[0]);
+        const cur = new Date(parts[0], parts[1] - 1, parts[2] + shift, 12, 0, 0);
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, '0');
+        const day = String(cur.getDate()).padStart(2, '0');
+        setStartDate(`${y}-${m}-${day}`);
     };
 
-    // Exact status colors matching hotel-management Legend
+    // Standard PMS status colors: Blue for Confirmed/Reserved, Emerald for Arrived/In-House
     const getStatusBadgeColor = (status: TimelineBooking['status']) => {
         switch (status) {
-            case 'arrived': return 'bg-[#4d79ff] text-white';
-            case 'stayover': return 'bg-[#668cff] text-white';
-            case 'checked-out': return 'bg-[#2d8659] text-white';
-            case 'due-out': return 'bg-[#ffb31a] text-white';
-            case 'confirmed': return 'bg-[#00cc00] text-white';
-            case 'hold': return 'bg-[#b366ff] text-white';
-            case 'day-use': return 'bg-[#d9b326] text-white';
-            case 'out-of-order': return 'bg-[#cc0000] text-white';
-            default: return 'bg-[#4d79ff] text-white';
+            case 'confirmed': return 'bg-blue-600 text-white';
+            case 'arrived': return 'bg-emerald-600 text-white';
+            case 'stayover': return 'bg-teal-600 text-white';
+            case 'due-out': return 'bg-orange-500 text-white';
+            case 'checked-out': return 'bg-slate-600 text-white';
+            case 'hold': return 'bg-purple-600 text-white';
+            case 'day-use': return 'bg-amber-600 text-white';
+            case 'out-of-order': return 'bg-red-600 text-white';
+            default: return 'bg-blue-600 text-white';
         }
     };
 
@@ -1689,21 +1957,19 @@ export const StayView: React.FC = () => {
                         <CalendarIcon size={13} />
                     </div>
                     <div className="flex items-center gap-1.5 min-w-0">
-                        <h1 className="text-xs font-bold text-gray-900 tracking-tight whitespace-nowrap">
+                        <h1 className="text-xs text-gray-900 tracking-tight whitespace-nowrap">
                             Stay View
                         </h1>
                         {/* Real-Time Cross-PC Sync Indicator */}
-                        <div 
-                            className={`hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all ${
-                                syncStatus.isConnected 
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                    : 'bg-slate-50 text-slate-600 border-slate-200'
-                            }`}
+                        <div
+                            className={`hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all ${syncStatus.isConnected
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
                             title={`Real-Time Synchronization: ${syncStatus.mode}. Current Terminal ID: ${syncStatus.terminalId}. Connected Terminals: ${syncStatus.connectedTerminalsCount}.`}
                         >
                             <span className={`w-1.5 h-1.5 rounded-full ${syncStatus.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                            <span className="tracking-tight">{syncStatus.isConnected ? 'Real-Time Sync: Live' : 'Local Sync: Ready'}</span>
-                            <span className="font-mono text-[9px] opacity-75">[{syncStatus.terminalId.split('-')[1] || '1'}]</span>
+                            <span className="tracking-tight">{syncStatus.isConnected ? 'Sync: Live' : 'Local Sync: Ready'}</span>
                         </div>
                     </div>
                 </div>
@@ -1723,7 +1989,7 @@ export const StayView: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => handleDateJump('today')}
-                            className="px-2 py-0.5 font-bold text-[11px] text-[#1e3a8a] hover:bg-white hover:shadow-2xs rounded transition-colors cursor-pointer"
+                            className="px-2 py-0.5 text-[10px] text-[#1e3a8a] hover:bg-white hover:shadow-2xs rounded transition-colors cursor-pointer"
                         >
                             Today
                         </button>
@@ -1738,13 +2004,13 @@ export const StayView: React.FC = () => {
                     </div>
 
                     {/* From Date Picker */}
-                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded px-2 text-[11px] h-7">
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded px-2 text-[10px] h-7">
                         <span className="text-gray-400 font-medium">From:</span>
                         <input
                             type="date"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="border-none p-0 text-[11px] font-semibold text-gray-800 outline-none cursor-pointer bg-transparent"
+                            className="border-none p-0 text-[10px] font-semibold text-gray-800 outline-none cursor-pointer bg-transparent"
                         />
                     </div>
 
@@ -1752,7 +2018,7 @@ export const StayView: React.FC = () => {
                     <select
                         value={daysWindow}
                         onChange={(e) => setDaysWindow(Number(e.target.value))}
-                        className="h-7 px-2 border border-gray-200 rounded text-[11px] font-semibold text-gray-700 bg-white hover:border-gray-300 outline-none cursor-pointer"
+                        className="h-7 px-2 border border-gray-200 rounded text-[10px] font-semibold text-gray-700 bg-white hover:border-gray-300 outline-none cursor-pointer"
                     >
                         <option value={7}>7 Days</option>
                         <option value={15}>15 Days</option>
@@ -1766,9 +2032,8 @@ export const StayView: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsInfoPopoverOpen(!isInfoPopoverOpen)}
-                                className={`h-7 px-2 rounded border text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                                    isInfoPopoverOpen ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                                }`}
+                                className={`h-7 px-2 rounded border text-[10px] flex items-center gap-1 transition-colors cursor-pointer ${isInfoPopoverOpen ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                    }`}
                                 title="Click to view Status & Indicator Legend"
                             >
                                 <span className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-black">i</span>
@@ -1780,7 +2045,7 @@ export const StayView: React.FC = () => {
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setIsInfoPopoverOpen(false)}></div>
                                     <div className="absolute right-0 top-8 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs animate-in fade-in zoom-in-95">
-                                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 font-bold text-gray-800 text-[11.5px]">
+                                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 text-gray-800 text-[11.5px]">
                                             <span>Legend &amp; Color Coding</span>
                                             <button onClick={() => setIsInfoPopoverOpen(false)} className="text-gray-400 hover:text-gray-600">
                                                 <X size={13} />
@@ -1790,18 +2055,18 @@ export const StayView: React.FC = () => {
                                         <div className="space-y-3">
                                             {/* Floor Counters Info */}
                                             <div>
-                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Floor Daily Counters [1][3][1]</div>
+                                                <div className="text-[10px] uppercase text-gray-400 mb-1.5">Floor Daily Counters [1][3][1]</div>
                                                 <div className="grid grid-cols-3 gap-1 text-[10px]">
                                                     <div className="flex items-center gap-1">
-                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#00cc00] text-white flex items-center justify-center font-bold text-[8.5px]">A</span>
+                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#00cc00] text-white flex items-center justify-center text-[8.5px]">A</span>
                                                         <span className="text-gray-700">Available</span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
-                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#1e3a8a] text-white flex items-center justify-center font-bold text-[8.5px]">B</span>
+                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#1e3a8a] text-white flex items-center justify-center text-[8.5px]">B</span>
                                                         <span className="text-gray-700">Assigned</span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
-                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#ff3333] text-white flex items-center justify-center font-bold text-[8.5px]">U</span>
+                                                        <span className="w-3.5 h-3.5 rounded-xs bg-[#ff3333] text-white flex items-center justify-center text-[8.5px]">U</span>
                                                         <span className="text-gray-700">Unassigned</span>
                                                     </div>
                                                 </div>
@@ -1809,38 +2074,38 @@ export const StayView: React.FC = () => {
 
                                             {/* Booking Status Colors */}
                                             <div className="pt-2 border-t border-gray-100">
-                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">Reservation Status</div>
+                                                <div className="text-[10px] uppercase text-gray-400 mb-1.5">Reservation Status</div>
                                                 <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#4d79ff] inline-block shadow-2xs"></span>
-                                                        <span className="text-gray-700">Arrived</span>
+                                                        <span className="w-3 h-3 rounded-xs bg-emerald-600 inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Arrived / In-House</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#668cff] inline-block shadow-2xs"></span>
-                                                        <span className="text-gray-700">Stayover</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#2d8659] inline-block shadow-2xs"></span>
-                                                        <span className="text-gray-700">Checked Out</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#ffb31a] inline-block shadow-2xs"></span>
-                                                        <span className="text-gray-700">Due Out</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#00cc00] inline-block shadow-2xs"></span>
+                                                        <span className="w-3 h-3 rounded-xs bg-blue-600 inline-block shadow-2xs"></span>
                                                         <span className="text-gray-700">Confirmed</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#b366ff] inline-block shadow-2xs"></span>
+                                                        <span className="w-3 h-3 rounded-xs bg-teal-600 inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Stayover</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-orange-500 inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Due Out</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-purple-600 inline-block shadow-2xs"></span>
                                                         <span className="text-gray-700">Hold</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#d9b326] inline-block shadow-2xs"></span>
+                                                        <span className="w-3 h-3 rounded-xs bg-slate-600 inline-block shadow-2xs"></span>
+                                                        <span className="text-gray-700">Checked Out</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-3 h-3 rounded-xs bg-amber-600 inline-block shadow-2xs"></span>
                                                         <span className="text-gray-700">Day Use</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="w-3 h-3 rounded-xs bg-[#cc0000] inline-block shadow-2xs"></span>
+                                                        <span className="w-3 h-3 rounded-xs bg-red-600 inline-block shadow-2xs"></span>
                                                         <span className="text-gray-700">Out of Order</span>
                                                     </div>
                                                 </div>
@@ -1848,7 +2113,7 @@ export const StayView: React.FC = () => {
 
                                             {/* Booking Floating Indicators */}
                                             <div className="pt-2 border-t border-gray-100">
-                                                <div className="text-[10px] font-bold uppercase text-gray-400 mb-1.5">4 Booking Floating Icons</div>
+                                                <div className="text-[10px] uppercase text-gray-400 mb-1.5">4 Booking Floating Icons</div>
                                                 <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 border border-white flex items-center justify-center shadow-xs flex-shrink-0">
@@ -1883,14 +2148,14 @@ export const StayView: React.FC = () => {
                         </div>
 
                         {/* Available Badge */}
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold h-7" title="Today Available Rooms">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] h-7" title="Today Available Rooms">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             <span>{todayAvailableCount}</span>
                             <span className="hidden md:inline font-medium text-emerald-600">Avail</span>
                         </div>
 
                         {/* Assigned Badge */}
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold h-7" title="Today Assigned Rooms">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] h-7" title="Today Assigned Rooms">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                             <span>{todayAssignedCount}</span>
                             <span className="hidden md:inline font-medium text-amber-600">Assigned</span>
@@ -1900,7 +2165,7 @@ export const StayView: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setIsAssignRoomsOpen(true)}
-                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-800 text-[10px] font-bold h-7 cursor-pointer transition-colors"
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-800 text-[10px] h-7 cursor-pointer transition-colors"
                             title="Click to view Unassigned Reservations"
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
@@ -1913,7 +2178,7 @@ export const StayView: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setIsAssignRoomsOpen(true)}
-                        className="h-7 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ml-1 active:scale-[0.98]"
+                        className="h-7 px-2.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[10px] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ml-1 active:scale-[0.98]"
                         title="Open Unassigned Reservations Drawer"
                     >
                         <BedDouble size={13} />
@@ -1932,11 +2197,10 @@ export const StayView: React.FC = () => {
                 <div ref={timelineContainerRef} className="overflow-auto flex-1 min-h-0 relative select-none">
                     <div style={{ width: `${TREE_COL_WIDTH + gridWidth}px`, minWidth: '100%' }} className="flex flex-col min-h-full">
                         {/* Header Row: Room Info Column + Date Columns */}
-                        <div className="flex border-b border-gray-200 bg-gray-50/95 font-bold sticky top-0 z-30 shadow-xs">
+                        <div className="flex border-b border-gray-200 bg-gray-50/95 sticky top-0 z-30 shadow-xs">
                             {/* Room Info Header */}
-                            <div style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }} className="px-2 py-1 border-r border-gray-200 flex items-center justify-between text-gray-700 text-[11px] sticky left-0 z-40 bg-gray-100 flex-shrink-0">
+                            <div style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }} className="px-2 py-1 border-r border-gray-200 flex items-center justify-between text-gray-700 text-[10px] sticky left-0 z-40 bg-gray-100 flex-shrink-0">
                                 <span>Rooms &amp; Types</span>
-                                <span className="text-[9px] text-gray-400 font-mono">Tree</span>
                             </div>
 
                             {/* Date Columns with exact Legend Colors */}
@@ -1945,20 +2209,19 @@ export const StayView: React.FC = () => {
                                     <div
                                         key={d.index}
                                         style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
-                                        className={`px-0.5 py-0.5 border-r text-center flex-shrink-0 transition-colors overflow-hidden ${
-                                            d.isToday
-                                                ? 'bg-blue-100/95 text-blue-900 font-black border-b-2 border-b-blue-600 border-r-blue-200'
-                                                : d.isPast
-                                                    ? 'bg-slate-200/95 text-slate-600 font-semibold border-b border-slate-300 border-r-slate-300/80'
-                                                    : d.isWeekend
-                                                        ? 'bg-[#ffcccc] text-[#991b1b] font-bold border-b border-rose-300 border-r-rose-200'
-                                                        : 'bg-gray-50/90 text-gray-700 font-medium border-b border-gray-200 border-r-gray-200'
-                                        }`}
+                                        className={`px-0.5 py-0.5 border-r text-center flex-shrink-0 transition-colors overflow-hidden ${d.isToday
+                                            ? 'bg-blue-100/95 text-blue-900 font-black border-b-2 border-b-blue-600 border-r-blue-200'
+                                            : d.isPast
+                                                ? 'bg-slate-200/95 text-slate-600 font-semibold border-b border-slate-300 border-r-slate-300/80'
+                                                : d.isWeekend
+                                                    ? 'bg-[#ffcccc] text-[#991b1b] border-b border-rose-300 border-r-rose-200'
+                                                    : 'bg-gray-50/90 text-gray-700 font-medium border-b border-gray-200 border-r-gray-200'
+                                            }`}
                                     >
                                         <div className="text-[8.5px] uppercase tracking-wider font-semibold opacity-85 leading-none truncate">
                                             {d.dayName}
                                         </div>
-                                        <div className="text-[12px] font-bold leading-tight mt-0.5">
+                                        <div className="text-[12px] leading-tight mt-0.5">
                                             {d.num}
                                         </div>
                                     </div>
@@ -1971,7 +2234,7 @@ export const StayView: React.FC = () => {
                             {roomTree.map(building => (
                                 <React.Fragment key={building.id}>
                                     {/* Building Header Row */}
-                                    <div className="flex bg-slate-50/90 border-b border-gray-200/90 font-bold text-gray-800 sticky left-0 z-20">
+                                    <div className="flex bg-slate-50/90 border-b border-gray-200/90 text-gray-800 sticky left-0 z-20">
                                         <div
                                             onClick={() => toggleNode(building.id)}
                                             style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }}
@@ -1979,7 +2242,7 @@ export const StayView: React.FC = () => {
                                         >
                                             {expandedNodes[building.id] ? <ChevronDown size={13} className="text-gray-500" /> : <ChevronRight size={13} className="text-gray-500" />}
                                             <Building2 size={13} className="text-blue-700 flex-shrink-0" />
-                                            <span className="text-[11px] truncate tracking-tight">{building.name}</span>
+                                            <span className="text-[10px] truncate tracking-tight">{building.name}</span>
                                         </div>
                                         <div className="flex flex-1" style={{ width: `${gridWidth}px` }}>
                                             {days.map(d => (
@@ -2003,7 +2266,7 @@ export const StayView: React.FC = () => {
                                                     className="px-2 py-0.5 pl-4 border-r border-gray-200 flex items-center gap-1 cursor-pointer hover:bg-gray-100 transition-colors sticky left-0 z-20 bg-gray-50/90 flex-shrink-0"
                                                 >
                                                     {expandedNodes[floor.id] ? <ChevronDown size={11} className="text-gray-400" /> : <ChevronRight size={11} className="text-gray-400" />}
-                                                    <span className="text-[10.5px] font-bold text-gray-700 tracking-tight">{floor.name}</span>
+                                                    <span className="text-[10.5px] text-gray-700 tracking-tight">{floor.name}</span>
                                                 </div>
 
                                                 {/* Floor Daily Breakdown Badges: O(1) Precomputed [Available] [Assigned] [Unassigned] */}
@@ -2016,9 +2279,8 @@ export const StayView: React.FC = () => {
                                                             <div
                                                                 key={d.index}
                                                                 style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
-                                                                className={`px-0.5 border-r flex items-center justify-center flex-shrink-0 min-h-[22px] overflow-hidden ${
-                                                                    d.isToday ? 'bg-blue-50/40 border-r-blue-100' : d.isPast ? 'bg-slate-200/50 border-r-slate-200' : d.isWeekend ? 'bg-[#ffebeb]/50 border-r-rose-100' : 'bg-gray-50/30 border-r-gray-100'
-                                                                }`}
+                                                                className={`px-0.5 border-r flex items-center justify-center flex-shrink-0 min-h-[22px] overflow-hidden ${d.isToday ? 'bg-blue-50/40 border-r-blue-100' : d.isPast ? 'bg-slate-200/50 border-r-slate-200' : d.isWeekend ? 'bg-[#ffebeb]/50 border-r-rose-100' : 'bg-gray-50/30 border-r-gray-100'
+                                                                    }`}
                                                             >
                                                                 <div className="flex items-center justify-center gap-[2px]">
                                                                     {/* 1. Available Badge (Green) */}
@@ -2061,14 +2323,13 @@ export const StayView: React.FC = () => {
                                                     {/* Room Info Cell */}
                                                     <div
                                                         style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }}
-                                                        className={`px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0 transition-colors min-h-[36px] ${
-                                                            moveDrag && moveDrag.isDragging && moveDrag.targetRoomNumber === room.roomNumber ? 'bg-blue-100 ring-2 ring-blue-500' : ''
-                                                        }`}
+                                                        className={`px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0 transition-colors min-h-[36px] ${moveDrag && moveDrag.isDragging && moveDrag.targetRoomNumber === room.roomNumber ? 'bg-blue-100 ring-2 ring-blue-500' : ''
+                                                            }`}
                                                     >
                                                         <div className="flex items-center gap-1.5 min-w-0">
                                                             <BedDouble size={12} className="text-gray-400 flex-shrink-0" />
                                                             <div className="truncate">
-                                                                <span className="font-bold text-[11px] text-gray-900 mr-1.5">
+                                                                <span className="text-[10px] text-gray-900 mr-1.5">
                                                                     {room.roomNumber}
                                                                 </span>
                                                                 <span className="text-[9.5px] text-gray-500 truncate">
@@ -2076,10 +2337,9 @@ export const StayView: React.FC = () => {
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                                            room.status === 'clean' ? 'bg-emerald-500' :
+                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${room.status === 'clean' ? 'bg-emerald-500' :
                                                             room.status === 'inspected' ? 'bg-blue-500' : 'bg-amber-500'
-                                                        }`} title={`Room is ${room.status}`}></span>
+                                                            }`} title={`Room is ${room.status}`}></span>
                                                     </div>
 
                                                     {/* Day Cells & Bookings Overlay */}
@@ -2134,8 +2394,12 @@ export const StayView: React.FC = () => {
                                                                     // Move Reservation Drag (Drag-and-Drop to any room or date)
                                                                     if (moveDrag && moveDrag.isDragging) {
                                                                         const stayDuration = moveDrag.booking.endIndex - moveDrag.booking.startIndex;
+                                                                        const isGuestInHouse = isInHouseBooking(moveDrag.booking);
                                                                         const offset = moveDrag.grabOffsetCols || 0;
-                                                                        const newStart = Math.max(0, Math.min(daysWindow - 1 - stayDuration, d.index - offset));
+                                                                        // In-house guests cannot change stay dates! Keep targetStartIndex locked to booking.startIndex
+                                                                        const newStart = isGuestInHouse
+                                                                            ? moveDrag.booking.startIndex
+                                                                            : Math.max(0, Math.min(daysWindow - 1 - stayDuration, d.index - offset));
                                                                         setMoveDrag(prev => prev ? ({
                                                                             ...prev,
                                                                             targetRoomNumber: room.roomNumber,
@@ -2144,15 +2408,14 @@ export const StayView: React.FC = () => {
                                                                         }) : null);
                                                                     }
                                                                 }}
-                                                                className={`border-r flex-shrink-0 transition-colors relative ${
-                                                                    d.isToday
-                                                                        ? 'bg-blue-50/50 border-r-blue-100/80 cursor-pointer hover:bg-blue-100/40'
-                                                                        : d.isPast
-                                                                            ? 'bg-[#e2e8f0]/80 border-r-slate-300/60 cursor-not-allowed'
-                                                                            : d.isWeekend
-                                                                                ? 'bg-[#ffebeb]/70 border-r-rose-100/80 cursor-pointer hover:bg-rose-100/40'
-                                                                                : 'border-r-gray-100 cursor-pointer hover:bg-blue-100/40'
-                                                                }`}
+                                                                className={`border-r flex-shrink-0 transition-colors relative ${d.isToday
+                                                                    ? 'bg-blue-50/50 border-r-blue-100/80 cursor-pointer hover:bg-blue-100/40'
+                                                                    : d.isPast
+                                                                        ? 'bg-[#e2e8f0]/80 border-r-slate-300/60 cursor-not-allowed'
+                                                                        : d.isWeekend
+                                                                            ? 'bg-[#ffebeb]/70 border-r-rose-100/80 cursor-pointer hover:bg-rose-100/40'
+                                                                            : 'border-r-gray-100 cursor-pointer hover:bg-blue-100/40'
+                                                                    }`}
                                                             ></div>
                                                         ))}
 
@@ -2170,9 +2433,8 @@ export const StayView: React.FC = () => {
                                                                         left: `${moveDrag.targetStartIndex * colWidth + 2}px`,
                                                                         width: `${Math.max(20, (moveDrag.targetEndIndex - moveDrag.targetStartIndex + 1) * colWidth - 4)}px`
                                                                     }}
-                                                                    className={`absolute top-[6px] bottom-[4px] border-2 border-dashed border-white text-white rounded px-2 py-0.5 text-[10px] font-bold flex items-center gap-1 shadow-lg z-20 pointer-events-none animate-pulse ${
-                                                                        hasMoveConflict ? 'bg-red-600/85' : 'bg-blue-600/70'
-                                                                    }`}
+                                                                    className={`absolute top-[6px] bottom-[4px] border-2 border-dashed border-white text-white rounded px-2 py-0.5 text-[10px] flex items-center gap-1 shadow-lg z-20 pointer-events-none animate-pulse ${hasMoveConflict ? 'bg-red-600/85' : 'bg-blue-600/70'
+                                                                        }`}
                                                                 >
                                                                     <span className="truncate">
                                                                         {hasMoveConflict
@@ -2210,7 +2472,34 @@ export const StayView: React.FC = () => {
                                                                     <div
                                                                         key={booking.id}
                                                                         style={{ left: `${left}px`, width: `${width}px` }}
+                                                                        onMouseEnter={(e) => {
+                                                                            if (isAnyDragActive) return;
+                                                                            const target = e.currentTarget;
+                                                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                                            hoverTimerRef.current = setTimeout(() => {
+                                                                                const rect = target.getBoundingClientRect();
+                                                                                const enriched = getEnrichedBookingDetails(booking);
+                                                                                setHoveredBooking({
+                                                                                    booking,
+                                                                                    enriched,
+                                                                                    rect: {
+                                                                                        top: rect.top,
+                                                                                        left: rect.left,
+                                                                                        right: rect.right,
+                                                                                        bottom: rect.bottom,
+                                                                                        width: rect.width,
+                                                                                        height: rect.height
+                                                                                    }
+                                                                                });
+                                                                            }, 80);
+                                                                        }}
+                                                                        onMouseLeave={() => {
+                                                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                                            setHoveredBooking(null);
+                                                                        }}
                                                                         onMouseDown={(e) => {
+                                                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                                            setHoveredBooking(null);
                                                                             if (e.button !== 0) return;
                                                                             if (booking.isPast) {
                                                                                 // Historical stays: read-only overview modal directly!
@@ -2238,12 +2527,9 @@ export const StayView: React.FC = () => {
                                                                                 targetEndIndex: booking.endIndex
                                                                             });
                                                                         }}
-                                                                        className={`absolute top-[6px] bottom-[4px] ${colorClass} rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center justify-between shadow-2xs z-10 overflow-visible transition-all select-none ${
-                                                                            isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto cursor-grab hover:brightness-105'
-                                                                        } ${isBeingExtended ? (isExtendBlocked ? 'ring-2 ring-red-500 shadow-lg z-30' : 'ring-2 ring-white shadow-lg z-30') : ''} ${
-                                                                            isBeingMoved ? 'opacity-40 ring-2 ring-dashed ring-amber-300' : ''
-                                                                        } ${booking.isPast ? 'opacity-90 ring-1 ring-slate-400/60' : ''}`}
-                                                                        title={`${booking.guestName} (${booking.reservationNumber})\nRoom ${booking.roomNumber} • ${booking.nights || 1} Night(s)\nTariff: ৳${(booking.totalAmount || 0).toLocaleString()} (${booking.taxApplicable === false ? 'Tax Exempt' : `Tax & VAT: ৳${(booking.totalTaxAmount || 0).toLocaleString()} [${booking.taxConfigCode || 'STD'}]`})${(booking.dueAmount || 0) > 0 ? ` • Due: ৳${(booking.dueAmount || 0).toLocaleString()}` : ' • Fully Paid'}\n${booking.isPast ? 'Historical Reservation (Audit Locked)' : 'Click to open details drawer • Drag edge to extend/shorten'}`}
+                                                                        className={`absolute top-[6px] bottom-[4px] ${colorClass} rounded px-1.5 py-0.5 text-[10px] flex items-center justify-between shadow-2xs z-10 overflow-visible transition-all select-none ${isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto cursor-grab hover:brightness-105'
+                                                                            } ${isBeingExtended ? (isExtendBlocked ? 'ring-2 ring-red-500 shadow-lg z-30' : 'ring-2 ring-white shadow-lg z-30') : ''} ${isBeingMoved ? 'opacity-40 ring-2 ring-dashed ring-amber-300' : ''
+                                                                            } ${booking.isPast ? 'opacity-90 ring-1 ring-slate-400/60' : ''}`}
                                                                     >
                                                                         {/* Floating Indicators Cluster: [👑 Group Owner] [👥 Group] [$ Due] [⭐ VIP/Single Lady] [EX Exempt] */}
                                                                         <div className={`flex items-center -space-x-1 absolute -top-2 left-1.5 z-20 ${isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto'}`}>
@@ -2299,6 +2585,13 @@ export const StayView: React.FC = () => {
 
                                                                         <div className="flex items-center gap-1 min-w-0 flex-1 truncate">
                                                                             <span className="truncate">{booking.guestName}</span>
+                                                                            <span
+                                                                                className="text-[8.5px] font-semibold bg-black/20 text-white/90 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"
+                                                                                title={`Occupancy: ${booking.adults || 2} Adult(s)${(booking.children || 0) > 0 ? `, ${booking.children} Child(ren)` : ''}`}
+                                                                            >
+                                                                                <Users size={8} className="opacity-80" />
+                                                                                {booking.adults || 2}A{(booking.children || 0) > 0 ? ` ${booking.children}C` : ''}
+                                                                            </span>
                                                                         </div>
                                                                         {booking.indicator && (
                                                                             <span className="text-[9px] bg-black/20 px-1 rounded flex-shrink-0 ml-1">
@@ -2324,22 +2617,21 @@ export const StayView: React.FC = () => {
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
                                                                                 }}
-                                                                                className={`absolute right-0 top-0 bottom-0 w-3.5 cursor-ew-resize flex items-center justify-center hover:bg-black/25 group/resize z-30 transition-colors ${
-                                                                                    isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto'
-                                                                                }`}
-                                                                                title="Drag left/right to shorten or extend stay (or click to extend +1 night)"
+                                                                                className={`absolute right-0 top-0 bottom-0 w-3.5 cursor-ew-resize flex items-center justify-center hover:bg-black/25 group/resize z-30 transition-colors ${isAnyDragActive ? 'pointer-events-none' : 'pointer-events-auto'
+                                                                                    }`}
+                                                                                title="Drag left/right to shorten or extend stay."
                                                                             >
                                                                                 <div className="w-[3px] h-3.5 bg-white/70 rounded-full group-hover/resize:bg-white group-hover/resize:h-4.5 transition-all shadow-xs" />
                                                                                 {isExtendBlocked ? (
-                                                                                    <div className="block absolute -top-6 right-0 bg-red-600 text-white border border-white shadow-lg rounded px-2 py-0.5 text-[10px] font-sans font-bold whitespace-nowrap z-50 pointer-events-none select-none">
+                                                                                    <div className="block absolute -top-6 right-0 bg-red-600 text-white border border-white shadow-lg rounded px-2 py-0.5 text-[10px] font-sans whitespace-nowrap z-50 pointer-events-none select-none">
                                                                                         🚫 Already Booked
                                                                                     </div>
                                                                                 ) : isBeingExtended ? (
-                                                                                    <div className="block absolute -top-6 right-0 bg-slate-900 text-white border border-white/40 shadow-lg rounded px-2 py-0.5 text-[10px] font-sans font-bold whitespace-nowrap z-50 pointer-events-none select-none">
+                                                                                    <div className="block absolute -top-6 right-0 bg-slate-900 text-white border border-white/40 shadow-lg rounded px-2 py-0.5 text-[10px] font-sans whitespace-nowrap z-50 pointer-events-none select-none">
                                                                                         {Math.max(1, extendDrag.currentEndIndex - booking.startIndex + 1)} Night(s)
                                                                                     </div>
                                                                                 ) : (
-                                                                                    <div className="hidden group-hover/resize:block absolute top-full right-0 mt-1.5 bg-white text-gray-900 border border-black shadow-lg rounded-xs px-2 py-0.5 text-[11px] font-sans font-medium whitespace-nowrap z-50 pointer-events-none select-none">
+                                                                                    <div className="hidden group-hover/resize:block absolute top-full right-0 mt-1.5 bg-white text-gray-900 border border-black shadow-lg rounded-xs px-2 py-0.5 text-[10px] font-sans font-medium whitespace-nowrap z-50 pointer-events-none select-none">
                                                                                         Extend / Shorten stay
                                                                                     </div>
                                                                                 )}
@@ -2371,11 +2663,11 @@ export const StayView: React.FC = () => {
                                                                 >
                                                                     <div className="flex items-center gap-1.5 truncate">
                                                                         <Lock size={10} className="text-amber-700 flex-shrink-0 animate-pulse" />
-                                                                        <span className="text-[9.5px] font-bold tracking-tight truncate">
+                                                                        <span className="text-[9.5px] tracking-tight truncate">
                                                                             Held by {lock.heldBy}
                                                                         </span>
                                                                     </div>
-                                                                    <span className="text-[8.5px] font-mono font-bold px-1 rounded bg-amber-300 text-amber-950 ml-1 flex-shrink-0">
+                                                                    <span className="text-[8.5px] font-mono px-1 rounded bg-amber-300 text-amber-950 ml-1 flex-shrink-0">
                                                                         {remainingMin}m
                                                                     </span>
                                                                 </div>
@@ -2402,7 +2694,7 @@ export const StayView: React.FC = () => {
                         </div>
 
                         {/* Occupancy Summary Strip (O(1) Precomputed, Fixed at Bottom of Timeline) */}
-                        <div className="bg-[#1e3a8a] text-white flex border-t border-blue-900 sticky bottom-0 z-30 font-bold select-none shadow-md">
+                        <div className="bg-[#1e3a8a] text-white flex border-t border-blue-900 sticky bottom-0 z-30 select-none shadow-md">
                             <div style={{ width: `${TREE_COL_WIDTH}px`, flex: `0 0 ${TREE_COL_WIDTH}px` }} className="px-2 py-1 border-r border-blue-800 text-[10.5px] sticky left-0 z-40 bg-[#1e3a8a] flex-shrink-0 flex flex-col justify-center">
                                 <div className="leading-tight">Occupancy (%)</div>
                                 <div className="text-[9px] font-normal text-blue-200">Available</div>
@@ -2417,7 +2709,7 @@ export const StayView: React.FC = () => {
                                             style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
                                             className="px-0.5 py-1 border-r border-blue-800/80 text-center flex-shrink-0 flex flex-col justify-center overflow-hidden"
                                         >
-                                            <div className="text-[10px] font-bold leading-tight">{occ.percent}%</div>
+                                            <div className="text-[10px] leading-tight">{occ.percent}%</div>
                                             <div className="text-[8.5px] font-mono text-blue-200 leading-tight">[{occ.available}]</div>
                                         </div>
                                     );
@@ -2444,7 +2736,7 @@ export const StayView: React.FC = () => {
                         {/* Drawer Header - Compact & Slim */}
                         <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
-                                <h2 className="text-[13.5px] font-bold text-gray-900 tracking-tight">Assign Rooms</h2>
+                                <h2 className="text-[13.5px] text-gray-900 tracking-tight">Assign Rooms</h2>
                                 <button
                                     type="button"
                                     className="w-6 h-6 rounded border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-2xs"
@@ -2486,11 +2778,10 @@ export const StayView: React.FC = () => {
                                         <div
                                             key={actualIndex}
                                             onClick={() => setSelectedModalDateIndex(actualIndex)}
-                                            className={`flex-1 flex flex-col items-center justify-center cursor-pointer transition-all relative ${
-                                                isActive
-                                                    ? 'bg-[#f0f7ff] text-[#3b82f6] border-b-2 border-b-[#3b82f6] font-bold'
-                                                    : 'text-gray-600 hover:bg-gray-50'
-                                            }`}
+                                            className={`flex-1 flex flex-col items-center justify-center cursor-pointer transition-all relative ${isActive
+                                                ? 'bg-[#f0f7ff] text-[#3b82f6] border-b-2 border-b-[#3b82f6] font-bold'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                                }`}
                                         >
                                             {/* Blue dot indicator for unassigned items */}
                                             {hasUnassignedOnDate && (
@@ -2542,7 +2833,7 @@ export const StayView: React.FC = () => {
                                                     ) : (
                                                         <ChevronRight size={13} className="text-gray-500" />
                                                     )}
-                                                    <span className="font-bold text-[11px] text-gray-900 tracking-tight">
+                                                    <span className="text-[10px] text-gray-900 tracking-tight">
                                                         Reservation Number : {item.reservationNumber}
                                                     </span>
                                                 </div>
@@ -2575,7 +2866,7 @@ export const StayView: React.FC = () => {
 
                                                         {/* Center Information */}
                                                         <div className="flex-1 min-w-0">
-                                                            <h4 className="text-xs font-bold text-gray-900 leading-tight truncate">
+                                                            <h4 className="text-xs text-gray-900 leading-tight truncate">
                                                                 {item.guestName}
                                                             </h4>
                                                             <p className="text-[9.5px] text-gray-400 font-medium mt-0.5">
@@ -2584,7 +2875,7 @@ export const StayView: React.FC = () => {
 
                                                             <div className="mt-1.5">
                                                                 <span className="text-[9px] text-gray-400 font-medium block">Room Type</span>
-                                                                <span className="text-[10.5px] font-bold text-gray-800 block truncate">
+                                                                <span className="text-[10.5px] text-gray-800 block truncate">
                                                                     {item.roomType}
                                                                 </span>
                                                             </div>
@@ -2611,7 +2902,7 @@ export const StayView: React.FC = () => {
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleConfirmAssign(item)}
-                                                                            className="h-5 px-2 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[9.5px] font-bold cursor-pointer transition-colors"
+                                                                            className="h-5 px-2 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[9.5px] cursor-pointer transition-colors"
                                                                         >
                                                                             Confirm
                                                                         </button>
@@ -2664,7 +2955,7 @@ export const StayView: React.FC = () => {
                                                     setModalDateStartIndex(Math.max(0, Math.min(modalDays.length - 7, targetIdx)));
                                                 }
                                             }}
-                                            className="mt-2.5 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[10px] rounded transition-colors border border-blue-200 cursor-pointer"
+                                            className="mt-2.5 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[10px] rounded transition-colors border border-blue-200 cursor-pointer"
                                         >
                                             Jump to next ({unassignedList[0]?.reservationNumber})
                                         </button>
@@ -2693,14 +2984,22 @@ export const StayView: React.FC = () => {
                     const endIso = baseEnd.toISOString().split('T')[0];
                     return {
                         room: selectedRange?.room || '101',
+                        roomNumber: selectedRange?.room || '101',
                         startDate: startIso,
+                        checkIn: startIso,
                         endDate: endIso,
+                        checkOut: endIso,
                         nights: stayNights,
                         startIndex: selectedRange?.startIndex,
                         endIndex: selectedRange?.endIndex
                     };
                 })()}
                 onReserve={(_newBooking) => {
+                    setIsQuickReservationOpen(false);
+                    setSelectedRange(null);
+                    syncStoredReservations();
+                }}
+                onReservationCreated={(_newRes) => {
                     setIsQuickReservationOpen(false);
                     setSelectedRange(null);
                     syncStoredReservations();
@@ -2759,39 +3058,11 @@ export const StayView: React.FC = () => {
                 onConfirmUnassign={handleConfirmUnassign}
                 onConfirmUngroup={handleConfirmUngroup}
                 onConfirmChangeOwner={handleConfirmChangeOwner}
-                onEdit={(b) => {
-                    const bookingToEdit = b || actionDrawerBooking;
-                    if (bookingToEdit) {
-                        const stored = getAllStoredReservations();
-                        const found = stored.find(r => r.reservationNumber === bookingToEdit.reservationNumber);
-                        if (found) {
-                            setEditingReservation(found);
-                        } else {
-                            const bRate = bookingToEdit.avgDailyRate || getStandardDailyRateForRoom(bookingToEdit.roomNumber, bookingToEdit.roomType);
-                            const bNights = bookingToEdit.nights || 1;
-                            const bTotal = bookingToEdit.totalAmount !== undefined ? bookingToEdit.totalAmount : (bRate * bNights);
-                            const bPaid = bookingToEdit.paidAmount || 0;
-                            const bDue = bookingToEdit.dueAmount !== undefined ? bookingToEdit.dueAmount : Math.max(0, bTotal - bPaid);
-                            setEditingReservation({
-                                id: bookingToEdit.id,
-                                reservationNumber: bookingToEdit.reservationNumber,
-                                guestName: bookingToEdit.guestName,
-                                roomNumber: bookingToEdit.roomNumber,
-                                roomType: bookingToEdit.roomType || 'Deluxe Double',
-                                allocatedRooms: [bookingToEdit.roomNumber],
-                                checkIn: bookingToEdit.arrivalDate,
-                                checkOut: bookingToEdit.departureDate,
-                                nights: bNights,
-                                status: bookingToEdit.status?.toLowerCase() || 'confirmed',
-                                totalAmount: bTotal,
-                                paidAmount: bPaid,
-                                dueAmount: bDue,
-                                source: 'Direct'
-                            } as any);
-                        }
-                    }
-                    setIsActionDrawerOpen(false);
-                    setIsAddReservationOpen(true);
+                onCheckIn={handleDrawerCheckIn}
+                onCheckOut={handleDrawerCheckOut}
+                systemDate={operatingDateStr}
+                onEdit={() => {
+                    setActionDrawerMode('amend');
                 }}
             />
 
@@ -2799,12 +3070,175 @@ export const StayView: React.FC = () => {
             {moveDrag && moveDrag.isDragging && (
                 <div
                     style={{ left: `${moveDrag.currentX + 16}px`, top: `${moveDrag.currentY + 16}px` }}
-                    className="fixed z-[100001] pointer-events-none bg-gray-900/95 text-white border border-blue-400/80 rounded-md px-3 py-1.5 text-xs shadow-2xl flex items-center gap-2 font-bold backdrop-blur-xs"
+                    className="fixed z-[100001] pointer-events-none bg-gray-900/95 text-white border border-blue-400/80 rounded-md px-3 py-1.5 text-xs shadow-2xl flex items-center gap-2 backdrop-blur-xs"
                 >
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span>Move to Room A-({moveDrag.targetRoomNumber})</span>
-                    <span className="text-blue-300">({days[moveDrag.targetStartIndex]?.date || ''})</span>
+                    {isInHouseBooking(moveDrag.booking) ? (
+                        <>
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                            <span>Transfer In-House to Room {moveDrag.targetRoomNumber}</span>
+                            <span className="text-amber-300">(Effective: {operatingDateStr})</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                            <span>Move to Room {moveDrag.targetRoomNumber}</span>
+                            <span className="text-blue-300">({days[moveDrag.targetStartIndex]?.date || ''})</span>
+                        </>
+                    )}
                 </div>
+            )}
+
+            {/* Rich Floating Luxury Hover Card Preview */}
+            {hoveredBooking && !isAnyDragActive && createPortal(
+                <div
+                    className="fixed z-[99999] pointer-events-none select-none transition-opacity duration-150 animate-in fade-in zoom-in-95"
+                    style={(() => {
+                        const cardWidth = 320;
+                        const cardHeight = 220;
+                        const rect = hoveredBooking.rect;
+                        const showAbove = rect.top > cardHeight + 16;
+                        const top = showAbove
+                            ? rect.top - cardHeight - 8
+                            : rect.bottom + 8;
+                        const left = Math.max(12, Math.min(window.innerWidth - cardWidth - 12, rect.left + rect.width / 2 - cardWidth / 2));
+                        return { top: `${top}px`, left: `${left}px`, width: `${cardWidth}px` };
+                    })()}
+                >
+                    <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700/80 p-3 text-xs space-y-2">
+                        {/* Header: Guest Name & Status Badge */}
+                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-slate-800">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-extrabold text-[12.5px] text-white tracking-tight truncate">
+                                        {hoveredBooking.enriched?.guestName || hoveredBooking.booking?.guestName}
+                                    </span>
+                                    {hoveredBooking.booking?.isVipOrSingleLady && (
+                                        <span className="px-1 py-0.2 bg-amber-500/20 border border-amber-400/40 text-amber-300 rounded text-[8.5px] font-bold">
+                                            ⭐ VIP
+                                        </span>
+                                    )}
+                                    {hoveredBooking.booking?.isGroupOwner && (
+                                        <span className="px-1 py-0.2 bg-purple-500/20 border border-purple-400/40 text-purple-300 rounded text-[8.5px] font-bold">
+                                            👑 Leader
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400 font-mono flex-wrap">
+                                    <span className="font-bold text-white">#{hoveredBooking.enriched?.subBookingNumber || hoveredBooking.booking?.subBookingNumber || hoveredBooking.enriched?.reservationNumber || hoveredBooking.booking?.reservationNumber}</span>
+                                    {(hoveredBooking.enriched?.groupCode || hoveredBooking.booking?.groupCode) && (
+                                        <span className="text-purple-300 font-semibold bg-purple-950/60 border border-purple-500/30 px-1 py-0.2 rounded text-[8.5px]">
+                                            {hoveredBooking.enriched?.groupCode || hoveredBooking.booking?.groupCode}
+                                        </span>
+                                    )}
+                                    {hoveredBooking.enriched?.registrationNumber && (
+                                        <>
+                                            <span>•</span>
+                                            <span className="text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1 py-0.2 rounded text-[9px]">
+                                                {hoveredBooking.enriched.registrationNumber}
+                                            </span>
+                                        </>
+                                    )}
+                                    <span>•</span>
+                                    <span className="text-blue-300 font-bold">Room {hoveredBooking.enriched?.roomNumber || hoveredBooking.booking?.roomNumber}</span>
+                                </div>
+                            </div>
+
+                            <span className={`px-2 py-0.5 rounded text-[9.5px] font-black uppercase tracking-wide border shadow-2xs shrink-0 ${(hoveredBooking.enriched?.status || hoveredBooking.booking?.status) === 'CONFIRMED'
+                                ? 'bg-blue-500/25 text-blue-300 border-blue-500/40'
+                                : (hoveredBooking.enriched?.status || hoveredBooking.booking?.status) === 'ARRIVED' || (hoveredBooking.enriched?.status || hoveredBooking.booking?.status) === 'IN-HOUSE'
+                                    ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40'
+                                    : (hoveredBooking.enriched?.status || hoveredBooking.booking?.status) === 'STAYOVER'
+                                        ? 'bg-teal-500/25 text-teal-300 border-teal-500/40'
+                                        : (hoveredBooking.enriched?.status || hoveredBooking.booking?.status) === 'DUE-OUT'
+                                            ? 'bg-orange-500/25 text-orange-300 border-orange-500/40'
+                                            : (hoveredBooking.enriched?.status || hoveredBooking.booking?.status) === 'HOLD'
+                                                ? 'bg-purple-500/25 text-purple-300 border-purple-500/40'
+                                                : 'bg-slate-700/60 text-slate-300 border-slate-600'
+                                }`}>
+                                {hoveredBooking.enriched?.status || hoveredBooking.booking?.status || 'CONFIRMED'}
+                            </span>
+                        </div>
+
+                        {/* 2x2 Details Grid */}
+                        <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                            {/* Stay Dates */}
+                            <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700/60">
+                                <div className="text-[8.5px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                    <CalendarIcon size={10} className="text-blue-400" />
+                                    <span>Stay Period</span>
+                                </div>
+                                <div className="text-slate-200 mt-0.5 text-[10.5px]">
+                                    {(hoveredBooking.enriched?.arrivalDate || hoveredBooking.booking?.checkInDate || '').slice(5)} ➔ {(hoveredBooking.enriched?.departureDate || hoveredBooking.booking?.checkOutDate || '').slice(5)}
+                                </div>
+                                <div className="text-[9px] text-blue-300 font-semibold font-mono">
+                                    {hoveredBooking.enriched?.nights ?? hoveredBooking.booking?.nights ?? 1} Night{(hoveredBooking.enriched?.nights ?? hoveredBooking.booking?.nights ?? 1) > 1 ? 's' : ''}
+                                </div>
+                            </div>
+
+                            {/* Room & Category */}
+                            <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700/60">
+                                <div className="text-[8.5px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                    <Home size={10} className="text-emerald-400" />
+                                    <span>Category &amp; Pax</span>
+                                </div>
+                                <div className="text-slate-200 mt-0.5 text-[10.5px] truncate" title={hoveredBooking.enriched?.roomType || hoveredBooking.booking?.roomType}>
+                                    {hoveredBooking.enriched?.roomType || hoveredBooking.booking?.roomType || 'Standard'}
+                                </div>
+                                <div className="text-[9px] text-slate-400">
+                                    {hoveredBooking.enriched?.adults ?? hoveredBooking.booking?.adults ?? 2} Adult{(hoveredBooking.enriched?.adults ?? hoveredBooking.booking?.adults ?? 2) > 1 ? 's' : ''}{(hoveredBooking.enriched?.children ?? hoveredBooking.booking?.children ?? 0) > 0 ? `, ${hoveredBooking.enriched?.children ?? hoveredBooking.booking?.children} Child` : ''}
+                                </div>
+                            </div>
+
+                            {/* Rate Plan */}
+                            <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700/60">
+                                <div className="text-[8.5px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                    <Printer size={10} className="text-amber-400" />
+                                    <span>Rate Plan</span>
+                                </div>
+                                <div className="text-slate-200 mt-0.5 text-[10.5px] truncate" title={hoveredBooking.enriched?.ratePlan || hoveredBooking.booking?.ratePlan}>
+                                    {hoveredBooking.enriched?.ratePlan || hoveredBooking.booking?.ratePlan || 'Standard Rate'}
+                                </div>
+                                <div className="text-[9px] text-slate-400 font-mono">
+                                    ৳{(hoveredBooking.enriched?.avgDailyRate ?? hoveredBooking.booking?.rate ?? 0).toLocaleString()}/night
+                                </div>
+                            </div>
+
+                            {/* Folio Financials */}
+                            <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700/60">
+                                <div className="text-[8.5px] text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                    <div className="flex items-center gap-1">
+                                        <Wallet size={10} className="text-cyan-400" />
+                                        <span>Total &amp; Balance</span>
+                                    </div>
+                                    {hoveredBooking.enriched?.folioNumber && (
+                                        <span className="text-[8px] font-mono text-cyan-300">
+                                            {hoveredBooking.enriched.folioNumber}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-white mt-0.5 text-[10.5px] font-mono">
+                                    ৳{(hoveredBooking.enriched?.totalAmount ?? hoveredBooking.booking?.totalAmount ?? 0).toLocaleString()}
+                                </div>
+                                <div className={`text-[9px] font-mono ${(hoveredBooking.enriched?.dueAmount ?? 0) > 0 ? 'text-rose-400' : 'text-emerald-400'
+                                    }`}>
+                                    {(hoveredBooking.enriched?.dueAmount ?? 0) > 0
+                                        ? `Due: ৳${(hoveredBooking.enriched?.dueAmount || 0).toLocaleString()}`
+                                        : '✓ Settled'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Micro Quick Hint */}
+                        <div className="pt-1.5 flex items-center justify-between text-[8.5px] text-slate-400 border-t border-slate-800/80">
+                            <span className="flex items-center gap-1">
+                                <span className="size-1.5 rounded-full bg-blue-400 animate-pulse" />
+                                Click bar for drawer actions
+                            </span>
+                            <span>Drag edge to resize Stay</span>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );

@@ -220,7 +220,7 @@ export const DiscountManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Active Discount Policies</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{activeCount} / {discounts.length}</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{activeCount} / {discounts.length}</div>
                         <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
                             <Check size={11} /> Authorized for Front Desk
                         </span>
@@ -233,7 +233,7 @@ export const DiscountManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Supervisor PIN Enforced</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">{pinRequiredCount} Policies</div>
+                        <div className="text-xl text-gray-900 mt-0.5">{pinRequiredCount} Policies</div>
                         <span className="text-[10px] text-amber-600 font-semibold mt-0.5 block">
                             Manager Security Gate
                         </span>
@@ -246,7 +246,7 @@ export const DiscountManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Maximum Cap Limit</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">৳ {maxDiscountValue.toLocaleString()}</div>
+                        <div className="text-xl text-gray-900 mt-0.5">৳ {maxDiscountValue.toLocaleString()}</div>
                         <span className="text-[10px] text-purple-600 font-semibold mt-0.5 block">
                             Highest Discretionary Cap
                         </span>
@@ -259,7 +259,7 @@ export const DiscountManagement: React.FC = () => {
                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs flex items-center justify-between">
                     <div>
                         <span className="text-gray-500 font-medium text-[11px]">Audit Contra-Ledger</span>
-                        <div className="text-xl font-bold text-gray-900 mt-0.5">GL-4990</div>
+                        <div className="text-xl text-gray-900 mt-0.5">GL-4990</div>
                         <span className="text-[10px] text-blue-600 font-semibold mt-0.5 block">
                             Room Revenue Allowances
                         </span>
@@ -300,7 +300,7 @@ export const DiscountManagement: React.FC = () => {
             {/* Discounts List / Table */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden text-xs">
                 <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                    <h2 className="font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <h2 className="text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Percent size={14} className="text-blue-600" />
                         <span>Authorized Discount & Allowance Policies</span>
                     </h2>
@@ -321,13 +321,13 @@ export const DiscountManagement: React.FC = () => {
                                 className={`p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 transition-colors ${disc.active ? 'hover:bg-gray-50/80' : 'bg-gray-50/40 opacity-70'}`}
                             >
                                 <div className="flex items-start gap-3.5">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-base flex-shrink-0 shadow-2xs border border-blue-100">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-base flex-shrink-0 shadow-2xs border border-blue-100">
                                         {disc.type === 'Percentage (%)' ? '%' : '৳'}
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <h3 className="font-bold text-gray-900 text-sm">{disc.name}</h3>
-                                            <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                            <h3 className="text-gray-900 text-sm">{disc.name}</h3>
+                                            <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                                                 {disc.code}
                                             </span>
                                             <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
@@ -362,7 +362,7 @@ export const DiscountManagement: React.FC = () => {
 
                                 <div className="flex items-center gap-2.5 self-end lg:self-auto flex-shrink-0">
                                     {disc.requiresManagerPin ? (
-                                        <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                                        <span className="px-2 py-1 rounded-md text-[10px] bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
                                             <Lock size={11} /> PIN Required
                                         </span>
                                     ) : (
@@ -380,7 +380,7 @@ export const DiscountManagement: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={() => handleToggleActive(disc.id)}
-                                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${disc.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
+                                        className={`px-2.5 py-1 rounded-full text-[10px] cursor-pointer transition-colors ${disc.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}
                                     >
                                         {disc.active ? 'Active' : 'Inactive'}
                                     </button>
@@ -413,7 +413,7 @@ export const DiscountManagement: React.FC = () => {
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
-                            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                            <h3 className="text-xs text-gray-900 flex items-center gap-2">
                                 <Percent size={15} className="text-blue-600" />
                                 <span>{editingDiscount ? 'Edit Discount Policy' : 'Create New Discount Policy'}</span>
                             </h3>
@@ -484,7 +484,7 @@ export const DiscountManagement: React.FC = () => {
                                         min={0}
                                         value={formData.value}
                                         onChange={e => setFormData({ ...formData, value: Number(e.target.value) })}
-                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none font-bold text-gray-900"
+                                        className="w-full h-8 px-2.5 border border-gray-200 rounded-lg outline-none text-gray-900"
                                     />
                                 </div>
                             </div>

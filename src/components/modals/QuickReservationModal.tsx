@@ -40,7 +40,15 @@ import {
     releaseRoomLock,
     validateAndCommitReservation,
     getAvailableRoomsForStay,
-    getCanonicalRooms
+    getCanonicalRooms,
+    getDynamicRoomTypes,
+    calculateTariffForRatePlan,
+    getRoomTypeCapacity,
+    generateMasterReservationNumber,
+    generateGroupCode,
+    generateSubBookingNumber,
+    generateRegistrationNumber,
+    generateFolioNumber
 } from '../../utils/roomInventoryEngine';
 import {
     calculateReservationTaxes,
@@ -48,26 +56,33 @@ import {
     getTaxConfigurations,
     type TaxCalculationResult
 } from '../../utils/taxCalculationEngine';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 import { toast } from '../../context/ToastContext';
 
 export interface QuickReservationModalProps {
     isOpen: boolean;
     onClose: () => void;
     roomInfo?: {
-        room: string;
-        startDate: string;
-        endDate: string;
-        nights: number;
+        room?: string;
+        roomNumber?: string;
+        startDate?: string;
+        checkIn?: string;
+        endDate?: string;
+        checkOut?: string;
+        nights?: number;
         startIndex?: number;
         endIndex?: number;
+        roomType?: string;
+        baseRate?: number;
     };
     onReserve?: (booking: {
         room: string;
-        startIndex: number;
-        endIndex: number;
+        startIndex?: number;
+        endIndex?: number;
         guestName: string;
         status: string;
     }) => void;
+    onReservationCreated?: (res: any) => void;
 }
 
 interface RoomItem {
@@ -100,7 +115,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     isOpen,
     onClose,
     roomInfo,
-    onReserve
+    onReserve,
+    onReservationCreated
 }) => {
     const [activeTab, setActiveTab] = useState<'reservation' | 'payment'>('reservation');
 
@@ -111,6 +127,33 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         return getActiveTaxConfiguration().id;
     });
     const availableTaxConfigs = useMemo(() => getTaxConfigurations().filter(c => c.status === 'Active'), []);
+
+    const [dbRatePlans, setDbRatePlans] = useState<any[]>(() => {
+        try {
+            const saved = localStorage.getItem('hotel_rate_plans_v1');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        } catch {}
+        return [];
+    });
+
+    useEffect(() => {
+        fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                    setDbRatePlans(json.data);
+                    localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    const availableRatePlans = dbRatePlans;
 
     // Reservation Details
     const [checkInDate, setCheckInDate] = useState<string>(() => getSystemDateISO());
@@ -131,7 +174,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 id: 1,
                 roomType: 'Deluxe Double',
                 noOfRooms: 1,
-                ratePlan: 'Summer Vacation',
+                ratePlan: '',
                 roomNumber: defaultRoomNumber,
                 assignedRooms: [defaultRoomNumber],
                 adults: 2,
@@ -170,24 +213,58 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
     // Initialize from roomInfo prop when opened
     useEffect(() => {
-        if (roomInfo) {
-            if (roomInfo.startDate) setCheckInDate(roomInfo.startDate);
-            if (roomInfo.endDate) setCheckOutDate(roomInfo.endDate);
-            if (roomInfo.nights) setNights(roomInfo.nights);
-            if (roomInfo.room) {
-                const cleanRoom = roomInfo.room.replace(/[^0-9a-zA-Z-]/g, '') || '101';
-                const canonical = getCanonicalRooms().find(r => r.number === cleanRoom);
-                setRoomsList(prev => [
-                    {
-                        ...prev[0],
-                        roomType: canonical?.roomTypeName || prev[0]?.roomType || 'Deluxe Double',
-                        roomNumber: cleanRoom,
-                        assignedRooms: [cleanRoom],
-                        rate: canonical?.baseRate || prev[0]?.rate || 3000
-                    }
-                ]);
-            }
+        if (!isOpen) return;
+
+        // Reset guest info for new express booking
+        setName('');
+        setMobile('');
+        setEmail('');
+        setActiveTab('reservation');
+
+        const targetStart = roomInfo?.startDate || roomInfo?.checkIn || getSystemDateISO();
+        const isDayUseInit = Boolean((roomInfo as any)?.isDayUse || (roomInfo as any)?.dayUse || (roomInfo?.startDate && roomInfo?.endDate && roomInfo.startDate === roomInfo.endDate));
+        const targetEnd = isDayUseInit ? targetStart : (roomInfo?.endDate || roomInfo?.checkOut || getNextDayISO(targetStart, 1));
+        const targetRoom = roomInfo?.room || roomInfo?.roomNumber || '101';
+
+        setDayUse(isDayUseInit);
+        setCheckInDate(targetStart);
+        setCheckOutDate(targetEnd);
+
+        let targetNights = isDayUseInit ? 0 : roomInfo?.nights;
+        if (!isDayUseInit && !targetNights) {
+            const s = new Date(targetStart);
+            const e = new Date(targetEnd);
+            targetNights = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
         }
+        setNights(targetNights ?? 0);
+
+        const cleanRoom = targetRoom.replace(/[^0-9a-zA-Z-]/g, '') || '101';
+        const canonical = getCanonicalRooms().find(r => r.number === cleanRoom);
+        const resolvedType = roomInfo?.roomType || canonical?.roomTypeName || 'Deluxe Double';
+        const canonicalRate = roomInfo?.baseRate || canonical?.baseRate || 3000;
+        const defaultPlan = availableRatePlans[0]?.name || '';
+        const initialCalculatedRate = calculateTariffForRatePlan(defaultPlan, resolvedType, canonicalRate, 2, 0, availableRatePlans);
+
+        setRoomsList([
+            {
+                id: 1,
+                roomType: resolvedType,
+                noOfRooms: 1,
+                ratePlan: defaultPlan,
+                roomNumber: cleanRoom,
+                assignedRooms: [cleanRoom],
+                adults: 2,
+                children: 0,
+                childrenAges: [],
+                rate: initialCalculatedRate,
+                checkInDate: targetStart,
+                checkOutDate: targetEnd,
+                nights: targetNights
+            }
+        ]);
+        setPaymentRows([
+            { id: 1, method: 'Cash', amount: initialCalculatedRate * (targetNights || 1) }
+        ]);
     }, [roomInfo, isOpen]);
 
 
@@ -322,7 +399,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const getMaxRoomsAllowedForRow = (typeName: string, currentItemId: number): number => {
         const totalFree = getTotalInventoryForType(typeName);
         const takenInOthers = getAllocatedCountInOtherRows(typeName, currentItemId);
-        return Math.max(1, totalFree - takenInOthers);
+        return Math.max(0, totalFree - takenInOthers);
     };
 
     // Overbooking validation check across the quick modal form
@@ -330,7 +407,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         if (totalRoomsAllocatedInForm > liveAvailabilityReport.availableCount) return true;
         for (const r of roomsList) {
             const maxForThis = getMaxRoomsAllowedForRow(r.roomType, r.id);
-            if ((Number(r.noOfRooms) || 1) > maxForThis) return true;
+            if (maxForThis <= 0 || (Number(r.noOfRooms) || 1) > maxForThis) return true;
         }
         return false;
     }, [totalRoomsAllocatedInForm, liveAvailabilityReport.availableCount, roomsList]);
@@ -491,18 +568,21 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             return;
         }
 
+        const defPlan = availableRatePlans[0]?.name || '';
+        const defRate = calculateTariffForRatePlan(defPlan, freeRoom.roomTypeName || 'Deluxe Double', freeRoom.baseRate || 3000, 2, 0, availableRatePlans);
+
         setRoomsList([
             ...roomsList,
             {
                 id: nextId,
                 roomType: freeRoom.roomTypeName || 'Deluxe Double',
                 noOfRooms: 1,
-                ratePlan: 'Standard Rate',
+                ratePlan: defPlan,
                 roomNumber: freeRoom.number,
                 assignedRooms: [freeRoom.number],
                 adults: 2,
                 children: 0,
-                rate: freeRoom.baseRate || 3000
+                rate: defRate
             }
         ]);
     };
@@ -551,16 +631,106 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const handleRoomFieldChange = <K extends keyof RoomItem>(id: number, field: K, value: RoomItem[K]) => {
         setRoomsList(roomsList.map(r => {
             if (r.id !== id) return r;
+            if (field === 'ratePlan') {
+                const planName = String(value);
+                const assignedRm = r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(planName, r.roomType, canonicalRate, r.adults, r.children, availableRatePlans);
+                return {
+                    ...r,
+                    ratePlan: planName,
+                    rate: newRate
+                };
+            }
+            if (field === 'adults') {
+                const capacity = getRoomTypeCapacity(r.roomType);
+                const rawAdults = Number(value) || 1;
+                const newAdults = Math.max(1, Math.min(rawAdults, capacity.maxAdults));
+                if (rawAdults > capacity.maxAdults) {
+                    toast.warning(`Capacity Limit: Maximum ${capacity.maxAdults} adult(s) allowed for ${r.roomType}!`);
+                }
+                const assignedRm = r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, newAdults, r.children, availableRatePlans);
+                return {
+                    ...r,
+                    adults: newAdults,
+                    rate: newRate
+                };
+            }
+            if (field === 'children') {
+                const capacity = getRoomTypeCapacity(r.roomType);
+                const rawChildren = Math.max(0, Number(value) || 0);
+                const newChildren = Math.min(rawChildren, capacity.maxChildren);
+                if (rawChildren > capacity.maxChildren) {
+                    toast.warning(`Capacity Limit: Maximum ${capacity.maxChildren} child(ren) allowed for ${r.roomType}!`);
+                }
+                const assignedRm = r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, r.adults, newChildren, availableRatePlans);
+                return {
+                    ...r,
+                    children: newChildren,
+                    rate: newRate
+                };
+            }
             if (field === 'roomType') {
-                const maxForNewType = getMaxRoomsAllowedForRow(String(value), id);
+                const newType = String(value);
+                const maxForNewType = getMaxRoomsAllowedForRow(newType, id);
+                if (maxForNewType <= 0) {
+                    toast.error(`Overbooking Prevented: No rooms available in "${newType}" for the selected dates!`);
+                    return r;
+                }
                 const safeCount = Math.min(r.noOfRooms, maxForNewType);
-                const autoAssigned = getAutoAssignedRoomsForRow({ ...r, roomType: value as string, noOfRooms: safeCount });
+                const autoAssigned = getAutoAssignedRoomsForRow({ ...r, roomType: newType, noOfRooms: safeCount });
+                const assignedRm = autoAssigned[0] || r.roomNumber;
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === newType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+
+                const newCapacity = getRoomTypeCapacity(newType);
+                const clampedAdults = Math.max(1, Math.min(r.adults, newCapacity.maxAdults));
+                const clampedChildren = Math.min(r.children, newCapacity.maxChildren);
+                const clampedAges = (r.childrenAges || []).slice(0, clampedChildren);
+                if (r.adults > newCapacity.maxAdults || r.children > newCapacity.maxChildren) {
+                    toast.info(`Occupancy adjusted to fit ${newType} limits (Max Adults: ${newCapacity.maxAdults}, Max Children: ${newCapacity.maxChildren}).`);
+                }
+
+                const resolvedRate = calculateTariffForRatePlan(r.ratePlan, newType, canonicalRate, clampedAdults, clampedChildren, availableRatePlans);
                 return { 
                     ...r, 
-                    roomType: value as any, 
+                    roomType: newType, 
+                    adults: clampedAdults,
+                    children: clampedChildren,
+                    childrenAges: clampedAges,
                     noOfRooms: Math.max(1, safeCount),
                     assignedRooms: autoAssigned,
-                    roomNumber: autoAssigned[0] || r.roomNumber
+                    roomNumber: assignedRm,
+                    rate: resolvedRate
+                };
+            }
+            if (field === 'roomNumber') {
+                const selectedRoomNum = String(value);
+                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === selectedRoomNum);
+                const dynamicTypes = getDynamicRoomTypes();
+                const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+                const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, canonicalRate, r.adults, r.children, availableRatePlans);
+                return {
+                    ...r,
+                    roomNumber: selectedRoomNum,
+                    assignedRooms: [selectedRoomNum],
+                    rate: newRate
                 };
             }
             if (field === 'noOfRooms') {
@@ -610,6 +780,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
     // Submit reservation action
     const handleCompleteReservation = (status: 'hold' | 'confirmed' | 'stayover' | 'arrived') => {
+        if (availableRatePlans.length === 0) {
+            toast.error('Cannot proceed: No Rate Plans configured. Please configure Rate Plans in Rate Plan Management (/rate-plans) first!');
+            return;
+        }
+
         if (hasOverbookingError) {
             toast.error('Overbooking Prevented: Requested rooms exceed available inventory for the selected dates!');
             return;
@@ -660,10 +835,57 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         const primaryRoom = allocatedRoomNumbers[0] || roomsList[0]?.roomNumber || roomInfo?.room || '101';
         const guestDisplayName = name.trim() ? `${title} ${name.trim()}` : `Walk-In Guest (${primaryRoom})`;
 
+        const isGroup = allocatedRoomNumbers.length > 1;
+        const reservationNumber = generateMasterReservationNumber();
+        const groupCode = isGroup ? generateGroupCode() : undefined;
+        const regNo = (status === 'arrived' || (status as string) === 'in-house') ? generateRegistrationNumber(reservationNumber) : undefined;
+        const folioNo = generateFolioNumber(reservationNumber);
+
+        const assignedRoomsExpanded = roomsList.flatMap((r) => {
+            const countNeeded = Number(r.noOfRooms) || 1;
+            const assigned = rowAllocatedMap.get(r.id) || (
+                (r.assignedRooms && r.assignedRooms.length === countNeeded)
+                    ? r.assignedRooms
+                    : [r.roomNumber]
+            );
+            return assigned.map(rm => {
+                const dateConf = r.roomDatesMap?.[rm];
+                return {
+                    ...r,
+                    noOfRooms: 1,
+                    roomNumber: rm,
+                    assignedRooms: [rm],
+                    checkInDate: dateConf?.checkIn || checkInDate,
+                    checkOutDate: dayUse ? checkInDate : (dateConf?.checkOut || checkOutDate),
+                    nights: dayUse ? 0 : (dateConf?.nights || nights),
+                    dayUse,
+                    isDayUse: dayUse
+                };
+            });
+        });
+
+        const subRoomsWithNumbers = assignedRoomsExpanded.map((rm, idx) => {
+            const subBookingNum = isGroup ? generateSubBookingNumber(reservationNumber, idx + 1) : `${reservationNumber}-01`;
+            const roomRegNo = (status === 'arrived' || (status as string) === 'in-house') ? generateRegistrationNumber(subBookingNum) : undefined;
+            const roomFolioNo = generateFolioNumber(subBookingNum);
+            return {
+                ...rm,
+                subBookingNumber: subBookingNum,
+                registrationNumber: roomRegNo,
+                folioNumber: roomFolioNo
+            };
+        });
+
         // Save to localStorage for full application persistence
         const newRecord = {
             id: Date.now(),
-            reservationNumber: `RES-${Date.now().toString().slice(-6)}`,
+            reservationNumber,
+            groupCode,
+            subBookingNumber: isGroup ? `${reservationNumber}-01` : `${reservationNumber}-01`,
+            isGroup,
+            registrationNumber: regNo,
+            registeredAt: (status === 'arrived' || (status as string) === 'in-house') ? new Date().toISOString() : undefined,
+            folioNumber: folioNo,
             guestName: guestDisplayName,
             phone: mobile || 'N/A',
             roomNumber: primaryRoom,
@@ -671,8 +893,10 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             allocatedRooms: allocatedRoomNumbers,
             roomsCount: totalRoomsAllocatedInForm,
             checkIn: checkInDate,
-            checkOut: checkOutDate,
-            nights,
+            checkOut: dayUse ? checkInDate : checkOutDate,
+            nights: dayUse ? 0 : nights,
+            dayUse,
+            isDayUse: dayUse,
             adults: roomsList.reduce((acc, r) => acc + r.adults, 0),
             children: roomsList.reduce((acc, r) => acc + r.children, 0),
             status,
@@ -700,26 +924,25 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 breakdown: taxCalculation.breakdown
             },
             source: businessSource,
-            roomsList: roomsList.flatMap((r) => {
-                const countNeeded = Number(r.noOfRooms) || 1;
-                const assigned = rowAllocatedMap.get(r.id) || (
-                    (r.assignedRooms && r.assignedRooms.length === countNeeded)
-                        ? r.assignedRooms
-                        : [r.roomNumber]
-                );
-                return assigned.map(rm => {
-                    const dateConf = r.roomDatesMap?.[rm];
-                    return {
-                        ...r,
-                        noOfRooms: 1,
-                        roomNumber: rm,
-                        assignedRooms: [rm],
-                        checkInDate: dateConf?.checkIn || checkInDate,
-                        checkOutDate: dateConf?.checkOut || checkOutDate,
-                        nights: dateConf?.nights || nights
-                    };
-                });
-            }),
+            roomsList: subRoomsWithNumbers,
+            groupRoomsList: subRoomsWithNumbers.map((rm, idx) => ({
+                reservationNumber: rm.subBookingNumber,
+                masterReservationNumber: reservationNumber,
+                subBookingNumber: rm.subBookingNumber,
+                registrationNumber: rm.registrationNumber,
+                folioNumber: rm.folioNumber,
+                roomNumber: rm.roomNumber,
+                roomType: rm.roomType || roomsList[0]?.roomType || 'Standard Room',
+                ratePlan: rm.ratePlan || roomsList[0]?.ratePlan || 'Standard Rate',
+                guestName: guestDisplayName,
+                adults: rm.adults || 1,
+                children: rm.children || 0,
+                status,
+                checkIn: rm.checkInDate || checkInDate,
+                checkOut: rm.checkOutDate || (dayUse ? checkInDate : checkOutDate),
+                isPrimary: idx === 0,
+                groupCode
+            })),
             servicesBundle: roomsList[0]?.servicesBundle || { extraBed: roomsList[0]?.extraBed, pickup: roomsList[0]?.pickup },
             extraBed: roomsList[0]?.servicesBundle?.extraBed || roomsList[0]?.extraBed || null,
             pickup: roomsList[0]?.servicesBundle?.pickup || roomsList[0]?.pickup || null,
@@ -761,15 +984,18 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                     : `Reservation ${newRecord.reservationNumber} confirmed successfully!`
         );
 
-        // Call parent callback
-        if (onReserve && roomInfo?.startIndex !== undefined && roomInfo?.endIndex !== undefined) {
+        // Call parent callbacks
+        if (onReserve) {
             onReserve({
                 room: primaryRoom,
-                startIndex: roomInfo.startIndex,
-                endIndex: roomInfo.endIndex,
+                startIndex: roomInfo?.startIndex !== undefined ? roomInfo.startIndex : 0,
+                endIndex: roomInfo?.endIndex !== undefined ? roomInfo.endIndex : ((roomInfo?.startIndex || 0) + nights - 1),
                 guestName: guestDisplayName,
                 status
             });
+        }
+        if (onReservationCreated) {
+            onReservationCreated(newRecord);
         }
 
         onClose();
@@ -783,12 +1009,12 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 {/* Modern Light Header */}
                 <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-2xs">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center font-bold shadow-xs flex-shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
                             <CalendarIcon size={14} />
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-sm font-bold text-slate-800 tracking-tight m-0">Quick Reservation</h2>
+                                <h2 className="text-sm text-slate-800 tracking-tight m-0">Quick Reservation</h2>
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                                     Express Mode
                                 </span>
@@ -844,7 +1070,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                         <div className="space-y-3 animate-in fade-in duration-100">
                             {/* Parameters Card Container (matching Add Reservation) */}
                             <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2.5">
-                                {/* Top Grid Fields: Consolidated Stay Period Picker + Source + Agent */}
+                                {/* Top Grid Fields: Consolidated Stay Period Picker + Day Use + Source + Agent */}
                                 <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end">
                                     {/* Consolidated Single Stay Dates Controller */}
                                     <div className="md:col-span-6">
@@ -868,8 +1094,32 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         />
                                     </div>
 
-                                    <div className="md:col-span-3 flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                    {/* Day Use Card (Matching Add Reservation) */}
+                                    <div className="md:col-span-2 flex flex-col gap-1">
+                                        <label className="text-[10px] text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                            <Clock size={11} className="text-amber-600" />
+                                            <span>Day Use</span>
+                                        </label>
+                                        <label
+                                            className={`w-full h-7.5 px-2 rounded-md border flex items-center justify-center gap-1.5 text-[11px] font-semibold cursor-pointer select-none transition-all shadow-2xs ${
+                                                dayUse
+                                                    ? 'bg-amber-50 border-amber-300 text-amber-900 ring-1 ring-amber-300'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300'
+                                            }`}
+                                            title="Toggle Day Use (Check-in and Check-out on same day, 0 nights)"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={dayUse}
+                                                onChange={e => handleDayUseToggle(e.target.checked)}
+                                                className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                            />
+                                            <span className="whitespace-nowrap">Day Use</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="md:col-span-2 flex flex-col gap-1">
+                                        <label className="text-[10px] text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Source</span>
                                             <span className="text-red-500">*</span>
                                         </label>
@@ -887,8 +1137,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </select>
                                     </div>
 
-                                    <div className="md:col-span-3 flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                                    <div className="md:col-span-2 flex flex-col gap-1">
+                                        <label className="text-[10px] text-gray-700 uppercase tracking-wider flex items-center gap-1">
                                             <span>Agent</span>
                                             <span className="text-red-500">*</span>
                                         </label>
@@ -907,16 +1157,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
                                 {/* Options Row */}
                                 <div className="flex items-center justify-between pt-2 border-t border-slate-200/80">
-                                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
-                                        <input
-                                            type="checkbox"
-                                            checked={dayUse}
-                                            onChange={e => handleDayUseToggle(e.target.checked)}
-                                            className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                        />
-                                        <span>Day Use</span>
-                                    </label>
-
                                     <div className="flex items-center gap-2">
                                         <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none hover:text-slate-900">
                                             <input
@@ -941,6 +1181,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             </select>
                                         )}
                                     </div>
+
+                                    {dayUse && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-800 bg-amber-100/80 border border-amber-300 px-2 py-0.5 rounded shadow-2xs">
+                                            <Clock size={11} className="text-amber-700" />
+                                            <span>Day Use Active (0 Nights • Same-Day Departure)</span>
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -948,10 +1195,10 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                             <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
                                 <div className="px-3 py-2 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                                        <span className="text-[11px] text-slate-700 uppercase tracking-wider">
                                             Room Allocation &amp; Inventory Check
                                         </span>
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border font-bold text-[10px] shadow-2xs transition-all ${
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] shadow-2xs transition-all ${
                                             remainingOverallFreeRooms > 0 
                                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                                                 : 'bg-amber-50 text-amber-800 border-amber-300'
@@ -962,7 +1209,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </span>
                                     </div>
                                     <span className="text-[10.5px] text-slate-500 font-medium">
-                                        Dates: <strong className="text-blue-900">{checkInDate}</strong> to <strong className="text-blue-900">{checkOutDate}</strong> ({nights}N)
+                                        Dates: <strong className="text-blue-900">{checkInDate}</strong> to <strong className="text-blue-900">{dayUse ? checkInDate : checkOutDate}</strong> ({dayUse ? 'Day Use • 0N' : `${nights}N`})
                                     </span>
                                 </div>
 
@@ -973,10 +1220,25 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     </div>
                                 )}
 
+                                {availableRatePlans.length === 0 && (
+                                    <div className="mx-3 my-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
+                                        <div className="flex items-center gap-2">
+                                            <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
+                                            <span>
+                                                <strong>No Active Rate Plans Found:</strong> Please configure Rate Plans in{' '}
+                                                <a href="/rate-plans" className="underline text-blue-700 hover:text-blue-900">
+                                                    Rate Plan Management (/rate-plans)
+                                                </a>{' '}
+                                                first before booking.
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="overflow-x-hidden">
                                     <table className="w-full text-left border-collapse text-[11px] table-auto">
                                         <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
+                                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                                 <th className="py-2 px-2.5 min-w-[120px]">Room Type</th>
                                                 <th className="py-2 px-1 text-center w-11">Qty</th>
                                                 <th className="py-2 px-2 min-w-[120px]">Rate Plan</th>
@@ -1003,11 +1265,15 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                 onChange={e => handleRoomFieldChange(item.id, 'roomType', e.target.value)}
                                                                 className="w-full min-w-[130px] max-w-[155px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium text-slate-800"
                                                             >
-                                                                <option value="Deluxe Double">Deluxe Double [{getRemainingFreeCountForType('Deluxe Double')}]</option>
-                                                                <option value="Superior King">Superior King [{getRemainingFreeCountForType('Superior King')}]</option>
-                                                                <option value="Executive Suite">Executive Suite [{getRemainingFreeCountForType('Executive Suite')}]</option>
-                                                                <option value="Standard Single">Standard Single [{getRemainingFreeCountForType('Standard Single')}]</option>
-                                                                <option value="Presidential Suite">Presidential Suite [{getRemainingFreeCountForType('Presidential Suite')}]</option>
+                                                                {getDynamicRoomTypes().map(typeObj => typeObj.name).map(typeOpt => {
+                                                                    const availForRow = getMaxRoomsAllowedForRow(typeOpt, item.id);
+                                                                    const isSoldOut = availForRow <= 0;
+                                                                    return (
+                                                                        <option key={typeOpt} value={typeOpt} disabled={isSoldOut && typeOpt !== item.roomType}>
+                                                                            {typeOpt} {isSoldOut ? '[Sold Out]' : `[${availForRow} Available]`}
+                                                                        </option>
+                                                                    );
+                                                                })}
                                                             </select>
                                                             {/* Ultra-Compact & Elegant Active Addons Pill */}
                                                             {(() => {
@@ -1038,7 +1304,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                             <Sparkles size={10} className="text-blue-600 flex-shrink-0" />
                                                                             <span className="truncate">{activeNames.slice(0, 2).join(', ')}{activeNames.length > 2 ? ` +${activeNames.length - 2}` : ''}{scopeLabel}</span>
                                                                         </div>
-                                                                        <span className="text-[8.5px] font-bold text-blue-700 bg-white/90 px-1 rounded border border-blue-200/60 flex-shrink-0 ml-1">
+                                                                        <span className="text-[8.5px] text-blue-700 bg-white/90 px-1 rounded border border-blue-200/60 flex-shrink-0 ml-1">
                                                                             +৳{addonsCost.toLocaleString()}
                                                                         </span>
                                                                     </button>
@@ -1070,7 +1336,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                                     handleRoomFieldChange(item.id, 'noOfRooms', raw);
                                                                                 }
                                                                             }}
-                                                                            className={`w-10 h-7 px-0.5 border rounded text-[11px] text-center font-bold outline-none mx-auto block transition-all ${
+                                                                            className={`w-10 h-7 px-0.5 border rounded text-[11px] text-center outline-none mx-auto block transition-all ${
                                                                                 isExceeded 
                                                                                     ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-400' 
                                                                                     : 'border-slate-200 focus:border-blue-500'
@@ -1089,9 +1355,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                 onChange={e => handleRoomFieldChange(item.id, 'ratePlan', e.target.value)}
                                                                 className="w-full min-w-[115px] max-w-[140px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
                                                             >
-                                                                <option value="Summer Vacation">Summer Vacation</option>
-                                                                <option value="Standard EP">Standard EP (Room Only)</option>
-                                                                <option value="Corporate CP">Corporate CP (Bed & Breakfast)</option>
+                                                                {availableRatePlans.length === 0 ? (
+                                                                    <option value="" disabled>No rate plans configured (Configure in Rate Plans)</option>
+                                                                ) : (
+                                                                    availableRatePlans.map(p => (
+                                                                        <option key={p.id} value={p.name}>{p.name}</option>
+                                                                    ))
+                                                                )}
                                                             </select>
                                                         </td>
                                                         <td className="py-1.5 px-1 text-center">
@@ -1105,7 +1375,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                         requiredCount: item.noOfRooms,
                                                                         isAutoMode: true
                                                                     })}
-                                                                    className="w-24 h-7 px-1.5 border border-blue-300 bg-blue-50/80 hover:bg-blue-100 text-blue-900 rounded text-[10px] font-bold flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all"
+                                                                    className="w-24 h-7 px-1.5 border border-blue-300 bg-blue-50/80 hover:bg-blue-100 text-blue-900 rounded text-[10px] flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all"
                                                                     title={`Assigned Rooms: ${(item.assignedRooms && item.assignedRooms.length === item.noOfRooms ? item.assignedRooms : getAutoAssignedRoomsForRow(item)).join(', ')} (Click to view/customize)`}
                                                                 >
                                                                     <div className="flex items-center gap-1 truncate">
@@ -1127,7 +1397,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                         handleRoomFieldChange(item.id, 'roomNumber', val);
                                                                         handleRoomFieldChange(item.id, 'assignedRooms', [val]);
                                                                     }}
-                                                                    className="w-24 h-7 px-1 border border-slate-200 rounded text-[11px] font-mono font-bold text-blue-700 bg-white outline-none text-center mx-auto block cursor-pointer"
+                                                                    className="w-24 h-7 px-1 border border-slate-200 rounded text-[11px] font-mono text-blue-700 bg-white outline-none text-center mx-auto block cursor-pointer"
                                                                 >
                                                                     {(() => {
                                                                         const otherRowsRooms = new Set<string>();
@@ -1166,25 +1436,44 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                 </select>
                                                             )}
                                                         </td>
-                                                        <td className="py-1.5 px-1 text-center">
-                                                            <input
-                                                                type="number"
-                                                                min={1}
-                                                                value={item.adults}
-                                                                onChange={e => handleRoomFieldChange(item.id, 'adults', parseInt(e.target.value) || 1)}
-                                                                className="w-9 h-7 px-0.5 border border-slate-200 rounded text-[11px] text-center outline-none mx-auto block"
-                                                            />
-                                                        </td>
-                                                        <td className="py-1.5 px-1 text-center">
-                                                            <ChildAgeSelector
-                                                                childrenCount={item.children}
-                                                                childrenAges={item.childrenAges}
-                                                                onChange={(count, ages) => {
-                                                                    setRoomsList(prev => prev.map(r => r.id === item.id ? { ...r, children: count, childrenAges: ages } : r));
-                                                                }}
-                                                                compact
-                                                            />
-                                                        </td>
+                                                        {(() => {
+                                                            const capacity = getRoomTypeCapacity(item.roomType);
+                                                            return (
+                                                                <>
+                                                                    <td className="py-1.5 px-1 text-center">
+                                                                        <div className="flex flex-col items-center">
+                                                                            <input
+                                                                                type="number"
+                                                                                min={1}
+                                                                                max={capacity.maxAdults}
+                                                                                value={item.adults}
+                                                                                onChange={e => handleRoomFieldChange(item.id, 'adults', parseInt(e.target.value) || 1)}
+                                                                                className="w-10 h-7 px-0.5 border border-slate-200 rounded text-[11px] font-semibold text-center outline-none mx-auto block focus:border-blue-500"
+                                                                                title={`Adults: 1 to ${capacity.maxAdults} for ${item.roomType}`}
+                                                                            />
+                                                                            <span className="text-[8.5px] text-slate-400">max {capacity.maxAdults}</span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-1.5 px-1 text-center">
+                                                                        <ChildAgeSelector
+                                                                            childrenCount={item.children}
+                                                                            childrenAges={item.childrenAges}
+                                                                            maxChildren={capacity.maxChildren}
+                                                                            onChange={(count, ages) => {
+                                                                                const assignedRm = item.roomNumber;
+                                                                                const canonicalRoom = getCanonicalRooms().find(cr => cr.number === assignedRm);
+                                                                                const dynamicTypes = getDynamicRoomTypes();
+                                                                                const matchedType = dynamicTypes.find(t => t.name === item.roomType);
+                                                                                const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || item.rate || 3000;
+                                                                                const newRate = calculateTariffForRatePlan(item.ratePlan, item.roomType, canonicalRate, item.adults, count, availableRatePlans);
+                                                                                setRoomsList(prev => prev.map(r => r.id === item.id ? { ...r, children: count, childrenAges: ages, rate: newRate } : r));
+                                                                            }}
+                                                                            compact
+                                                                        />
+                                                                    </td>
+                                                                </>
+                                                            );
+                                                        })()}
                                                         <td className="py-1.5 px-1.5 text-right">
                                                             <input
                                                                 type="number"
@@ -1193,7 +1482,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                 className="w-16 h-7 px-1 border border-slate-200 rounded text-[11px] font-semibold text-right outline-none ml-auto block"
                                                             />
                                                         </td>
-                                                        <td className="py-1.5 px-2 text-right font-bold text-slate-800 whitespace-nowrap text-[11px]">
+                                                        <td className="py-1.5 px-2 text-right text-slate-800 whitespace-nowrap text-[11px]">
                                                             <div>৳{lineTotal.toLocaleString()}</div>
                                                             {itemAddons > 0 && (
                                                                 <div className="text-[9px] text-slate-400 font-normal">
@@ -1208,7 +1497,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                         type="button"
                                                                         onClick={() => handleSplitRowIntoRooms(item.id)}
                                                                         title={`Split group row into ${item.noOfRooms} separate room rows`}
-                                                                        className="px-1.5 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer transition-colors flex items-center gap-0.5 text-[9px] font-bold shadow-2xs"
+                                                                        className="px-1.5 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 cursor-pointer transition-colors flex items-center gap-0.5 text-[9px] shadow-2xs"
                                                                     >
                                                                         <Split size={11} className="text-blue-600" />
                                                                         <span>Split</span>
@@ -1257,7 +1546,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
                             {/* Guest Quick Info */}
                             <div className="bg-slate-50/50 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2">
-                                <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider m-0">
+                                <h3 className="text-[10px] text-slate-700 uppercase tracking-wider m-0">
                                     Guest Profile
                                 </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -1324,7 +1613,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                 <div className="lg:col-span-7 space-y-3.5">
                                     {/* Discount Section */}
                                     <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs">
-                                        <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Discount</h3>
+                                        <h3 className="text-[10px] text-slate-700 uppercase tracking-wider mb-2">Discount</h3>
                                         <div className="flex items-center gap-2">
                                             <select
                                                 value={discountType}
@@ -1358,7 +1647,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     {/* Payment Method Section */}
                                     <div className="bg-slate-50/70 border border-slate-200/90 rounded-lg p-3 shadow-2xs">
                                         <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Payment Method</h3>
+                                            <h3 className="text-[10px] text-slate-700 uppercase tracking-wider">Payment Method</h3>
                                             <button
                                                 type="button"
                                                 onClick={handleAddPaymentRow}
@@ -1426,55 +1715,55 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             {totalPickupArrivalCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-blue-700">
                                                     <span className="flex items-center gap-1"><Car size={11} /> Airport Pickup (Inbound)</span>
-                                                    <span className="font-bold font-mono">+৳{totalPickupArrivalCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+৳{totalPickupArrivalCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalDropDepartureCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-sky-700">
                                                     <span className="flex items-center gap-1"><Plane size={11} /> Airport Drop (Outbound)</span>
-                                                    <span className="font-bold font-mono">+৳{totalDropDepartureCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+৳{totalDropDepartureCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalExtraBedCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-indigo-700">
                                                     <span className="flex items-center gap-1"><BedDouble size={11} /> Extra Bed &amp; Cot</span>
-                                                    <span className="font-bold font-mono">+৳{totalExtraBedCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+৳{totalExtraBedCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalMealPlanCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-amber-700">
                                                     <span className="flex items-center gap-1"><Utensils size={11} /> Meal Plans</span>
-                                                    <span className="font-bold font-mono">+৳{totalMealPlanCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+৳{totalMealPlanCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalCelebrationCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-rose-700">
                                                     <span className="flex items-center gap-1"><Gift size={11} /> Decor &amp; Romance</span>
-                                                    <span className="font-bold font-mono">+৳{totalCelebrationCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+৳{totalCelebrationCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalSpaCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-teal-700">
                                                     <span className="flex items-center gap-1"><Sparkles size={11} /> Wellness &amp; Spa</span>
-                                                    <span className="font-bold font-mono">+৳{totalSpaCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+৳{totalSpaCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalTimingCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-sky-700">
                                                     <span className="flex items-center gap-1"><Clock size={11} /> Time Flex</span>
-                                                    <span className="font-bold font-mono">+৳{totalTimingCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+৳{totalTimingCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             <div className="flex justify-between py-1 border-t border-slate-200 text-slate-700 font-semibold">
                                                 <span>Total Gross (Tariff + Addons)</span>
-                                                <span className="font-bold text-slate-900">৳{totalAmount.toLocaleString()}</span>
+                                                <span className="text-slate-900">৳{totalAmount.toLocaleString()}</span>
                                             </div>
 
                                             {discountedAmount > 0 && (
@@ -1484,14 +1773,14 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                 </div>
                                             )}
 
-                                            <div className="flex justify-between py-1 text-slate-800 font-bold border-t border-dashed border-slate-200">
+                                            <div className="flex justify-between py-1 text-slate-800 border-t border-dashed border-slate-200">
                                                 <span>Subtotal (Net Base)</span>
-                                                <span className="font-bold text-slate-900">৳{netBaseAmount.toLocaleString()}</span>
+                                                <span className="text-slate-900">৳{netBaseAmount.toLocaleString()}</span>
                                             </div>
 
                                             {taxApplicable && taxCalculation.breakdown.length > 0 && (
                                                 <div className="py-1.5 space-y-1 bg-amber-50/70 p-2 rounded-lg border border-amber-200/80 my-1">
-                                                    <div className="flex justify-between items-center text-[10px] font-bold text-amber-900 uppercase tracking-wider">
+                                                    <div className="flex justify-between items-center text-[10px] text-amber-900 uppercase tracking-wider">
                                                         <span>Taxes, VAT &amp; Surcharge</span>
                                                         <span className="font-mono text-amber-900">+৳{taxCalculation.totalTaxAmount.toLocaleString()}</span>
                                                     </div>
@@ -1506,15 +1795,15 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
                                             <div className="flex justify-between py-1 text-slate-900 font-extrabold border-t border-slate-300 text-sm">
                                                 <span>Grand Total (Payable)</span>
-                                                <span className="font-bold text-blue-900">৳{finalPayable.toLocaleString()}</span>
+                                                <span className="text-blue-900">৳{finalPayable.toLocaleString()}</span>
                                             </div>
 
                                             <div className="flex justify-between py-1 text-slate-600">
                                                 <span>Total Advance Paid</span>
-                                                <span className="font-bold text-emerald-700">৳{totalPaid.toLocaleString()}</span>
+                                                <span className="text-emerald-700">৳{totalPaid.toLocaleString()}</span>
                                             </div>
 
-                                            <div className="bg-white -mx-3 -mb-3 px-3 py-2.5 flex justify-between font-bold text-xs border-t border-slate-200 rounded-b-lg">
+                                            <div className="bg-white -mx-3 -mb-3 px-3 py-2.5 flex justify-between text-xs border-t border-slate-200 rounded-b-lg">
                                                 <span className="text-slate-800">Remaining Balance Due:</span>
                                                 <span className={totalDue > 0 ? 'text-amber-700' : 'text-emerald-700'}>
                                                     ৳{totalDue.toLocaleString()}
@@ -1686,7 +1975,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                             className="fixed z-[99999] w-64 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100 select-none max-h-[82vh] overflow-y-auto"
                             onClick={e => e.stopPropagation()}
                         >
-                            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                            <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
                                 <span>Room #{item.roomNumber || item.id} Services</span>
                                 <span className="text-[9px] text-blue-600 font-semibold">Expert Addons</span>
                             </div>
@@ -1704,7 +1993,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <span>Airport Pickup (Arrival)</span>
                                 </span>
                                 {item.servicesBundle?.pickup?.enabled || item.pickup?.enabled ? (
-                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                    <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                 ) : (
                                     <span className="text-[10px] text-slate-400">+ Add</span>
                                 )}
@@ -1723,7 +2012,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <span>Airport Drop (Departure)</span>
                                 </span>
                                 {item.servicesBundle?.pickup?.dropEnabled || item.pickup?.dropEnabled ? (
-                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                    <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                 ) : (
                                     <span className="text-[10px] text-slate-400">+ Add</span>
                                 )}
@@ -1742,7 +2031,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <span>Extra Bed &amp; Baby Cot</span>
                                 </span>
                                 {item.servicesBundle?.extraBed?.enabled || item.extraBed?.enabled ? (
-                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                    <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                 ) : (
                                     <span className="text-[10px] text-slate-400">+ Add</span>
                                 )}
@@ -1761,7 +2050,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <span>Meal Plans &amp; Dining</span>
                                 </span>
                                 {item.servicesBundle?.mealPlan?.enabled ? (
-                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                    <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                 ) : (
                                     <span className="text-[10px] text-slate-400">+ Add</span>
                                 )}
@@ -1780,7 +2069,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <span>Honeymoon &amp; Decor</span>
                                 </span>
                                 {item.servicesBundle?.celebration?.enabled ? (
-                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                    <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                 ) : (
                                     <span className="text-[10px] text-slate-400">+ Add</span>
                                 )}
@@ -1799,7 +2088,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <span>Spa &amp; Wellness</span>
                                 </span>
                                 {item.servicesBundle?.spaWellness?.enabled ? (
-                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                    <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                 ) : (
                                     <span className="text-[10px] text-slate-400">+ Add</span>
                                 )}
@@ -1818,7 +2107,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     <span>Early / Late Check-Out</span>
                                 </span>
                                 {item.servicesBundle?.timingFlex?.earlyCheckIn || item.servicesBundle?.timingFlex?.lateCheckOut ? (
-                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
+                                    <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Active</span>
                                 ) : (
                                     <span className="text-[10px] text-slate-400">+ Add</span>
                                 )}
@@ -1832,7 +2121,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     setServiceModalConfig({ isOpen: true, rowId: item.id, initialTab: 'pickup' });
                                     setMenuAnchor(null);
                                 }}
-                                className="w-full px-3 py-1.5 text-left text-xs font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
+                                className="w-full px-3 py-1.5 text-left text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
                             >
                                 <Sparkles size={13} />
                                 <span>Manage All Services...</span>

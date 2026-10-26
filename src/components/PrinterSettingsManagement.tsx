@@ -350,7 +350,7 @@ export default function PrinterSettingsManagement() {
                 <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Default Roll Width</span>
-                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold font-mono text-xs">
+                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-mono text-xs">
                             {config.paperSize}
                         </div>
                     </div>
@@ -442,7 +442,7 @@ export default function PrinterSettingsManagement() {
                         <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900">
+                                    <h3 className="text-sm text-slate-900">
                                         Thermal Receipt Layout Options
                                     </h3>
                                     <p className="text-xs text-slate-500">
@@ -469,7 +469,7 @@ export default function PrinterSettingsManagement() {
                                         <button
                                             type="button"
                                             onClick={() => setConfig({ ...config, paperSize: '80mm' })}
-                                            className={`py-2 text-xs font-bold rounded-lg border transition ${
+                                            className={`py-2 text-xs rounded-lg border transition ${
                                                 config.paperSize === '80mm'
                                                     ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
                                                     : 'bg-slate-50 border-slate-200 text-slate-600'
@@ -480,7 +480,7 @@ export default function PrinterSettingsManagement() {
                                         <button
                                             type="button"
                                             onClick={() => setConfig({ ...config, paperSize: '58mm' })}
-                                            className={`py-2 text-xs font-bold rounded-lg border transition ${
+                                            className={`py-2 text-xs rounded-lg border transition ${
                                                 config.paperSize === '58mm'
                                                     ? 'bg-indigo-50 border-indigo-400 text-indigo-700'
                                                     : 'bg-slate-50 border-slate-200 text-slate-600'
@@ -608,7 +608,7 @@ export default function PrinterSettingsManagement() {
                     {/* Photorealistic Thermal Receipt Preview (5 Cols) */}
                     <div className="lg:col-span-5 flex flex-col items-center">
                         <div className="w-full flex items-center justify-between mb-2 px-1">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="text-xs text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                 <Receipt className="size-3.5 text-indigo-600" />
                                 <span>Thermal Print Preview ({config.paperSize})</span>
                             </span>
@@ -670,7 +670,7 @@ export default function PrinterSettingsManagement() {
 
                             {/* Itemized Table */}
                             <div className="space-y-1 text-[11px] border-b border-dashed border-gray-400 pb-2">
-                                <div className="flex justify-between font-bold border-b border-gray-300 pb-1">
+                                <div className="flex justify-between border-b border-gray-300 pb-1">
                                     <span>ITEM DESCRIPTION</span>
                                     <span>AMOUNT</span>
                                 </div>
@@ -742,7 +742,7 @@ export default function PrinterSettingsManagement() {
                                             <div className="bg-black"></div>
                                         </div>
                                     </div>
-                                    <div className="text-[9px] text-gray-600 font-bold mt-1 uppercase">
+                                    <div className="text-[9px] text-gray-600 mt-1 uppercase">
                                         Scan for Digital Folio & Tax Verification
                                     </div>
                                 </div>
@@ -777,7 +777,7 @@ export default function PrinterSettingsManagement() {
                         <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900">
+                                    <h3 className="text-sm text-slate-900">
                                         Kitchen & Room Service Order Ticket (KOT)
                                     </h3>
                                     <p className="text-xs text-slate-500">
@@ -879,7 +879,7 @@ export default function PrinterSettingsManagement() {
                     {/* KOT Visual Kitchen Slip (5 Cols) */}
                     <div className="lg:col-span-5 flex flex-col items-center">
                         <div className="w-full flex items-center justify-between mb-2 px-1">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="text-xs text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                 <Utensils className="size-3.5 text-rose-600" />
                                 <span>Kitchen KOT Slip Preview</span>
                             </span>
@@ -930,7 +930,7 @@ export default function PrinterSettingsManagement() {
                                     <span>[HOT]</span>
                                 </div>
                                 {config.kotShowNotes && (
-                                    <div className="text-xs text-rose-700 font-bold pl-4">
+                                    <div className="text-xs text-rose-700 pl-4">
                                         &gt;&gt; Special Note: Medium well, sauce on side!
                                     </div>
                                 )}
@@ -940,7 +940,7 @@ export default function PrinterSettingsManagement() {
                                     <span>[PAN]</span>
                                 </div>
                                 {config.kotShowNotes && (
-                                    <div className="text-xs text-rose-700 font-bold pl-4">
+                                    <div className="text-xs text-rose-700 pl-4">
                                         &gt;&gt; Special Note: Gluten-free, no cheese on top!
                                     </div>
                                 )}
@@ -963,7 +963,7 @@ export default function PrinterSettingsManagement() {
                 <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                         <div>
-                            <h2 className="text-sm font-bold text-slate-900">
+                            <h2 className="text-sm text-slate-900">
                                 Registered Physical Hardware Printers
                             </h2>
                             <p className="text-xs text-slate-500">
@@ -999,7 +999,7 @@ export default function PrinterSettingsManagement() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <h4 className="font-bold text-slate-900 text-sm">
+                                                <h4 className="text-slate-900 text-sm">
                                                     {p.name}
                                                 </h4>
                                                 {p.isDefault && (
@@ -1013,7 +1013,7 @@ export default function PrinterSettingsManagement() {
                                     </div>
 
                                     <span
-                                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                        className={`px-2.5 py-0.5 rounded-full text-[10px] border ${
                                             p.status === 'online'
                                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                 : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -1093,7 +1093,7 @@ export default function PrinterSettingsManagement() {
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
                             <div className="flex items-center gap-2">
                                 <Printer className="size-5 text-indigo-600" />
-                                <h2 className="text-base font-bold text-slate-900">
+                                <h2 className="text-base text-slate-900">
                                     {editingPrinter ? 'Edit Hardware Printer' : 'Register Hardware Printer'}
                                 </h2>
                             </div>
@@ -1138,7 +1138,7 @@ export default function PrinterSettingsManagement() {
                                         required
                                         value={formPrnCode}
                                         onChange={e => setFormPrnCode(e.target.value.toUpperCase())}
-                                        className="w-full px-3 py-2 text-xs font-mono font-bold uppercase bg-white border border-slate-200 rounded-lg"
+                                        className="w-full px-3 py-2 text-xs font-mono uppercase bg-white border border-slate-200 rounded-lg"
                                     />
                                 </div>
 

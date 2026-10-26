@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if ([
             'taxes-vat', 'tax-vat-settings', 'multi-property', 'properties', 'property-create',
             'printer-settings', 'policy-management', 'holiday-management',
-            'general-settings'
+            'general-settings', 'hotel-info', 'hotel-profile', 'edit-property'
         ].includes(activePage)) {
             setOpenDropdowns(prev => ({ ...prev, 'Settings': true }));
         }
@@ -245,6 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         { id: 'taxes-vat', label: 'Taxes & VAT', icon: <Percent size={12} /> },
                         { id: 'multi-property', label: 'Chain Console', icon: <Building2 size={12} />, badge: 'HQ', badgeColor: 'bg-indigo-100 text-indigo-700' },
                         { id: 'properties', label: 'Properties', icon: <Building2 size={12} /> },
+                        { id: 'hotel-info', label: 'Hotel Profile', icon: <Building2 size={12} /> },
                         { id: 'property-create', label: 'Add Property', icon: <Plus size={12} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
                         { id: 'printer-settings', label: 'Printers & Hardware', icon: <Printer size={12} /> },
                         { id: 'policy-management', label: 'Policies & Rules', icon: <FileText size={12} /> },
@@ -281,21 +282,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // ========================================================================
     if (isCollapsed) {
         return (
-            <aside className="sticky top-0 hidden h-screen w-16 flex-col border-r border-slate-200 bg-white text-slate-800 md:flex select-none z-30 shrink-0 shadow-2xs">
+            <aside className="sticky top-0 hidden h-screen w-14 flex-col border-r border-slate-200 bg-white text-slate-800 md:flex select-none z-30 shrink-0 shadow-2xs">
                 {/* Brand Logo & Expand Toggle */}
-                <div className="h-14 border-b border-slate-100 flex items-center justify-center shrink-0">
+                <div className="h-11 border-b border-slate-100 flex items-center justify-center shrink-0">
                     <button
                         type="button"
                         onClick={toggleSidebar}
-                        className="size-9 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition flex items-center justify-center cursor-pointer"
+                        className="size-7 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition flex items-center justify-center cursor-pointer"
                         title="Expand sidebar"
                     >
-                        <PanelLeft size={16} />
+                        <PanelLeft size={14} />
                     </button>
                 </div>
 
                 {/* Collapsed Nav Icons */}
-                <div className="flex-1 overflow-y-auto py-2.5 px-2 space-y-1.5 scrollbar-none">
+                <div className="flex-1 overflow-y-auto py-2 px-1.5 space-y-1 scrollbar-none">
                     {sections.flatMap(s => s.items).map((item, idx) => {
                         const targetId = item.id || (item.children && item.children[0]?.id) || 'dashboard';
                         const isActive = activePage === item.id || (item.children && item.children.some(c => c.id === activePage));
@@ -305,7 +306,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 key={idx}
                                 type="button"
                                 onClick={() => setActivePage(targetId)}
-                                className={`w-full py-2.5 rounded-xl flex flex-col items-center justify-center transition cursor-pointer relative group ${
+                                className={`w-full py-2 rounded-lg flex flex-col items-center justify-center transition cursor-pointer relative group ${
                                     isActive
                                         ? 'bg-blue-50 text-blue-600 font-bold shadow-2xs'
                                         : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
@@ -322,7 +323,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 {/* Footer User Avatar */}
                 <div className="p-2 border-t border-slate-100 flex flex-col items-center justify-center shrink-0">
-                    <div className="size-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+                    <div className="size-6.5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold shadow-2xs">
                         {userInitial}
                     </div>
                 </div>
@@ -331,25 +332,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     // ========================================================================
-    // RENDER: EXPANDED FULL STANDARD SIDEBAR
+    // RENDER: EXPANDED FULL STANDARD SIDEBAR (COMPACT ENTERPRISE DENSITY)
     // ========================================================================
     return (
-        <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r border-slate-200/90 bg-white text-slate-800 md:flex select-none z-30 shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <aside className="sticky top-0 hidden h-screen w-[228px] flex-col border-r border-slate-200/90 bg-white text-slate-800 md:flex select-none z-30 shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             {/* Top Brand Header */}
-            <div className="h-14 px-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="h-11 px-3 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <button
                     type="button"
                     onClick={() => setActivePage('front-desk')}
-                    className="flex items-center gap-2.5 text-left transition hover:opacity-90 cursor-pointer min-w-0"
+                    className="flex items-center gap-2 text-left transition hover:opacity-90 cursor-pointer min-w-0"
                 >
-                    <div className="size-8 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs font-bold text-xs shrink-0">
-                        <Building2 size={16} />
+                    <div className="size-6.5 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-2xs font-bold text-xs shrink-0">
+                        <Building2 size={13} />
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-xs font-bold text-slate-900 tracking-tight leading-tight truncate">
+                        <h1 className="text-[11.5px] font-bold text-slate-900 tracking-tight leading-none truncate">
                             HotelManagementOS
                         </h1>
-                        <p className="text-[9.5px] font-semibold text-blue-600 uppercase tracking-wider leading-tight truncate">
+                        <p className="text-[8.5px] font-semibold text-blue-600 uppercase tracking-wider leading-none mt-0.5 truncate">
                             Enterprise PMS & RMS
                         </p>
                     </div>
@@ -358,42 +359,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                     type="button"
                     onClick={toggleSidebar}
-                    className="size-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                    className="size-6 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
                     title="Collapse sidebar"
                 >
-                    <PanelLeftClose size={15} />
+                    <PanelLeftClose size={14} />
                 </button>
             </div>
 
             {/* Quick Search Input */}
-            <div className="px-3 pt-3 pb-1.5 shrink-0">
+            <div className="px-2.5 pt-2 pb-1 shrink-0">
                 <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-slate-400 pointer-events-none" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search menu (e.g. POS, Folios, Rates)..."
-                        className="w-full bg-slate-50 border border-slate-200/90 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                        placeholder="Search menu (e.g. POS, Folios)..."
+                        className="w-full h-7 bg-slate-50 border border-slate-200/90 rounded-lg pl-6.5 pr-6 py-0.5 text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
                     />
                     {searchQuery && (
                         <button
                             type="button"
                             onClick={() => setSearchQuery('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                         >
-                            <X size={12} />
+                            <X size={11} />
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Navigation List */}
-            <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-3 scrollbar-thin">
+            <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-1.5 scrollbar-thin">
                 {filteredSections.map((sec, sIdx) => (
                     <div key={sIdx} className="space-y-0.5">
                         {sec.title && (
-                            <div className="px-2.5 pt-2 pb-1 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
+                            <div className="px-2 pt-1.5 pb-0.5 text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">
                                 {sec.title}
                             </div>
                         )}
@@ -409,50 +410,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => toggleDropdown(item.label)}
-                                            className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer group ${
+                                            className={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${
                                                 hasActiveChild
-                                                    ? 'text-blue-600 font-bold bg-blue-50/50'
-                                                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                                                    ? 'text-blue-600 font-bold bg-blue-50/70'
+                                                    : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
                                             }`}
                                         >
-                                            <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className="flex items-center gap-2 min-w-0">
                                                 <span className={hasActiveChild ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>
                                                     {item.icon}
                                                 </span>
                                                 <span className="truncate">{item.label}</span>
                                             </div>
                                             <ChevronDown
-                                                size={12}
+                                                size={11}
                                                 className={`text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
                                             />
                                         </button>
 
                                         {isOpen && (
-                                            <div className="relative ml-4 pl-3.5 border-l border-slate-200/80 space-y-0.5 pt-0.5 pb-1">
+                                            <div className="relative ml-3 pl-2.5 border-l border-slate-200/80 space-y-0.5 pt-0.5 pb-0.5">
                                                 {item.children.map((sub, subIdx) => {
-                                                    const isSubActive = activePage === sub.id;
+                                                    const isSubActive =
+                                                        activePage === sub.id ||
+                                                        (sub.id === 'general-settings' &&
+                                                            ['hotel-info', 'hotel-profile', 'edit-property'].includes(activePage));
                                                     return (
                                                         <button
                                                             key={subIdx}
                                                             type="button"
                                                             onClick={() => setActivePage(sub.id)}
-                                                            className={`relative group flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-xs transition cursor-pointer ${
+                                                            className={`relative group flex w-full items-center justify-between rounded-md px-2 py-0.5 text-[10.5px] transition cursor-pointer ${
                                                                 isSubActive
                                                                     ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
-                                                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                                                                    : 'text-slate-600 hover:bg-slate-100/60 hover:text-slate-900 font-normal'
                                                             }`}
                                                         >
-                                                            <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="flex items-center gap-1.5 min-w-0">
                                                                 {isSubActive && (
-                                                                    <span className="absolute -left-[15px] top-1.5 bottom-1.5 w-[3px] rounded-full bg-blue-600" />
+                                                                    <span className="absolute -left-[11px] top-1 bottom-1 w-[2.5px] rounded-full bg-blue-600" />
                                                                 )}
                                                                 <span className={isSubActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}>
                                                                     {sub.icon}
                                                                 </span>
-                                                                <span className="truncate text-[11.5px]">{sub.label}</span>
+                                                                <span className="truncate">{sub.label}</span>
                                                             </div>
                                                             {sub.badge && (
-                                                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md shrink-0 ${sub.badgeColor || 'bg-slate-100 text-slate-600'}`}>
+                                                                <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${sub.badgeColor || 'bg-slate-100 text-slate-600'}`}>
                                                                     {sub.badge}
                                                                 </span>
                                                             )}
@@ -472,20 +476,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     key={iIdx}
                                     type="button"
                                     onClick={() => item.id && setActivePage(item.id)}
-                                    className={`relative flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer group ${
+                                    className={`relative flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${
                                         isActive
                                             ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
-                                            : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                                            : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
                                     }`}
                                 >
-                                    <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0">
                                         <span className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>
                                             {item.icon}
                                         </span>
                                         <span className="truncate">{item.label}</span>
                                     </div>
                                     {item.badge && (
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md shrink-0 ${item.badgeColor || 'bg-slate-100 text-slate-600'}`}>
+                                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${item.badgeColor || 'bg-slate-100 text-slate-600'}`}>
                                             {item.badge}
                                         </span>
                                     )}
@@ -497,17 +501,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </nav>
 
             {/* Sidebar Bottom Footer: User Profile & Quick Hotel Context */}
-            <div className="p-3 border-t border-slate-100 bg-slate-50/60 shrink-0">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <div className="size-8 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+            <div className="p-2 border-t border-slate-100 bg-slate-50/70 shrink-0">
+                <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="size-6.5 rounded-lg bg-gradient-to-tr from-blue-700 to-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs">
                             {userInitial}
                         </div>
                         <div className="min-w-0 text-left">
-                            <p className="text-xs font-bold text-slate-800 truncate leading-tight">
+                            <p className="text-[11px] font-bold text-slate-800 truncate leading-tight">
                                 {currentUser?.name || 'Alexander Vance'}
                             </p>
-                            <p className="text-[10px] text-blue-600 font-semibold truncate leading-tight">
+                            <p className="text-[9px] text-blue-600 font-medium truncate leading-tight">
                                 {userRoleDisplay} • {activeProperty?.code || 'GPD'}
                             </p>
                         </div>
@@ -516,10 +520,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                         type="button"
                         onClick={() => setActivePage('multi-property')}
-                        className="size-7 rounded-lg hover:bg-white text-slate-400 hover:text-blue-600 transition flex items-center justify-center shrink-0 border border-transparent hover:border-slate-200 cursor-pointer"
+                        className="size-6 rounded-md hover:bg-white text-slate-400 hover:text-blue-600 transition flex items-center justify-center shrink-0 border border-transparent hover:border-slate-200 cursor-pointer"
                         title="Chain Portfolio Console"
                     >
-                        <Building2 size={13} />
+                        <Building2 size={12} />
                     </button>
                 </div>
             </div>

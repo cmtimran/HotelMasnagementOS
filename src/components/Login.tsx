@@ -165,7 +165,7 @@ const Login = ({ onLogin }: LoginProps) => {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-2xl font-black tracking-[0.2em] text-white">HOTELOS</span>
-                            <span className="text-[10px] font-bold tracking-[0.4em] uppercase" style={{ color: accentColor }}>Enterprise Multi-Property ERP</span>
+                            <span className="text-[10px] tracking-[0.4em] uppercase" style={{ color: accentColor }}>Enterprise Multi-Property ERP</span>
                         </div>
                     </div>
                 </div>
@@ -174,7 +174,7 @@ const Login = ({ onLogin }: LoginProps) => {
                     <div className="space-y-6">
                         <div className="flex items-center gap-2 mb-[-1rem]">
                             <Star size={12} fill={accentColor} color={accentColor} />
-                            <span className="text-[10px] font-bold tracking-[0.4em] uppercase text-white/60">Enterprise Architecture</span>
+                            <span className="text-[10px] tracking-[0.4em] uppercase text-white/60">Enterprise Architecture</span>
                         </div>
 
                         <div className="h-48 relative">
@@ -197,14 +197,14 @@ const Login = ({ onLogin }: LoginProps) => {
                     <div className="flex gap-8">
                         <div className="flex flex-col">
                             <span className="text-white text-base font-bold">Multi-Property Core</span>
-                            <span className="text-[9px] font-bold uppercase tracking-widest">Dhaka & Cox's Bazar</span>
+                            <span className="text-[9px] uppercase tracking-widest">Dhaka & Cox's Bazar</span>
                         </div>
                         <div className="flex flex-col">
                             <span className="text-white text-base font-bold">54 Rooms</span>
-                            <span className="text-[9px] font-bold uppercase tracking-widest">Cloud PostgreSQL 17</span>
+                            <span className="text-[9px] uppercase tracking-widest">Cloud PostgreSQL 17</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase">
+                    <div className="flex items-center gap-2 text-[10px] tracking-widest uppercase">
                         <Globe size={14} style={{ color: accentColor }} />
                         Secured TiDB Cluster
                     </div>
@@ -238,7 +238,7 @@ const Login = ({ onLogin }: LoginProps) => {
                                     placeholder="Property / Workspace ID"
                                     required
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 border border-slate-100 bg-slate-50 px-1.5 py-0.5 rounded uppercase tracking-wider pointer-events-none">
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 border border-slate-100 bg-slate-50 px-1.5 py-0.5 rounded uppercase tracking-wider pointer-events-none">
                                     Required
                                 </span>
                             </div>
@@ -290,13 +290,13 @@ const Login = ({ onLogin }: LoginProps) => {
                                 </div>
                                 <span className="text-[11px] font-medium text-slate-500 group-hover:text-slate-900 transition-colors">Remember device</span>
                             </label>
-                            <span className="text-[11px] font-bold text-[#2050d5] hover:underline cursor-pointer">Security Protocol</span>
+                            <span className="text-[11px] text-[#2050d5] hover:underline cursor-pointer">Security Protocol</span>
                         </div>
 
                         {loginStatus === 'error' && (
                             <div className="p-2.5 bg-red-50 rounded-xl flex items-center gap-2.5 text-red-600 animate-shake shadow-xs border border-red-100">
                                 <AlertCircle size={16} />
-                                <span className="text-[11px] font-bold italic">Verification failed. Check credentials.</span>
+                                <span className="text-[11px] italic">Verification failed. Check credentials.</span>
                             </div>
                         )}
 
@@ -327,7 +327,7 @@ const Login = ({ onLogin }: LoginProps) => {
                     {/* DISCRETE 1-CLICK DEMO ACCOUNT SELECTOR */}
                     <div className="mt-8 pt-5 border-t border-slate-100">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">
                                 Demo Fast-Fill Profiles:
                             </span>
                             <span className="text-[9.5px] text-slate-400">Click to load</span>
@@ -338,7 +338,7 @@ const Login = ({ onLogin }: LoginProps) => {
                                 onClick={fillSuperAdmin}
                                 className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
                                     propertyId === 'HQ-CORP' 
-                                        ? 'border-indigo-500 bg-indigo-50/70 font-bold text-indigo-950 shadow-2xs' 
+                                        ? 'border-indigo-500 bg-indigo-50/70 text-indigo-950 shadow-2xs' 
                                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                                 }`}
                                 title="Load Super Admin (HQ Master Console)"
@@ -355,7 +355,7 @@ const Login = ({ onLogin }: LoginProps) => {
                                 onClick={fillDhakaFrontDesk}
                                 className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
                                     propertyId === 'GPD-001' 
-                                        ? 'border-emerald-500 bg-emerald-50/70 font-bold text-emerald-950 shadow-2xs' 
+                                        ? 'border-emerald-500 bg-emerald-50/70 text-emerald-950 shadow-2xs' 
                                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                                 }`}
                                 title="Load Front Desk Staff (Grand Palace Dhaka PMS)"
@@ -372,7 +372,7 @@ const Login = ({ onLogin }: LoginProps) => {
                                 onClick={fillCoxsBazarGM}
                                 className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
                                     propertyId === 'GOR-002' 
-                                        ? 'border-blue-500 bg-blue-50/70 font-bold text-blue-950 shadow-2xs' 
+                                        ? 'border-blue-500 bg-blue-50/70 text-blue-950 shadow-2xs' 
                                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                                 }`}
                                 title="Load Resort Operations (Grand Ocean Cox's Bazar PMS)"

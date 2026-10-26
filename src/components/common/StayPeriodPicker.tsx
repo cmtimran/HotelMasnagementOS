@@ -63,7 +63,7 @@ export const normalizeToISO = (val: string): string => {
  */
 export const getSystemDateISO = (): string => {
     try {
-        const raw = localStorage.getItem('hotel_system_date');
+        const raw = localStorage.getItem('hotel_system_date_iso') || localStorage.getItem('hotel_system_date');
         const norm = normalizeToISO(raw || '');
         return norm || '2026-07-01';
     } catch {
@@ -345,14 +345,14 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
             {/* Top Label & Day Summary */}
             {label && (
                 <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                    <label className="text-[10px] text-gray-700 uppercase tracking-wider flex items-center gap-1">
                         <CalendarIcon size={11} className="text-blue-600" />
                         <span>{label}</span>
                         <span className="text-red-500">*</span>
                     </label>
                     <span className="text-[9px] font-semibold text-blue-700">
                         {dayUse ? (
-                            <span className="text-amber-700 font-bold bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                            <span className="text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
                                 {getDayName(safeCheckIn)} (Day Use)
                             </span>
                         ) : (
@@ -381,7 +381,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                     title={`Check-In Date: ${formatDisplayDate(safeCheckIn)} (Click to select)`}
                 >
                     <CalendarIcon size={12} className="text-blue-600 flex-shrink-0" />
-                    <span className="text-[11px] font-bold text-slate-800 tracking-tight">
+                    <span className="text-[11px] text-slate-800 tracking-tight">
                         {formatInputDate(safeCheckIn)}
                     </span>
                 </button>
@@ -465,7 +465,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                     }
                 >
                     <ArrowRight size={11} className={`${dayUse ? 'text-amber-500' : 'text-slate-400'} flex-shrink-0`} />
-                    <span className="text-[11px] font-bold tracking-tight">
+                    <span className="text-[11px] tracking-tight">
                         {formatInputDate(safeCheckOut)}
                     </span>
                 </button>
@@ -492,16 +492,16 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                         </button>
 
                         <div className="text-center">
-                            <h3 className="text-xs font-bold text-slate-900 tracking-tight leading-tight">
+                            <h3 className="text-xs text-slate-900 tracking-tight leading-tight">
                                 {monthNames[viewMonth]} {viewYear}
                             </h3>
                             {rangePhase === 'picking_checkout' && !dayUse && (
-                                <p className="text-[8.5px] font-bold text-blue-600 leading-none">
+                                <p className="text-[8.5px] text-blue-600 leading-none">
                                     Click Check-Out Date
                                 </p>
                             )}
                             {dayUse && (
-                                <p className="text-[8.5px] font-bold text-amber-700 leading-none">
+                                <p className="text-[8.5px] text-amber-700 leading-none">
                                     Click date for Day Use
                                 </p>
                             )}
@@ -587,11 +587,11 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => handleDayClick(dateStr)}
-                                        className={`w-6 h-6 rounded-md text-[10.5px] font-bold transition-all cursor-pointer flex items-center justify-center relative ${
+                                        className={`w-6 h-6 rounded-md text-[10.5px] transition-all cursor-pointer flex items-center justify-center relative ${
                                             isStart || isEnd
                                                 ? 'bg-[#0066ff] text-white shadow-xs font-black z-10 scale-105'
                                                 : isInRange
-                                                    ? 'text-slate-900 font-bold hover:bg-slate-200/80'
+                                                    ? 'text-slate-900 hover:bg-slate-200/80'
                                                     : 'text-slate-700 hover:bg-slate-100 hover:text-blue-600'
                                         } ${isSingleSelected ? 'ring-2 ring-blue-500 ring-offset-0' : ''}`}
                                     >
@@ -609,7 +609,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                     <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1">
                         {!dayUse ? (
                             <div className="flex items-center gap-0.5">
-                                <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-tight mr-0.5">
+                                <span className="text-[8.5px] text-slate-400 uppercase tracking-tight mr-0.5">
                                     Nights:
                                 </span>
                                 {[1, 2, 3, 5, 7].map(n => (
@@ -620,7 +620,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                                             handleNightsChange(n);
                                             setIsOpen(false);
                                         }}
-                                        className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold transition-all cursor-pointer ${
+                                        className={`px-1.5 py-0.2 rounded text-[9.5px] transition-all cursor-pointer ${
                                             nights === n
                                                 ? 'bg-blue-600 text-white shadow-2xs'
                                                 : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700'
@@ -631,7 +631,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-[9.5px] font-bold text-amber-800">
+                            <div className="text-[9.5px] text-amber-800">
                                 Single-Day Use (No Overnight)
                             </div>
                         )}
@@ -639,7 +639,7 @@ export const StayPeriodPicker: React.FC<StayPeriodPickerProps> = ({
                         <button
                             type="button"
                             onClick={() => setIsOpen(false)}
-                            className="px-2 py-0.5 rounded bg-[#1e3a8a] text-white text-[9.5px] font-bold hover:bg-blue-900 shadow-2xs cursor-pointer flex items-center gap-0.5 transition-colors"
+                            className="px-2 py-0.5 rounded bg-[#1e3a8a] text-white text-[9.5px] hover:bg-blue-900 shadow-2xs cursor-pointer flex items-center gap-0.5 transition-colors"
                         >
                             <Check size={9} className="stroke-[3]" />
                             <span>Done</span>

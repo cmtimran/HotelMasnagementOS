@@ -3,10 +3,12 @@ import {
     Layers, Plus, Save, Edit2, Trash2, ChevronLeft, Link as LinkIcon, Check, ShieldCheck, Search, Filter
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
+import { getApiBaseUrl } from '../utils/apiUrl';
 import {
     getCanonicalRooms,
     getDynamicRoomTypes,
-    syncRoomTypesAndRoomsFromDB
+    syncRoomTypesAndRoomsFromDB,
+    broadcastPMSEvent
 } from '../utils/roomInventoryEngine';
 
 interface ComponentRoom {
@@ -27,49 +29,23 @@ interface ConnectingRoom {
 
 const STORAGE_KEY = 'hotel_connecting_rooms_v1';
 
-const deriveDefaultConnectingRooms = (roomsList: ReturnType<typeof getCanonicalRooms>): ConnectingRoom[] => {
-    const connectingUnits = roomsList.filter(r => r.isConnecting);
-    if (connectingUnits.length >= 2) {
-        return [{
-            id: 1,
-            name: `Interconnecting Suite (${connectingUnits.slice(0, 2).map(u => u.number).join('-')})`,
-            componentRooms: connectingUnits.slice(0, 2).map(u => ({
-                roomTypeId: String(u.roomTypeId),
-                count: 1,
-                roomNumbers: [u.number]
-            })),
-            inventoryLogic: 'Auto-Sync',
-            pricingStrategy: 'Sum of Rates',
-            status: 'Active'
-        }];
-    }
-    if (roomsList.length >= 2) {
-        return [{
-            id: 1,
-            name: `Adjoining Suite (${roomsList[0].number}-${roomsList[1].number})`,
-            componentRooms: [
-                { roomTypeId: String(roomsList[0].roomTypeId), count: 1, roomNumbers: [roomsList[0].number] },
-                { roomTypeId: String(roomsList[1].roomTypeId), count: 1, roomNumbers: [roomsList[1].number] }
-            ],
-            inventoryLogic: 'Auto-Sync',
-            pricingStrategy: 'Sum of Rates',
-            status: 'Active'
-        }];
-    }
-    return [];
-};
-
 const ConnectingRoomManagement = () => {
     const [view, setView] = useState<'list' | 'form'>('list');
     const [roomTypes, setRoomTypes] = useState(() => getDynamicRoomTypes());
     const [physicalRoomsState, setPhysicalRoomsState] = useState(() => getCanonicalRooms());
 
-    useEffect(() => {
-        syncRoomTypesAndRoomsFromDB(1).then(({ roomTypes: rt, rooms: r }) => {
-            if (rt.length > 0) setRoomTypes(rt);
-            if (r.length > 0) setPhysicalRoomsState(r);
-        }).catch(() => {});
-    }, []);
+    const [connectingRooms, setConnectingRooms] = useState<ConnectingRoom[]>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) return parsed;
+            }
+        } catch {
+            // ignore
+        }
+        return [];
+    });
 
     const existingRoomTypes = useMemo(() => roomTypes.map(rt => ({
         id: String(rt.id),
@@ -84,18 +60,23 @@ const ConnectingRoomManagement = () => {
         typeId: String(r.roomTypeId)
     })), [physicalRoomsState]);
 
-    const [connectingRooms, setConnectingRooms] = useState<ConnectingRoom[]>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            }
-        } catch {
-            // ignore
-        }
-        return deriveDefaultConnectingRooms(getCanonicalRooms());
-    });
+    useEffect(() => {
+        syncRoomTypesAndRoomsFromDB(1).then(({ roomTypes: rt, rooms: r }) => {
+            if (rt && rt.length > 0) setRoomTypes(rt);
+            if (r && r.length > 0) setPhysicalRoomsState(r);
+        }).catch(() => {});
+
+        // Fetch connecting rooms directly from database
+        fetch(`${getApiBaseUrl()}/api/connecting-rooms?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data)) {
+                    setConnectingRooms(json.data);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(json.data));
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [formData, setFormData] = useState<ConnectingRoom | null>(null);
@@ -113,10 +94,12 @@ const ConnectingRoomManagement = () => {
 
     const handleAddNew = () => {
         setEditingId(null);
+        const firstType = existingRoomTypes[0]?.id || '1';
+        const matchingRoom = physicalRoomsList.find(r => r.typeId === firstType) || physicalRoomsList[0];
         setFormData({
             id: Date.now(),
             name: '',
-            componentRooms: [{ roomTypeId: '1', count: 1, roomNumbers: ['101'] }],
+            componentRooms: [{ roomTypeId: firstType, count: 1, roomNumbers: matchingRoom ? [matchingRoom.number] : [] }],
             inventoryLogic: 'Auto-Sync',
             pricingStrategy: 'Sum of Rates',
             status: 'Active'
@@ -130,25 +113,52 @@ const ConnectingRoomManagement = () => {
         setView('form');
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData || !formData.name.trim()) {
             alert('Please provide a name for the connecting room suite.');
             return;
         }
         let updated: ConnectingRoom[];
+        const API_BASE = getApiBaseUrl();
         if (editingId) {
+            try {
+                await fetch(`${API_BASE}/api/connecting-rooms/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+            } catch {}
             updated = connectingRooms.map(r => r.id === editingId ? formData : r);
         } else {
-            updated = [...connectingRooms, formData];
+            let newId = formData.id;
+            try {
+                const res = await fetch(`${API_BASE}/api/connecting-rooms`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const json = await res.json();
+                if (json.success && json.data?.id) newId = Number(json.data.id);
+            } catch {}
+            updated = [...connectingRooms, { ...formData, id: newId }];
         }
         persistRooms(updated);
+        try {
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+        } catch {}
         setView('list');
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to remove this connecting room setup?')) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/connecting-rooms/${id}`, { method: 'DELETE' });
+            } catch {}
             const updated = connectingRooms.filter(r => r.id !== id);
             persistRooms(updated);
+            try {
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            } catch {}
         }
     };
 
@@ -257,7 +267,7 @@ const ConnectingRoomManagement = () => {
                     <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Tariff</span>
-                            <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs font-mono">
+                            <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-mono">
                                 ৳
                             </div>
                         </div>
@@ -334,10 +344,10 @@ const ConnectingRoomManagement = () => {
                                             </div>
                                         </div>
 
-                                        <h3 className="text-base font-bold text-slate-900 leading-snug">{room.name}</h3>
+                                        <h3 className="text-base text-slate-900 leading-snug">{room.name}</h3>
 
                                         <div className="mt-3.5 space-y-2 bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
-                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                            <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                                                 <LinkIcon size={12} className="text-primary" /> Linked Physical Units
                                             </div>
                                             {room.componentRooms.map((comp, idx) => (
@@ -361,12 +371,12 @@ const ConnectingRoomManagement = () => {
 
                                     <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 border-t border-slate-100 pt-3.5 mt-4">
                                         <div>
-                                            <span className="block text-[10px] uppercase font-bold text-slate-400">Rate Strategy</span>
+                                            <span className="block text-[10px] uppercase text-slate-400">Rate Strategy</span>
                                             <span className="font-semibold text-slate-800">{room.pricingStrategy}</span>
                                         </div>
                                         <div className="text-right">
-                                            <span className="block text-[10px] uppercase font-bold text-slate-400">Effective Rate</span>
-                                            <span className="font-bold font-mono text-emerald-600 text-sm">৳{displayPrice.toLocaleString()}</span>
+                                            <span className="block text-[10px] uppercase text-slate-400">Effective Rate</span>
+                                            <span className="font-mono text-emerald-600 text-sm">৳{displayPrice.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -392,7 +402,7 @@ const ConnectingRoomManagement = () => {
                         <ChevronLeft size={18} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                        <h1 className="text-xl text-slate-900 tracking-tight">
                             {editingId ? 'Edit Connecting Suite' : 'Create New Connecting Suite'}
                         </h1>
                         <p className="text-xs text-slate-500">Configure virtual interconnected layout, component units and sync rules</p>
@@ -418,7 +428,7 @@ const ConnectingRoomManagement = () => {
             <div className="card-container p-6 space-y-6">
                 {/* Basic Info */}
                 <div className="space-y-4">
-                    <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <h2 className="text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
                         <Layers size={15} className="text-primary" /> Basic Information
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -449,7 +459,7 @@ const ConnectingRoomManagement = () => {
                 {/* Component Rooms */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                        <h2 className="text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
                             <LinkIcon size={15} className="text-primary" /> Component Categories & Room Numbers
                         </h2>
                         <button
@@ -469,7 +479,7 @@ const ConnectingRoomManagement = () => {
                                     <div className="flex items-start gap-4">
                                         {/* Room Type Column */}
                                         <div className="w-1/3 min-w-[200px] space-y-1.5">
-                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Room Category</label>
+                                            <label className="text-[11px] text-slate-500 uppercase tracking-wider">Room Category</label>
                                             <select
                                                 value={comp.roomTypeId}
                                                 onChange={e => {
@@ -493,7 +503,7 @@ const ConnectingRoomManagement = () => {
 
                                         {/* Room Selection Column */}
                                         <div className="flex-1 space-y-1.5">
-                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                                            <label className="text-[11px] text-slate-500 uppercase tracking-wider flex items-center justify-between">
                                                 <span>Assign Physical Rooms</span>
                                                 {comp.roomNumbers && comp.roomNumbers.length > 0 && (
                                                     <span className="text-primary font-bold">({comp.roomNumbers.length} selected)</span>
@@ -520,7 +530,7 @@ const ConnectingRoomManagement = () => {
                                                                         updateField('componentRooms', updatedComponents);
                                                                     }
                                                                 }}
-                                                                className={`px-3 py-1 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                                                                className={`px-3 py-1 rounded-lg text-xs border flex items-center gap-1.5 transition-all cursor-pointer ${
                                                                     isSelected
                                                                         ? 'bg-primary text-white border-primary shadow-2xs'
                                                                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
@@ -562,7 +572,7 @@ const ConnectingRoomManagement = () => {
 
                 {/* Pricing Strategy */}
                 <div className="space-y-4">
-                    <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <h2 className="text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
                         <Save size={15} className="text-primary" /> Pricing & Billing Strategy
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -581,7 +591,7 @@ const ConnectingRoomManagement = () => {
                         {formData?.pricingStrategy === 'Sum of Rates' ? (
                             <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-700">Calculated Suite Rate</label>
-                                <div className="px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-mono font-bold text-sm flex items-center justify-between">
+                                <div className="px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-mono text-sm flex items-center justify-between">
                                     <span>৳{calculateSumPrice().toLocaleString()}</span>
                                     <span className="text-xs font-normal text-emerald-600">Sum of component tariffs</span>
                                 </div>
@@ -596,7 +606,7 @@ const ConnectingRoomManagement = () => {
                                         value={formData?.fixedPrice || ''}
                                         onChange={e => updateField('fixedPrice', parseFloat(e.target.value) || 0)}
                                         placeholder="Enter combo rate"
-                                        className="input-standard pl-8 font-bold font-mono text-primary text-sm"
+                                        className="input-standard pl-8 font-mono text-primary text-sm"
                                     />
                                 </div>
                             </div>

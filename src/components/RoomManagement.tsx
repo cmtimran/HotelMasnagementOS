@@ -9,6 +9,7 @@ import {
     getCanonicalRooms,
     getDynamicRoomTypes,
     syncRoomTypesAndRoomsFromDB,
+    broadcastPMSEvent,
     type DynamicRoomType
 } from '../utils/roomInventoryEngine';
 
@@ -214,6 +215,10 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                     });
                 } catch {}
             }
+            try {
+                await syncRoomTypesAndRoomsFromDB(1);
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
+            } catch {}
         }
     };
 
@@ -263,10 +268,19 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            name: formData.name,
+                            buildingId: formData.buildingId,
                             floorId: formData.floorId,
                             roomTypeId: formData.roomTypeId,
                             status: formData.status,
-                            housekeepingStatus: formData.housekeepingStatus
+                            housekeepingStatus: formData.housekeepingStatus,
+                            phoneExt: formData.phoneExt,
+                            lockId: formData.lockId,
+                            isConnecting: formData.isConnecting,
+                            connectedTo: formData.connectedTo,
+                            smokingStatus: formData.smokingStatus,
+                            nearElevator: formData.nearElevator,
+                            remarks: formData.remarks
                         })
                     });
                 } catch {}
@@ -274,13 +288,14 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                 persistRooms(updated);
             }
 
-            // Refresh rooms from DB after save
+            // Refresh rooms from DB after save and broadcast to other components
             try {
                 const { rooms: dbRooms } = await syncRoomTypesAndRoomsFromDB(1);
                 if (dbRooms && dbRooms.length > 0) {
                     setRooms(dbRooms as unknown as Room[]);
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(dbRooms));
                 }
+                broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             } catch {
                 // Keep the locally persisted state on network failure
             }
@@ -294,6 +309,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                 updated = rooms.map(r => r.id === formData.id ? formData : r);
             }
             persistRooms(updated);
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         }
 
         setView('list');
@@ -443,7 +459,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-100">
                             {/* Floor Filter */}
                             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Floor:</span>
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider mr-1">Floor:</span>
                                 <button
                                     onClick={() => setSelectedFloor('all')}
                                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
@@ -471,7 +487,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
 
                             {/* Status Filter */}
                             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Status:</span>
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider mr-1">Status:</span>
                                 <button
                                     onClick={() => setSelectedStatus('all')}
                                     className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition ${
@@ -517,8 +533,8 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <h3 className="text-lg font-bold text-slate-900 tracking-tight font-mono">{room.number}</h3>
-                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${getStatusColor(room.status)}`}>
+                                                        <h3 className="text-lg text-slate-900 tracking-tight font-mono">{room.number}</h3>
+                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] border ${getStatusColor(room.status)}`}>
                                                             {room.status}
                                                         </span>
                                                     </div>
@@ -542,7 +558,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                                 </div>
                                                 <div className="flex items-center justify-between text-[11px]">
                                                     <span className="text-slate-400">Lock RFID:</span>
-                                                    <span className="font-mono font-bold text-slate-700">{room.lockId || `KEY-${room.number}`}</span>
+                                                    <span className="font-mono text-slate-700">{room.lockId || `KEY-${room.number}`}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[11px]">
                                                     <span className="text-slate-400">Phone Ext:</span>
@@ -552,11 +568,11 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                         </div>
 
                                         <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
-                                            <span className={`px-2 py-0.5 rounded-full font-bold ${getHousekeepingBadge(room.housekeepingStatus)}`}>
+                                            <span className={`px-2 py-0.5 rounded-full ${getHousekeepingBadge(room.housekeepingStatus)}`}>
                                                 HK: {room.housekeepingStatus}
                                             </span>
                                             {room.isConnecting && (
-                                                <span className="text-primary font-bold bg-primary-subtle px-2 py-0.5 rounded-md text-[10px] border border-primary-border/40">
+                                                <span className="text-primary bg-primary-subtle px-2 py-0.5 rounded-md text-[10px] border border-primary-border/40">
                                                     Connecting {room.connectedTo ? `(${room.connectedTo})` : ''}
                                                 </span>
                                             )}
@@ -585,7 +601,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition whitespace-nowrap ${
                                     activeTab === tab.id
-                                        ? 'bg-primary-subtle text-primary font-bold shadow-2xs'
+                                        ? 'bg-primary-subtle text-primary shadow-2xs'
                                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                 }`}
                             >
@@ -603,7 +619,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <MapPin className="size-5 text-primary" />
                                     <div>
-                                        <h3 className="text-sm font-bold text-slate-900">Physical Location & Categorization</h3>
+                                        <h3 className="text-sm text-slate-900">Physical Location & Categorization</h3>
                                         <p className="text-xs text-slate-500">Building wing, floor elevation, and room inventory designation</p>
                                     </div>
                                 </div>
@@ -672,7 +688,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <Key className="size-5 text-primary" />
                                     <div>
-                                        <h3 className="text-sm font-bold text-slate-900">Door Locks & Communication Systems</h3>
+                                        <h3 className="text-sm text-slate-900">Door Locks & Communication Systems</h3>
                                         <p className="text-xs text-slate-500">RFID lock encoder bindings and in-room telephony extension</p>
                                     </div>
                                 </div>
@@ -707,14 +723,14 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <Layers className="size-5 text-primary" />
                                     <div>
-                                        <h3 className="text-sm font-bold text-slate-900">Interconnection & Room Specifications</h3>
+                                        <h3 className="text-sm text-slate-900">Interconnection & Room Specifications</h3>
                                         <p className="text-xs text-slate-500">Adjoining door connections, smoking compliance, and elevator proximity</p>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                                         <div>
-                                            <span className="text-xs font-bold text-slate-800">Connecting Room Facility</span>
+                                            <span className="text-xs text-slate-800">Connecting Room Facility</span>
                                             <p className="text-[11px] text-slate-500">Has an internal connecting door to an adjoining room</p>
                                         </div>
                                         <input
@@ -772,7 +788,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2.5">
                                     <CheckCircle2 className="size-5 text-primary" />
                                     <div>
-                                        <h3 className="text-sm font-bold text-slate-900">Operational & Housekeeping States</h3>
+                                        <h3 className="text-sm text-slate-900">Operational & Housekeeping States</h3>
                                         <p className="text-xs text-slate-500">Live inventory reservation eligibility and housekeeping approval</p>
                                     </div>
                                 </div>
