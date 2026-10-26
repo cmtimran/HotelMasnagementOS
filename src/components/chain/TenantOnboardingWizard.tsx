@@ -170,7 +170,7 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({ 
                     ? `Allocating Dedicated PostgreSQL Database 'tenant_${propSlug.replace(/-/g, '_')}'...`
                     : `Initializing High-Density Tenant Partition inside Clustered PostgreSQL...`,
                 'Executing 1NF–4NF Relational DDL Migrations & Constraints...',
-                `Generating ${totalRoomsCount} Physical Inventory Rooms across ${totalFloors} Floors...`,
+                'Provisioning Clean Property Master Record (Zero dummy rooms, buildings, or mock bookings)...',
                 'Registering Executive General Manager HRM Master Record...',
                 'Enabling Selected Modular Plugins & Central Control Plane Routing...'
             ]);
@@ -692,12 +692,22 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({ 
                                         </div>
                                         <div>
                                             <h2 className="text-base font-bold text-slate-900">
-                                                Building Architecture &amp; Room Matrix Generator
+                                                Property Blueprint &amp; Clean Provisioning Policy
                                             </h2>
                                             <p className="text-xs text-slate-500 mt-0.5">
-                                                Configure building floors and rooms. The engine generates all physical rooms and links them to room types in 1NF–4NF schema.
+                                                Zero-mock guarantee: When this property is provisioned, only the property master record is created in PostgreSQL. No dummy buildings, room types, rooms, or mock bookings are auto-created.
                                             </p>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">✓</div>
+                                    <div className="text-xs text-emerald-900 leading-relaxed">
+                                        <p className="font-bold">Enterprise Clean State Principle Enforced:</p>
+                                        <p className="mt-0.5 text-emerald-800">
+                                            Your new hotel tenant begins with an unpolluted database. Your hospitality team will configure your exact physical wings, floors, room categories, and room numbers through the <strong>Room Management</strong> console.
+                                        </p>
                                     </div>
                                 </div>
 

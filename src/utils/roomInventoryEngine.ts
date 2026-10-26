@@ -618,7 +618,7 @@ try {
     console.warn('BroadcastChannel not supported in this environment', e);
 }
 
-export type PMSBroadcastMessage =
+export type PMSBroadcastMessage = (
     | { type: 'ROOM_LOCK_ACQUIRED'; lock: RoomLock }
     | { type: 'ROOM_LOCK_RELEASED'; lockId: string }
     | { type: 'RESERVATION_COMMITTED'; reservation: StoredReservation }
@@ -626,7 +626,8 @@ export type PMSBroadcastMessage =
     | { type: 'ROOM_STATUS_CHANGED'; roomNo: string; hkStatus?: string; foStatus?: string }
     | { type: 'FOLIO_UPDATED'; folioId?: string | number }
     | { type: 'SYSTEM_DATE_CHANGED'; systemDate: string; displayDate: string }
-    | { type: 'INVENTORY_REFRESH' };
+    | { type: 'INVENTORY_REFRESH' }
+) & { propertyId?: number | string };
 
 export const broadcastPMSEvent = (message: PMSBroadcastMessage) => {
     try {
@@ -725,15 +726,24 @@ export const checkIntervalOverlap = (
 };
 
 // =========================================================================
-// 2. CANONICAL ROOM INVENTORY REPOSITORY
+// 2. CANONICAL ROOM INVENTORY REPOSITORY (Scoped per Property)
 // =========================================================================
 
-export const getCanonicalRooms = (): CanonicalRoom[] => {
+export const getActivePropertyId = (): number => {
+    if (typeof window === 'undefined') return 1;
+    return Number(localStorage.getItem('hotel_active_property_id')) || 1;
+};
+
+export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
     try {
-        const saved = localStorage.getItem(STORAGE_KEY_ROOMS);
-        if (saved) {
+        const propId = propertyId || getActivePropertyId();
+        const scopedKey = `hotel_rooms_prop_${propId}`;
+        const saved = typeof window !== 'undefined' 
+            ? (localStorage.getItem(scopedKey) || (propId === 1 ? localStorage.getItem(STORAGE_KEY_ROOMS) : null))
+            : null;
+        if (saved !== null) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
                 const dynamicTypes = getDynamicRoomTypes();
                 return parsed.map((r: any) => {
                     const matchedType = dynamicTypes.find(t => String(t.id) === String(r.roomTypeId));
@@ -753,7 +763,10 @@ export const getCanonicalRooms = (): CanonicalRoom[] => {
             }
         }
     } catch {}
-    return DEFAULT_CANONICAL_ROOMS;
+    // If property 1 (HQ baseline) and not yet synced from DB, return default catalog.
+    // For all other properties (new tenants), start completely clean with 0 rooms!
+    const activeProp = propertyId || getActivePropertyId();
+    return activeProp === 1 ? DEFAULT_CANONICAL_ROOMS : [];
 };
 
 // =========================================================================
@@ -846,11 +859,16 @@ export const DEFAULT_STORED_RESERVATIONS: StoredReservation[] = [];
  * Centralized Canonical Persistence for Reservations Cache.
  * Consolidates all legacy cache keys into a single source of truth.
  */
-export const saveStoredReservations = (reservations: StoredReservation[]): void => {
+export const saveStoredReservations = (reservations: StoredReservation[], propertyId?: number): void => {
     try {
         if (typeof window !== 'undefined') {
+            const propId = propertyId || getActivePropertyId();
+            const scopedKey = `hotel_reservations_prop_${propId}`;
             const json = JSON.stringify(reservations);
-            localStorage.setItem(STORAGE_KEY_RESERVATIONS, json);
+            localStorage.setItem(scopedKey, json);
+            if (propId === 1) {
+                localStorage.setItem(STORAGE_KEY_RESERVATIONS, json);
+            }
             // Clean up obsolete duplicate keys so browser storage is not wasted
             localStorage.removeItem('hotel_reservations_v3');
             localStorage.removeItem('hotel_reservations_v10');
@@ -860,10 +878,12 @@ export const saveStoredReservations = (reservations: StoredReservation[]): void 
     }
 };
 
-export const getAllStoredReservations = (): StoredReservation[] => {
+export const getAllStoredReservations = (propertyId?: number): StoredReservation[] => {
     try {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem(STORAGE_KEY_RESERVATIONS) || localStorage.getItem('hotel_reservations_v3');
+            const propId = propertyId || getActivePropertyId();
+            const scopedKey = `hotel_reservations_prop_${propId}`;
+            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? (localStorage.getItem(STORAGE_KEY_RESERVATIONS) || localStorage.getItem('hotel_reservations_v3')) : null);
             if (saved !== null) {
                 const list = JSON.parse(saved);
                 if (Array.isArray(list)) {
@@ -872,7 +892,7 @@ export const getAllStoredReservations = (): StoredReservation[] => {
             }
         }
     } catch {}
-    return DEFAULT_STORED_RESERVATIONS;
+    return [];
 };
 
 /**
@@ -1311,15 +1331,21 @@ export const updateReservationStatusInDB = async (
  */
 export const updateRoomHousekeepingInDB = async (
     roomNo: string,
-    housekeepingStatus: 'Clean' | 'Dirty' | 'Inspected'
+    housekeepingStatus: 'Clean' | 'Dirty' | 'Inspected',
+    propertyId?: number
 ): Promise<boolean> => {
     try {
-        const rooms = getCanonicalRooms();
+        const propId = propertyId || getActivePropertyId();
+        const rooms = getCanonicalRooms(propId);
         const updated = rooms.map(r => r.number === roomNo ? { ...r, housekeepingStatus } : r);
-        localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(updated));
+        localStorage.setItem(`hotel_rooms_prop_${propId}`, JSON.stringify(updated));
+        if (propId === 1) {
+            localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(updated));
+        }
 
         broadcastPMSEvent({
             type: 'ROOM_STATUS_CHANGED',
+            propertyId: propId,
             roomNo,
             hkStatus: housekeepingStatus
         });
@@ -1328,7 +1354,10 @@ export const updateRoomHousekeepingInDB = async (
             const API_BASE = getApiBaseUrl();
             await fetch(`${API_BASE}/api/rooms/${roomNo}/housekeeping`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-property-id': String(propId)
+                },
                 body: JSON.stringify({ status: housekeepingStatus.toUpperCase() })
             });
         }
@@ -1820,7 +1849,10 @@ export const syncRoomTypesAndRoomsFromDB = async (
                     status: rt.status || 'Active',
                     description: rt.description
                 }));
-                localStorage.setItem(STORAGE_KEY_ROOM_TYPES, JSON.stringify(mappedTypes));
+                localStorage.setItem(`hotel_room_types_prop_${propId}`, JSON.stringify(mappedTypes));
+                if (propId === 1) {
+                    localStorage.setItem(STORAGE_KEY_ROOM_TYPES, JSON.stringify(mappedTypes));
+                }
             }
 
             let mappedRooms: CanonicalRoom[] = [];
@@ -1843,6 +1875,9 @@ export const syncRoomTypesAndRoomsFromDB = async (
                     nearElevator: Boolean(r.near_elevator || r.nearElevator),
                     remarks: r.remarks
                 }));
+            }
+            localStorage.setItem(`hotel_rooms_prop_${propId}`, JSON.stringify(mappedRooms));
+            if (propId === 1) {
                 localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(mappedRooms));
             }
 

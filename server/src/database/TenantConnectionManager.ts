@@ -307,62 +307,12 @@ export class TenantConnectionManager {
                 ]);
                 const propertyId = propRes.rows[0].id;
 
-                // 3. Create default building
-                const bldRes = await client.query(`
-                    INSERT INTO buildings (property_id, code, name, total_floors)
-                    VALUES ($1, 'BLD-MAIN', $2, $3) RETURNING id;
-                `, [propertyId, params.buildingName || 'Main Tower', totalFloors]);
-                const buildingId = bldRes.rows[0].id;
+                // Clean Property Creation: ONLY the property record is created.
+                // No dummy buildings, floors, room types, rooms, or bookings are auto-created.
+                // The property initializes with 0 rooms, allowing hoteliers to build their real inventory layout in Room Management.
+                const totalRoomsCreated = 0;
 
-                // 4. Create floors
-                const floorIds: number[] = [];
-                for (let f = 1; f <= totalFloors; f++) {
-                    const floorName = f === 1 ? '1st Floor (Ground)' : f === 2 ? '2nd Floor' : f === 3 ? '3rd Floor' : `${f}th Floor`;
-                    const flrRes = await client.query(`
-                        INSERT INTO floors (building_id, floor_number, name)
-                        VALUES ($1, $2, $3) RETURNING id;
-                    `, [buildingId, f, floorName]);
-                    floorIds.push(flrRes.rows[0].id);
-                }
-
-                // 5. Create room types
-                const createdRtIds: number[] = [];
-                for (const rt of selectedRoomTypes) {
-                    const rtRes = await client.query(`
-                        INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                        RETURNING id;
-                    `, [
-                        propertyId,
-                        rt.code.toUpperCase(),
-                        rt.name,
-                        rt.maxAdults || 2,
-                        rt.maxAdults || 2,
-                        rt.maxChildren ?? 1,
-                        rt.baseRate || 5000,
-                        rt.extraBedRate || 1000
-                    ]);
-                    createdRtIds.push(rtRes.rows[0].id);
-                }
-
-                // 6. Generate physical rooms across floors
-                let roomSeq = 0;
-                for (let fIdx = 0; fIdx < floorIds.length; fIdx++) {
-                    const floorId = floorIds[fIdx];
-                    const floorNum = fIdx + 1;
-                    for (let r = 1; r <= roomsPerFloor; r++) {
-                        roomSeq++;
-                        const roomNum = `${floorNum}${r < 10 ? '0' + r : r}`;
-                        const rtId = createdRtIds[(roomSeq - 1) % createdRtIds.length];
-                        await client.query(`
-                            INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status)
-                            VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', 'CLEAN');
-                        `, [propertyId, buildingId, floorId, rtId, roomNum, `Room ${roomNum}`]);
-                    }
-                }
-                const totalRoomsCreated = roomSeq;
-
-                // 7. Seed Primary Administrator / General Manager
+                // Seed Primary Administrator / General Manager in HRM (if requested)
                 try {
                     const deptRes = await client.query(`
                         INSERT INTO departments (property_id, code, name, cost_center_code, is_active)
@@ -523,60 +473,9 @@ export class TenantConnectionManager {
                 ]);
                 enterprisePropertyId = propRes.rows[0].id;
 
-                // 3. Create Building & Floors
-                const bldRes = await client.query(`
-                    INSERT INTO buildings (property_id, code, name, total_floors)
-                    VALUES ($1, 'BLD-MAIN', $2, $3)
-                    RETURNING id;
-                `, [enterprisePropertyId, params.buildingName || 'Executive Tower', totalFloors]);
-                const buildingId = bldRes.rows[0].id;
-
-                const floorIds: number[] = [];
-                for (let f = 1; f <= totalFloors; f++) {
-                    const floorName = f === 1 ? '1st Floor (Ground)' : f === 2 ? '2nd Floor' : f === 3 ? '3rd Floor' : `${f}th Floor`;
-                    const flrRes = await client.query(`
-                        INSERT INTO floors (building_id, floor_number, name)
-                        VALUES ($1, $2, $3) RETURNING id;
-                    `, [buildingId, f, floorName]);
-                    floorIds.push(flrRes.rows[0].id);
-                }
-
-                // 4. Create Room Types
-                const createdRtIds: number[] = [];
-                for (const rt of selectedRoomTypes) {
-                    const rtRes = await client.query(`
-                        INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                        RETURNING id;
-                    `, [
-                        enterprisePropertyId,
-                        rt.code.toUpperCase(),
-                        rt.name,
-                        rt.maxAdults || 2,
-                        rt.maxAdults || 2,
-                        rt.maxChildren ?? 1,
-                        rt.baseRate || 7500,
-                        rt.extraBedRate || 1500
-                    ]);
-                    createdRtIds.push(rtRes.rows[0].id);
-                }
-
-                // 5. Generate Physical Rooms
-                let roomSeq = 0;
-                for (let fIdx = 0; fIdx < floorIds.length; fIdx++) {
-                    const floorId = floorIds[fIdx];
-                    const floorNum = fIdx + 1;
-                    for (let r = 1; r <= roomsPerFloor; r++) {
-                        roomSeq++;
-                        const roomNum = `${floorNum}${r < 10 ? '0' + r : r}`;
-                        const rtId = createdRtIds[(roomSeq - 1) % createdRtIds.length];
-                        await client.query(`
-                            INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status)
-                            VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', 'CLEAN');
-                        `, [enterprisePropertyId, buildingId, floorId, rtId, roomNum, `Room ${roomNum}`]);
-                    }
-                }
-                totalRoomsCreated = roomSeq;
+                // Clean Property Creation: ONLY the property record is created.
+                // No dummy buildings, floors, room types, rooms, or bookings are auto-created.
+                const totalRoomsCreated = 0;
 
                 // 6. Seed Primary Administrator / General Manager in HRM
                 try {

@@ -219,17 +219,17 @@ export const FrontDesk: React.FC = () => {
         return () => window.removeEventListener('hotel_pms_sync_event', handleSyncEvent);
     }, []);
 
-    // Save back to localStorage and PostgreSQL DB whenever reservations change
-    const persistReservations = (updated: FrontDeskGuestRecord[]) => {
+    // Save back to localStorage and PostgreSQL DB (Single Targeted DB Update)
+    const persistReservations = (updated: FrontDeskGuestRecord[], changedItem?: { id: string | number; status: string }) => {
         setReservations(updated);
         try {
+            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
+            localStorage.setItem(`hotel_reservations_prop_${activePropertyId}`, JSON.stringify(updated));
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(updated));
-            // Sync status to PostgreSQL database
-            updated.forEach(item => {
-                if (item.status && item.id) {
-                    updateReservationStatusInDB(item.id, item.status);
-                }
-            });
+            // Trigger database update only for the specific reservation that changed
+            if (changedItem?.id && changedItem?.status) {
+                updateReservationStatusInDB(changedItem.id, changedItem.status);
+            }
         } catch (e) {
             console.error('Failed to sync to local storage', e);
         }
@@ -460,7 +460,7 @@ export const FrontDesk: React.FC = () => {
         const activeRegNo = checkInModalRecord.registrationNumber || generateRegistrationNumber(checkInModalRecord.subBookingNumber || checkInModalRecord.reservationNumber);
         const activeFolioNo = checkInModalRecord.folioNumber || generateFolioNumber(checkInModalRecord.subBookingNumber || checkInModalRecord.reservationNumber);
 
-        persistReservations(updated);
+        persistReservations(updated, { id: checkInModalRecord.id, status: 'in-house' });
         setActionLog(prev => [
             `[IN-HOUSE] Guest ${checkInModalRecord.guestName} checked into Room ${checkInModalRecord.roomNumber}. Reg #: ${activeRegNo} | KeyCard: ${checkInKeyCard} | Folio: ${activeFolioNo}.`,
             ...prev
@@ -488,7 +488,7 @@ export const FrontDesk: React.FC = () => {
             return r;
         });
 
-        persistReservations(updated);
+        persistReservations(updated, { id: checkOutModalRecord.id, status: 'checked-out' });
         setActionLog(prev => [
             `[CHECK-OUT] Room ${checkOutModalRecord.roomNumber} vacated by ${checkOutModalRecord.guestName}. Balance of BDT ${checkOutModalRecord.dueAmount} settled via ${paymentMethod}. Room flagged DIRTY for housekeeping.`,
             ...prev

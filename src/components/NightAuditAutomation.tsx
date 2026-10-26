@@ -6,6 +6,7 @@ import {
     Landmark, Play
 } from 'lucide-react';
 import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB, getOperatingSystemDate, setOperatingSystemDate } from '../utils/roomInventoryEngine';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 interface AuditStep {
     id: number;
@@ -117,60 +118,103 @@ export const NightAuditAutomation: React.FC = () => {
 
     const handleRunFullAudit = async () => {
         setIsRunning(true);
-        addLog('Beginning Automated Night Audit Pipeline...');
+        addLog('Beginning Automated Night Audit Pipeline via Cloud Database Engine...');
 
-        // Step 1
+        // Set Step 1 running
         setSteps(prev => prev.map(s => s.id === 1 ? { ...s, status: 'RUNNING' } : s));
-        await new Promise(r => setTimeout(r, 700));
-        setSteps(prev => prev.map(s => s.id === 1 ? { ...s, status: 'COMPLETED', resultSummary: 'Morning & Evening shifts closed. Cash & POS reconciled with 0 variance.' } : s));
-        addLog('Step 1 complete: Shift cashiers reconciled.');
 
-        // Step 2
-        setSteps(prev => prev.map(s => s.id === 2 ? { ...s, status: 'RUNNING' } : s));
-        await new Promise(r => setTimeout(r, 800));
-        setSteps(prev => prev.map(s => s.id === 2 ? { ...s, status: 'COMPLETED', resultSummary: '1 guaranteed no-show charged ৳ 4,500 retention to GL-4501. 2 unheld blocks released.' } : s));
-        addLog('Step 2 complete: No-show reservations penalized & released.');
+        try {
+            const API_BASE = getApiBaseUrl();
+            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
 
-        // Step 3
-        setSteps(prev => prev.map(s => s.id === 3 ? { ...s, status: 'RUNNING' } : s));
-        await new Promise(r => setTimeout(r, 900));
-        setSteps(prev => prev.map(s => s.id === 3 ? { ...s, status: 'COMPLETED', resultSummary: 'Posted ৳ 156,000 room rent + ৳ 31,470 VAT + ৳ 20,980 service charge across 24 rooms.' } : s));
-        addLog('Step 3 complete: Daily room charges & taxes posted to all in-house guest folios.');
+            const res = await fetch(`${API_BASE}/api/accounting/night-audit/run`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-property-id': String(activePropertyId)
+                },
+                body: JSON.stringify({
+                    propertyId: activePropertyId,
+                    businessDate
+                })
+            });
 
-        // Step 4
-        setSteps(prev => prev.map(s => s.id === 4 ? { ...s, status: 'RUNNING' } : s));
-        await new Promise(r => setTimeout(r, 700));
-        setSteps(prev => prev.map(s => s.id === 4 ? { ...s, status: 'COMPLETED', resultSummary: 'The Grand Buffet & Cafe terminal batches closed and synchronized.' } : s));
-        addLog('Step 4 complete: Outlets & F&B POS closed.');
+            const json = await res.json();
+            if (!json.success) {
+                throw new Error(json.error || 'Night audit failed on server');
+            }
 
-        // Step 5
-        setSteps(prev => prev.map(s => s.id === 5 ? { ...s, status: 'RUNNING' } : s));
-        await new Promise(r => setTimeout(r, 800));
-        const parts = businessDate.split('-').map(Number);
-        const d = new Date(parts[0], parts[1] - 1, parts[2] + 1, 12, 0, 0);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const nextDay = `${y}-${m}-${day}`;
-        setBusinessDate(nextDay);
-        setOperatingSystemDate(nextDay);
-        setSteps(prev => prev.map(s => s.id === 5 ? { ...s, status: 'COMPLETED', resultSummary: `System date rolled from ${businessDate} to ${nextDay}. Flash report compiled.` } : s));
-        addLog(`Step 5 complete: Business date rolled to ${nextDay}. General Ledger balanced.`);
+            const data = json.data;
 
-        setIsRunning(false);
-        setAuditCompleted(true);
-        showToast('Night Audit executed successfully! Business date rolled over.');
+            // Step 1: Shifts
+            setSteps(prev => prev.map(s => s.id === 1 ? { 
+                ...s, 
+                status: 'COMPLETED', 
+                resultSummary: data.stepSummaries?.step1 || 'Shift cashiers reconciled.' 
+            } : s));
+            addLog('Step 1 complete: Shift cashiers reconciled.');
+
+            // Step 2: No-shows
+            setSteps(prev => prev.map(s => s.id === 2 ? { 
+                ...s, 
+                status: 'COMPLETED', 
+                resultSummary: data.stepSummaries?.step2 || `${data.noShowsProcessed} no-show reservation(s) handled.` 
+            } : s));
+            addLog(`Step 2 complete: ${data.noShowsProcessed} no-shows penalized/released.`);
+
+            // Step 3: Room Rent & Tax
+            setSteps(prev => prev.map(s => s.id === 3 ? { 
+                ...s, 
+                status: 'COMPLETED', 
+                resultSummary: data.stepSummaries?.step3 || `Posted charges across ${data.foliosChargedCount} active in-house folios.` 
+            } : s));
+            addLog(`Step 3 complete: Daily room rent ৳${Number(data.totalRoomRentPosted || 0).toLocaleString()} & taxes posted.`);
+
+            // Step 4: POS Outlets
+            setSteps(prev => prev.map(s => s.id === 4 ? { 
+                ...s, 
+                status: 'COMPLETED', 
+                resultSummary: data.stepSummaries?.step4 || 'All F&B and POS terminal batches synchronized.' 
+            } : s));
+            addLog('Step 4 complete: Outlets & F&B POS closed.');
+
+            // Step 5: Rollover Date
+            const nextDay = data.newBusinessDate;
+            setBusinessDate(nextDay);
+            setOperatingSystemDate(nextDay);
+            setSteps(prev => prev.map(s => s.id === 5 ? { 
+                ...s, 
+                status: 'COMPLETED', 
+                resultSummary: data.stepSummaries?.step5 || `Business date rolled to ${nextDay}. General Ledger balanced.` 
+            } : s));
+            addLog(`Step 5 complete: Business date rolled to ${nextDay}. General Ledger balanced.`);
+
+            // Refresh reservations from DB to reflect any status or folio balance changes
+            syncReservationsFromDB().then(refreshed => {
+                if (refreshed.length > 0) setReservations(refreshed);
+            }).catch(() => {});
+
+            setAuditCompleted(true);
+            showToast('Night Audit executed successfully! Business date rolled over.');
+        } catch (err: any) {
+            console.error('Audit execution error:', err);
+            showToast(`Audit failed: ${err.message}`);
+            addLog(`Audit Error: ${err.message}`);
+        } finally {
+            setIsRunning(false);
+        }
     };
 
     const handleResetAudit = () => {
         setSteps(INITIAL_STEPS);
         setAuditCompleted(false);
-        setBusinessDate('2026-07-01');
-        setOperatingSystemDate('2026-07-01');
+        const todayIso = new Date().toISOString().slice(0, 10);
+        setBusinessDate(todayIso);
+        setOperatingSystemDate(todayIso);
         setAuditLogs([
-            'Audit sequence reset to baseline business date (2026-07-01).'
+            `Audit sequence reset to baseline operational date (${todayIso}).`
         ]);
-        showToast('Night Audit reset to baseline mode.');
+        showToast('Night Audit reset to current operational date.');
     };
 
     const totalDebits = glPostings.reduce((acc, p) => acc + p.debitBDT, 0);

@@ -60,16 +60,17 @@ router.get('/stream', (req: Request, res: Response) => {
         connectedAt: Date.now()
     });
 
-    // Notify other terminals that a new PC connected
+    // Notify other terminals that a new PC connected (scoped to property)
     const joinEvent = JSON.stringify({
         type: 'TERMINAL_CONNECTED',
         clientId,
         terminalName,
+        propertyId,
         connectedCount: clients.size,
         timestamp: Date.now()
     });
     for (const [id, client] of clients.entries()) {
-        if (id !== clientId) {
+        if (id !== clientId && (!propertyId || !client.propertyId || String(client.propertyId) === String(propertyId))) {
             try {
                 client.res.write(`data: ${joinEvent}\n\n`);
             } catch {
@@ -84,14 +85,17 @@ router.get('/stream', (req: Request, res: Response) => {
             type: 'TERMINAL_DISCONNECTED',
             clientId,
             terminalName,
+            propertyId,
             connectedCount: clients.size,
             timestamp: Date.now()
         });
         for (const [id, client] of clients.entries()) {
-            try {
-                client.res.write(`data: ${leaveEvent}\n\n`);
-            } catch {
-                clients.delete(id);
+            if (!propertyId || !client.propertyId || String(client.propertyId) === String(propertyId)) {
+                try {
+                    client.res.write(`data: ${leaveEvent}\n\n`);
+                } catch {
+                    clients.delete(id);
+                }
             }
         }
     });
@@ -100,7 +104,7 @@ router.get('/stream', (req: Request, res: Response) => {
 /**
  * Programmatic Server-Side Event Broadcaster
  * Can be called by controllers, services, or internal audit daemons to emit real-time events to all connected terminals.
- * Automatically fans out across the entire cluster using Redis Pub/Sub!
+ * Automatically fans out across the entire cluster using Redis Pub/Sub with Multi-Tenant isolation!
  */
 export function broadcastServerEvent(event: any, senderClientId?: string): number {
     const payload = JSON.stringify({
@@ -109,15 +113,22 @@ export function broadcastServerEvent(event: any, senderClientId?: string): numbe
         senderClientId: senderClientId || 'SERVER_DAEMON'
     });
 
+    const targetPropertyId = event?.propertyId ? String(event.propertyId) : undefined;
+
     let deliveredCount = 0;
     for (const [id, client] of clients.entries()) {
-        if (!senderClientId || id !== senderClientId) {
-            try {
-                client.res.write(`data: ${payload}\n\n`);
-                deliveredCount++;
-            } catch {
-                clients.delete(id);
-            }
+        if (senderClientId && id === senderClientId) continue;
+
+        // Multi-Tenant Isolation: If target propertyId specified, only send to terminals connected to same property
+        if (targetPropertyId && client.propertyId && client.propertyId !== 'all' && String(client.propertyId) !== targetPropertyId) {
+            continue;
+        }
+
+        try {
+            client.res.write(`data: ${payload}\n\n`);
+            deliveredCount++;
+        } catch {
+            clients.delete(id);
         }
     }
 

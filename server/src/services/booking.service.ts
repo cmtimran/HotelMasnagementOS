@@ -1,5 +1,8 @@
 import { generateMasterReservationNumber, generateGroupCode } from '../database/db.js';
 import { pgPool } from '../database/postgres.js';
+import { getActiveTenantPool } from '../database/tenantContext.js';
+
+const getPool = () => getActiveTenantPool(pgPool);
 
 export interface BookingRecord {
   id: string | number;
@@ -184,7 +187,7 @@ export const bookingService = {
   getAllBookings: async (propertyId: string | number, status?: string): Promise<BookingRecord[]> => {
     const propId = resolvePropertyId(propertyId);
 
-    const reservationsRes = await pgPool.query(`
+    const reservationsRes = await getPool().query(`
       SELECT 
         r.id,
         r.property_id,
@@ -218,7 +221,7 @@ export const bookingService = {
       ORDER BY r.id DESC
     `, [propId]);
 
-    const roomsRes = await pgPool.query(`
+    const roomsRes = await getPool().query(`
       SELECT 
         rr.id,
         rr.reservation_id,
@@ -398,211 +401,219 @@ export const bookingService = {
           ? payload.allocatedRooms.map((rNum: string) => ({ roomNumber: rNum }))
           : [{ roomNumber: payload.roomNumber || payload.roomNo || '101' }];
 
-    // 0. Strict Pre-Commit Overlap & Duplicate Room Validation across all active bookings
-    const existingBookings = await bookingService.getAllBookings(propId);
-    const seenRoomsInPayload = new Set<string>();
+    // Acquire connection from active tenant's pool to execute ACID transaction
+    const pool = getPool();
+    const client = await pool.connect();
+    let reservationNumber = '';
 
-    for (const rm of rawRooms) {
-      const roomNum = String(rm.roomNumber || rm.number || '101').trim();
-      if (seenRoomsInPayload.has(roomNum)) {
-        throw new Error(`Duplicate room ${roomNum} in reservation request.`);
+    try {
+      await client.query('BEGIN');
+
+      // 0. Strict Database-Level Pessimistic Row Lock & Overlap Check (Prevents Race Conditions)
+      const seenRoomsInPayload = new Set<string>();
+
+      for (const rm of rawRooms) {
+        const roomNum = String(rm.roomNumber || rm.number || '').trim();
+        if (!roomNum) continue;
+        if (seenRoomsInPayload.has(roomNum)) {
+          throw new Error(`Duplicate room ${roomNum} in reservation request.`);
+        }
+        seenRoomsInPayload.add(roomNum);
+
+        const roomIn = String(rm.checkIn || rm.checkInDate || checkIn).slice(0, 10);
+        const roomOut = String(rm.checkOut || rm.checkOutDate || checkOut).slice(0, 10);
+
+        const conflictCheck = await client.query(`
+          SELECT r.room_number, rr.check_in_date, rr.check_out_date, res.reservation_number, g.first_name, g.last_name
+          FROM reservation_rooms rr
+          JOIN rooms r ON r.id = rr.room_id
+          JOIN reservations res ON res.id = rr.reservation_id
+          LEFT JOIN guests g ON g.id = res.booker_guest_id
+          WHERE r.property_id = $1
+            AND r.room_number = $2
+            AND res.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
+            AND rr.check_in_date < $4
+            AND rr.check_out_date > $3
+          FOR UPDATE
+        `, [propId, roomNum, roomIn, roomOut]);
+
+        if (conflictCheck.rows.length > 0) {
+          const c = conflictCheck.rows[0];
+          const guest = `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'another guest';
+          throw new Error(`Room ${roomNum} is already booked by ${guest} (${c.reservation_number}) from ${String(c.check_in_date).slice(0, 10)} to ${String(c.check_out_date).slice(0, 10)}!`);
+        }
       }
-      seenRoomsInPayload.add(roomNum);
 
-      const roomIn = String(rm.checkIn || rm.checkInDate || checkIn).slice(0, 10);
-      const roomOut = String(rm.checkOut || rm.checkOutDate || checkOut).slice(0, 10);
+      // 1. Resolve or Create Guest in PostgreSQL `guests` table
+      const phone = payload.phone || payload.mobile || '+880 1711-000000';
+      const email = payload.email || 'guest@hospitality.com';
+      const rawName = (payload.guestName || 'Valued Guest').replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim();
+      const nameParts = rawName.split(' ');
+      const firstName = nameParts[0] || 'Valued';
+      const lastName = nameParts.slice(1).join(' ') || 'Guest';
+      const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr)\.?\s+/i)?.[1]) || 'Mr';
+      const vipStatus = payload.vip || payload.vipStatus || 'NONE';
 
-      for (const b of existingBookings) {
-        const bStatus = String(b.status || '').toLowerCase();
-        if (bStatus === 'cancelled' || bStatus === 'voided' || bStatus === 'checked-out' || bStatus === 'completed') {
-          continue;
-        }
-        if (payload.reservationNumber && b.reservationNumber === payload.reservationNumber) {
-          continue;
-        }
-
-        if (b.roomsList && Array.isArray(b.roomsList) && b.roomsList.length > 0) {
-          for (const sub of b.roomsList) {
-            if (String(sub.roomNumber) === roomNum) {
-              const sIn = String(sub.checkInDate || sub.checkIn || b.checkIn).slice(0, 10);
-              const sOut = String(sub.checkOutDate || sub.checkOut || b.checkOut).slice(0, 10);
-              if (sIn < roomOut && sOut > roomIn) {
-                throw new Error(`Room ${roomNum} is already booked by ${b.guestName} (${b.reservationNumber}) from ${sIn} to ${sOut}!`);
-              }
-            }
-          }
-        } else if (String(b.roomNumber) === roomNum || (b.allocatedRooms && b.allocatedRooms.map(String).includes(roomNum))) {
-          const bIn = String(b.checkIn).slice(0, 10);
-          const bOut = String(b.checkOut).slice(0, 10);
-          if (bIn < roomOut && bOut > roomIn) {
-            throw new Error(`Room ${roomNum} is already booked by ${b.guestName} (${b.reservationNumber}) from ${bIn} to ${bOut}!`);
-          }
-        }
-      }
-    }
-
-    // 1. Resolve or Create Guest in PostgreSQL `guests` table
-    const phone = payload.phone || payload.mobile || '+880 1711-000000';
-    const email = payload.email || 'guest@hospitality.com';
-    const rawName = (payload.guestName || 'Valued Guest').replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim();
-    const nameParts = rawName.split(' ');
-    const firstName = nameParts[0] || 'Valued';
-    const lastName = nameParts.slice(1).join(' ') || 'Guest';
-    const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr)\.?\s+/i)?.[1]) || 'Mr';
-    const vipStatus = payload.vip || payload.vipStatus || 'NONE';
-
-    let guestId: number;
-    const guestLookup = await pgPool.query('SELECT id FROM guests WHERE phone = $1 LIMIT 1', [phone]);
-    if (guestLookup.rows.length > 0) {
-      guestId = guestLookup.rows[0].id;
-    } else {
-      const gIns = await pgPool.query(`
-        INSERT INTO guests (organization_id, salutation, first_name, last_name, email, phone, vip_status)
-        VALUES (1, $1, $2, $3, $4, $5, $6)
-        RETURNING id
-      `, [salutation, firstName, lastName, email, phone, vipStatus === 'None' ? 'NONE' : vipStatus]);
-      guestId = gIns.rows[0].id;
-    }
-
-    // 2. Prepare Reservation Master
-    const reservationNumber = (payload.reservationNumber && !payload.reservationNumber.includes('NaN')) 
-      ? payload.reservationNumber 
-      : (payload.resNo || await generateMasterReservationNumber());
-    const statusDb = STATUS_UI_TO_DB[payload.status] || 'CONFIRMED';
-    const totalAmount = Number(payload.totalAmount || payload.rateAmount || 0);
-    const paidAmount = Number(payload.paidAmount || 0);
-    const dueAmount = totalAmount - paidAmount;
-    const totalTaxAmount = Number(payload.totalTaxAmount || payload.vatAmount || 0);
-    const baseAmount = Number(payload.baseAmount) || Math.max(0, totalAmount - totalTaxAmount);
-    const isGroup = Boolean(payload.isGroup || rawRooms.length > 1 || (payload.roomsCount && Number(payload.roomsCount) > 1) || (payload.allocatedRooms && payload.allocatedRooms.length > 1));
-    const groupCode = isGroup ? (payload.groupCode || await generateGroupCode()) : (payload.groupCode || null);
-    const regNo = statusDb === 'IN_HOUSE' ? (payload.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : (payload.registrationNumber || null);
-    const folioNo = payload.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`;
-
-    const resInsert = await pgPool.query(`
-      INSERT INTO reservations (
-        property_id, reservation_number, group_code, registration_number, registration_date, folio_number,
-        booker_guest_id, source, channel, agent,
-        is_group, status, total_amount, paid_amount, due_amount, special_requests
-      ) VALUES ($1, $2, $3, $4, CASE WHEN $4 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      RETURNING id
-    `, [
-      propId,
-      reservationNumber,
-      groupCode,
-      regNo,
-      folioNo,
-      guestId,
-      payload.source || 'Direct',
-      payload.channel || 'Front Desk',
-      payload.agent || null,
-      isGroup,
-      statusDb,
-      totalAmount,
-      paidAmount,
-      dueAmount,
-      payload.specialRequests || payload.special_requests || null
-    ]);
-
-    const reservationId = resInsert.rows[0].id;
-
-    // 3. Allocate Rooms in `reservation_rooms`
-    const roomRatePerRoom = rawRooms.length > 0 ? totalAmount / rawRooms.length : totalAmount;
-
-    for (let i = 0; i < rawRooms.length; i++) {
-      const rm = rawRooms[i];
-      const roomNum = String(rm.roomNumber || rm.number || '101');
-      
-      let roomId: number;
-      const roomLookup = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, roomNum]);
-      if (roomLookup.rows.length > 0) {
-        roomId = roomLookup.rows[0].id;
+      let guestId: number;
+      const guestLookup = await client.query('SELECT id FROM guests WHERE phone = $1 LIMIT 1', [phone]);
+      if (guestLookup.rows.length > 0) {
+        guestId = guestLookup.rows[0].id;
       } else {
-        const fallbackRoom = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 LIMIT 1', [propId]);
-        roomId = fallbackRoom.rows[0]?.id || 1;
+        const gIns = await client.query(`
+          INSERT INTO guests (organization_id, salutation, first_name, last_name, email, phone, vip_status)
+          VALUES (1, $1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `, [salutation, firstName, lastName, email, phone, vipStatus === 'None' ? 'NONE' : vipStatus]);
+        guestId = gIns.rows[0].id;
       }
 
-      const roomIn = rm.checkIn || rm.checkInDate || checkIn;
-      const roomOut = rm.checkOut || rm.checkOutDate || checkOut;
-      const roomNights = rm.nights || nights;
-      const roomRate = rm.rate || roomRatePerRoom;
-      const subBookingNum = rawRooms.length > 1 || payload.subBookingNumber
-        ? (rm.subBookingNumber || `${reservationNumber}-${String(i + 1).padStart(2, '0')}`)
-        : (rm.subBookingNumber || `${reservationNumber}-01`);
+      // 2. Prepare Reservation Master
+      reservationNumber = (payload.reservationNumber && !payload.reservationNumber.includes('NaN')) 
+        ? payload.reservationNumber 
+        : (payload.resNo || await generateMasterReservationNumber());
+      const statusDb = STATUS_UI_TO_DB[payload.status] || 'CONFIRMED';
+      const totalAmount = Number(payload.totalAmount || payload.rateAmount || 0);
+      const paidAmount = Number(payload.paidAmount || 0);
+      const dueAmount = totalAmount - paidAmount;
+      const totalTaxAmount = Number(payload.totalTaxAmount || payload.vatAmount || 0);
+      const baseAmount = Number(payload.baseAmount) || Math.max(0, totalAmount - totalTaxAmount);
+      const isGroup = Boolean(payload.isGroup || rawRooms.length > 1 || (payload.roomsCount && Number(payload.roomsCount) > 1) || (payload.allocatedRooms && payload.allocatedRooms.length > 1));
+      const groupCode = isGroup ? (payload.groupCode || await generateGroupCode()) : (payload.groupCode || null);
+      const regNo = statusDb === 'IN_HOUSE' ? (payload.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : (payload.registrationNumber || null);
+      const folioNo = payload.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`;
 
-      const roomRegNo = statusDb === 'IN_HOUSE'
-        ? (rm.registrationNumber || `REG-${subBookingNum.replace(/^RES-/, '')}`)
-        : (rm.registrationNumber || null);
-      const roomFolioNo = rm.folioNumber || `FOL-${subBookingNum.replace(/^RES-/, '')}`;
+      const resInsert = await client.query(`
+        INSERT INTO reservations (
+          property_id, reservation_number, group_code, registration_number, registration_date, folio_number,
+          booker_guest_id, source, channel, agent,
+          is_group, status, total_amount, paid_amount, due_amount, special_requests
+        ) VALUES ($1, $2, $3, $4, CASE WHEN $4 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        RETURNING id
+      `, [
+        propId,
+        reservationNumber,
+        groupCode,
+        regNo,
+        folioNo,
+        guestId,
+        payload.source || 'Direct',
+        payload.channel || 'Front Desk',
+        payload.agent || null,
+        isGroup,
+        statusDb,
+        totalAmount,
+        paidAmount,
+        dueAmount,
+        payload.specialRequests || payload.special_requests || null
+      ]);
 
-      await pgPool.query(`
-        INSERT INTO reservation_rooms (
-          reservation_id, sub_booking_number, registration_number, registration_date, folio_number,
-          room_id, guest_id, check_in_date, check_out_date,
-          nights, room_rate, adults, children, status
-        ) VALUES ($1, $2, $3, CASE WHEN $3 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      const reservationId = resInsert.rows[0].id;
+
+      // 3. Allocate Rooms in `reservation_rooms`
+      const roomRatePerRoom = rawRooms.length > 0 ? totalAmount / rawRooms.length : totalAmount;
+
+      for (let i = 0; i < rawRooms.length; i++) {
+        const rm = rawRooms[i];
+        const roomNum = String(rm.roomNumber || rm.number || '101');
+        
+        let roomId: number;
+        const roomLookup = await client.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, roomNum]);
+        if (roomLookup.rows.length > 0) {
+          roomId = roomLookup.rows[0].id;
+        } else {
+          const fallbackRoom = await client.query('SELECT id FROM rooms WHERE property_id = $1 LIMIT 1', [propId]);
+          roomId = fallbackRoom.rows[0]?.id || 1;
+        }
+
+        const roomIn = rm.checkIn || rm.checkInDate || checkIn;
+        const roomOut = rm.checkOut || rm.checkOutDate || checkOut;
+        const roomNights = rm.nights || nights;
+        const roomRate = rm.rate || roomRatePerRoom;
+        const subBookingNum = rawRooms.length > 1 || payload.subBookingNumber
+          ? (rm.subBookingNumber || `${reservationNumber}-${String(i + 1).padStart(2, '0')}`)
+          : (rm.subBookingNumber || `${reservationNumber}-01`);
+
+        const roomRegNo = statusDb === 'IN_HOUSE'
+          ? (rm.registrationNumber || `REG-${subBookingNum.replace(/^RES-/, '')}`)
+          : (rm.registrationNumber || null);
+        const roomFolioNo = rm.folioNumber || `FOL-${subBookingNum.replace(/^RES-/, '')}`;
+
+        await client.query(`
+          INSERT INTO reservation_rooms (
+            reservation_id, sub_booking_number, registration_number, registration_date, folio_number,
+            room_id, guest_id, check_in_date, check_out_date,
+            nights, room_rate, adults, children, status
+          ) VALUES ($1, $2, $3, CASE WHEN $3 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `, [
+          reservationId,
+          subBookingNum,
+          roomRegNo,
+          roomFolioNo,
+          roomId,
+          guestId,
+          roomIn,
+          roomOut,
+          roomNights,
+          roomRate,
+          Number(payload.adults) || 1,
+          Number(payload.children) || 0,
+          statusDb === 'IN_HOUSE' ? 'CHECKED_IN' : 'ASSIGNED'
+        ]);
+      }
+
+      // 4. Create Folio in `folios`
+      const folioInsert = await client.query(`
+        INSERT INTO folios (reservation_id, guest_id, folio_number, folio_type, status, balance)
+        VALUES ($1, $2, $3, 'GUEST', $4, $5)
+        RETURNING id
       `, [
         reservationId,
-        subBookingNum,
-        roomRegNo,
-        roomFolioNo,
-        roomId,
         guestId,
-        roomIn,
-        roomOut,
-        roomNights,
-        roomRate,
-        Number(payload.adults) || 1,
-        Number(payload.children) || 0,
-        statusDb === 'IN_HOUSE' ? 'CHECKED_IN' : 'ASSIGNED'
+        folioNo,
+        paidAmount >= totalAmount ? 'SETTLED' : 'OPEN',
+        dueAmount
       ]);
-    }
 
-    // 4. Create Folio in `folios`
-    const folioInsert = await pgPool.query(`
-      INSERT INTO folios (reservation_id, guest_id, folio_number, folio_type, status, balance)
-      VALUES ($1, $2, $3, 'GUEST', $4, $5)
-      RETURNING id
-    `, [
-      reservationId,
-      guestId,
-      folioNo,
-      paidAmount >= totalAmount ? 'SETTLED' : 'OPEN',
-      dueAmount
-    ]);
+      const folioId = folioInsert.rows[0].id;
 
-    const folioId = folioInsert.rows[0].id;
+      // 4b. Record initial Room Tariff and Tax charges into `folio_charges` (USALI Accounting)
+      try {
+        const taxPolicyDesc = payload.taxConfigCode ? ` [${payload.taxConfigCode}]` : '';
+        await client.query(`
+          INSERT INTO folio_charges (
+            folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date
+          ) VALUES ($1, 'ROOM_TARIFF', $2, $3, $4, $5, $6)
+        `, [
+          folioId,
+          `Room Accommodation Tariff (${nights} night${nights > 1 ? 's' : ''})${taxPolicyDesc}`,
+          baseAmount,
+          totalTaxAmount,
+          totalAmount,
+          checkIn
+        ]);
+      } catch (chargeErr) {
+        console.warn('Failed to insert initial folio charges', chargeErr);
+      }
 
-    // 4b. Record initial Room Tariff and Tax charges into `folio_charges` (USALI Accounting)
-    try {
-      const taxPolicyDesc = payload.taxConfigCode ? ` [${payload.taxConfigCode}]` : '';
-      await pgPool.query(`
-        INSERT INTO folio_charges (
-          folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date
-        ) VALUES ($1, 'ROOM_TARIFF', $2, $3, $4, $5, $6)
-      `, [
-        folioId,
-        `Room Accommodation Tariff (${nights} night${nights > 1 ? 's' : ''})${taxPolicyDesc}`,
-        baseAmount,
-        totalTaxAmount,
-        totalAmount,
-        checkIn
-      ]);
-    } catch (chargeErr) {
-      console.warn('Failed to insert initial folio charges', chargeErr);
-    }
+      // 5. If initial payment provided, record in `payments`
+      if (paidAmount > 0) {
+        await client.query(`
+          INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
+          VALUES ($1, $2, $3, 'CASH', $4, 'FRONT_DESK_DEPOSIT')
+        `, [
+          folioId,
+          propId,
+          `PAY-${reservationNumber}`,
+          paidAmount
+        ]);
+      }
 
-    // 5. If initial payment provided, record in `payments`
-    if (paidAmount > 0) {
-      await pgPool.query(`
-        INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
-        VALUES ($1, $2, $3, 'CASH', $4, 'FRONT_DESK_DEPOSIT')
-      `, [
-        folioId,
-        propId,
-        `PAY-${reservationNumber}`,
-        paidAmount
-      ]);
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
     }
 
     const createdBooking = await bookingService.getBookingById(reservationNumber, propId);
@@ -630,7 +641,7 @@ export const bookingService = {
       const email = payload.email || existing.email;
       const vip = payload.vip || existing.vip || 'NONE';
 
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE guests
         SET salutation = $1, first_name = $2, last_name = $3, email = $4, phone = $5, vip_status = $6, updated_at = CURRENT_TIMESTAMP
         WHERE id = (SELECT booker_guest_id FROM reservations WHERE id = $7 LIMIT 1)
@@ -644,13 +655,13 @@ export const bookingService = {
     const statusDb = payload.status ? (STATUS_UI_TO_DB[payload.status] || payload.status.toUpperCase()) : undefined;
 
     if (statusDb) {
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservations
         SET total_amount = $1, paid_amount = $2, due_amount = $3, status = $4, special_requests = COALESCE($5, special_requests), updated_at = CURRENT_TIMESTAMP
         WHERE id = $6
       `, [newTotal, newPaid, newDue, statusDb, payload.specialRequests ?? null, resId]);
     } else {
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservations
         SET total_amount = $1, paid_amount = $2, due_amount = $3, special_requests = COALESCE($4, special_requests), updated_at = CURRENT_TIMESTAMP
         WHERE id = $5
@@ -658,7 +669,7 @@ export const bookingService = {
     }
 
     // Update Folio balance
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE folios
       SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END
       WHERE reservation_id = $2
@@ -677,10 +688,10 @@ export const bookingService = {
         const rNights = Number(r.nights) || newNights;
         const rRate = Number(r.rate) || 0;
 
-        const roomRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(rNum)]);
+        const roomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(rNum)]);
         if (roomRes.rows.length > 0) {
           const physId = roomRes.rows[0].id;
-          await pgPool.query(`
+          await getPool().query(`
             UPDATE reservation_rooms
             SET room_id = $1, check_in_date = $2, check_out_date = $3, nights = $4, room_rate = CASE WHEN $5 > 0 THEN $5 ELSE room_rate END
             WHERE reservation_id = $6 AND (room_id = $1 OR id = $7)
@@ -689,15 +700,15 @@ export const bookingService = {
       }
     } else {
       const targetRoomNum = payload.roomNumber || payload.roomNo || existing.roomNumber;
-      const roomRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(targetRoomNum)]);
+      const roomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(targetRoomNum)]);
       if (roomRes.rows.length > 0) {
-        await pgPool.query(`
+        await getPool().query(`
           UPDATE reservation_rooms
           SET room_id = $1, check_in_date = $2, check_out_date = $3, nights = $4
           WHERE reservation_id = $5
         `, [roomRes.rows[0].id, newCheckIn, newCheckOut, newNights, resId]);
       } else {
-        await pgPool.query(`
+        await getPool().query(`
           UPDATE reservation_rooms
           SET check_in_date = $1, check_out_date = $2, nights = $3
           WHERE reservation_id = $4
@@ -764,15 +775,15 @@ export const bookingService = {
       }
     }
 
-    const roomRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, targetRoomNo]);
+    const roomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, targetRoomNo]);
     if (roomRes.rows.length > 0) {
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservation_rooms
         SET check_out_date = $1, nights = $2
         WHERE reservation_id = $3 AND room_id = $4
       `, [canonicalDeparture, canonicalNights, resId, roomRes.rows[0].id]);
     } else {
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservation_rooms
         SET check_out_date = $1, nights = $2
         WHERE reservation_id = $3
@@ -785,13 +796,13 @@ export const bookingService = {
       const paid = Number(existing.paidAmount || 0);
       const due = newDueAmount !== undefined ? Number(newDueAmount) : Math.max(0, newTotal - paid);
 
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservations
         SET total_amount = $1, due_amount = $2, updated_at = CURRENT_TIMESTAMP
         WHERE id = $3
       `, [newTotal, due, resId]);
 
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE folios
         SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END
         WHERE reservation_id = $2
@@ -817,7 +828,7 @@ export const bookingService = {
     const resId = existing.id;
     const { oldRoomNumber, newRoomNumber, newFromDate, newToDate } = payload;
 
-    const targetRoomRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(newRoomNumber)]);
+    const targetRoomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(newRoomNumber)]);
     if (targetRoomRes.rows.length === 0) {
       throw new Error(`Target room ${newRoomNumber} not found for property ${propId}`);
     }
@@ -827,7 +838,7 @@ export const bookingService = {
     const effTo = newToDate || existing.checkOut;
 
     // Strict Overlap / Collision Check on targetRoom before moving
-    const conflictRes = await pgPool.query(`
+    const conflictRes = await getPool().query(`
       SELECT r.reservation_number, rr.check_in_date, rr.check_out_date
       FROM reservation_rooms rr
       JOIN reservations r ON r.id = rr.reservation_id
@@ -845,9 +856,9 @@ export const bookingService = {
     }
 
     if (oldRoomNumber) {
-      const oldRoomRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(oldRoomNumber)]);
+      const oldRoomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(oldRoomNumber)]);
       if (oldRoomRes.rows.length > 0) {
-        await pgPool.query(`
+        await getPool().query(`
           UPDATE reservation_rooms
           SET room_id = $1, 
               check_in_date = COALESCE($2, check_in_date),
@@ -856,7 +867,7 @@ export const bookingService = {
         `, [targetRoomId, newFromDate || null, newToDate || null, resId, oldRoomRes.rows[0].id]);
       }
     } else {
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservation_rooms
         SET room_id = $1, 
             check_in_date = COALESCE($2, check_in_date),
@@ -885,27 +896,27 @@ export const bookingService = {
     const newPaid = Number(existing.paidAmount || 0) + amount;
     const newDue = Math.max(0, Number(existing.totalAmount || 0) - newPaid);
 
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE reservations
       SET paid_amount = $1, due_amount = $2, updated_at = CURRENT_TIMESTAMP
       WHERE id = $3
     `, [newPaid, newDue, resId]);
 
     // Update Folio balance
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE folios
       SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END
       WHERE reservation_id = $2
     `, [newDue, resId]);
 
     // Record Payment
-    const folioRes = await pgPool.query('SELECT id FROM folios WHERE reservation_id = $1 LIMIT 1', [resId]);
+    const folioRes = await getPool().query('SELECT id FROM folios WHERE reservation_id = $1 LIMIT 1', [resId]);
     const folioId = folioRes.rows[0]?.id || 1;
     const paymentMethod = (payload.paymentMethod || 'CASH').toUpperCase();
     const paymentNumber = `PAY-${Date.now()}`;
 
     try {
-      await pgPool.query(`
+      await getPool().query(`
         INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
         VALUES ($1, $2, $3, $4, $5, $6)
       `, [folioId, propId, paymentNumber, paymentMethod, amount, payload.remarks || 'FRONT_DESK_PAYMENT']);
@@ -945,23 +956,23 @@ export const bookingService = {
     const nights2 = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(splitDate).getTime()) / 86400000));
 
     // Update existing room stay to end at splitDate
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE reservation_rooms
       SET check_out_date = $1, nights = $2
       WHERE reservation_id = $3
     `, [splitDate, nights1, resId]);
 
     // Insert second leg for targetRoomNumber
-    const targetRoomRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(payload.targetRoomNumber)]);
+    const targetRoomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(payload.targetRoomNumber)]);
     if (targetRoomRes.rows.length > 0) {
-      const guestRes = await pgPool.query('SELECT booker_guest_id FROM reservations WHERE id = $1', [resId]);
-      await pgPool.query(`
+      const guestRes = await getPool().query('SELECT booker_guest_id FROM reservations WHERE id = $1', [resId]);
+      await getPool().query(`
         INSERT INTO reservation_rooms (
           reservation_id, room_id, guest_id, check_in_date, check_out_date, nights, room_rate, adults, children, status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1, 0, 'ASSIGNED')
       `, [resId, targetRoomRes.rows[0].id, guestRes.rows[0]?.booker_guest_id || 1, splitDate, checkOut, nights2, 3000]);
 
-      await pgPool.query('UPDATE reservations SET is_group = true WHERE id = $1', [resId]);
+      await getPool().query('UPDATE reservations SET is_group = true WHERE id = $1', [resId]);
     }
 
     return bookingService.getBookingById(resId, propId);
@@ -975,13 +986,13 @@ export const bookingService = {
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE reservations
       SET status = 'VOIDED', special_requests = COALESCE(special_requests || ' | ', '') || 'Void reason: ' || $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
     `, [payload.reason || 'Voided by front desk', existing.id]);
 
-    await pgPool.query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1`, [existing.id]);
+    await getPool().query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1`, [existing.id]);
 
     return bookingService.getBookingById(existing.id, propId);
   },
@@ -994,7 +1005,7 @@ export const bookingService = {
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE reservations
       SET status = 'HOLD', special_requests = COALESCE(special_requests || ' | ', '') || 'Hold reason: ' || $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
@@ -1012,12 +1023,12 @@ export const bookingService = {
     if (!existing) return null;
 
     if (payload.roomNumber) {
-      const rmRes = await pgPool.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(payload.roomNumber)]);
+      const rmRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(payload.roomNumber)]);
       if (rmRes.rows.length > 0) {
-        await pgPool.query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1 AND room_id = $2`, [existing.id, rmRes.rows[0].id]);
+        await getPool().query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1 AND room_id = $2`, [existing.id, rmRes.rows[0].id]);
       }
     } else {
-      await pgPool.query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1`, [existing.id]);
+      await getPool().query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1`, [existing.id]);
     }
 
     return bookingService.getBookingById(existing.id, propId);
@@ -1036,7 +1047,7 @@ export const bookingService = {
 
     const groupCode = target.groupCode || toLink.groupCode || await generateGroupCode();
 
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE reservations 
       SET group_code = $1, is_group = true, updated_at = CURRENT_TIMESTAMP
       WHERE property_id = $2 AND reservation_number IN ($3, $4)
@@ -1057,7 +1068,7 @@ export const bookingService = {
     const existing = await bookingService.getBookingById(reservationNumber, propId);
     if (!existing) return null;
 
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE reservations 
       SET group_code = NULL, is_group = false, updated_at = CURRENT_TIMESTAMP
       WHERE property_id = $1 AND reservation_number = $2
@@ -1090,7 +1101,7 @@ export const bookingService = {
       const parts = raw.split(' ');
       const fName = parts[0] || 'Valued';
       const lName = parts.slice(1).join(' ') || 'Guest';
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE guests SET first_name = $1, last_name = $2
         WHERE id = (SELECT booker_guest_id FROM reservations WHERE id = $3 LIMIT 1)
       `, [fName, lName, existing.id]);
@@ -1124,7 +1135,7 @@ export const bookingService = {
     const numericId = isNaN(Number(id)) ? -1 : Number(id);
 
     if (dbStatus === 'IN_HOUSE') {
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservations 
         SET status = $1,
             registration_number = COALESCE(registration_number, $2),
@@ -1135,13 +1146,13 @@ export const bookingService = {
       `, [dbStatus, autoRegNum, autoFolioNum, propId, numericId, String(id)]);
 
       if (existing) {
-        const pgRooms = await pgPool.query('SELECT id, sub_booking_number, registration_number, folio_number FROM reservation_rooms WHERE reservation_id = $1 ORDER BY id ASC', [existing.id]);
+        const pgRooms = await getPool().query('SELECT id, sub_booking_number, registration_number, folio_number FROM reservation_rooms WHERE reservation_id = $1 ORDER BY id ASC', [existing.id]);
         for (let i = 0; i < pgRooms.rows.length; i++) {
           const rRow = pgRooms.rows[i];
           const subNo = rRow.sub_booking_number || (pgRooms.rows.length > 1 ? `${resNum}-${String(i + 1).padStart(2, '0')}` : `${resNum}-01`);
           const regNo = rRow.registration_number || `REG-${subNo.replace(/^RES-/, '')}`;
           const folNo = rRow.folio_number || `FOL-${subNo.replace(/^RES-/, '')}`;
-          await pgPool.query(`
+          await getPool().query(`
             UPDATE reservation_rooms
             SET status = 'CHECKED_IN',
                 sub_booking_number = COALESCE(sub_booking_number, $1),
@@ -1154,9 +1165,9 @@ export const bookingService = {
 
         // Ensure open folio exists in folios table
         try {
-          const folioRow = await pgPool.query('SELECT id FROM folios WHERE reservation_id = $1 LIMIT 1', [existing.id]);
+          const folioRow = await getPool().query('SELECT id FROM folios WHERE reservation_id = $1 LIMIT 1', [existing.id]);
           if (folioRow.rows.length === 0) {
-            await pgPool.query(`
+            await getPool().query(`
               INSERT INTO folios (reservation_id, guest_id, folio_number, folio_type, status, balance)
               VALUES ($1, 1, $2, 'GUEST', 'OPEN', $3)
             `, [existing.id, autoFolioNum, existing.dueAmount || 0]);
@@ -1166,13 +1177,13 @@ export const bookingService = {
         }
       }
     } else {
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservations 
         SET status = $1, updated_at = CURRENT_TIMESTAMP
         WHERE property_id = $2 AND (id = $3 OR reservation_number = $4)
       `, [dbStatus, propId, numericId, String(id)]);
 
-      await pgPool.query(`
+      await getPool().query(`
         UPDATE reservation_rooms
         SET status = $1
         WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $2 AND (id = $3 OR reservation_number = $4))
@@ -1187,7 +1198,7 @@ export const bookingService = {
    */
   deleteBooking: async (id: string | number, propertyId: string | number): Promise<boolean> => {
     const propId = resolvePropertyId(propertyId);
-    await pgPool.query(`
+    await getPool().query(`
       UPDATE reservations
       SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
       WHERE property_id = $1 AND (id = $2 OR reservation_number = $3)
@@ -1201,14 +1212,14 @@ export const bookingService = {
   resetAllBookingsAndInventory: async (propertyId: string | number): Promise<boolean> => {
     const propId = resolvePropertyId(propertyId);
     try {
-      await pgPool.query('DELETE FROM folio_charges');
-      await pgPool.query('DELETE FROM payments');
-      await pgPool.query('DELETE FROM folios');
-      await pgPool.query('DELETE FROM reservation_rooms');
-      await pgPool.query('DELETE FROM reservations WHERE property_id = $1', [propId]);
-      await pgPool.query('DELETE FROM daily_sequences');
-      await pgPool.query("UPDATE rooms SET status = 'ACTIVE', housekeeping_status = 'CLEAN', remarks = NULL WHERE property_id = $1", [propId]);
-      await pgPool.query("UPDATE rooms SET room_type_id = 5 WHERE room_number IN ('105', '106', '205', '302', '405')");
+      await getPool().query('DELETE FROM folio_charges');
+      await getPool().query('DELETE FROM payments');
+      await getPool().query('DELETE FROM folios');
+      await getPool().query('DELETE FROM reservation_rooms');
+      await getPool().query('DELETE FROM reservations WHERE property_id = $1', [propId]);
+      await getPool().query('DELETE FROM daily_sequences');
+      await getPool().query("UPDATE rooms SET status = 'ACTIVE', housekeeping_status = 'CLEAN', remarks = NULL WHERE property_id = $1", [propId]);
+      await getPool().query("UPDATE rooms SET room_type_id = 5 WHERE room_number IN ('105', '106', '205', '302', '405')");
       console.log('✅ Successfully cleared reservations and reset inventory in PostgreSQL / TiDB');
       return true;
     } catch (err: any) {

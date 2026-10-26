@@ -66,6 +66,7 @@ import HRMManagementDashboard from './components/hrm/HRMManagementDashboard';
 import MultiPropertyConsole from './components/chain/MultiPropertyConsole';
 import TenantIsolationHub from './components/chain/TenantIsolationHub';
 import TenantOnboardingWizard from './components/chain/TenantOnboardingWizard';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import { initNetworkSync } from './utils/pmsNetworkSync';
 import { syncReservationsFromDB } from './utils/roomInventoryEngine';
 
@@ -784,7 +785,9 @@ function App() {
       <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden transition-all duration-300">
         <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0 [&>*]:w-full [&>*]:min-w-0">
-          {renderContent()}
+          <ErrorBoundary onReset={() => setActivePage('dashboard')}>
+            {renderContent()}
+          </ErrorBoundary>
         </div>
       </div>
       <GenericSectionModal
