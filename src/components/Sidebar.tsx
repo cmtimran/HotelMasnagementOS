@@ -277,14 +277,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return (
             <aside className="sticky top-0 hidden h-screen w-14 flex-col border-r border-slate-200 bg-white text-slate-800 md:flex select-none z-30 shrink-0 shadow-2xs">
                 {/* Brand Logo & Expand Toggle */}
-                <div className="h-11 border-b border-slate-100 flex items-center justify-center shrink-0">
+                <div className="h-14 border-b border-slate-200/80 flex items-center justify-center shrink-0">
                     <button
                         type="button"
                         onClick={toggleSidebar}
                         className="size-7 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition flex items-center justify-center cursor-pointer"
                         title="Expand sidebar"
                     >
-                        <PanelLeft size={14} />
+                        <PanelLeft size={15} />
                     </button>
                 </div>
 
@@ -299,11 +299,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 key={idx}
                                 type="button"
                                 onClick={() => setActivePage(targetId)}
-                                className={`w-full py-2 rounded-lg flex flex-col items-center justify-center transition cursor-pointer relative group ${
-                                    isActive
+                                className={`w-full py-2 rounded-lg flex flex-col items-center justify-center transition cursor-pointer relative group ${isActive
                                         ? 'bg-blue-50 text-blue-600 font-bold shadow-2xs'
                                         : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-                                }`}
+                                    }`}
                                 title={item.label}
                             >
                                 <span className={isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-900'}>
@@ -323,20 +322,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (
         <aside className="sticky top-0 hidden h-screen w-[228px] flex-col border-r border-slate-200/90 bg-white text-slate-800 md:flex select-none z-30 shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             {/* Top Brand Header */}
-            <div className="h-11 px-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="h-14 px-3 border-b border-slate-200/80 flex items-center justify-between shrink-0">
                 <button
                     type="button"
                     onClick={() => setActivePage('front-desk')}
-                    className="flex items-center gap-2 text-left transition hover:opacity-90 cursor-pointer min-w-0"
+                    className="flex items-center gap-2.5 text-left transition hover:opacity-90 cursor-pointer min-w-0"
                 >
-                    <div className="size-6.5 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-2xs font-bold text-xs shrink-0">
-                        <Building2 size={13} />
+                    <div className="size-7 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-2xs font-bold text-xs shrink-0">
+                        <Building2 size={14} />
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-[11.5px] font-bold text-slate-900 tracking-tight leading-none truncate">
+                        <h1 className="text-xs font-bold text-slate-900 tracking-tight leading-none truncate">
                             HotelManagementOS
                         </h1>
-                        <p className="text-[8.5px] font-semibold text-blue-600 uppercase tracking-wider leading-none mt-0.5 truncate">
+                        <p className="text-[8.5px] font-semibold text-blue-600 uppercase tracking-wider leading-none mt-1 truncate">
                             Enterprise PMS & RMS
                         </p>
                     </div>
@@ -345,23 +344,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                     type="button"
                     onClick={toggleSidebar}
-                    className="size-6 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                    className="size-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
                     title="Collapse sidebar"
                 >
-                    <PanelLeftClose size={14} />
+                    <PanelLeftClose size={15} />
                 </button>
             </div>
 
             {/* Quick Search Input */}
-            <div className="px-2.5 pt-2 pb-1 shrink-0">
+            <div className="px-3 pt-2.5 pb-1.5 shrink-0">
                 <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-slate-400 pointer-events-none" />
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-slate-400 pointer-events-none" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search menu (e.g. POS, Folios)..."
-                        className="w-full h-7 bg-slate-50 border border-slate-200/90 rounded-lg pl-6.5 pr-6 py-0.5 text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                        placeholder="Search menu..."
+                        className="w-full h-8 bg-slate-50 border border-slate-200/90 rounded-lg pl-7 pr-6 text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
                     />
                     {searchQuery && (
                         <button
@@ -396,11 +395,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => toggleDropdown(item.label)}
-                                            className={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${
-                                                hasActiveChild
+                                            className={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${hasActiveChild
                                                     ? 'text-blue-600 font-bold bg-blue-50/70'
                                                     : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className={hasActiveChild ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>
@@ -426,11 +424,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                             key={subIdx}
                                                             type="button"
                                                             onClick={() => setActivePage(sub.id)}
-                                                            className={`relative group flex w-full items-center justify-between rounded-md px-2 py-0.5 text-[10.5px] transition cursor-pointer ${
-                                                                isSubActive
+                                                            className={`relative group flex w-full items-center justify-between rounded-md px-2 py-0.5 text-[10.5px] transition cursor-pointer ${isSubActive
                                                                     ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
                                                                     : 'text-slate-600 hover:bg-slate-100/60 hover:text-slate-900 font-normal'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <div className="flex items-center gap-1.5 min-w-0">
                                                                 {isSubActive && (
@@ -462,11 +459,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     key={iIdx}
                                     type="button"
                                     onClick={() => item.id && setActivePage(item.id)}
-                                    className={`relative flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${
-                                        isActive
+                                    className={`relative flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${isActive
                                             ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
                                             : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
-                                    }`}
+                                        }`}
                                 >
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>

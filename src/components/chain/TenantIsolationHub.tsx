@@ -297,7 +297,7 @@ export const TenantIsolationHub: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     adminNotes: actionNotes,
-                    approvedBy: 'Alexander Vance (Super Admin)'
+                    approvedBy: 'System Admin'
                 })
             });
             const data = await res.json();
@@ -330,7 +330,7 @@ export const TenantIsolationHub: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     adminNotes: actionNotes,
-                    approvedBy: 'Alexander Vance (Super Admin)'
+                    approvedBy: 'System Admin'
                 })
             });
             const data = await res.json();

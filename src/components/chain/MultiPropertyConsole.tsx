@@ -100,71 +100,71 @@ export const MultiPropertyConsole: React.FC = () => {
 
             {/* Top Luxury Executive Banner */}
             <div className="bg-white border-b border-slate-200/80 shadow-2xs">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         
                         {/* Title & Brand Identity */}
-                        <div className="flex items-start gap-4">
-                            <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 flex items-center justify-center text-white shadow-md shadow-blue-500/20 ring-4 ring-blue-50 shrink-0">
-                                <Building2 size={26} className="stroke-[2.2]" />
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="size-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 flex items-center justify-center text-white shadow-xs shrink-0">
+                                <Building2 size={18} className="stroke-[2.2]" />
                             </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2.5 flex-wrap">
-                                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
                                         Multi-Property Hotel Chain Console
                                     </h1>
-                                    <span className="text-[11px] font-bold px-3 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
-                                        Grand Hospitality Group (GHG)
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/80">
+                                        GHG Group
                                     </span>
-                                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1.5 shadow-2xs">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 hidden md:inline-flex items-center gap-1">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        TiDB Cloud PostgreSQL Active
+                                        TiDB Cloud Active
                                     </span>
                                 </div>
-                                <p className="text-xs text-slate-500 max-w-2xl font-normal leading-relaxed">
-                                    Centralized Hotel Group Governance, Cross-Property Operations, High-Density Partitioning &amp; Enterprise Database Isolation.
+                                <p className="text-[11px] text-slate-500 truncate hidden sm:block">
+                                    Centralized Hotel Group Governance, Cross-Property Operations &amp; Database Isolation
                                 </p>
                             </div>
                         </div>
 
                         {/* Top Action Buttons */}
-                        <div className="flex items-center gap-2.5 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                             <button 
                                 type="button"
                                 onClick={() => setActivePage('property-create')}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-600/20 hover:shadow-md transition-all cursor-pointer active:scale-98"
+                                className="flex items-center gap-1.5 h-8 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer active:scale-98"
                             >
-                                <Plus size={16} className="stroke-[2.5]" />
-                                <span>Onboard New Hotel</span>
+                                <Plus size={14} className="stroke-[2.5]" />
+                                <span>Onboard Hotel</span>
                             </button>
                             <button 
                                 type="button"
                                 onClick={() => refreshProperties()}
-                                className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-slate-200/90 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer"
+                                className="flex items-center gap-1.5 h-8 px-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
                                 title="Sync live database portfolio"
                             >
-                                <RefreshCw size={14} className={loading ? 'animate-spin text-blue-600' : 'text-slate-500'} />
-                                <span className="hidden sm:inline">Sync Portfolio</span>
+                                <RefreshCw size={13} className={loading ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+                                <span className="hidden sm:inline">Sync</span>
                             </button>
                         </div>
 
                     </div>
 
                     {/* View Switcher Tabs Bar */}
-                    <div className="flex items-center gap-3 mt-6 pt-5 border-t border-slate-100">
-                        <div className="p-1 bg-slate-100/80 rounded-xl flex items-center gap-1 border border-slate-200/70">
+                    <div className="flex items-center justify-between gap-3 mt-3 pt-2.5 border-t border-slate-100">
+                        <div className="p-0.5 bg-slate-100/90 rounded-lg flex items-center gap-1 border border-slate-200/70">
                             <button
                                 type="button"
                                 onClick={() => setConsoleView('portfolio')}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
                                     consoleView === 'portfolio'
-                                        ? 'bg-white text-blue-700 shadow-xs'
+                                        ? 'bg-white text-blue-700 shadow-2xs'
                                         : 'text-slate-500 hover:text-slate-900'
                                 }`}
                             >
-                                <Building2 size={15} />
-                                <span>Hotel Chain Portfolio</span>
-                                <span className="px-2 py-0.2 rounded-full text-[10.5px] bg-blue-50 text-blue-700 font-extrabold border border-blue-200">
+                                <Building2 size={13} />
+                                <span>Portfolio</span>
+                                <span className="px-1.5 py-0.2 rounded text-[10px] bg-blue-50 text-blue-700 font-extrabold border border-blue-200">
                                     {properties.length}
                                 </span>
                             </button>
@@ -172,25 +172,25 @@ export const MultiPropertyConsole: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setConsoleView('isolation')}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
                                     consoleView === 'isolation'
-                                        ? 'bg-white text-blue-700 shadow-xs'
+                                        ? 'bg-white text-blue-700 shadow-2xs'
                                         : 'text-slate-500 hover:text-slate-900'
                                 }`}
                             >
-                                <Database size={15} />
-                                <span>Tenant Database Isolation Hub</span>
-                                <span className="px-2 py-0.2 rounded-full text-[10.5px] bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-200 flex items-center gap-1">
-                                    <ShieldCheck size={11} /> 10,000+ Scale
+                                <Database size={13} />
+                                <span>Database Isolation Hub</span>
+                                <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-200 hidden sm:inline-flex items-center gap-1">
+                                    <ShieldCheck size={10} /> 10,000+ Scale
                                 </span>
                             </button>
                         </div>
 
                         {consoleView === 'portfolio' && (
-                            <div className="ml-auto hidden md:flex items-center gap-2 text-xs text-slate-500">
-                                <span>Active Hotel Session:</span>
-                                <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 font-mono text-[11px]">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <div className="hidden md:flex items-center gap-2 text-xs text-slate-500">
+                                <span className="text-[11px]">Active Hotel Session:</span>
+                                <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md flex items-center gap-1.5 font-mono text-[11px]">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                     {activeProperty?.name || 'Grand Palace Hotel (HQ)'}
                                 </span>
                             </div>
@@ -200,121 +200,121 @@ export const MultiPropertyConsole: React.FC = () => {
             </div>
 
             {/* MAIN CONTENT AREA */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 space-y-4">
 
                 {consoleView === 'isolation' ? (
                     <TenantIsolationHub />
                 ) : (
                     <>
                         {/* 4 HIGH-END EXECUTIVE METRIC CARDS */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                             
                             {/* Metric 1 */}
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
-                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Group Portfolio</span>
-                                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                                        <Building2 size={18} />
+                            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition relative overflow-hidden">
+                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                                <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Group Portfolio</span>
+                                    <div className="size-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                        <Building2 size={14} />
                                     </div>
                                 </div>
-                                <div className="mt-3 flex items-baseline gap-2">
-                                    <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">{properties.length}</span>
-                                    <span className="text-xs font-semibold text-slate-500">Active Properties</span>
+                                <div className="mt-1 flex items-baseline gap-1.5">
+                                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-mono">{properties.length}</span>
+                                    <span className="text-[10.5px] font-semibold text-slate-500">Properties</span>
                                 </div>
-                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                                <div className="mt-1 text-[10.5px] text-slate-500 flex items-center gap-1">
                                     <span className="text-emerald-600 font-bold flex items-center gap-0.5">
-                                        <TrendingUp size={12} /> 100%
+                                        <TrendingUp size={11} /> 100%
                                     </span>
-                                    <span>Operational Uptime</span>
+                                    <span className="truncate">Active Uptime</span>
                                 </div>
                             </div>
 
                             {/* Metric 2 */}
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
-                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Chain Room Inventory</span>
-                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                                        <BedDouble size={18} />
+                            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition relative overflow-hidden">
+                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+                                <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Room Inventory</span>
+                                    <div className="size-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                        <BedDouble size={14} />
                                     </div>
                                 </div>
-                                <div className="mt-3 flex items-baseline gap-2">
-                                    <span className="text-3xl font-black text-emerald-600 tracking-tight font-mono">{totalRooms}</span>
-                                    <span className="text-xs font-semibold text-slate-500">Total Rooms</span>
+                                <div className="mt-1 flex items-baseline gap-1.5">
+                                    <span className="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight font-mono">{totalRooms}</span>
+                                    <span className="text-[10.5px] font-semibold text-slate-500">Rooms</span>
                                 </div>
-                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
-                                    <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold font-mono text-[10.5px]">
-                                        1NF–4NF Scoped
+                                <div className="mt-1 text-[10.5px] text-slate-500 flex items-center gap-1 truncate">
+                                    <span className="px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold font-mono text-[9.5px]">
+                                        1NF–4NF
                                     </span>
-                                    <span>Relational Database</span>
+                                    <span className="truncate">Relational DB</span>
                                 </div>
                             </div>
 
                             {/* Metric 3 */}
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
-                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Consolidated Staff</span>
-                                    <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                                        <Users size={18} />
+                            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition relative overflow-hidden">
+                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+                                <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Staff</span>
+                                    <div className="size-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                        <Users size={14} />
                                     </div>
                                 </div>
-                                <div className="mt-3 flex items-baseline gap-2">
-                                    <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">{totalStaff}</span>
-                                    <span className="text-xs font-semibold text-slate-500">Personnel</span>
+                                <div className="mt-1 flex items-baseline gap-1.5">
+                                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-mono">{totalStaff}</span>
+                                    <span className="text-[10.5px] font-semibold text-slate-500">Personnel</span>
                                 </div>
-                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                                <div className="mt-1 text-[10.5px] text-slate-500 flex items-center gap-1 truncate">
                                     <span className="text-purple-600 font-bold">Cross-Property</span>
-                                    <span>HRM &amp; Shift Rosters</span>
+                                    <span className="truncate">HRM Roster</span>
                                 </div>
                             </div>
 
                             {/* Metric 4 */}
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition relative overflow-hidden group">
-                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Group Revenue Inflow</span>
-                                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                                        <TrendingUp size={18} />
+                            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition relative overflow-hidden">
+                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+                                <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Revenue Inflow</span>
+                                    <div className="size-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                        <TrendingUp size={14} />
                                     </div>
                                 </div>
-                                <div className="mt-3 flex items-baseline gap-1">
+                                <div className="mt-1 flex items-baseline gap-1">
                                     <span className="text-xs font-bold text-amber-600">৳</span>
-                                    <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
-                                        {chainOverview ? Number(chainOverview.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '248,500'}
+                                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-mono">
+                                        {chainOverview ? Number(chainOverview.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0'}
                                     </span>
                                 </div>
-                                <div className="mt-2 text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                                <div className="mt-1 text-[10.5px] text-slate-500 flex items-center gap-1 truncate">
                                     <span className="text-emerald-600 font-bold flex items-center gap-0.5">
-                                        <TrendingUp size={12} /> +14.8%
+                                        <TrendingUp size={11} /> +14.8%
                                     </span>
-                                    <span>USALI Ledger Inflow</span>
+                                    <span className="truncate">USALI Inflow</span>
                                 </div>
                             </div>
 
                         </div>
 
                         {/* SEARCH & FILTER BAR */}
-                        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
-                            <div className="relative w-full sm:w-80">
-                                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                            <div className="relative w-full sm:w-72">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                     placeholder="Search hotel name, code or city..."
-                                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 focus:bg-white transition"
+                                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-blue-500 focus:bg-white transition"
                                 />
                             </div>
 
                             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                                <span className="text-xs text-slate-400 font-medium hidden sm:inline">Filter Region:</span>
+                                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Region:</span>
                                 <div className="flex items-center gap-1 overflow-x-auto">
                                     <button
                                         type="button"
                                         onClick={() => setCityFilter('ALL')}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
                                             cityFilter === 'ALL'
                                                 ? 'bg-blue-600 text-white shadow-2xs'
                                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -327,7 +327,7 @@ export const MultiPropertyConsole: React.FC = () => {
                                             key={city}
                                             type="button"
                                             onClick={() => setCityFilter(city)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                                            className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
                                                 cityFilter === city
                                                     ? 'bg-blue-600 text-white shadow-2xs'
                                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -341,7 +341,7 @@ export const MultiPropertyConsole: React.FC = () => {
                         </div>
 
                         {/* HOTEL PROPERTIES GRID */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {filteredProperties.map(property => {
                                 const isSelected = property.id === activePropertyId;
                                 const starCount = property.star_rating || 5;
@@ -349,67 +349,67 @@ export const MultiPropertyConsole: React.FC = () => {
                                 return (
                                     <div 
                                         key={property.id}
-                                        className={`rounded-2xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative ${
+                                        className={`rounded-xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative ${
                                             isSelected 
                                                 ? 'bg-white border-blue-600 shadow-md ring-2 ring-blue-500/10' 
                                                 : 'bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300'
                                         }`}
                                     >
                                         {/* Top Accent Strip */}
-                                        <div className={`h-1.5 w-full ${
+                                        <div className={`h-1 w-full ${
                                             isSelected 
                                                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
                                                 : 'bg-slate-200'
                                         }`} />
 
-                                        <div className="p-5 sm:p-6 space-y-5">
+                                        <div className="p-4 space-y-3">
                                             {/* Header Row: Code & Session State */}
                                             <div className="flex items-center justify-between gap-2">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200">
+                                                    <span className="font-mono text-[10.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                                                         {property.code}
                                                     </span>
-                                                    <span className="text-xs text-slate-400 font-medium">
+                                                    <span className="text-[11px] text-slate-400 font-medium">
                                                         ID #{property.id}
                                                     </span>
                                                 </div>
 
                                                 {isSelected ? (
-                                                    <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-blue-600 text-white flex items-center gap-1.5 shadow-2xs">
+                                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white flex items-center gap-1.5 shadow-2xs">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                                                        Active Hotel Session
+                                                        Active Session
                                                     </span>
                                                 ) : (
-                                                    <span className="text-[11px] text-slate-400 font-medium bg-slate-50 px-2.5 py-0.5 rounded-md border border-slate-200">
+                                                    <span className="text-[10px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
                                                         Standby Context
                                                     </span>
                                                 )}
                                             </div>
 
                                             {/* Hotel Title, Star & Location */}
-                                            <div className="flex items-start gap-4">
-                                                <div className={`w-13 h-13 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 shadow-sm ${
+                                            <div className="flex items-start gap-3">
+                                                <div className={`size-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs ${
                                                     isSelected 
                                                         ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white' 
                                                         : 'bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700'
                                                 }`}>
                                                     {property.name.slice(0, 2).toUpperCase()}
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <h3 className="text-lg font-bold text-slate-900 tracking-tight leading-snug">
+                                                <div className="space-y-0.5 min-w-0">
+                                                    <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug truncate">
                                                         {property.name}
                                                     </h3>
-                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
                                                         <div className="flex items-center gap-0.5 text-amber-500">
                                                             {[...Array(starCount)].map((_, i) => (
-                                                                <Star key={i} size={13} fill="currentColor" />
+                                                                <Star key={i} size={11} fill="currentColor" />
                                                             ))}
                                                         </div>
-                                                        <span className="text-[11.5px] font-semibold text-slate-600">
+                                                        <span className="text-[11px] font-semibold text-slate-600">
                                                             {starCount}-Star {property.city === 'Dhaka' ? 'Business Hotel' : 'Luxury Resort'}
                                                         </span>
                                                         <span className="text-slate-300">•</span>
-                                                        <span className="text-[11px] text-slate-500 font-mono">
+                                                        <span className="text-[10.5px] text-slate-500 font-mono">
                                                             Currency: <strong>{property.currency || 'BDT'}</strong>
                                                         </span>
                                                     </div>
@@ -417,18 +417,18 @@ export const MultiPropertyConsole: React.FC = () => {
                                             </div>
 
                                             {/* Address & Contact Chips */}
-                                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5 text-xs text-slate-600">
+                                            <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/70 space-y-1 text-[11px] text-slate-600">
                                                 <div className="flex items-center gap-2 truncate">
-                                                    <MapPin size={13} className="text-slate-400 shrink-0" />
+                                                    <MapPin size={12} className="text-slate-400 shrink-0" />
                                                     <span className="truncate">{property.address}, {property.city}, {property.country || 'Bangladesh'}</span>
                                                 </div>
-                                                <div className="flex items-center gap-4 text-[11.5px]">
-                                                    <div className="flex items-center gap-1.5 font-mono text-slate-600">
-                                                        <Phone size={12} className="text-slate-400 shrink-0" />
+                                                <div className="flex items-center gap-3 text-[11px]">
+                                                    <div className="flex items-center gap-1 font-mono text-slate-600">
+                                                        <Phone size={11} className="text-slate-400 shrink-0" />
                                                         <span>{property.phone}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 truncate text-slate-600">
-                                                        <Mail size={12} className="text-slate-400 shrink-0" />
+                                                    <div className="flex items-center gap-1 truncate text-slate-600">
+                                                        <Mail size={11} className="text-slate-400 shrink-0" />
                                                         <span className="truncate">{property.email}</span>
                                                     </div>
                                                 </div>
@@ -436,21 +436,21 @@ export const MultiPropertyConsole: React.FC = () => {
 
                                             {/* 3 Metric Mini-Cards */}
                                             <div className="grid grid-cols-3 gap-2 text-center">
-                                                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Physical Rooms</span>
-                                                    <span className="text-lg font-black text-slate-900 font-mono mt-0.5 block">
+                                                <div className="p-2 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                                                    <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">Physical Rooms</span>
+                                                    <span className="text-base font-black text-slate-900 font-mono mt-0.5 block">
                                                         {property.total_rooms || 0}
                                                     </span>
                                                 </div>
-                                                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Wings / Towers</span>
-                                                    <span className="text-lg font-black text-slate-900 font-mono mt-0.5 block">
+                                                <div className="p-2 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                                                    <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">Wings / Towers</span>
+                                                    <span className="text-base font-black text-slate-900 font-mono mt-0.5 block">
                                                         {property.total_buildings || 1}
                                                     </span>
                                                 </div>
-                                                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Staff Roster</span>
-                                                    <span className="text-lg font-black text-slate-900 font-mono mt-0.5 block">
+                                                <div className="p-2 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                                                    <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">Staff Roster</span>
+                                                    <span className="text-base font-black text-slate-900 font-mono mt-0.5 block">
                                                         {property.total_staff || 0}
                                                     </span>
                                                 </div>
@@ -458,39 +458,39 @@ export const MultiPropertyConsole: React.FC = () => {
                                         </div>
 
                                         {/* Action Bar Footer */}
-                                        <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2.5">
-                                            <div className="flex items-center gap-2">
+                                        <div className="px-4 py-2.5 bg-slate-50/80 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-1.5">
                                                 {!isSelected ? (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleSwitchProperty(property)}
-                                                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs transition flex items-center gap-1.5 cursor-pointer active:scale-98"
+                                                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-2xs transition flex items-center gap-1.5 cursor-pointer active:scale-98"
                                                     >
-                                                        <CheckCircle2 size={13} />
-                                                        <span>Switch Context</span>
+                                                        <CheckCircle2 size={12} />
+                                                        <span>Switch</span>
                                                     </button>
                                                 ) : (
-                                                    <span className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
-                                                        <CheckCircle2 size={14} className="text-blue-600" />
-                                                        <span>Operating</span>
+                                                    <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
+                                                        <CheckCircle2 size={13} className="text-blue-600" />
+                                                        <span>Active</span>
                                                     </span>
                                                 )}
 
                                                 <button
                                                     type="button"
                                                     onClick={() => handleLaunchFrontDesk(property)}
-                                                    className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-2xs"
                                                 >
-                                                    <Sparkles size={12} className="text-blue-600" />
+                                                    <Sparkles size={11} className="text-blue-600" />
                                                     <span>Front Desk</span>
                                                 </button>
 
                                                 <button
                                                     type="button"
                                                     onClick={() => handleLaunchStayView(property)}
-                                                    className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-2xs"
                                                 >
-                                                    <Calendar size={12} className="text-emerald-600" />
+                                                    <Calendar size={11} className="text-emerald-600" />
                                                     <span>StayView</span>
                                                 </button>
                                             </div>
@@ -501,12 +501,12 @@ export const MultiPropertyConsole: React.FC = () => {
                                                     handleSwitchProperty(property);
                                                     setConsoleView('isolation');
                                                 }}
-                                                className="text-[11.5px] font-semibold text-slate-500 hover:text-blue-700 flex items-center gap-1 cursor-pointer transition"
+                                                className="text-[11px] font-semibold text-slate-500 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer transition"
                                                 title="View Database Isolation Specs"
                                             >
-                                                <Database size={12} />
+                                                <Database size={11} />
                                                 <span>DB Isolation</span>
-                                                <ChevronRight size={13} />
+                                                <ChevronRight size={12} />
                                             </button>
                                         </div>
                                     </div>
@@ -515,33 +515,33 @@ export const MultiPropertyConsole: React.FC = () => {
                         </div>
 
                         {/* CHAIN COMPARISON MATRIX TABLE */}
-                        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                        <Landmark size={17} className="text-blue-600" />
+                                    <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                        <Landmark size={15} className="text-blue-600" />
                                         <span>Consolidated Hotel Chain Comparison Matrix</span>
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
                                         Standardized multi-property performance metrics, rack rate schedules, and database isolation scope
                                     </p>
                                 </div>
-                                <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 w-fit">
+                                <span className="text-[11px] font-mono font-semibold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 w-fit">
                                     {properties.length} Properties Analyzed
                                 </span>
                             </div>
 
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-xs text-slate-600">
-                                    <thead className="bg-slate-50 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                    <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                         <tr>
-                                            <th className="px-4 py-3">Property Name</th>
-                                            <th className="px-4 py-3">Category &amp; Location</th>
-                                            <th className="px-4 py-3">Physical Inventory</th>
-                                            <th className="px-4 py-3">Rack Rate Range</th>
-                                            <th className="px-4 py-3">HRM Personnel</th>
-                                            <th className="px-4 py-3">Database Architecture</th>
-                                            <th className="px-4 py-3 text-right">Operational Switch</th>
+                                            <th className="px-3.5 py-2.5">Property Name</th>
+                                            <th className="px-3.5 py-2.5">Category &amp; Location</th>
+                                            <th className="px-3.5 py-2.5">Physical Inventory</th>
+                                            <th className="px-3.5 py-2.5">Currency</th>
+                                            <th className="px-3.5 py-2.5">HRM Personnel</th>
+                                            <th className="px-3.5 py-2.5">Database Architecture</th>
+                                            <th className="px-3.5 py-2.5 text-right">Operational Switch</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 font-medium">
@@ -549,44 +549,44 @@ export const MultiPropertyConsole: React.FC = () => {
                                             const isCurrent = p.id === activePropertyId;
                                             return (
                                                 <tr key={p.id} className={`transition ${isCurrent ? 'bg-blue-50/50' : 'hover:bg-slate-50/60'}`}>
-                                                    <td className="px-4 py-3.5">
+                                                    <td className="px-3.5 py-2.5">
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                                                                 {p.code}
                                                             </span>
                                                             <span className="font-bold text-slate-900">{p.name}</span>
                                                             {isCurrent && (
-                                                                <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-blue-600 text-white shadow-2xs">
+                                                                <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white shadow-2xs">
                                                                     Active
                                                                 </span>
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-slate-600">
-                                                        {p.city === 'Dhaka' ? '5★ Corporate Tower (Dhaka)' : `${p.star_rating || 5}★ Luxury Resort (${p.city})`}
+                                                    <td className="px-3.5 py-2.5 text-slate-600">
+                                                        {`${p.star_rating || 5}★ ${p.city ? `${p.city}` : 'Standard Property'}`}
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-slate-900 font-semibold font-mono">
+                                                    <td className="px-3.5 py-2.5 text-slate-900 font-semibold font-mono">
                                                         {p.total_rooms || 0} Rooms ({p.total_buildings || 1} Wing)
                                                     </td>
-                                                    <td className="px-4 py-3.5 font-mono text-slate-700 font-bold">
-                                                        {p.city === 'Dhaka' ? '৳2,200 – ৳18,000' : '৳5,500 – ৳22,000'}
+                                                    <td className="px-3.5 py-2.5 font-mono text-slate-700 font-semibold">
+                                                        {p.currency || 'BDT'}
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-slate-700 font-mono">
+                                                    <td className="px-3.5 py-2.5 text-slate-700 font-mono">
                                                         {p.total_staff || 0} Staff
                                                     </td>
-                                                    <td className="px-4 py-3.5">
-                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                                    <td className="px-3.5 py-2.5">
+                                                        <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
                                                             <ShieldCheck size={11} /> 1NF–4NF Clustered
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right">
+                                                    <td className="px-3.5 py-2.5 text-right">
                                                         {isCurrent ? (
                                                             <span className="text-xs font-bold text-blue-600">Active</span>
                                                         ) : (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleSwitchProperty(p)}
-                                                                className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
+                                                                className="px-2 py-0.5 bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 text-slate-700 rounded-md text-xs font-semibold transition cursor-pointer shadow-2xs"
                                                             >
                                                                 Switch
                                                             </button>
