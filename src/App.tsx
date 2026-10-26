@@ -69,6 +69,7 @@ import TenantOnboardingWizard from './components/chain/TenantOnboardingWizard';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { initNetworkSync } from './utils/pmsNetworkSync';
 import { syncReservationsFromDB } from './utils/roomInventoryEngine';
+import { Agentation } from 'agentation';
 
 import { useNavigation } from './context/NavigationContext';
 import { usePortal, type UserData } from './context/PortalContext';
@@ -771,7 +772,12 @@ function App() {
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <>
+        <Login onLogin={handleLogin} />
+        {import.meta.env.DEV && <Agentation />}
+      </>
+    );
   }
 
   return (
@@ -797,6 +803,7 @@ function App() {
         subtitle={modalConfig.subtitle}
         sections={modalConfig.sections}
       />
+      {import.meta.env.DEV && <Agentation />}
     </div>
   );
 }
