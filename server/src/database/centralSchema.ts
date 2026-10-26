@@ -9,19 +9,22 @@ export async function ensureCentralSchema(pool: Pool): Promise<void> {
     try {
         await client.query('BEGIN');
 
-        // 1. Central Tenants Registry
+        // 1. Central Tenants Registry (Supports Hybrid Multi-Tenancy: Shared Pools & Dedicated DBs)
         await client.query(`
             CREATE TABLE IF NOT EXISTS central_tenants (
                 id SERIAL PRIMARY KEY,
                 slug VARCHAR(64) UNIQUE NOT NULL,
                 name VARCHAR(255) NOT NULL,
-                db_name VARCHAR(128) UNIQUE NOT NULL,
+                db_name VARCHAR(128) NOT NULL,
                 db_host VARCHAR(255) NOT NULL,
                 db_port INT NOT NULL DEFAULT 5432,
                 db_user VARCHAR(128) NOT NULL,
                 db_pass VARCHAR(255) NOT NULL,
                 db_ssl BOOLEAN NOT NULL DEFAULT TRUE,
                 status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+                isolation_mode VARCHAR(32) NOT NULL DEFAULT 'DEDICATED',
+                property_id INT,
+                cluster_pool_id VARCHAR(64) DEFAULT 'primary-shared',
                 custom_domain VARCHAR(255),
                 subscription_tier VARCHAR(64) DEFAULT 'ENTERPRISE',
                 admin_name VARCHAR(128),
@@ -29,6 +32,12 @@ export async function ensureCentralSchema(pool: Pool): Promise<void> {
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Progressive Migration: Ensure hybrid multi-tenant columns & relaxed constraints exist
+            ALTER TABLE central_tenants DROP CONSTRAINT IF EXISTS central_tenants_db_name_key;
+            ALTER TABLE central_tenants ADD COLUMN IF NOT EXISTS isolation_mode VARCHAR(32) DEFAULT 'DEDICATED';
+            ALTER TABLE central_tenants ADD COLUMN IF NOT EXISTS property_id INT;
+            ALTER TABLE central_tenants ADD COLUMN IF NOT EXISTS cluster_pool_id VARCHAR(64) DEFAULT 'primary-shared';
         `);
 
         // 2. Plugins Catalog (System & Optional Addons)

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/apiUrl';
 import { useToast } from '../../context/ToastContext';
+import { useNavigation } from '../../context/NavigationContext';
 
 interface TenantRecord {
     id: number;
@@ -16,6 +17,8 @@ interface TenantRecord {
     db_host: string;
     db_port: number;
     status: 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED';
+    isolation_mode?: 'DEDICATED' | 'SHARED';
+    property_id?: number;
     subscription_tier: string;
     admin_name: string;
     admin_email: string;
@@ -24,6 +27,14 @@ interface TenantRecord {
     occupied_rooms: number;
     revenue_bdt: string | number;
     active_plugins: string[];
+}
+
+interface ClusterOverview {
+    totalTenants: number;
+    dedicatedTenants: number;
+    sharedTenants: number;
+    scalingCapacity: string;
+    activePoolsSaved: string;
 }
 
 interface PluginCatalogItem {
@@ -61,6 +72,7 @@ export const TenantIsolationHub: React.FC = () => {
     const [tenants, setTenants] = useState<TenantRecord[]>([]);
     const [plugins, setPlugins] = useState<PluginCatalogItem[]>([]);
     const [requests, setRequests] = useState<CustomRequestItem[]>([]);
+    const [clusterOverview, setClusterOverview] = useState<ClusterOverview | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [healthStatus, setHealthStatus] = useState<Record<string, { status: string; latencyMs: number; roomCount: number; bookingCount: number }>>({});
     const [pingingSlug, setPingingSlug] = useState<string | null>(null);
@@ -74,8 +86,9 @@ export const TenantIsolationHub: React.FC = () => {
         adminName: '',
         adminEmail: '',
         address: '',
-        city: 'Cox\'s Bazar',
-        totalRooms: 15
+        city: 'Dhaka',
+        totalRooms: 10,
+        tier: 'STANDARD' as 'STANDARD' | 'ENTERPRISE'
     });
 
     // Custom Request Modal State
@@ -98,6 +111,7 @@ export const TenantIsolationHub: React.FC = () => {
     const [isExecutingAction, setIsExecutingAction] = useState(false);
 
     const { showToast } = useToast();
+    const { setActivePage } = useNavigation();
     const API_BASE = getApiBaseUrl();
 
     // 1. Fetch Tenants
@@ -108,9 +122,34 @@ export const TenantIsolationHub: React.FC = () => {
             const data = await res.json();
             if (data.success) {
                 setTenants(data.data);
+                if (data.clusterOverview) {
+                    setClusterOverview(data.clusterOverview);
+                }
             }
         } catch (err: any) {
             console.error('Failed to load tenants:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Promote Standard (Shared) Tenant to Dedicated Physical Database
+    const handleUpgradeTenant = async (slug: string) => {
+        try {
+            setIsLoading(true);
+            const res = await fetch(`${API_BASE}/api/central/tenants/${slug}/upgrade`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            showToast(data.data.message || 'Tenant successfully promoted to dedicated database!', {
+                type: 'success',
+                title: 'Dedicated Database Allocated'
+            });
+            await fetchTenants();
+        } catch (err: any) {
+            showToast(err.message, { type: 'error', title: 'Upgrade Failed' });
         } finally {
             setIsLoading(false);
         }
@@ -201,7 +240,8 @@ export const TenantIsolationHub: React.FC = () => {
                 adminEmail: '',
                 address: '',
                 city: 'Cox\'s Bazar',
-                totalRooms: 15
+                totalRooms: 15,
+                tier: 'STANDARD'
             });
             await fetchTenants();
         } catch (err: any) {
@@ -342,7 +382,7 @@ export const TenantIsolationHub: React.FC = () => {
                         <div className="flex items-center gap-2">
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                Multi-Tenant Database-per-Tenant Isolation Active
+                                Hybrid Clustered Multi-Tenancy (Standard &amp; Enterprise VIP)
                             </span>
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30">
                                 TiDB Cloud PG Gateway 17
@@ -350,32 +390,21 @@ export const TenantIsolationHub: React.FC = () => {
                         </div>
                         <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                             <Database size={22} className="text-blue-400" />
-                            <span>Central Control Plane &amp; Dedicated Database Governance</span>
+                            <span>Central Control Plane &amp; Multi-Tenant Database Governance</span>
                         </h2>
                         <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
-                            Each property operates on its own dedicated physical PostgreSQL database. Schema alterations, custom migrations, and runtime queries execute within isolated transaction boundaries with zero blast radius across properties.
+                            Engineered to scale from 1 to 10,000+ properties using Hybrid Multi-Tenancy: high-density shared clustering for standard hotels with zero connection pool overhead, and physical dedicated databases for VIP enterprise properties.
                         </p>
                     </div>
 
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <button
                             type="button"
-                            onClick={() => {
-                                setProvForm({
-                                    name: '',
-                                    slug: '',
-                                    adminName: '',
-                                    adminEmail: '',
-                                    address: '',
-                                    city: 'Cox\'s Bazar',
-                                    totalRooms: 15
-                                });
-                                setIsProvisionModalOpen(true);
-                            }}
+                            onClick={() => setActivePage('property-create')}
                             className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer transition-all ring-1 ring-white/20"
                         >
                             <Plus size={15} />
-                            <span>Provision Dedicated Database</span>
+                            <span>Launch Onboarding Wizard</span>
                         </button>
                         <button
                             type="button"
@@ -395,29 +424,29 @@ export const TenantIsolationHub: React.FC = () => {
                 {/* KPI Chips */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/10 text-xs">
                     <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                        <span className="text-slate-400 text-[10.5px] uppercase font-bold block">Isolated Databases</span>
-                        <div className="text-xl font-bold font-mono text-white mt-0.5">{tenants.length} Dedicated DBs</div>
+                        <span className="text-slate-400 text-[10.5px] uppercase font-bold block">Portfolio Density</span>
+                        <div className="text-xl font-bold font-mono text-white mt-0.5">{tenants.length} Properties Active</div>
                         <span className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
-                            <ShieldCheck size={11} /> 100% Data Isolation
+                            <ShieldCheck size={11} /> {clusterOverview?.dedicatedTenants ?? 2} Dedicated DBs • {clusterOverview?.sharedTenants ?? 1} Shared
                         </span>
+                    </div>
+
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                        <span className="text-slate-400 text-[10.5px] uppercase font-bold block">Scaling Capacity</span>
+                        <div className="text-xl font-bold font-mono text-cyan-300 mt-0.5">10,000+ Tenants</div>
+                        <span className="text-[10px] text-slate-300 mt-0.5 block">High-Density Hybrid Clustered</span>
+                    </div>
+
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                        <span className="text-slate-400 text-[10.5px] uppercase font-bold block">Pool Efficiency</span>
+                        <div className="text-xl font-bold font-mono text-emerald-300 mt-0.5">LRU + Shared Cluster</div>
+                        <span className="text-[10px] text-emerald-400 mt-0.5 block">0 Connection Leaks • Fast Lookups</span>
                     </div>
 
                     <div className="bg-white/5 rounded-xl p-3 border border-white/10">
                         <span className="text-slate-400 text-[10.5px] uppercase font-bold block">Pending Custom Requests</span>
                         <div className="text-xl font-bold font-mono text-amber-300 mt-0.5">{pendingRequestsCount} Pending Approval</div>
                         <span className="text-[10px] text-slate-300 mt-0.5 block">Requires Super Admin Review</span>
-                    </div>
-
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                        <span className="text-slate-400 text-[10.5px] uppercase font-bold block">Modular Addon Catalog</span>
-                        <div className="text-xl font-bold font-mono text-white mt-0.5">{plugins.length} Core Plugins</div>
-                        <span className="text-[10px] text-blue-300 mt-0.5 block">On-Demand DDL Migration</span>
-                    </div>
-
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                        <span className="text-slate-400 text-[10.5px] uppercase font-bold block">Connection Pooler</span>
-                        <div className="text-xl font-bold font-mono text-emerald-300 mt-0.5">LRU Dynamic Manager</div>
-                        <span className="text-[10px] text-slate-300 mt-0.5 block">Max 20 Pools • Zero Leak</span>
                     </div>
                 </div>
             </div>
@@ -523,12 +552,17 @@ export const TenantIsolationHub: React.FC = () => {
                                                         <h4 className="text-sm font-bold text-slate-900">{tenant.name}</h4>
                                                         {isMaster ? (
                                                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                                HQ Master DB
+                                                                HQ Master Cluster
+                                                            </span>
+                                                        ) : tenant.isolation_mode === 'SHARED' ? (
+                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                                                Standard (High-Density Shared)
                                                             </span>
                                                         ) : (
                                                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                                                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                                Isolated DB
+                                                                Enterprise (Dedicated DB)
                                                             </span>
                                                         )}
                                                     </div>
@@ -547,7 +581,7 @@ export const TenantIsolationHub: React.FC = () => {
                                             <div className="text-right flex flex-col items-end">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Storage Target</span>
                                                 <span className="font-mono text-xs font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 mt-0.5">
-                                                    {tenant.db_name}
+                                                    {tenant.isolation_mode === 'SHARED' ? `Shared DB: ${tenant.db_name} (PID: ${tenant.property_id ?? 'N/A'})` : tenant.db_name}
                                                 </span>
                                             </div>
                                         </div>
@@ -627,6 +661,18 @@ export const TenantIsolationHub: React.FC = () => {
                                         </button>
 
                                         <div className="flex items-center gap-2">
+                                            {tenant.isolation_mode === 'SHARED' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpgradeTenant(tenant.slug)}
+                                                    className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl font-semibold flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                                                    title="Promote tenant to enterprise dedicated physical database"
+                                                >
+                                                    <Sparkles size={12} className="text-amber-600" />
+                                                    <span>Upgrade DB</span>
+                                                </button>
+                                            )}
+
                                             <button
                                                 type="button"
                                                 onClick={() => {

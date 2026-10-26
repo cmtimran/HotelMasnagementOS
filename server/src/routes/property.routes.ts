@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database/db.js';
+import { TenantConnectionManager } from '../database/TenantConnectionManager.js';
 
 const router = Router();
 
@@ -139,62 +140,49 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 });
 
-// POST /api/properties - Create a new hotel property
+// POST /api/properties - Create and onboard a new hotel property
 router.post('/', async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
         const name = body.name || body.propertyName || 'New Luxury Hotel';
+        let rawSlug = body.slug || name.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/(^-+|-+$)/g, '');
+        if (rawSlug.length < 3) rawSlug = `hotel-${Date.now().toString().slice(-4)}`;
         const code = (body.code || body.shortCode || `${name.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-2)}`).toUpperCase();
-        const starRating = Math.min(5, Math.max(1, Number(body.starRating) || 5));
-        const email = body.email || 'info@hotel.com';
-        const phone = body.phone || '+880 1711-000000';
-        const address = body.address || body.addressLine1 || 'Dhaka, Bangladesh';
-        const city = body.city || 'Dhaka';
-        const country = body.country || 'Bangladesh';
-        const currency = (body.currency || 'BDT').slice(0, 3).toUpperCase();
-        const timeZone = body.timeZone || 'Asia/Dhaka';
-        const checkInTime = body.checkInTime || '14:00';
-        const checkOutTime = body.checkOutTime || '12:00';
 
-        const insertResult = await db.prepare(`
-            INSERT INTO properties (
-                organization_id, name, code, star_rating,
-                email, phone, address, city, country, currency,
-                time_zone, check_in_time, check_out_time
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(name, code, starRating, email, phone, address, city, country, currency, timeZone, checkInTime, checkOutTime);
+        const provisionResult = await TenantConnectionManager.provisionTenantDatabase({
+            slug: rawSlug,
+            name,
+            code,
+            tier: body.tier || 'STANDARD',
+            starRating: Number(body.starRating) || 5,
+            propertyType: body.propertyType || 'LUXURY_HOTEL',
+            currency: body.currency || 'BDT',
+            timeZone: body.timeZone || 'Asia/Dhaka',
+            checkInTime: body.checkInTime || '14:00',
+            checkOutTime: body.checkOutTime || '12:00',
+            address: body.address || 'Dhaka, Bangladesh',
+            city: body.city || 'Dhaka',
+            country: body.country || 'Bangladesh',
+            phone: body.phone || '+880 1700-000000',
+            email: body.email || `${rawSlug}@hotelms.com`,
+            buildingName: body.buildingName,
+            totalFloors: body.totalFloors ? Number(body.totalFloors) : 3,
+            roomsPerFloor: body.roomsPerFloor ? Number(body.roomsPerFloor) : 4,
+            totalRooms: body.totalRooms ? Number(body.totalRooms) : 12,
+            roomTypes: body.roomTypes,
+            adminName: body.adminName || 'General Manager',
+            adminEmail: body.adminEmail || body.email,
+            adminPhone: body.adminPhone || body.phone,
+            plugins: body.plugins || []
+        });
 
-        const newPropId = Number(insertResult.lastInsertRowid);
-
-        // Bootstrap default building, floors, room types, and initial rooms
-        try {
-            const bldInsert = await db.prepare(`
-                INSERT INTO buildings (property_id, code, name, sort_order)
-                VALUES (?, 'MAIN', 'Main Wing', 1)
-            `).run(newPropId);
-            const bldId = Number(bldInsert.lastInsertRowid);
-
-            const f1 = await db.prepare(`INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES (?, 1, 'Floor 1', 1)`).run(bldId);
-            const f2 = await db.prepare(`INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES (?, 2, 'Floor 2', 2)`).run(bldId);
-
-            const rt1 = await db.prepare(`INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate) VALUES (?, 'DLX', 'Deluxe Double', 2, 2, 1, 4000, 1000)`).run(newPropId);
-            const rt2 = await db.prepare(`INSERT INTO room_types (property_id, code, name, base_occupancy, max_adults, max_children, base_rate, extra_bed_rate) VALUES (?, 'SUPK', 'Superior King', 2, 2, 1, 5500, 1200)`).run(newPropId);
-
-            const rt1Id = Number(rt1.lastInsertRowid);
-            const rt2Id = Number(rt2.lastInsertRowid);
-            const f1Id = Number(f1.lastInsertRowid);
-            const f2Id = Number(f2.lastInsertRowid);
-
-            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '101', 'Deluxe 101')`).run(newPropId, bldId, f1Id, rt1Id);
-            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '102', 'Deluxe 102')`).run(newPropId, bldId, f1Id, rt1Id);
-            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '201', 'Superior 201')`).run(newPropId, bldId, f2Id, rt2Id);
-            await db.prepare(`INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name) VALUES (?, ?, ?, ?, '202', 'Superior 202')`).run(newPropId, bldId, f2Id, rt2Id);
-        } catch (bootErr) {
-            console.warn('Property bootstrap assets notice:', bootErr);
-        }
-
-        const created = await db.prepare('SELECT * FROM properties WHERE id = ?').get(newPropId);
-        res.status(201).json({ success: true, data: created, message: 'Property created successfully' });
+        const created = await db.prepare('SELECT * FROM properties WHERE id = ?').get(provisionResult.propertyId);
+        res.status(201).json({
+            success: true,
+            data: created || { id: provisionResult.propertyId, name, code },
+            tenant: provisionResult,
+            message: provisionResult.message
+        });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create property' });
     }

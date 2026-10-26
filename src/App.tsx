@@ -65,6 +65,7 @@ import AdvanceAccountingDashboard from './components/accounting/AdvanceAccountin
 import HRMManagementDashboard from './components/hrm/HRMManagementDashboard';
 import MultiPropertyConsole from './components/chain/MultiPropertyConsole';
 import TenantIsolationHub from './components/chain/TenantIsolationHub';
+import TenantOnboardingWizard from './components/chain/TenantOnboardingWizard';
 import { initNetworkSync } from './utils/pmsNetworkSync';
 import { syncReservationsFromDB } from './utils/roomInventoryEngine';
 
@@ -362,7 +363,8 @@ function App() {
         return <ManagerDashboard />;
       case 'property-create':
       case 'add-property':
-        return <AddProperty onBack={() => setActivePage('properties')} isCreateMode={true} currentUser={currentUser} onNavigate={setActivePage} />;
+      case 'tenant-onboarding':
+        return <TenantOnboardingWizard onBack={() => setActivePage('multi-property')} onNavigate={setActivePage} />;
       case 'hotel-info':
       case 'hotel-profile':
         return (

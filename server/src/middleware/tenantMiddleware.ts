@@ -43,6 +43,13 @@ export async function tenantMiddleware(req: Request, res: Response, next: NextFu
         // Set diagnostic response headers
         res.setHeader('X-Tenant-Resolved', context.tenantSlug);
         res.setHeader('X-Tenant-Database', context.dbName);
+        res.setHeader('X-Tenant-Isolation', context.isolationMode || 'DEDICATED');
+
+        // Automatically populate property scope for shared multi-tenant routing
+        if (context.propertyId) {
+            (req as any).propertyId = String(context.propertyId);
+            (req.headers as any)['x-property-id'] = String(context.propertyId);
+        }
 
         // Run next middleware chain within the isolated tenant async storage scope
         tenantLocalStorage.run(context, () => {

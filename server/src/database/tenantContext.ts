@@ -7,6 +7,9 @@ export interface TenantContext {
     dbName: string;
     pool: Pool;
     isCentral?: boolean;
+    isolationMode?: 'DEDICATED' | 'SHARED';
+    subscriptionTier?: string;
+    propertyId?: number;
 }
 
 export const tenantLocalStorage = new AsyncLocalStorage<TenantContext>();
