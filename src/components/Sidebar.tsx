@@ -41,8 +41,6 @@ import {
     PanelLeftClose,
     PanelLeft
 } from 'lucide-react';
-import { useProperty } from '../context/PropertyContext';
-import { usePortal } from '../context/PortalContext';
 
 export interface SubMenuItem {
     id: string;
@@ -80,8 +78,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     toggleSidebar
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const { activeProperty } = useProperty();
-    const { currentUser } = usePortal();
 
     // Accordion state - persisted in localStorage
     const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => {
@@ -274,9 +270,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             .filter(sec => sec.items.length > 0);
     }, [sections, searchQuery]);
 
-    const userInitial = currentUser?.name ? currentUser.name.trim()[0].toUpperCase() : 'A';
-    const userRoleDisplay = currentUser?.role ? currentUser.role.replace('_', ' ').toUpperCase() : 'ADMIN';
-
     // ========================================================================
     // RENDER: COLLAPSED ICON-ONLY SIDEBAR
     // ========================================================================
@@ -319,13 +312,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             </button>
                         );
                     })}
-                </div>
-
-                {/* Footer User Avatar */}
-                <div className="p-2 border-t border-slate-100 flex flex-col items-center justify-center shrink-0">
-                    <div className="size-6.5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold shadow-2xs">
-                        {userInitial}
-                    </div>
                 </div>
             </aside>
         );
@@ -499,34 +485,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                 ))}
             </nav>
-
-            {/* Sidebar Bottom Footer: User Profile & Quick Hotel Context */}
-            <div className="p-2 border-t border-slate-100 bg-slate-50/70 shrink-0">
-                <div className="flex items-center justify-between gap-1.5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="size-6.5 rounded-lg bg-gradient-to-tr from-blue-700 to-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs">
-                            {userInitial}
-                        </div>
-                        <div className="min-w-0 text-left">
-                            <p className="text-[11px] font-bold text-slate-800 truncate leading-tight">
-                                {currentUser?.name || 'Alexander Vance'}
-                            </p>
-                            <p className="text-[9px] text-blue-600 font-medium truncate leading-tight">
-                                {userRoleDisplay} • {activeProperty?.code || 'GPD'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('multi-property')}
-                        className="size-6 rounded-md hover:bg-white text-slate-400 hover:text-blue-600 transition flex items-center justify-center shrink-0 border border-transparent hover:border-slate-200 cursor-pointer"
-                        title="Chain Portfolio Console"
-                    >
-                        <Building2 size={12} />
-                    </button>
-                </div>
-            </div>
         </aside>
     );
 };
