@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     ArrowLeft, Building2, Clock, CreditCard, Monitor, User,
     Briefcase, MapPin, Shield, Settings, Zap, CheckCircle2,
@@ -10,6 +10,7 @@ import {
 import { useProperty } from '../context/PropertyContext';
 import { useToast } from '../context/ToastContext';
 import { getApiBaseUrl } from '../utils/apiUrl';
+import { getCanonicalRooms } from '../utils/roomInventoryEngine';
 import BuildingManagement from './BuildingManagement';
 import RoomTypeManagement from './RoomTypeManagement';
 import RoomManagement from './RoomManagement';
@@ -250,13 +251,63 @@ const AddProperty: React.FC<AddPropertyProps> = ({
     const targetProperty = isCreateMode ? null : (initialData?.raw || initialData || activeProperty);
     const propStorageKey = `hotel_unified_settings_prop_${targetProperty?.id || 1}`;
 
-    const [activeTab, setActiveTab] = useState<string>(initialTab);
+    const getInitialTabFromUrl = (): string => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const qTab = params.get('tab');
+            if (qTab) return qTab;
+            if (window.location.hash) {
+                const hTab = window.location.hash.replace('#', '');
+                if (hTab) return hTab;
+            }
+        } catch {}
+        return initialTab || 'identity';
+    };
+
+    const [activeTab, setActiveTabState] = useState<string>(() => getInitialTabFromUrl());
     const [activePolicyPillar, setActivePolicyPillar] = useState<string>('booking');
     const [isSaving, setIsSaving] = useState(false);
 
+    const setActiveTab = (tabId: string) => {
+        setActiveTabState(tabId);
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tabId);
+            window.history.replaceState({ tab: tabId }, '', url.toString());
+        } catch {}
+    };
+
     useEffect(() => {
-        if (initialTab) setActiveTab(initialTab);
+        const handlePopState = () => {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const qTab = params.get('tab');
+                if (qTab) {
+                    setActiveTabState(qTab);
+                }
+            } catch {}
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    useEffect(() => {
+        if (initialTab && initialTab !== activeTab) {
+            setActiveTab(initialTab);
+        }
     }, [initialTab]);
+
+    const SELF_MANAGED_TABS = useMemo(() => new Set([
+        'amenities',
+        'floors-wings',
+        'room-types',
+        'rooms',
+        'connecting-rooms',
+        'holidays',
+        'taxes-vat',
+        'printer-settings'
+    ]), []);
+    const isSelfManagedTab = SELF_MANAGED_TABS.has(activeTab);
 
     // Core Property Fields
     const [propName, setPropName] = useState<string>(
@@ -274,6 +325,14 @@ const AddProperty: React.FC<AddPropertyProps> = ({
     const [propRooms, setPropRooms] = useState<number>(
         Number(targetProperty?.total_rooms ?? targetProperty?.rooms ?? 34)
     );
+    const liveRoomsCount = useMemo(() => {
+        try {
+            const r = getCanonicalRooms(targetProperty?.id);
+            return r.length;
+        } catch {
+            return propRooms;
+        }
+    }, [targetProperty?.id, propRooms]);
     const [propCity, setPropCity] = useState<string>(
         isCreateMode ? 'Dhaka' : (targetProperty?.city || 'Dhaka')
     );
@@ -378,6 +437,21 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         checkInTime: p?.check_in_time || parsed.settings.checkInTime || '14:00',
                         checkOutTime: p?.check_out_time || parsed.settings.checkOutTime || '12:00'
                     });
+                    if (Array.isArray(parsed.settings.holidaysCatalog) && parsed.settings.holidaysCatalog.length > 0) {
+                        if (!localStorage.getItem('hotel_holidays_calendar_v1')) {
+                            localStorage.setItem('hotel_holidays_calendar_v1', JSON.stringify(parsed.settings.holidaysCatalog));
+                        }
+                    }
+                    if (Array.isArray(parsed.settings.taxConfigurations) && parsed.settings.taxConfigurations.length > 0) {
+                        if (!localStorage.getItem('hotel_tax_configurations_v1')) {
+                            localStorage.setItem('hotel_tax_configurations_v1', JSON.stringify(parsed.settings.taxConfigurations));
+                        }
+                    }
+                    if (Array.isArray(parsed.settings.connectingRooms) && parsed.settings.connectingRooms.length > 0) {
+                        if (!localStorage.getItem('hotel_connecting_rooms_inventory_v1')) {
+                            localStorage.setItem('hotel_connecting_rooms_inventory_v1', JSON.stringify(parsed.settings.connectingRooms));
+                        }
+                    }
                 }
                 if (Array.isArray(parsed.bankAccounts)) setBankAccounts(parsed.bankAccounts);
                 if (Array.isArray(parsed.posOutlets)) setPosOutlets(parsed.posOutlets);
@@ -421,12 +495,31 @@ const AddProperty: React.FC<AddPropertyProps> = ({
             const fbUrl = socialLinks.find(s => s.platform.toLowerCase().includes('facebook'))?.url || settings.facebookUrl || '';
             const igUrl = socialLinks.find(s => s.platform.toLowerCase().includes('instagram'))?.url || settings.instagramUrl || '';
             const taUrl = socialLinks.find(s => s.platform.toLowerCase().includes('tripadvisor'))?.url || settings.tripAdvisorUrl || '';
+            const holidaysCatalog = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem('hotel_holidays_calendar_v1') || '[]');
+                } catch { return []; }
+            })();
+            const taxConfigurations = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem('hotel_tax_configurations_v1') || '[]');
+                } catch { return []; }
+            })();
+            const connectingRooms = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem('hotel_connecting_rooms_inventory_v1') || '[]');
+                } catch { return []; }
+            })();
+
             const mergedSettings = {
                 ...settings,
                 facebookUrl: fbUrl,
                 instagramUrl: igUrl,
                 tripAdvisorUrl: taUrl,
-                socialLinks
+                socialLinks,
+                holidaysCatalog,
+                taxConfigurations,
+                connectingRooms
             };
 
             if (isCreateMode) {
@@ -685,30 +778,39 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         <button
                             type="button"
                             onClick={() => onNavigate('hotel-info')}
-                            className="btn-secondary"
+                            className="btn-secondary !h-7 !py-1 !px-2.5 text-xs"
                             title="View Read-Only Hotel Profile"
                         >
                             <Eye size={13} className="text-slate-500" />
                             <span>View Profile</span>
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => handleSave('draft')}
-                        disabled={isSaving}
-                        className="btn-secondary"
-                    >
-                        Save Draft
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleSave('publish')}
-                        disabled={isSaving}
-                        className="btn-primary"
-                    >
-                        <CheckCircle2 size={14} />
-                        <span>{isSaving ? 'Saving...' : 'Save & Publish'}</span>
-                    </button>
+                    {isSelfManagedTab ? (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[11px] font-medium text-slate-600">Auto-Synced Module</span>
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => handleSave('draft')}
+                                disabled={isSaving}
+                                className="btn-secondary !h-7 !py-1 !px-2.5 text-xs"
+                            >
+                                Save Draft
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSave('publish')}
+                                disabled={isSaving}
+                                className="btn-primary !h-7 !py-1 !px-3 text-xs flex items-center gap-1.5"
+                            >
+                                <CheckCircle2 size={13} />
+                                <span>{isSaving ? 'Saving...' : 'Save & Publish'}</span>
+                            </button>
+                        </>
+                    )}
                 </div>
             </header>
 
@@ -794,7 +896,27 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             <option value="3 Star">3 Star</option>
                                         </Select>
                                     </FormField>
-                                    <FormField label="Total Rooms" required>
+                                    <FormField
+                                        label="Total Rooms"
+                                        required
+                                        hint={
+                                            liveRoomsCount !== propRooms ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPropRooms(liveRoomsCount);
+                                                        showToast(`Synced total rooms to ${liveRoomsCount} physical keys`, { type: 'success' });
+                                                    }}
+                                                    className="flex items-center gap-1 text-amber-600 font-semibold cursor-pointer hover:underline text-left"
+                                                >
+                                                    <span>Live Inventory: {liveRoomsCount} keys</span>
+                                                    <span className="text-[9px] bg-amber-100/80 px-1 py-0.2 rounded border border-amber-300">Sync</span>
+                                                </button>
+                                            ) : (
+                                                <span className="text-emerald-600 font-medium text-[10px]">✓ Synced with {liveRoomsCount} physical rooms</span>
+                                            )
+                                        }
+                                    >
                                         <Input
                                             type="number"
                                             value={propRooms}
@@ -1018,16 +1140,16 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                        ======================================================================== */}
                     {activeTab === 'amenities' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
-                            <BuildingManagement initialTab="amenities" />
+                            <BuildingManagement initialTab="amenities" allowedTabs={['amenities']} />
                         </div>
                     )}
 
                     {/* ========================================================================
-                        FLOORS & WINGS (BuildingManagement initialTab="buildings")
+                        FLOORS & WINGS (BuildingManagement initialTab="floors")
                        ======================================================================== */}
                     {activeTab === 'floors-wings' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
-                            <BuildingManagement initialTab="buildings" />
+                            <BuildingManagement initialTab="floors" allowedTabs={['floors', 'buildings', 'matrix']} />
                         </div>
                     )}
 
@@ -2275,6 +2397,34 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         <div className="p-4 sm:p-5 lg:p-6 space-y-6 animate-in fade-in duration-150">
                             <div>
                                 <SectionTitle icon={Receipt} title="Document Numbering & Prefixes" />
+
+                                {/* Live Sequence Preview Banner */}
+                                <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 mb-4">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="size-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">
+                                            <Receipt size={16} />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-800">Live Sequence Preview</div>
+                                            <div className="text-[11px] text-slate-500">Live preview of generated document numbers across PMS folios & POS</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-blue-200 text-blue-700 font-bold shadow-2xs">
+                                            Res: {settings.reservationPrefix || 'RES-'}00492
+                                        </span>
+                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-700 font-bold shadow-2xs">
+                                            Inv: {settings.invoicePrefix || 'INV-'}01842
+                                        </span>
+                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-purple-200 text-purple-700 font-bold shadow-2xs">
+                                            Folio: {settings.folioPrefix || 'FOL-'}8821
+                                        </span>
+                                        <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-amber-700 font-bold shadow-2xs">
+                                            KOT: {settings.kotPrefix || 'KOT-'}3920
+                                        </span>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <FormField
                                         label="Reservation Prefix"

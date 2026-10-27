@@ -257,9 +257,10 @@ const STORAGE_KEY_ROOMS = 'hotel_rooms_inventory_v1';
 
 interface BuildingManagementProps {
     initialTab?: 'buildings' | 'floors' | 'amenities' | 'matrix';
+    allowedTabs?: ('buildings' | 'floors' | 'amenities' | 'matrix')[];
 }
 
-const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'buildings' }) => {
+const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'buildings', allowedTabs }) => {
     // Navigation / View Tabs
     const [mainTab, setMainTab] = useState<'buildings' | 'floors' | 'amenities' | 'matrix'>(initialTab);
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -1070,70 +1071,80 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             </div>
 
             {/* Navigation Tabs Bar */}
-            <div className="bg-white p-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1 p-0.5 bg-slate-100/80 rounded-lg">
-                    <button
-                        onClick={() => setMainTab('buildings')}
-                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                            mainTab === 'buildings'
-                                ? 'bg-white text-primary shadow-2xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                        <Building2 size={13} />
-                        <span>Buildings</span>
-                        <span className="badge-code !py-0 !px-1.5 !text-[10px]">
-                            {buildings.length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setMainTab('floors')}
-                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                            mainTab === 'floors'
-                                ? 'bg-white text-primary shadow-2xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                        <Layers size={13} />
-                        <span>Floors</span>
-                        <span className="badge-code !py-0 !px-1.5 !text-[10px]">
-                            {floors.length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setMainTab('amenities')}
-                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                            mainTab === 'amenities'
-                                ? 'bg-white text-primary shadow-2xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                        <ShieldCheck size={13} className="text-emerald-600" />
-                        <span>Amenities & Safety</span>
-                        <span className="badge-code !py-0 !px-1.5 !text-[10px]">
-                            {amenitiesCatalog.length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setMainTab('matrix')}
-                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                            mainTab === 'matrix'
-                                ? 'bg-white text-primary shadow-2xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                        <Compass size={13} />
-                        <span>Matrix</span>
-                    </button>
-                </div>
+            {(!allowedTabs || allowedTabs.length > 1) && (
+                <div className="bg-white p-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-1 p-0.5 bg-slate-100/80 rounded-lg">
+                        {(!allowedTabs || allowedTabs.includes('floors')) && (
+                            <button
+                                onClick={() => setMainTab('floors')}
+                                className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                                    mainTab === 'floors'
+                                        ? 'bg-white text-primary shadow-2xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <Layers size={13} />
+                                <span>Floors</span>
+                                <span className="badge-code !py-0 !px-1.5 !text-[10px]">
+                                    {floors.length}
+                                </span>
+                            </button>
+                        )}
+                        {(!allowedTabs || allowedTabs.includes('buildings')) && (
+                            <button
+                                onClick={() => setMainTab('buildings')}
+                                className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                                    mainTab === 'buildings'
+                                        ? 'bg-white text-primary shadow-2xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <Building2 size={13} />
+                                <span>Buildings</span>
+                                <span className="badge-code !py-0 !px-1.5 !text-[10px]">
+                                    {buildings.length}
+                                </span>
+                            </button>
+                        )}
+                        {(!allowedTabs || allowedTabs.includes('amenities')) && (
+                            <button
+                                onClick={() => setMainTab('amenities')}
+                                className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                                    mainTab === 'amenities'
+                                        ? 'bg-white text-primary shadow-2xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <ShieldCheck size={13} className="text-emerald-600" />
+                                <span>Amenities & Safety</span>
+                                <span className="badge-code !py-0 !px-1.5 !text-[10px]">
+                                    {amenitiesCatalog.length}
+                                </span>
+                            </button>
+                        )}
+                        {(!allowedTabs || allowedTabs.includes('matrix')) && (
+                            <button
+                                onClick={() => setMainTab('matrix')}
+                                className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                                    mainTab === 'matrix'
+                                        ? 'bg-white text-primary shadow-2xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <Compass size={13} />
+                                <span>Matrix</span>
+                            </button>
+                        )}
+                    </div>
 
-                <div className="text-xs text-slate-400 font-medium px-2 hidden sm:block">
-                    {mainTab === 'buildings' && 'Viewing property wings & structural specs'}
-                    {mainTab === 'floors' && 'Viewing floor levels & capacity'}
-                    {mainTab === 'amenities' && 'Viewing life safety assets & guest amenities'}
-                    {mainTab === 'matrix' && 'Floor & Amenity Coverage Matrix'}
+                    <div className="text-xs text-slate-400 font-medium px-2 hidden sm:block">
+                        {mainTab === 'buildings' && 'Viewing property wings & structural specs'}
+                        {mainTab === 'floors' && 'Viewing floor levels & capacity'}
+                        {mainTab === 'amenities' && 'Viewing life safety assets & guest amenities'}
+                        {mainTab === 'matrix' && 'Floor & Amenity Coverage Matrix'}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* TAB CONTENT 1: BUILDINGS MASTER */}
             {mainTab === 'buildings' && (
