@@ -284,23 +284,11 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     return (
         <>
             <header className="h-14 sm:h-14 bg-white border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 flex-shrink-0 z-30 sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.02)] select-none">
-                {/* Left Side - Clean Page Context / Breadcrumb */}
-                <div className="flex items-center gap-2.5 text-xs font-medium text-slate-500 min-w-0">
-                    <button
-                        type="button"
-                        onClick={() => setActivePage('front-desk')}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 transition cursor-pointer"
-                        title="Go to Front Desk Overview"
-                    >
-                        <Building2 size={13} className="text-blue-600" />
-                        <span className="text-[11px] tracking-tight">{activeProperty?.code || 'GPD'}</span>
-                    </button>
-
-                    <span className="text-slate-300 font-light">/</span>
-
-                    <span className="text-slate-900 text-xs sm:text-[13px] truncate max-w-[200px] sm:max-w-xs">
+                {/* Left Side - Clean Page Title */}
+                <div className="flex items-center min-w-0">
+                    <h1 className="text-slate-900 text-sm sm:text-base font-bold tracking-tight truncate max-w-[260px] sm:max-w-md">
                         {pageTitle}
-                    </span>
+                    </h1>
                 </div>
 
                 {/* Right Side - OrderlyRMS Branch Selector, System Date, Quick Actions, Alerts, and User Profile */}
