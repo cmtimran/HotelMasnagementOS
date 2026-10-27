@@ -450,33 +450,23 @@ function App() {
       case 'building-floor':
       case 'building-management':
       case 'floor-management':
-      case 'amenities-safety':
-      case 'amenities':
-      case 'safety':
-      case 'buildings':
       case 'floors':
       case 'buildings-floors':
       case 'building':
       case 'floor-setup':
-        return (
-          <BuildingManagement
-            initialTab={
-              activePage === 'floor-management' || activePage === 'floors' || activePage === 'floor-setup'
-                ? 'floors'
-                : activePage === 'amenities-safety' || activePage === 'amenities' || activePage === 'safety'
-                ? 'amenities'
-                : 'buildings'
-            }
-          />
-        );
+        return <GeneralSettings initialTab="floors-wings" onNavigate={setActivePage} currentUser={currentUser} />;
+      case 'amenities-safety':
+      case 'amenities':
+      case 'safety':
+        return <GeneralSettings initialTab="amenities" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'manage-room-type':
       case 'room-types':
       case 'room-type':
-        return <RoomTypeManagement />;
+        return <GeneralSettings initialTab="room-types" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'manage-room':
       case 'manage-rooms':
       case 'rooms':
-        return <RoomManagement onBack={() => setActivePage('dashboard')} />;
+        return <GeneralSettings initialTab="rooms" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'room-rack':
         return <RoomRack />;
       case 'reservations':
@@ -509,7 +499,7 @@ function App() {
       case 'joint-room':
       case 'connecting-rooms':
       case 'connecting-room':
-        return <ConnectingRoomManagement />;
+        return <GeneralSettings initialTab="connecting-rooms" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'rate-plans':
       case 'rate-plan':
         return <RatePlanManagement />;
@@ -559,11 +549,11 @@ function App() {
       case 'tax-vat-settings':
       case 'taxes':
       case 'vat':
-        return <TaxVatManagement />;
+        return <GeneralSettings initialTab="taxes-vat" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'printer-settings':
       case 'printers':
       case 'hardware-printers':
-        return <PrinterSettingsManagement />;
+        return <GeneralSettings initialTab="printer-settings" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'user-management':
       case 'users':
       case 'staff':

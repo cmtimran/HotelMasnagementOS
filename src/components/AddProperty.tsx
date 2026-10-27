@@ -4,11 +4,18 @@ import {
     Briefcase, MapPin, Shield, Settings, Zap, CheckCircle2,
     LogIn, ShieldCheck, ShieldAlert, DollarSign, Calendar,
     AlertCircle, FileText, Image, Trash2, Plus,
-    Globe, Receipt, Mail, Lock, Eye, RotateCcw, Send, Database
+    Globe, Receipt, Mail, Lock, Eye, RotateCcw, Send, Database,
+    Layers, Sparkles, BedDouble, FolderKanban, Percent, Printer, Utensils, Building
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useToast } from '../context/ToastContext';
 import { getApiBaseUrl } from '../utils/apiUrl';
+import BuildingManagement from './BuildingManagement';
+import RoomTypeManagement from './RoomTypeManagement';
+import RoomManagement from './RoomManagement';
+import ConnectingRoomManagement from './ConnectingRoomManagement';
+import TaxVatManagement from './TaxVatManagement';
+import PrinterSettingsManagement from './PrinterSettingsManagement';
 
 export interface AddPropertyProps {
     onBack?: () => void;
@@ -529,13 +536,30 @@ const AddProperty: React.FC<AddPropertyProps> = ({
 
     // Standard Hospitality Left Sidebar Navigation (Exact /edit-property Style)
     const tabs = [
-        { id: 'identity', label: 'Property & Location', icon: <Building2 size={15} /> },
-        { id: 'operations', label: 'Operations & Policies', icon: <Clock size={15} /> },
-        { id: 'finance', label: 'Finance & Taxes', icon: <CreditCard size={15} /> },
-        { id: 'numbering', label: 'Folio & Numbering', icon: <Receipt size={15} /> },
-        { id: 'system', label: 'System & Channels', icon: <Monitor size={15} /> },
-        { id: 'communication', label: 'Email & SMS', icon: <Mail size={15} /> },
+        // 1. Property Setup
+        { id: 'identity', label: 'Property & Location', icon: <Building2 size={15} />, group: 'Property & Brand' },
         { id: 'branding', label: 'Branding & Contacts', icon: <User size={15} /> },
+
+        // 2. Physical Layout & Inventory
+        { id: 'amenities', label: 'Amenities & Safety', icon: <Sparkles size={15} />, group: 'Rooms & Inventory' },
+        { id: 'floors-wings', label: 'Floors & Wings', icon: <Layers size={15} /> },
+        { id: 'room-types', label: 'Room Types', icon: <BedDouble size={15} /> },
+        { id: 'rooms', label: 'All Rooms', icon: <Building size={15} /> },
+        { id: 'connecting-rooms', label: 'Connecting Rooms', icon: <FolderKanban size={15} /> },
+
+        // 3. Operations & Financials
+        { id: 'operations', label: 'Operations & Policies', icon: <Clock size={15} />, group: 'Policies & Taxes' },
+        { id: 'taxes-vat', label: 'Taxes & VAT', icon: <Percent size={15} /> },
+        { id: 'numbering', label: 'Folio & Numbering', icon: <Receipt size={15} /> },
+        { id: 'finance', label: 'Bank Accounts & FX', icon: <CreditCard size={15} /> },
+
+        // 4. POS & Hardware
+        { id: 'outlets', label: 'Outlet Configurations', icon: <Utensils size={15} />, group: 'Outlets & Peripherals' },
+        { id: 'printer-settings', label: 'Printer Settings', icon: <Printer size={15} /> },
+        { id: 'system', label: 'System & Channels', icon: <Monitor size={15} /> },
+
+        // 5. Communications & Security
+        { id: 'communication', label: 'Email & SMS', icon: <Mail size={15} />, group: 'Communications & System' },
         { id: 'backup', label: 'Backup & Security', icon: <ShieldCheck size={15} /> }
     ];
 
@@ -692,23 +716,29 @@ const AddProperty: React.FC<AddPropertyProps> = ({
             <main className="max-w-[1500px] mx-auto p-3 sm:p-4 lg:p-5 flex flex-col lg:flex-row gap-4 items-start">
                 {/* Left Sidebar Nav */}
                 <aside className="w-full lg:w-60 flex-shrink-0">
-                    <nav className="bg-white rounded-xl border border-gray-200 p-1.5 shadow-2xs sticky top-16 space-y-1">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs transition-all text-left cursor-pointer ${
-                                    activeTab === tab.id
-                                        ? 'bg-primary-subtle text-primary border-l-4 border-primary'
-                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                                }`}
-                            >
-                                <span className={activeTab === tab.id ? 'text-primary' : 'text-gray-400'}>
-                                    {tab.icon}
-                                </span>
-                                <span className="truncate">{tab.label}</span>
-                            </button>
+                    <nav className="bg-white rounded-xl border border-gray-200 p-1.5 shadow-2xs sticky top-16 space-y-0.5">
+                        {tabs.map((tab: any, idx: number) => (
+                            <React.Fragment key={tab.id}>
+                                {tab.group && (
+                                    <div className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 ${idx > 0 ? 'mt-2 pt-2 border-t border-slate-100' : ''}`}>
+                                        {tab.group}
+                                    </div>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all text-left cursor-pointer ${
+                                        activeTab === tab.id
+                                            ? 'bg-primary-subtle text-primary border-l-4 border-primary font-bold'
+                                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                                    }`}
+                                >
+                                    <span className={activeTab === tab.id ? 'text-primary' : 'text-gray-400'}>
+                                        {tab.icon}
+                                    </span>
+                                    <span className="truncate">{tab.label}</span>
+                                </button>
+                            </React.Fragment>
                         ))}
                     </nav>
                 </aside>
@@ -978,6 +1008,197 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        AMENITIES & FACILITIES (BuildingManagement initialTab="amenities")
+                       ======================================================================== */}
+                    {activeTab === 'amenities' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <BuildingManagement initialTab="amenities" />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        FLOORS & WINGS (BuildingManagement initialTab="buildings")
+                       ======================================================================== */}
+                    {activeTab === 'floors-wings' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <BuildingManagement initialTab="buildings" />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        ROOM TYPES (RoomTypeManagement)
+                       ======================================================================== */}
+                    {activeTab === 'room-types' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <RoomTypeManagement />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        ALL ROOMS (RoomManagement)
+                       ======================================================================== */}
+                    {activeTab === 'rooms' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <RoomManagement onBack={() => setActiveTab('identity')} />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        CONNECTING ROOMS (ConnectingRoomManagement)
+                       ======================================================================== */}
+                    {activeTab === 'connecting-rooms' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <ConnectingRoomManagement />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        TAXES & VAT (TaxVatManagement)
+                       ======================================================================== */}
+                    {activeTab === 'taxes-vat' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <TaxVatManagement />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        OUTLET CONFIGURATIONS (POS Outlets & Revenue Centers)
+                       ======================================================================== */}
+                    {activeTab === 'outlets' && (
+                        <div className="p-4 sm:p-5 lg:p-6 space-y-6 animate-in fade-in duration-150">
+                            <div>
+                                <SectionTitle icon={Utensils} title="Food & Beverage Outlets, Spas & Revenue Centers" />
+                                <p className="text-xs text-gray-500 mb-4 -mt-2">
+                                    Configure restaurant dining rooms, rooftop lounges, banquets, and leisure facilities with POS & KOT routing.
+                                </p>
+                                <div className="flex items-center justify-between mb-3 pb-1.5 border-b border-gray-100">
+                                    <h4 className="text-xs font-bold text-gray-800">Active Outlets Registry</h4>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setPosOutlets(prev => [
+                                                ...prev,
+                                                {
+                                                    id: Date.now().toString(),
+                                                    name: 'New Restaurant / Outlet',
+                                                    type: 'All-Day Dining',
+                                                    hours: '07:00 AM - 11:00 PM',
+                                                    capacity: '60 Seats',
+                                                    posStation: 'Main Kitchen KOT-1',
+                                                    status: 'Active'
+                                                }
+                                            ])
+                                        }
+                                        className="btn-primary text-xs flex items-center gap-1.5"
+                                    >
+                                        <Plus size={13} /> Add New Outlet
+                                    </button>
+                                </div>
+                                <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-3 overflow-x-auto">
+                                    <table className="w-full border-spacing-x-2 border-separate text-xs">
+                                        <thead>
+                                            <tr className="text-left">
+                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Outlet Name</th>
+                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Type</th>
+                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Operating Hours</th>
+                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Capacity</th>
+                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">POS / KOT Station</th>
+                                                <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">Status</th>
+                                                <th className="w-8"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {posOutlets.map((outlet, idx) => (
+                                                <tr key={outlet.id}>
+                                                    <td className="pb-1.5">
+                                                        <Input
+                                                            className="!h-7 !py-1 text-xs"
+                                                            value={outlet.name}
+                                                            onChange={(e: any) => {
+                                                                const updated = [...posOutlets];
+                                                                updated[idx].name = e.target.value;
+                                                                setPosOutlets(updated);
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="pb-1.5">
+                                                        <Input
+                                                            className="!h-7 !py-1 text-xs"
+                                                            value={outlet.type}
+                                                            onChange={(e: any) => {
+                                                                const updated = [...posOutlets];
+                                                                updated[idx].type = e.target.value;
+                                                                setPosOutlets(updated);
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="pb-1.5">
+                                                        <Input
+                                                            className="!h-7 !py-1 text-xs"
+                                                            value={outlet.hours}
+                                                            onChange={(e: any) => {
+                                                                const updated = [...posOutlets];
+                                                                updated[idx].hours = e.target.value;
+                                                                setPosOutlets(updated);
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="pb-1.5">
+                                                        <Input
+                                                            className="!h-7 !py-1 text-xs"
+                                                            value={outlet.capacity}
+                                                            onChange={(e: any) => {
+                                                                const updated = [...posOutlets];
+                                                                updated[idx].capacity = e.target.value;
+                                                                setPosOutlets(updated);
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="pb-1.5">
+                                                        <Input
+                                                            className="!h-7 !py-1 text-xs"
+                                                            value={outlet.posStation}
+                                                            onChange={(e: any) => {
+                                                                const updated = [...posOutlets];
+                                                                updated[idx].posStation = e.target.value;
+                                                                setPosOutlets(updated);
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="pb-1.5">
+                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            {outlet.status || 'Active'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="pb-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPosOutlets(prev => prev.filter((_, i) => i !== idx))}
+                                                            className="text-gray-400 hover:text-red-500 p-1"
+                                                            title="Delete Outlet"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        PRINTER SETTINGS (PrinterSettingsManagement)
+                       ======================================================================== */}
+                    {activeTab === 'printer-settings' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <PrinterSettingsManagement />
                         </div>
                     )}
 

@@ -196,16 +196,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ]
         },
         {
-            title: 'ROOMS & RATES',
+            title: 'RATES & PACKAGES',
             items: [
-                { id: 'manage-room-type', label: 'Room Types', icon: <BedDouble size={14} /> },
-                { id: 'manage-room', label: 'All Rooms', icon: <Building2 size={14} /> },
-                { id: 'joint-room', label: 'Connecting Rooms', icon: <FolderKanban size={14} /> },
                 { id: 'rate-plans', label: 'Rate Plans', icon: <Percent size={14} /> },
                 { id: 'package-builder', label: 'Packages & Offers', icon: <Ticket size={14} /> },
                 { id: 'meal-plans', label: 'Meal Plans', icon: <Coffee size={14} /> },
                 { id: 'rate-calendar', label: 'Rate Calendar', icon: <Calendar size={14} /> },
-                { id: 'building-management', label: 'Floors & Wings', icon: <Building2 size={14} /> },
             ]
         },
         {
@@ -261,14 +257,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     label: 'Settings',
                     icon: <Settings size={14} />,
                     children: [
-                        { id: 'taxes-vat', label: 'Taxes & VAT', icon: <Percent size={12} /> },
-                        { id: 'properties', label: 'Chain Properties', icon: <Building2 size={12} />, badge: 'Portfolio', badgeColor: 'bg-indigo-100 text-indigo-700' },
+                        { id: 'general-settings', label: 'General Settings', icon: <Settings size={12} /> },
                         { id: 'hotel-info', label: 'Hotel Profile', icon: <Building2 size={12} /> },
+                        { id: 'properties', label: 'Chain Properties', icon: <Building2 size={12} />, badge: 'Portfolio', badgeColor: 'bg-indigo-100 text-indigo-700' },
                         { id: 'property-create', label: 'Add Property', icon: <Plus size={12} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
-                        { id: 'printer-settings', label: 'Printers & Hardware', icon: <Printer size={12} /> },
                         { id: 'policy-management', label: 'Policies & Rules', icon: <FileText size={12} /> },
                         { id: 'holiday-management', label: 'Holiday Calendar', icon: <Calendar size={12} /> },
-                        { id: 'general-settings', label: 'General Settings', icon: <Settings size={12} /> },
                     ]
                 }
             ]

@@ -4,9 +4,10 @@ import AddProperty from './AddProperty';
 interface GeneralSettingsProps {
     onNavigate?: (page: string) => void;
     currentUser?: any;
+    initialTab?: string;
 }
 
-export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ onNavigate, currentUser }) => {
+export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ onNavigate, currentUser, initialTab }) => {
     return (
         <AddProperty
             isCreateMode={false}
@@ -14,6 +15,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ onNavigate, cu
             currentUser={currentUser}
             onNavigate={onNavigate}
             onBack={onNavigate ? () => onNavigate('hotel-info') : undefined}
+            initialTab={initialTab}
         />
     );
 };
