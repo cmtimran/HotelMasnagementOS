@@ -24,22 +24,30 @@ export default function PageHeader({
   className = '',
 }: PageHeaderProps) {
   return (
-    <div className={`flex flex-wrap items-center justify-between gap-3.5 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs ${className}`}>
-      <div className="flex items-center gap-3.5 min-w-0 sm:min-w-[380px] flex-1">
+    <div className={`bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3 py-1.5 flex items-center justify-between gap-2.5 flex-shrink-0 ${className}`}>
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {icon && (
-          <div className="size-11 rounded-2xl bg-primary-subtle text-primary border border-primary-border/60 flex items-center justify-center shrink-0 shadow-2xs">
+          <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs shrink-0 [&>svg]:size-3.5 [&>svg]:stroke-[2.2]">
             {icon}
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-base sm:text-lg tracking-tight text-slate-900 leading-snug">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none truncate">
               {title}
             </h1>
-            {badge && <div className="shrink-0">{badge}</div>}
+            {badge && (
+              typeof badge === 'string' ? (
+                <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-blue-50 text-blue-700 border border-blue-200 leading-none">
+                  {badge}
+                </span>
+              ) : (
+                <div className="shrink-0 text-[8.5px] leading-none">{badge}</div>
+              )
+            )}
           </div>
           {subtitle && (
-            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
+            <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap leading-tight truncate">
               {subtitle}
             </div>
           )}

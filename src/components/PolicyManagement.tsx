@@ -950,35 +950,35 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
             )}
 
             {/* Elevated Header Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0 shadow-2xs">
-                            <ShieldCheck size={24} />
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden">
+                <div className="px-3 py-1.5 flex items-center justify-between gap-2.5 border-b border-slate-100 flex-shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs shrink-0">
+                            <ShieldCheck size={14} className="text-white" />
                         </div>
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                                <h1 className="text-lg sm:text-xl text-slate-900 tracking-tight leading-tight">
+                                <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                     Dynamic Hotel Policy & Rules Engine
                                 </h1>
                                 <span className="badge-status-active">
                                     Computational Engine
                                 </span>
-                                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-primary border border-blue-200">
+                                <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8.5px] bg-blue-50 text-primary border border-blue-200">
                                     GL Ledger Mapped
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
+                            <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-gray-500 mt-0.5 leading-tight">
                                 <span className="flex items-center gap-1">
-                                    <ShieldCheck size={12} className="text-slate-400" />
+                                    <ShieldCheck size={11} className="text-slate-400" />
                                     <span>{policies.filter(p => p.isActive).length} Active Enforced Policies</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <Clock size={12} className="text-slate-400" />
+                                    <Clock size={11} className="text-slate-400" />
                                     <span>Check-in: 14:00 • Check-out: 12:00</span>
                                 </span>
                                 <span className="hidden sm:flex items-center gap-1">
-                                    <Calendar size={12} className="text-slate-400" />
+                                    <Calendar size={11} className="text-slate-400" />
                                     <span>Cancellation Cutoff: {policies.find(p => p.code === 'POL-CANC-FLEX48')?.params.hoursThreshold ?? 48}h Window</span>
                                 </span>
                             </div>
@@ -986,7 +986,7 @@ export const PolicyManagement: React.FC<PolicyManagementProps> = () => {
                     </div>
 
                     {/* Header Action Buttons */}
-                    <div className="flex items-center gap-2 self-start lg:self-auto shrink-0 flex-wrap">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <button
                             type="button"
                             onClick={() => setIsSimulatorOpen(!isSimulatorOpen)}

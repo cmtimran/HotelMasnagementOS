@@ -36,17 +36,17 @@ body {
 @layer components {
   /* Standardized Page Container */
   .page-container {
-    @apply w-full min-w-0 p-4 sm:p-6 max-w-7xl mx-auto space-y-5 font-sans text-slate-800;
+    @apply w-full min-w-0 p-2.5 sm:p-3 max-w-[1440px] mx-auto space-y-2.5 font-sans text-slate-800;
   }
 
   /* Standardized Primary Action Button */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-primary hover:bg-[#0063ba] text-white shadow-xs transition duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold whitespace-nowrap bg-primary hover:bg-[#0063ba] text-white shadow-2xs transition duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   /* Standardized Secondary Action Button */
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs transition duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold whitespace-nowrap bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs transition duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   /* Standardized Small Icon Action Button */
@@ -71,17 +71,17 @@ body {
 
   /* Standardized Active Status Badge */
   .badge-status-active {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200;
   }
 
   /* Standardized Inactive Status Badge */
   .badge-status-inactive {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-semibold bg-slate-100 text-slate-500 border border-slate-200;
   }
 
   /* Standardized Monospace Short Code Badge */
   .badge-code {
-    @apply inline-block px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200;
+    @apply inline-block px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200;
   }
 
   /* Standardized Card Container */

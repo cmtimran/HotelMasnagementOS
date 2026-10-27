@@ -212,40 +212,42 @@ export const HRMManagementDashboard: React.FC = () => {
     const totalMonthlyPayrollExpense = employees.reduce((sum, e) => sum + (Number(e.basic_salary) || 0), 0);
 
     return (
-        <div className="p-6 bg-slate-50 min-h-screen text-slate-800">
+        <div className="p-2 sm:p-3 bg-slate-50 min-h-screen text-slate-800 space-y-2.5">
             {/* Top Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-200 gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-purple-600 text-white rounded-xl shadow-md">
-                        <Users size={24} />
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3 py-1.5 flex items-center justify-between gap-2.5 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                        <Users size={14} />
                     </div>
                     <div>
-                        <h1 className="text-2xl text-slate-900 tracking-tight flex items-center gap-2">
-                            HRM & 24/7 Workforce Suite
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-300">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
+                                HRM & 24/7 Workforce Suite
+                            </h1>
+                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-purple-50 text-purple-700 border border-purple-200 leading-none font-semibold">
                                 24/7 Shift Rostering & Payroll GL
                             </span>
-                        </h1>
-                        <p className="text-sm text-slate-500 mt-0.5">
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                             Front Office, Housekeeping, Dining & Accounts Staffing with Automated GL Payroll Postings
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
                     <button 
                         onClick={loadHRMData}
-                        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium shadow-sm transition"
+                        className="btn-secondary"
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Refresh
+                        <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                        <span>Refresh</span>
                     </button>
                     <button 
                         onClick={() => setIsPayrollModalOpen(true)}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold shadow transition"
+                        className="btn-primary"
                     >
-                        <DollarSign size={16} />
-                        Run Monthly Payroll & Post GL
+                        <DollarSign size={14} />
+                        <span>Run Monthly Payroll & Post GL</span>
                     </button>
                 </div>
             </div>

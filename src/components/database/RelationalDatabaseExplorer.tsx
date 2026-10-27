@@ -111,35 +111,35 @@ export const RelationalDatabaseExplorer: React.FC = () => {
     const activeTableMeta = tables.find(t => t.name === selectedTable);
 
     return (
-        <div className="p-6 bg-slate-50 min-h-screen text-slate-800">
+        <div className="p-2 sm:p-3 bg-slate-50 min-h-screen text-slate-800 space-y-2.5">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-200 gap-4">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md">
-                            <Database size={24} />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl text-slate-900 tracking-tight flex items-center gap-2">
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3 py-1.5 flex items-center justify-between gap-2.5 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                        <Database size={14} />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 Relational Enterprise Schema Explorer
-                                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                    1NF • 2NF • 3NF • 4NF Certified
-                                </span>
                             </h1>
-                            <p className="text-sm text-slate-500 mt-0.5">
-                                Multi-Property Hotel Group, USALI Double-Entry General Ledger, 24/7 HRM & Shift Rostering
-                            </p>
+                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none font-semibold">
+                                1NF • 2NF • 3NF • 4NF Certified
+                            </span>
                         </div>
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
+                            Multi-Property Hotel Group, USALI Double-Entry General Ledger, 24/7 HRM &amp; Shift Rostering
+                        </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
                     <button 
                         onClick={() => fetchSchema()}
-                        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium shadow-sm transition"
+                        className="btn-secondary"
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Refresh Schema
+                        <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                        <span>Refresh Schema</span>
                     </button>
                     <button 
                         onClick={() => setActiveTab('normalization')}

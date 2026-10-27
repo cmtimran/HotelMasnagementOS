@@ -207,28 +207,28 @@ export const FloorPlan: React.FC = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs z-20">
-                <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
-                        <Building2 size={18} />
+            <header className="bg-white border-b border-gray-200/80 px-3 py-1.5 flex items-center justify-between gap-2.5 shadow-2xs z-20 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                        <Building2 size={14} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base text-slate-900 tracking-tight">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 Floor Plan Architectural CAD View
                             </h1>
-                            <span className="badge-status-active">
+                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none font-semibold">
                                 Live Spatial Map
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                             Spatial visualization of room occupancy, corridor logistics, turnover status, and quick room inspection.
                         </p>
                     </div>
                 </div>
 
                 {/* Dynamic Floor Switcher Buttons */}
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/90 gap-1 shadow-2xs overflow-x-auto">
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 gap-1 shadow-2xs overflow-x-auto h-8 shrink-0">
                     {availableFloors.map(floorNum => {
                         const isActive = selectedFloor === floorNum;
                         const floorCount = rooms.filter(r => r.floor === floorNum).length;
@@ -240,10 +240,10 @@ export const FloorPlan: React.FC = () => {
                                     setSelectedFloor(floorNum);
                                     setSelectedRoom(null);
                                 }}
-                                className={`h-7 px-3 rounded-lg text-xs cursor-pointer transition-all whitespace-nowrap ${
+                                className={`h-7 px-2.5 rounded-md text-xs cursor-pointer transition-all whitespace-nowrap ${
                                     isActive
-                                        ? 'bg-primary text-white shadow-xs font-bold'
-                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                                        ? 'bg-[#0074d9] text-white shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 font-medium'
                                 }`}
                             >
                                 Floor {floorNum} ({floorCount} Rooms)

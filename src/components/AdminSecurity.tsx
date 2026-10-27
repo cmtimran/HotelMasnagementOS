@@ -883,22 +883,22 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
             )}
 
             {/* Consistent Elevated Header Card */}
-            <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs overflow-hidden">
-                <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/80 flex items-center justify-center text-blue-700 text-sm shadow-2xs flex-shrink-0">
-                            <ShieldCheck size={22} className="text-blue-600" />
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden">
+                <div className="px-3 py-1.5 flex items-center justify-between gap-2.5 border-b border-gray-100 flex-shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] flex items-center justify-center text-white shadow-xs shrink-0">
+                            <ShieldCheck size={14} className="text-white" />
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-base sm:text-lg text-gray-900 tracking-tight leading-tight">
+                                <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                     Staff Directory & Access Control
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8.5px] bg-blue-50 text-blue-700 border border-blue-200/60 flex-shrink-0 leading-none">
                                     Enterprise RBAC
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 mt-1 font-medium">
+                            <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-gray-500 mt-0.5 leading-tight">
                                 <span className="flex items-center gap-1">
                                     <Users size={11} className="text-gray-400" />
                                     <span>{staffList.filter(s => s.status === 'Active').length} Active Staff</span>
@@ -920,7 +920,7 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
                     </div>
 
                     {/* Header Action Buttons */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                         <button
                             type="button"
                             onClick={handleExportStaffCsv}

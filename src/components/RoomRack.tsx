@@ -300,37 +300,37 @@ export const RoomRack: React.FC = () => {
     };
 
     return (
-        <div className="p-3 sm:p-4 max-w-[1440px] mx-auto space-y-3 font-sans select-none animate-in fade-in duration-150">
+        <div className="p-2 sm:p-3 max-w-[1440px] mx-auto space-y-2.5 font-sans select-none animate-in fade-in duration-150">
             {/* Top Operational Header */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center shadow-xs flex-shrink-0">
-                        <BedDouble size={20} />
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3 py-1.5 flex items-center justify-between gap-2.5 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                        <BedDouble size={14} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 Interactive Room Rack Grid
                             </h1>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-blue-50 text-blue-700 border border-blue-200 leading-none">
                                 {stats.occupancyRate}% Occupied
                             </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                             Live physical room inventory, housekeeping status &amp; direct allocation matrix
                         </p>
                     </div>
                 </div>
 
                 {/* Header Actions */}
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
                     {/* View Switcher */}
-                    <div className="flex p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                    <div className="flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 h-8 items-center">
                         <button
                             type="button"
                             onClick={() => setViewMode('grid')}
-                            className={`p-1.5 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all ${
-                                viewMode === 'grid' ? 'bg-white text-blue-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                            className={`h-7 px-2.5 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all ${
+                                viewMode === 'grid' ? 'bg-white text-blue-900 shadow-2xs font-semibold' : 'text-slate-500 hover:text-slate-800'
                             }`}
                             title="Floor Grid View"
                         >
@@ -340,8 +340,8 @@ export const RoomRack: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setViewMode('dense')}
-                            className={`p-1.5 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all ${
-                                viewMode === 'dense' ? 'bg-white text-blue-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                            className={`h-7 px-2.5 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all ${
+                                viewMode === 'dense' ? 'bg-white text-blue-900 shadow-2xs font-semibold' : 'text-slate-500 hover:text-slate-800'
                             }`}
                             title="Dense Matrix View"
                         >
@@ -353,7 +353,7 @@ export const RoomRack: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => setActivePage('front-desk')}
-                        className="h-8 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        className="btn-secondary"
                     >
                         <span>Front Desk Hub</span>
                         <ArrowRight size={13} />

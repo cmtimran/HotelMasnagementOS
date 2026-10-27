@@ -1115,39 +1115,39 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
             )}
 
             {/* Elevated Header Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="size-11 sm:size-12 rounded-2xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0 shadow-2xs">
-                            <Coins size={22} className="text-primary" />
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden">
+                <div className="px-3 py-1.5 flex items-center justify-between gap-2.5 border-b border-slate-100 flex-shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs shrink-0">
+                            <Coins size={14} className="text-white" />
                         </div>
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                                <h1 className="text-lg sm:text-xl text-slate-900 tracking-tight leading-tight">
+                                <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                     Master Data & Financial Configuration
                                 </h1>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-primary border border-blue-200 flex-shrink-0">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8.5px] bg-blue-50 text-blue-700 border border-blue-200 flex-shrink-0 leading-none">
                                     Base: {baseCurrency.name} ({baseCurrency.symbol} {baseCurrency.code})
                                 </span>
                                 <span className="badge-status-active">
                                     USALI 11th Edition
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
+                            <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-gray-500 mt-0.5 leading-tight">
                                 <span className="flex items-center gap-1">
-                                    <TrendingUp size={12} className="text-slate-400" />
-                                    <span>{revenueHeads.length} USALI Revenue Heads</span>
+                                    <TrendingUp size={11} className="text-slate-400" />
+                                    <span>{revenueHeads.length} USALI Heads</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <Receipt size={12} className="text-slate-400" />
+                                    <Receipt size={11} className="text-slate-400" />
                                     <span>{extraCharges.length} Extra Add-ons</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <Landmark size={12} className="text-slate-400" />
+                                    <Landmark size={11} className="text-slate-400" />
                                     <span>{bankAccounts.length} Banks & {mfsWallets.length} MFS</span>
                                 </span>
                                 <span className="hidden sm:flex items-center gap-1">
-                                    <Building2 size={12} className="text-slate-400" />
+                                    <Building2 size={11} className="text-slate-400" />
                                     <span>{departments.length} Depts / {workShifts.length} Shifts</span>
                                 </span>
                             </div>
@@ -1155,7 +1155,7 @@ export const MasterDataConfig: React.FC<MasterDataConfigProps> = ({
                     </div>
 
                     {/* Quick Action Buttons */}
-                    <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         {activeTab === 'currency' && (
                             <button
                                 type="button"

@@ -99,29 +99,29 @@ export const MultiPropertyConsole: React.FC = () => {
             )}
 
             {/* Top Luxury Executive Banner */}
-            <div className="bg-white border-b border-slate-200/80 shadow-2xs">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="bg-white border-b border-gray-200/80 shadow-2xs">
+                <div className="max-w-7xl mx-auto px-3 py-1.5">
+                    <div className="flex items-center justify-between gap-2.5">
                         
                         {/* Title & Brand Identity */}
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="size-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 flex items-center justify-center text-white shadow-xs shrink-0">
-                                <Building2 size={18} className="stroke-[2.2]" />
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] flex items-center justify-center text-white shadow-xs shrink-0">
+                                <Building2 size={14} className="stroke-[2.2]" />
                             </div>
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
+                                    <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                         Multi-Property Hotel Chain Console
                                     </h1>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/80">
+                                    <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/80 leading-none">
                                         GHG Group
                                     </span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 hidden md:inline-flex items-center gap-1">
+                                    <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/80 hidden md:inline-flex items-center gap-1 leading-none">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                         TiDB Cloud Active
                                     </span>
                                 </div>
-                                <p className="text-[11px] text-slate-500 truncate hidden sm:block">
+                                <p className="text-[10px] text-gray-500 truncate hidden sm:block mt-0.5 leading-tight">
                                     Centralized Hotel Group Governance, Cross-Property Operations &amp; Database Isolation
                                 </p>
                             </div>

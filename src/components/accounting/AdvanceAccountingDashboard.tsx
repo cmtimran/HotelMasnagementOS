@@ -203,40 +203,42 @@ export const AdvanceAccountingDashboard: React.FC = () => {
     };
 
     return (
-        <div className="p-6 bg-slate-50 min-h-screen text-slate-800">
+        <div className="p-2 sm:p-3 bg-slate-50 min-h-screen text-slate-800 space-y-2.5">
             {/* Top Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-200 gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-md">
-                        <Landmark size={24} />
+            <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3 py-1.5 flex items-center justify-between gap-2.5 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                        <Landmark size={14} />
                     </div>
                     <div>
-                        <h1 className="text-2xl text-slate-900 tracking-tight flex items-center gap-2">
-                            USALI Enterprise Accounting & General Ledger
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
+                                USALI Enterprise Accounting & General Ledger
+                            </h1>
+                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none font-semibold">
                                 Double-Entry Enforced
                             </span>
-                        </h1>
-                        <p className="text-sm text-slate-500 mt-0.5">
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                             Uniform System of Accounts for the Lodging Industry (USALI 11th Edition) & Folio Ledger
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
                     <button 
                         onClick={loadAllAccountingData}
-                        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium shadow-sm transition"
+                        className="btn-secondary"
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Refresh Accounts
+                        <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                        <span>Refresh Accounts</span>
                     </button>
                     <button 
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold shadow transition"
+                        className="btn-primary"
                     >
-                        <Plus size={16} />
-                        Post Journal Voucher
+                        <Plus size={14} />
+                        <span>Post Journal Voucher</span>
                     </button>
                 </div>
             </div>

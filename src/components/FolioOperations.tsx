@@ -395,16 +395,16 @@ export const FolioOperations: React.FC = () => {
                         <span>{toastMessage}</span>
                     </div>
                 )}
-                <header className="bg-white text-slate-900 px-4 py-3 flex items-center justify-between shadow-2xs z-20 border-b border-slate-200/90">
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
-                            <FileText size={18} />
+                <header className="bg-white text-slate-900 px-3 py-1.5 flex items-center justify-between shadow-2xs z-20 border-b border-gray-200/80">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs shrink-0">
+                            <FileText size={14} />
                         </div>
                         <div>
-                            <h1 className="text-base tracking-tight text-slate-900 font-semibold">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 Billing & Folio Operations
                             </h1>
-                            <p className="text-xs text-slate-500 mt-0.5">
+                            <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                                 Guest ledger accounts, multi-window billing, and settlement
                             </p>
                         </div>
@@ -433,24 +433,24 @@ export const FolioOperations: React.FC = () => {
             )}
 
             {/* Master Header Bar */}
-            <header className="bg-white text-slate-900 px-4 py-3 flex items-center justify-between shadow-2xs z-20 border-b border-slate-200/90">
-                <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
-                        <FileText size={18} />
+            <header className="bg-white text-slate-900 px-3 py-1.5 flex items-center justify-between shadow-2xs z-20 border-b border-gray-200/80">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs shrink-0">
+                        <FileText size={14} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base tracking-tight text-slate-900">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 {activeFolio.guestName}
                             </h1>
                             <span className="badge-code">
                                 Room {activeFolio.roomNumber} ({activeFolio.roomType})
                             </span>
-                            <span className="text-[11px] text-slate-400 font-mono">
+                            <span className="text-[9px] text-slate-400 font-mono">
                                 {activeFolio.folioNumber}
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                             Stay: {activeFolio.checkIn} → {activeFolio.checkOut} • {activeFolio.company || 'Direct FIT'}
                         </p>
                     </div>

@@ -276,43 +276,43 @@ export const OccupancyHeatmap: React.FC = () => {
     return (
         <div className="h-full min-h-[calc(100vh-48px)] bg-gray-50 flex flex-col font-sans text-xs select-none animate-in fade-in duration-150">
             {/* Master Header */}
-            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex items-center justify-between shadow-2xs z-20">
-                <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-primary-subtle text-primary border border-primary-border flex items-center justify-center shrink-0">
-                        <TrendingUp size={18} />
+            <header className="bg-white border-b border-gray-200/80 px-3 py-1.5 flex items-center justify-between gap-2.5 shadow-2xs z-20 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                        <TrendingUp size={14} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base text-slate-900 tracking-tight">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 Occupancy Heatmap & Revenue Forecast
                             </h1>
-                            <span className="badge-status-active">
+                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-blue-50 text-blue-700 border border-blue-200 leading-none font-semibold">
                                 30-Day Yield Matrix
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                             Calendar heat distribution of room inventory occupancy, daily revenue pacing, and dynamic yield pricing.
                         </p>
                     </div>
                 </div>
 
                 {/* Month Navigator */}
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/90">
+                <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 h-8">
                         <button
                             onClick={prevMonth}
-                            className="p-1 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                            className="px-1.5 py-1 hover:bg-white rounded text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                         >
-                            <ChevronLeft size={14} />
+                            <ChevronLeft size={13} />
                         </button>
-                        <span className="text-slate-900 px-3 text-xs">
+                        <span className="text-slate-900 px-2.5 text-xs font-semibold">
                             {monthNames[month]} {year}
                         </span>
                         <button
                             onClick={nextMonth}
-                            className="p-1 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                            className="px-1.5 py-1 hover:bg-white rounded text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                         >
-                            <ChevronRight size={14} />
+                            <ChevronRight size={13} />
                         </button>
                     </div>
                 </div>

@@ -202,21 +202,21 @@ export const GuestVoucherSystem: React.FC = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white border-b border-slate-200/90 px-4 py-3 flex items-center justify-between shadow-2xs z-20">
-                <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
-                        <Ticket size={18} />
+            <header className="bg-white border-b border-gray-200/80 px-3 py-1.5 flex items-center justify-between gap-2.5 shadow-2xs z-20 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                        <Ticket size={14} />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-base text-slate-900 tracking-tight">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 Digital Guest Service Vouchers & Passes
                             </h1>
-                            <span className="badge-status-active">
+                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none font-semibold">
                                 In-Stay Privileges
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                             Issuance and real-time QR redemption of breakfast passes, dining coupons, spa sessions, and airport transfers.
                         </p>
                     </div>

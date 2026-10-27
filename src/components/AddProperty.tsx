@@ -622,34 +622,34 @@ const AddProperty: React.FC<AddPropertyProps> = ({
             {/* ============================================================================
                 SLIM STICKY HEADER (Exact /edit-property: Manage Property Style)
                ============================================================================ */}
-            <header className="bg-white border-b border-gray-200/90 px-4 sm:px-6 py-2.5 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-30">
-                <div className="flex items-center gap-3 min-w-0">
+            <header className="bg-white border-b border-gray-200/90 px-3 py-1.5 flex justify-between items-center gap-2.5 sticky top-0 z-30">
+                <div className="flex items-center gap-2.5 min-w-0">
                     {onBack && (
                         <button
                             type="button"
                             onClick={onBack}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg border border-gray-200 transition-all cursor-pointer shrink-0"
+                            className="h-7 w-7 rounded-lg hover:bg-gray-100 border border-gray-200 flex items-center justify-center transition-all cursor-pointer shrink-0"
                             title="Back"
                         >
-                            <ArrowLeft size={16} className="text-gray-500" />
+                            <ArrowLeft size={13} className="text-gray-500" />
                         </button>
                     )}
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-sm sm:text-base text-slate-800 tracking-tight leading-tight">
+                            <h1 className="text-xs font-bold text-gray-900 tracking-tight leading-none">
                                 {isCreateMode ? 'Add New Property' : `Manage Property: ${propName}`}
                             </h1>
                             {propCode && (
-                                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[10px] font-mono">
+                                <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[8.5px] font-mono leading-none">
                                     {propCode}
                                 </span>
                             )}
-                            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[10px] font-bold">
+                            <span className="px-1.5 py-0.2 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[8.5px] font-bold leading-none">
                                 {propGrade}
                             </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-medium leading-tight mt-0.5">
-                            Hotel Profile, Operational Policies & General Settings
+                        <p className="text-[10px] text-gray-500 font-medium leading-tight mt-0.5">
+                            Hotel Profile, Operational Policies &amp; General Settings
                         </p>
                     </div>
                 </div>
