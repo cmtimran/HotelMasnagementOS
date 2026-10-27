@@ -1193,7 +1193,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 title="Link an existing reservation into this group without modifying its confirmation number"
                                             >
                                                 <LinkIcon size={10} />
-                                                <span>+ Link Group</span>
+                                                <span>Link Group</span>
                                             </button>
                                             <button
                                                 type="button"
@@ -1202,7 +1202,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 title="Add a new room booking"
                                             >
                                                 <Plus size={10} />
-                                                <span>+ Add Room</span>
+                                                <span>Add Room</span>
                                             </button>
                                         </div>
                                     </div>
