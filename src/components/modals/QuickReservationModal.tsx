@@ -15,8 +15,7 @@ import {
     Sparkles,
     CheckCircle2,
     AlertTriangle,
-    Split,
-    Link2
+    Split
 } from 'lucide-react';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
 import { ChildAgeSelector } from '../common/ChildAgeSelector';
@@ -59,12 +58,6 @@ import {
 } from '../../utils/taxCalculationEngine';
 import { getApiBaseUrl } from '../../utils/apiUrl';
 import { toast } from '../../context/ToastContext';
-import {
-    getConnectingRoomsMap,
-    getActiveConnectingSuites,
-    syncConnectingRoomsFromDB,
-    type ConnectingSuiteConfig
-} from '../../utils/connectingRoomHelper';
 
 export interface QuickReservationModalProps {
     isOpen: boolean;
@@ -81,7 +74,6 @@ export interface QuickReservationModalProps {
         endIndex?: number;
         roomType?: string;
         baseRate?: number;
-        connectPartner?: boolean;
     };
     onReserve?: (booking: {
         room: string;
@@ -219,16 +211,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         { id: 1, method: 'Cash', amount: 3000 }
     ]);
 
-    const [connectingSuites, setConnectingSuites] = useState<ConnectingSuiteConfig[]>(() => getActiveConnectingSuites());
-    const connectingRoomsMap = useMemo(() => getConnectingRoomsMap(), [connectingSuites, isOpen]);
-
-    useEffect(() => {
-        syncConnectingRoomsFromDB().then(suites => setConnectingSuites(suites)).catch(() => {});
-        const handleConn = () => setConnectingSuites(getActiveConnectingSuites());
-        window.addEventListener('hotel_connecting_rooms_updated', handleConn);
-        return () => window.removeEventListener('hotel_connecting_rooms_updated', handleConn);
-    }, []);
-
     // Initialize from roomInfo prop when opened
     useEffect(() => {
         if (!isOpen) return;
@@ -257,64 +239,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         setNights(targetNights ?? 0);
 
         const cleanRoom = targetRoom.replace(/[^0-9a-zA-Z-]/g, '') || '101';
-        const allCanonical = getCanonicalRooms();
-        const canonical = allCanonical.find(r => r.number === cleanRoom);
+        const canonical = getCanonicalRooms().find(r => r.number === cleanRoom);
         const resolvedType = roomInfo?.roomType || canonical?.roomTypeName || 'Deluxe Double';
         const canonicalRate = roomInfo?.baseRate || canonical?.baseRate || 3000;
         const defaultPlan = availableRatePlans[0]?.name || '';
         const initialCalculatedRate = calculateTariffForRatePlan(defaultPlan, resolvedType, canonicalRate, 2, 0, availableRatePlans);
-
-        const connMap = getConnectingRoomsMap();
-        const connInfo = connMap.get(cleanRoom);
-
-        if (roomInfo?.connectPartner && connInfo && connInfo.allSuiteRooms.length >= 2) {
-            const availReport = getAvailableRoomsForStay(targetStart, targetEnd);
-            const suiteRooms = connInfo.allSuiteRooms;
-            const fixedPerRoom = connInfo.pricingStrategy === 'Fixed Rate' && connInfo.fixedPrice
-                ? Math.round(connInfo.fixedPrice / suiteRooms.length)
-                : null;
-
-            const builtRows: RoomItem[] = [];
-            suiteRooms.forEach((rmNum, idx) => {
-                const isFree = availReport.availableRooms.some(ar => ar.number === rmNum);
-                if (!isFree && idx > 0) {
-                    toast.warning(`Connecting Partner Room ${rmNum} is not available for ${targetStart} to ${targetEnd}!`);
-                    return;
-                }
-                const rmCanon = allCanonical.find(r => r.number === rmNum);
-                const rmType = rmCanon?.roomTypeName || resolvedType;
-                const rmBase = rmCanon?.baseRate || canonicalRate;
-                const rmRate = fixedPerRoom !== null
-                    ? fixedPerRoom
-                    : calculateTariffForRatePlan(defaultPlan, rmType, rmBase, 2, 0, availableRatePlans);
-
-                builtRows.push({
-                    id: idx + 1,
-                    roomType: rmType,
-                    noOfRooms: 1,
-                    ratePlan: defaultPlan,
-                    roomNumber: rmNum,
-                    assignedRooms: [rmNum],
-                    adults: 2,
-                    children: 0,
-                    childrenAges: [],
-                    rate: rmRate,
-                    checkInDate: targetStart,
-                    checkOutDate: targetEnd,
-                    nights: targetNights
-                });
-            });
-
-            if (builtRows.length > 0) {
-                setRoomsList(builtRows);
-                const sumRates = builtRows.reduce((s, r) => s + r.rate, 0);
-                setPaymentRows([{ id: 1, method: 'Cash', amount: sumRates * (targetNights || 1) }]);
-                if (builtRows.length >= 2) {
-                    toast.success(`🔗 Connecting Suite Ready: Rooms ${builtRows.map(b => b.roomNumber).join(' & ')} (${connInfo.name})`);
-                }
-                return;
-            }
-        }
 
         setRoomsList([
             {
@@ -670,78 +599,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const handleRemoveRoom = (id: number) => {
         if (roomsList.length <= 1) return;
         setRoomsList(roomsList.filter(r => r.id !== id));
-    };
-
-    // Book / Pair Connecting Room Suite (1-Click from Quick Reservation)
-    const handleBookConnectingSuite = (suite: ConnectingSuiteConfig, replaceAll = false) => {
-        const allCanonical = getCanonicalRooms();
-        const defPlan = availableRatePlans[0]?.name || '';
-        const usedRooms = new Set<string>();
-        if (!replaceAll) {
-            roomsList.forEach(r => {
-                if (r.assignedRooms && r.assignedRooms.length > 0) {
-                    r.assignedRooms.forEach(rn => usedRooms.add(rn));
-                } else if (r.roomNumber) {
-                    usedRooms.add(r.roomNumber);
-                }
-            });
-        }
-
-        const missingRooms = suite.roomNumbers.filter(rn => !usedRooms.has(rn));
-        if (missingRooms.length === 0 && !replaceAll) {
-            toast.info(`All rooms of "${suite.name}" (${suite.roomNumbers.join(', ')}) are already in this booking!`);
-            return;
-        }
-
-        const targetRooms = replaceAll ? suite.roomNumbers : missingRooms;
-        const unavailable = targetRooms.filter(
-            rn => !liveAvailabilityReport.availableRooms.some(ar => ar.number === rn)
-        );
-        if (unavailable.length > 0) {
-            toast.error(`Connecting Room(s) ${unavailable.join(', ')} are already occupied or unavailable for ${checkInDate} to ${checkOutDate}!`);
-            return;
-        }
-
-        const fixedPerRoom = suite.pricingStrategy === 'Fixed Rate' && suite.fixedPrice
-            ? Math.round(suite.fixedPrice / suite.roomNumbers.length)
-            : null;
-
-        let maxId = replaceAll || roomsList.length === 0 ? 0 : Math.max(...roomsList.map(r => r.id));
-        const newItems: RoomItem[] = targetRooms.map(rmNum => {
-            const rmCanon = allCanonical.find(r => r.number === rmNum);
-            const rmType = rmCanon?.roomTypeName || 'Deluxe Double';
-            const rmBase = rmCanon?.baseRate || 3000;
-            const rmRate = fixedPerRoom !== null
-                ? fixedPerRoom
-                : calculateTariffForRatePlan(defPlan, rmType, rmBase, 2, 0, availableRatePlans);
-
-            return {
-                id: ++maxId,
-                roomType: rmType,
-                noOfRooms: 1,
-                ratePlan: defPlan,
-                roomNumber: rmNum,
-                assignedRooms: [rmNum],
-                adults: 2,
-                children: 0,
-                childrenAges: [],
-                rate: rmRate,
-                checkInDate,
-                checkOutDate,
-                nights
-            };
-        });
-
-        if (replaceAll) {
-            setRoomsList(newItems);
-        } else {
-            // Also update existing partner room rate if Fixed Rate strategy applies
-            const updatedExisting = fixedPerRoom !== null
-                ? roomsList.map(r => suite.roomNumbers.includes(r.roomNumber) ? { ...r, rate: fixedPerRoom } : r)
-                : roomsList;
-            setRoomsList([...updatedExisting, ...newItems]);
-        }
-        toast.success(`🔗 Added Connecting Rooms (${ suite.roomNumbers.join(' & ') }) — ${suite.name}!`);
     };
 
     // Front Desk Split Action: Split multi-room group row into individual 1-room rows
@@ -1573,7 +1430,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                             let tag = 'Free';
                                                                             if (isUsedInOther) tag = 'In Form';
                                                                             else if (!st.isAvailable) tag = 'Booked';
-                                                                            const conn = connectingRoomsMap.get(String(st.room.number));
 
                                                                             return (
                                                                                 <option
@@ -1581,7 +1437,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                                     value={st.room.number}
                                                                                     disabled={!isAvail && item.roomNumber !== st.room.number}
                                                                                 >
-                                                                                    {st.room.number}{conn ? ` 🔗${conn.partnerRoom}` : ''} ({tag})
+                                                                                    {st.room.number} ({tag})
                                                                                 </option>
                                                                             );
                                                                         });
@@ -1689,93 +1545,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={handleAddRoom}
-                                    className="border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-md shadow-2xs cursor-pointer inline-flex items-center gap-1 transition-colors"
-                                >
-                                    + Add Room
-                                </button>
-
-                                {/* 1-Click Partner Room Pairing if a selected room belongs to a Connecting Suite */}
-                                {(() => {
-                                    const currentSelectedSet = new Set(
-                                        roomsList.flatMap(r => (r.assignedRooms && r.assignedRooms.length > 0 ? r.assignedRooms : [r.roomNumber]))
-                                    );
-                                    const matchedSuites = connectingSuites.filter(suite =>
-                                        suite.roomNumbers.some(rn => currentSelectedSet.has(rn)) &&
-                                        suite.roomNumbers.some(rn => !currentSelectedSet.has(rn))
-                                    );
-                                    return matchedSuites.map(suite => {
-                                        const missing = suite.roomNumbers.filter(rn => !currentSelectedSet.has(rn));
-                                        const allFree = missing.every(rn => liveAvailabilityReport.availableRooms.some(ar => ar.number === rn));
-                                        return (
-                                            <button
-                                                key={`pair-${suite.id}`}
-                                                type="button"
-                                                disabled={!allFree}
-                                                onClick={() => handleBookConnectingSuite(suite, false)}
-                                                className={`text-xs font-semibold px-2.5 py-1 rounded-md shadow-2xs inline-flex items-center gap-1.5 transition-all ${
-                                                    allFree
-                                                        ? 'bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 hover:border-indigo-600 cursor-pointer'
-                                                        : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                                                }`}
-                                                title={allFree ? `Pair with connecting Room ${missing.join(', ')} (${suite.name})` : `Partner Room ${missing.join(', ')} is currently occupied`}
-                                            >
-                                                <Link2 size={12} />
-                                                <span>
-                                                    + Pair Connecting Room {missing.join(', ')} ({suite.name})
-                                                    {!allFree ? ' [Occupied]' : ''}
-                                                </span>
-                                            </button>
-                                        );
-                                    });
-                                })()}
-
-                                {/* Dropdown / Button to Book Any Configured Connecting Suite */}
-                                {connectingSuites.length > 0 && (
-                                    <div className="inline-flex items-center gap-1.5">
-                                        {connectingSuites.map(suite => {
-                                            const currentSelectedSet = new Set(
-                                                roomsList.flatMap(r => (r.assignedRooms && r.assignedRooms.length > 0 ? r.assignedRooms : [r.roomNumber]))
-                                            );
-                                            const isAlreadyFull = suite.roomNumbers.every(rn => currentSelectedSet.has(rn));
-                                            if (isAlreadyFull) {
-                                                return (
-                                                    <span
-                                                        key={`active-${suite.id}`}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold"
-                                                    >
-                                                        <Link2 size={11} className="text-emerald-600" />
-                                                        <span>{suite.name} ({suite.roomNumbers.join(' & ')}) Active</span>
-                                                    </span>
-                                                );
-                                            }
-                                            const allFree = suite.roomNumbers.every(rn =>
-                                                currentSelectedSet.has(rn) || liveAvailabilityReport.availableRooms.some(ar => ar.number === rn)
-                                            );
-                                            return (
-                                                <button
-                                                    key={`suite-${suite.id}`}
-                                                    type="button"
-                                                    disabled={!allFree}
-                                                    onClick={() => handleBookConnectingSuite(suite, true)}
-                                                    className={`text-xs font-semibold px-2.5 py-1 rounded-md shadow-2xs inline-flex items-center gap-1.5 transition-all ${
-                                                        allFree
-                                                            ? 'border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 cursor-pointer'
-                                                            : 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
-                                                    }`}
-                                                    title={`Book entire Connecting Suite: ${suite.name} (Rooms ${suite.roomNumbers.join(' & ')})`}
-                                                >
-                                                    <Link2 size={12} />
-                                                    <span>Book {suite.name}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
+                            <button
+                                type="button"
+                                onClick={handleAddRoom}
+                                className="border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-md shadow-2xs cursor-pointer inline-flex items-center gap-1 transition-colors"
+                            >
+                                + Add Room
+                            </button>
 
                             {/* Guest Quick Info */}
                             <div className="bg-slate-50/50 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2">

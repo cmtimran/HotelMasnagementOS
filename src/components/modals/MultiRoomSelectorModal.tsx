@@ -9,11 +9,9 @@ import {
     RotateCcw,
     CalendarRange,
     Calendar,
-    ArrowRight,
-    Link2
+    ArrowRight
 } from 'lucide-react';
 import { getAvailableRoomsForStay, isMatchingRoomType } from '../../utils/roomInventoryEngine';
-import { getConnectingRoomsMap } from '../../utils/connectingRoomHelper';
 import { getNextDayISO } from '../common/StayPeriodPicker';
 
 export interface RoomStayConfig {
@@ -70,8 +68,6 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
     const report = useMemo(() => {
         return getAvailableRoomsForStay(checkIn, checkOut, roomType);
     }, [checkIn, checkOut, roomType, isOpen]);
-
-    const connectingRoomsMap = useMemo(() => getConnectingRoomsMap(), [isOpen]);
 
     // Matching rooms of this category
     const categoryRooms = useMemo(() => {
@@ -587,20 +583,9 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                     className={`relative p-3.5 rounded-xl border flex flex-col justify-between transition-all select-none ${cardStyle}`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-lg font-extrabold font-mono tracking-tight text-slate-900">
-                                                {st.room.number}
-                                            </span>
-                                            {connectingRoomsMap.has(String(st.room.number)) && (
-                                                <span
-                                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9.5px] font-mono font-bold"
-                                                    title={`Connecting Room: Connects with Room ${connectingRoomsMap.get(String(st.room.number))?.partnerRoom}`}
-                                                >
-                                                    <Link2 size={9} />
-                                                    <span>{connectingRoomsMap.get(String(st.room.number))?.partnerRoom}</span>
-                                                </span>
-                                            )}
-                                        </div>
+                                        <span className="text-lg font-extrabold font-mono tracking-tight text-slate-900">
+                                            {st.room.number}
+                                        </span>
                                         {isSelected ? (
                                             <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
                                                 <Check size={14} strokeWidth={3} />

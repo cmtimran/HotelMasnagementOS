@@ -15,11 +15,9 @@ import {
     Lock,
     Home,
     Printer,
-    Wallet,
-    Link2
+    Wallet
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
-import { getConnectingRoomsMap, syncConnectingRoomsFromDB } from '../utils/connectingRoomHelper';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
 import type { AmendBookingData } from './modals/AmendStayModal';
@@ -116,9 +114,6 @@ export interface RoomNode {
     building: string;
     status: string;
     wing?: string;
-    connectingWith?: string;
-    connectingDoorType?: string;
-    connectingMutualBlock?: boolean;
 }
 
 export interface FloorNode {
@@ -211,18 +206,8 @@ export const StayView: React.FC = () => {
         }
     }, [activeProperty?.currency]);
 
-    // Dynamic Canonical Rooms & Connecting Rooms Version
+    // Dynamic Canonical Rooms Version
     const [roomsVersion, setRoomsVersion] = useState(0);
-
-    // Dynamic Connecting Rooms Resolution Map from General Settings & DB
-    const connectingRoomsMap = useMemo(() => getConnectingRoomsMap(), [roomsVersion]);
-
-    useEffect(() => {
-        syncConnectingRoomsFromDB().then(() => setRoomsVersion(v => v + 1)).catch(() => {});
-        const handleConnUpdate = () => setRoomsVersion(v => v + 1);
-        window.addEventListener('hotel_connecting_rooms_updated', handleConnUpdate);
-        return () => window.removeEventListener('hotel_connecting_rooms_updated', handleConnUpdate);
-    }, []);
 
     // Current System Operating Date state (realtime synchronized with Header & Night Audit)
     const [operatingDateStr, setOperatingDateStr] = useState<string>(() => getOperatingSystemDate());
@@ -258,7 +243,6 @@ export const StayView: React.FC = () => {
         startIndex: number;
         endIndex: number;
         rect?: DOMRect;
-        connectPartner?: boolean;
     } | null>(null);
 
     // Drag-to-select range state
@@ -525,18 +509,13 @@ export const StayView: React.FC = () => {
                             ? 'dirty'
                             : 'clean';
 
-            const connInfo = connectingRoomsMap.get(String(r.number));
-
             floorMap.get(fId)!.push({
                 id: `r-${r.number}`,
                 roomNumber: String(r.number),
                 type: r.roomTypeName,
                 floor: fId,
                 building: buildingNames[bId] || `Building ${bId}`,
-                status: normalizedStatus,
-                connectingWith: connInfo?.partnerRoom,
-                connectingDoorType: connInfo?.doorType,
-                connectingMutualBlock: connInfo?.mutualBlock
+                status: normalizedStatus
             });
         });
 
@@ -560,7 +539,7 @@ export const StayView: React.FC = () => {
         });
 
         return tree;
-    }, [roomsVersion, connectingRoomsMap]);
+    }, [roomsVersion]);
 
     // Total rooms count across entire hotel
     const totalRoomsCount = useMemo(() => {
@@ -1993,15 +1972,6 @@ export const StayView: React.FC = () => {
                         return;
                     }
 
-                    // Connecting Room Awareness & Mutual Block Warning
-                    const conn = connectingRoomsMap.get(String(moveDrag.targetRoomNumber));
-                    if (conn) {
-                        const partnerConflict = findRoomConflict(conn.partnerRoom, moveDrag.targetStartIndex, moveDrag.targetEndIndex, b.id);
-                        if (partnerConflict) {
-                            showToast(`ℹ️ Connected Room Note: Linked Room ${conn.partnerRoom} is occupied by ${partnerConflict.guestName}.`);
-                        }
-                    }
-
                     // Room Type Upgrade Tariff Difference Alert
                     const targetBase = targetCanonical?.baseRate || (targetCap ? targetCap.baseRate : dailyBase);
                     if (targetBase > dailyBase) {
@@ -2493,28 +2463,6 @@ export const StayView: React.FC = () => {
                                                                 <span className="text-[10px] text-gray-900 font-semibold">
                                                                     {room.roomNumber}
                                                                 </span>
-                                                                {room.connectingWith && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const todayIdx = days.findIndex(d => d.isToday);
-                                                                            const idx = todayIdx >= 0 ? todayIdx : 0;
-                                                                            setSelectedRange({
-                                                                                room: room.roomNumber,
-                                                                                startIndex: idx,
-                                                                                endIndex: idx,
-                                                                                connectPartner: true
-                                                                            });
-                                                                            setIsQuickReservationOpen(true);
-                                                                        }}
-                                                                        className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[7.5px] font-mono font-bold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200/80 hover:border-indigo-600 flex-shrink-0 cursor-pointer transition-colors"
-                                                                        title={`Click to Book Connecting Suite: Room ${room.roomNumber} + Room ${room.connectingWith} (${room.connectingDoorType || 'Connecting Door'})`}
-                                                                    >
-                                                                        <Link2 size={7} className="stroke-[2.5]" />
-                                                                        <span>{room.connectingWith}</span>
-                                                                    </button>
-                                                                )}
                                                                 <span className="text-[9.5px] text-gray-500 truncate ml-0.5">
                                                                     {room.type}
                                                                 </span>
@@ -3207,8 +3155,7 @@ export const StayView: React.FC = () => {
                         checkOut: endIso,
                         nights: stayNights,
                         startIndex: selectedRange?.startIndex,
-                        endIndex: selectedRange?.endIndex,
-                        connectPartner: selectedRange?.connectPartner
+                        endIndex: selectedRange?.endIndex
                     };
                 })()}
                 onReserve={(_newBooking) => {
