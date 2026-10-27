@@ -506,27 +506,27 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                         {/* Left: Avatar + Identity */}
                         <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
                             {/* Modern Hotel Logo Monogram with Hover Change Overlay */}
-                            <div className="relative shrink-0 group">
+                            <div className="size-16 sm:size-20 relative shrink-0 group">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setTempLogoUrl(logoUrl);
                                         setIsLogoModalOpen(true);
                                     }}
-                                    className="size-13 sm:size-15 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-xl sm:text-2xl tracking-tight shadow-sm ring-2 ring-slate-100 overflow-hidden cursor-pointer relative transition-transform hover:scale-[1.02] text-center"
+                                    className="size-full rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-2xl sm:text-3xl tracking-tight shadow-sm ring-4 ring-slate-100 overflow-hidden cursor-pointer relative transition-transform hover:scale-[1.02] text-center"
                                     title="Click to change hotel brand logo"
                                 >
                                     {logoUrl ? (
-                                        <img src={logoUrl} alt={propName} className="size-full object-cover" />
+                                        <img src={logoUrl} alt={propName} className="w-full h-full object-cover" />
                                     ) : (
                                         <span>{propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}</span>
                                     )}
                                     <div className="absolute inset-0 bg-black/55 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Camera size={14} />
-                                        <span className="text-[8px] font-bold mt-0.5 tracking-tight uppercase">Change</span>
+                                        <Camera size={16} />
+                                        <span className="text-[9px] font-bold mt-0.5 tracking-tight uppercase">Change</span>
                                     </div>
                                 </button>
-                                <span className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Operating Property"></span>
+                                <span className="absolute -bottom-1 -right-1 size-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Operating Property"></span>
                             </div>
 
                             <div className="min-w-0 flex-1 space-y-1">
