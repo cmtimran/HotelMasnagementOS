@@ -1866,10 +1866,6 @@ export const AddReservation: React.FC = () => {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="px-3 py-2 bg-slate-50/90 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-slate-600">
-                                    <span>Total Allocated: <strong className="text-slate-900 font-bold">{totalRoomsCount} Room(s)</strong> across {roomsList.length} row(s)</span>
-                                    <span>Rate Mode: <strong className="text-slate-900 font-semibold">{ratePerNight}</strong></span>
-                                </div>
                             </div>
 
                             {/* Floating 3-dots Menu rendered outside overflow containers via createPortal */}
@@ -2044,22 +2040,6 @@ export const AddReservation: React.FC = () => {
                                     , document.body
                                 );
                             })()}
-
-                            {/* Below-Table Action Bar with "+ Add Room" Button (Positioned lower with clean breathing room) */}
-                            <div className="flex items-center justify-between pt-1">
-                                <button
-                                    type="button"
-                                    onClick={handleAddRoomRow}
-                                    className="h-8 px-3.5 bg-white border border-blue-400 hover:border-blue-600 hover:bg-blue-50/80 text-blue-700 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
-                                >
-                                    <Plus size={13} className="text-blue-600 stroke-[2.5]" />
-                                    <span>Add Room</span>
-                                </button>
-
-                                <div className="text-xs text-gray-600">
-                                    Total Estimated: <strong className="text-gray-900 font-mono text-sm font-bold">{grossTotal.toFixed(2)}</strong> {currencyCode}
-                                </div>
-                            </div>
                         </div>
                     )}
 
@@ -2780,7 +2760,7 @@ export const AddReservation: React.FC = () => {
 
                 {/* Footer Action Buttons */}
                 <div className="bg-gray-50/90 border-t border-gray-200 px-4 py-2 flex items-center justify-between select-none">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-3">
                         {step === 1 && (
                             <button
                                 type="button"
@@ -2793,7 +2773,15 @@ export const AddReservation: React.FC = () => {
                             </button>
                         )}
                         <div className="text-[11px] text-gray-500">
-                            {step === 1 && `Rooms: ${totalRoomsCount} | Check-in: ${checkIn}`}
+                            {step === 1 && (
+                                <span className="flex items-center gap-2">
+                                    <span>Rooms: <strong className="text-gray-800 font-semibold">{totalRoomsCount}</strong></span>
+                                    <span className="text-gray-300">•</span>
+                                    <span>Check-in: <strong className="text-gray-800 font-semibold">{checkIn}</strong></span>
+                                    <span className="text-gray-300">•</span>
+                                    <span>Total Estimated: <strong className="text-blue-900 font-mono text-xs font-bold">{grossTotal.toFixed(2)}</strong> {currencyCode}</span>
+                                </span>
+                            )}
                             {step === 2 && `Guest: ${guestName || 'Not entered'} | Phone: ${mobile || 'N/A'}`}
                             {step === 3 && `Payable: ৳${finalPayable.toFixed(2)} | Paid: ৳${totalPaid.toFixed(2)} | Due: ৳${totalDue.toFixed(2)}`}
                         </div>
