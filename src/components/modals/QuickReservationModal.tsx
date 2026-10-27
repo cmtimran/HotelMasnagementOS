@@ -460,8 +460,10 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     // Anchored portal state for 3-dots dropdown menu
     const [menuAnchor, setMenuAnchor] = useState<{
         rowId: number;
-        top: number;
+        top?: number;
+        bottom?: number;
         right: number;
+        maxHeight: number;
     } | null>(null);
 
     const handleToggleRowMenu = (e: React.MouseEvent<HTMLButtonElement>, rowId: number) => {
@@ -470,10 +472,17 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             setMenuAnchor(null);
         } else {
             const rect = e.currentTarget.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const menuEstimatedHeight = 320;
+            const openUpwards = spaceBelow < menuEstimatedHeight && spaceAbove > spaceBelow;
+
             setMenuAnchor({
                 rowId,
-                top: rect.bottom + 4,
-                right: Math.max(16, window.innerWidth - rect.right)
+                top: openUpwards ? undefined : rect.bottom + 4,
+                bottom: openUpwards ? Math.max(8, window.innerHeight - rect.top + 4) : undefined,
+                right: Math.max(16, window.innerWidth - rect.right),
+                maxHeight: openUpwards ? Math.max(180, spaceAbove - 16) : Math.max(180, spaceBelow - 16)
             });
         }
     };
@@ -1971,8 +1980,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                             onClick={() => setMenuAnchor(null)}
                         />
                         <div 
-                            style={{ top: `${menuAnchor.top}px`, right: `${menuAnchor.right}px` }}
-                            className="fixed z-[99999] w-64 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100 select-none max-h-[82vh] overflow-y-auto"
+                            style={{
+                                top: menuAnchor.top !== undefined ? `${menuAnchor.top}px` : undefined,
+                                bottom: menuAnchor.bottom !== undefined ? `${menuAnchor.bottom}px` : undefined,
+                                right: `${menuAnchor.right}px`,
+                                maxHeight: `${menuAnchor.maxHeight}px`
+                            }}
+                            className="fixed z-[99999] w-64 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100 select-none overflow-y-auto"
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
