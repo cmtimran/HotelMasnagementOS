@@ -493,6 +493,19 @@ export const MultiPropertyConsole: React.FC = () => {
                                                     <Calendar size={11} className="text-emerald-600" />
                                                     <span>StayView</span>
                                                 </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        handleSwitchProperty(property);
+                                                        setActivePage('hotel-profile');
+                                                    }}
+                                                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                                                    title="Configure Hotel Profile, Policies, Outlets & Numbering"
+                                                >
+                                                    <Building2 size={11} className="text-indigo-600" />
+                                                    <span>Profile</span>
+                                                </button>
                                             </div>
 
                                             <button

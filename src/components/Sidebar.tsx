@@ -239,8 +239,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     icon: <Settings size={14} />,
                     children: [
                         { id: 'taxes-vat', label: 'Taxes & VAT', icon: <Percent size={12} /> },
-                        { id: 'multi-property', label: 'Chain Console', icon: <Building2 size={12} />, badge: 'HQ', badgeColor: 'bg-indigo-100 text-indigo-700' },
-                        { id: 'properties', label: 'Properties', icon: <Building2 size={12} /> },
+                        { id: 'properties', label: 'Chain Properties', icon: <Building2 size={12} />, badge: 'Portfolio', badgeColor: 'bg-indigo-100 text-indigo-700' },
                         { id: 'hotel-info', label: 'Hotel Profile', icon: <Building2 size={12} /> },
                         { id: 'property-create', label: 'Add Property', icon: <Plus size={12} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
                         { id: 'printer-settings', label: 'Printers & Hardware', icon: <Printer size={12} /> },

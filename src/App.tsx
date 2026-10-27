@@ -10,7 +10,6 @@ import TableFormModal from './components/TableFormModal';
 import GenericSectionModal, { type FormSection } from './components/GenericSectionModal';
 import Header from './components/Header';
 import Login from './components/Login';
-import PropertyDetailsModal from './components/PropertyDetailsModal';
 import AddProperty from './components/AddProperty';
 import HotelInfoView from './components/HotelInfoView';
 import FrontDesk from './components/FrontDesk';
@@ -78,7 +77,7 @@ import { useProperty } from './context/PropertyContext';
 function App() {
   const { activePage, setActivePage } = useNavigation();
   const { updateUserSession } = usePortal();
-  const { properties, activeProperty, setActivePropertyId } = useProperty();
+  const { properties, activeProperty } = useProperty();
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   // Session Management: Synchronous initialization eliminates login screen flash/flicker on reload
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -97,8 +96,6 @@ function App() {
       return null;
     }
   });
-
-  const [viewingProperty, setViewingProperty] = useState<any>(null);
 
   // Global Event-Driven Realtime Network Sync & PostgreSQL Database Hydration on Application Boot
   useEffect(() => {
@@ -200,41 +197,6 @@ function App() {
     { id: 1, name: 'John Doe', phone: '555-0101', role: 'Senior Waiter' },
   ];
 
-  const propertiesData = [
-    {
-      id: 1,
-      logo: 'https://placehold.co/40x40?text=GH',
-      name: 'Grand Hotel',
-      address: '123 Ocean Drive',
-      country: 'USA',
-      city: 'Miami',
-      currency: 'USD',
-      website: 'www.grandhotel.com',
-      rooms: 120,
-      grade: '5 Star',
-      phone: '+1 305-555-0199',
-      email: 'info@grandhotel.com',
-      description: 'The Grand Hotel offers luxurious accommodations with stunning ocean views. Located in the heart of Miami, our 5-star property features world-class dining, a full-service spa, and private beach access.',
-      features: ['Beach Access', 'Spa', 'Pool', 'Fine Dining', 'Fitness Center']
-    },
-    {
-      id: 2,
-      logo: 'https://placehold.co/40x40?text=CH',
-      name: 'City Hub',
-      address: '45 Downtown Ave',
-      country: 'UK',
-      city: 'London',
-      currency: 'GBP',
-      website: 'www.cityhublondon.com',
-      rooms: 85,
-      grade: '4 Star',
-      phone: '+44 20 7946 0958',
-      email: 'london@cityhub.com',
-      description: 'Modern urban hotel in central London. Perfect for business travelers and city explorers.',
-      features: ['Free WiFi', 'Coworking Space', 'Central Location', 'Smart Rooms']
-    }
-  ];
-
   const livePropertiesData = useMemo(() => {
     if (properties && properties.length > 0) {
       return properties.map(p => ({
@@ -242,23 +204,23 @@ function App() {
         logo: `https://placehold.co/40x40?text=${p.code || 'GH'}`,
         name: p.name,
         code: p.code,
-        address: p.address || 'Dhaka, Bangladesh',
+        address: p.address || '—',
         country: p.country || 'Bangladesh',
-        city: p.city || 'Dhaka',
+        city: p.city || '—',
         currency: p.currency || 'BDT',
-        website: 'www.grandhospitality.com',
-        rooms: p.total_rooms || 34,
+        website: '—',
+        rooms: p.total_rooms || 0,
         grade: `${p.star_rating || 5} Star`,
-        phone: p.phone || '+880 2 9882200',
-        email: p.email || 'dhaka@grandhospitality.com',
-        description: `${p.name} - Luxury accommodation and professional hospitality management.`,
-        features: ['High-speed WiFi', 'Executive Lounge', 'Room Service', 'Fine Dining', 'Concierge Desk'],
+        phone: p.phone || '—',
+        email: p.email || '—',
+        description: `${p.name} - Hotel property management.`,
+        features: ['High-speed WiFi', 'Room Service', 'Concierge Desk'],
         buildings: p.total_buildings || 1,
         staff: p.total_staff || 0,
         raw: p
       }));
     }
-    return propertiesData;
+    return [];
   }, [properties]);
 
   const categorySections: FormSection[] = [
@@ -392,100 +354,7 @@ function App() {
       case 'property-list':
       case 'all-properties':
       case 'properties':
-        return (
-          <>
-            <ConfigurationPage
-              title="Properties"
-              description="Manage your hotel properties and physical locations"
-              columns={[
-                {
-                  key: 'name',
-                  header: 'Property',
-                  className: 'w-[42%]',
-                  render: (row) => (
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200/80 flex items-center justify-center text-slate-700 text-xs flex-shrink-0 shadow-2xs overflow-hidden">
-                        {row.logo && !row.logo.includes('placehold.co') ? (
-                          <img src={row.logo} alt={row.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span>{row.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-gray-900 text-xs sm:text-[13px] leading-tight truncate">{row.name}</p>
-                        <p className="text-gray-500 text-[11px] mt-0.5 leading-tight truncate">
-                          {row.address}, {row.city}, {row.country}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                },
-                {
-                  key: 'rooms',
-                  header: 'Inventory',
-                  className: 'w-[18%]',
-                  render: (row) => (
-                    <div className="flex flex-col">
-                      <span className="text-gray-900 text-xs">{row.rooms} Rooms</span>
-                      <span className="text-[10px] text-gray-400">Physical Units</span>
-                    </div>
-                  )
-                },
-                {
-                  key: 'grade',
-                  header: 'Grade',
-                  className: 'w-[15%]',
-                  render: (row) => (
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/60 rounded-full">
-                      <span className="text-[10px] uppercase tracking-wider">{row.grade}</span>
-                    </div>
-                  )
-                },
-                {
-                  key: 'actions',
-                  header: 'Actions',
-                  className: 'text-right',
-                  render: (row) => (
-                    <div className="flex items-center justify-end gap-1.5">
-                      {row.id !== activeProperty?.id && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActivePropertyId(row.id);
-                          }}
-                          className="h-7 px-2 rounded-lg text-[11px] text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
-                        >
-                          Switch Hotel
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleManageProperty(row.raw || row)}
-                        className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-blue-700 hover:text-blue-800 bg-blue-50/70 hover:bg-blue-100 border border-blue-200/90 transition-all cursor-pointer active:scale-[0.98]"
-                      >
-                        Manage Property
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setViewingProperty(row.raw || row)}
-                        className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-gray-700 hover:text-blue-600 bg-white hover:bg-blue-50/50 border border-gray-200/90 hover:border-blue-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
-                      >
-                        View Details
-                      </button>
-                    </div>
-                  )
-                }
-              ]}
-              data={livePropertiesData}
-              onAdd={() => setActivePage('property-create')}
-            />
-            <PropertyDetailsModal
-              isOpen={!!viewingProperty}
-              onClose={() => setViewingProperty(null)}
-              property={viewingProperty}
-            />
-          </>
-        );
+        return <MultiPropertyConsole />;
       case 'pos':
         return <POSPage />;
       case 'products':
