@@ -125,7 +125,7 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
                     dueAmount: subIdx === 0 ? (Number(item.dueAmount) || 0) : 0,
                     status: uiStatus,
                     source: item.source || 'Direct',
-                    vip: item.vip || 'None',
+                    vip: (item.vip && String(item.vip).toUpperCase() !== 'NONE' && String(item.vip).toUpperCase() !== 'REGULAR') ? item.vip : 'None',
                     specialRequests: item.specialRequests || '',
                     servicesBundle: rm.servicesBundle || item.servicesBundle,
                     extraBed: rm.extraBed || item.extraBed,
@@ -169,7 +169,7 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
             dueAmount: Number(item.dueAmount) || 0,
             status: st,
             source: item.source || 'Direct',
-            vip: item.vip || 'None',
+            vip: (item.vip && String(item.vip).toUpperCase() !== 'NONE' && String(item.vip).toUpperCase() !== 'REGULAR') ? item.vip : 'None',
             specialRequests: item.specialRequests || '',
             servicesBundle: item.servicesBundle,
             extraBed: item.extraBed || item.servicesBundle?.extraBed || null,
@@ -868,7 +868,7 @@ export const FrontDesk: React.FC = () => {
                                                         <div>
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-slate-900">{item.guestName}</span>
-                                                                {item.vip && item.vip !== 'None' && item.vip !== 'Regular' && (
+                                                                {item.vip && item.vip !== 'None' && item.vip.toUpperCase() !== 'NONE' && item.vip !== 'Regular' && item.vip.toUpperCase() !== 'REGULAR' && (
                                                                     <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300">
                                                                         {item.vip}
                                                                     </span>

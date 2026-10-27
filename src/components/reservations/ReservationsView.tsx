@@ -217,7 +217,7 @@ export const ReservationsView: React.FC = () => {
                         paidAmount: subIdx === 0 ? (Number(r.paidAmount) || 0) : 0,
                         dueAmount: subIdx === 0 ? (Number(r.dueAmount) || 0) : 0,
                         source: r.source || 'Direct',
-                        vip: r.vip || 'None',
+                        vip: (rm.vip && String(rm.vip).toUpperCase() !== 'NONE' && String(rm.vip).toUpperCase() !== 'REGULAR') ? rm.vip : (r.vip && String(r.vip).toUpperCase() !== 'NONE' && String(r.vip).toUpperCase() !== 'REGULAR') ? r.vip : 'None',
                         isGroup: true,
                         groupId: r.groupCode || r.groupId,
                         groupName: r.groupCode ? `Group: ${r.groupCode}` : undefined,
@@ -228,6 +228,8 @@ export const ReservationsView: React.FC = () => {
 
             const rawStatus = r.status || 'confirmed';
             const resolvedStatus = resolveUiStatus(rawStatus, r.checkIn, r.checkOut, opDate);
+            const rawVip = String(r.vip || '').trim();
+            const normalizedVip = (rawVip && rawVip.toUpperCase() !== 'NONE' && rawVip.toUpperCase() !== 'REGULAR' && rawVip.toLowerCase() !== 'null') ? rawVip : 'None';
 
             return [{
                 id: r.id || idx + 1,
@@ -251,7 +253,7 @@ export const ReservationsView: React.FC = () => {
                 paidAmount: Number(r.paidAmount) || 0,
                 dueAmount: Number(r.dueAmount) || 0,
                 source: r.source || 'Direct',
-                vip: r.vip || 'None',
+                vip: normalizedVip,
                 isGroup: Boolean(r.isGroup || r.groupCode),
                 groupId: r.groupCode || r.groupId,
                 groupName: r.groupCode ? `Group: ${r.groupCode}` : undefined,
@@ -401,7 +403,8 @@ export const ReservationsView: React.FC = () => {
             const matchesSource = sourceFilter === 'all' || (r.source || 'Direct').toLowerCase().includes(sourceFilter.toLowerCase());
 
             // 6. VIP Filter
-            const matchesVip = vipFilter === 'all' ? true : vipFilter === 'vip' ? (r.vip && r.vip !== 'None') : (!r.vip || r.vip === 'None');
+            const isGuestVip = Boolean(r.vip && r.vip !== 'None' && r.vip.toUpperCase() !== 'NONE' && r.vip.toUpperCase() !== 'REGULAR');
+            const matchesVip = vipFilter === 'all' ? true : vipFilter === 'vip' ? isGuestVip : !isGuestVip;
 
             return matchesTab && matchesGuest && matchesQuery && matchesDate && matchesSource && matchesVip;
         });
@@ -1053,7 +1056,7 @@ export const ReservationsView: React.FC = () => {
                                             <td className="px-3 py-2">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="font-semibold text-gray-900">{r.guestName}</span>
-                                                    {r.vip && r.vip !== 'None' && (
+                                                    {r.vip && r.vip !== 'None' && r.vip.toUpperCase() !== 'NONE' && r.vip.toUpperCase() !== 'REGULAR' && (
                                                         <span className="px-1 py-0.2 rounded text-[9px] bg-amber-100 text-amber-800 border border-amber-200">
                                                             {r.vip}
                                                         </span>
@@ -1218,7 +1221,7 @@ export const ReservationsView: React.FC = () => {
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5">
                                                     <h4 className="text-gray-900 text-xs truncate">{r.guestName}</h4>
-                                                    {r.vip && r.vip !== 'None' && (
+                                                    {r.vip && r.vip !== 'None' && r.vip.toUpperCase() !== 'NONE' && r.vip.toUpperCase() !== 'REGULAR' && (
                                                         <span className="px-1 py-0.2 rounded text-[8px] bg-amber-100 text-amber-800 border border-amber-200">
                                                             {r.vip}
                                                         </span>
