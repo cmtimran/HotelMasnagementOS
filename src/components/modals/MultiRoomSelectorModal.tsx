@@ -29,7 +29,11 @@ export interface MultiRoomSelectorModalProps {
     checkIn: string;
     checkOut: string;
     currentSelected: string[];
-    onConfirm: (selectedRooms: string[], roomDatesMap?: Record<string, { checkIn: string; checkOut: string; nights: number }>) => void;
+    onConfirm: (
+        selectedRooms: string[],
+        roomDatesMap?: Record<string, { checkIn: string; checkOut: string; nights: number }>,
+        isAuto?: boolean
+    ) => void;
     otherRowsTakenRooms?: string[];
     isAutoMode?: boolean;
     initialRoomDatesMap?: Record<string, { checkIn: string; checkOut: string; nights: number }>;
@@ -51,6 +55,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
     const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
     const [roomDatesMap, setRoomDatesMap] = useState<Record<string, { checkIn: string; checkOut: string; nights: number }>>({});
     const [customDatesEnabled, setCustomDatesEnabled] = useState<boolean>(false);
+    const [isAuto, setIsAuto] = useState<boolean>(isAutoMode);
     const prevIsOpenRef = useRef(false);
 
     // Default duration for group
@@ -78,6 +83,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
     // Initialize selection on modal open (ONLY when modal transitions from closed to open)
     useEffect(() => {
         if (isOpen && !prevIsOpenRef.current) {
+            setIsAuto(Boolean(isAutoMode));
             const defaultN = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24)));
             const datesMap: Record<string, { checkIn: string; checkOut: string; nights: number }> = { ...(initialRoomDatesMap || {}) };
 
@@ -145,6 +151,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
 
     const handleToggleRoom = (roomNum: string, isAvailable: boolean) => {
         if (!isAvailable) return;
+        setIsAuto(false);
 
         if (selectedRooms.includes(roomNum)) {
             setSelectedRooms(prev => prev.filter(r => r !== roomNum));
@@ -165,6 +172,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
     };
 
     const handleAutoSelectAll = () => {
+        setIsAuto(true);
         const picked = availableRooms.slice(0, requiredCount).map(ar => ar.room.number);
         setSelectedRooms(picked);
         const newDates = { ...roomDatesMap };
@@ -176,6 +184,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
 
     const handleClearAll = () => {
         setSelectedRooms([]);
+        setIsAuto(false);
     };
 
     const handleSyncAllToMaster = () => {
@@ -232,7 +241,7 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
             }
         });
 
-        onConfirm(finalSelection, customDatesEnabled ? finalDatesMap : undefined);
+        onConfirm(finalSelection, customDatesEnabled ? finalDatesMap : undefined, isAuto);
         onClose();
     };
 
@@ -251,16 +260,35 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                         <div>
                             <div className="flex items-center gap-2">
                                 <h3 className="text-base font-extrabold text-slate-800 tracking-tight">
-                                    Multi-Room Assignment: {roomType}
+                                    {requiredCount > 1 ? 'Multi-Room Assignment' : 'Room Assignment'}: {roomType}
                                 </h3>
-                                {isAutoMode && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 flex items-center gap-1 border border-blue-200">
-                                        <Sparkles size={11} className="text-blue-600" /> Auto Mode
-                                    </span>
+                                {isAuto ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAuto(false)}
+                                        className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-800 flex items-center gap-1 border border-blue-200 cursor-pointer transition-colors"
+                                        title="Auto Allocation mode. Click to switch to Manual mode"
+                                    >
+                                        <Sparkles size={11} className="text-blue-600" />
+                                        <span className="font-bold">Auto Mode</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsAuto(true);
+                                            handleAutoSelectAll();
+                                        }}
+                                        className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center gap-1 border border-emerald-200 cursor-pointer transition-colors"
+                                        title="Manual Assignment mode. Click to switch to Auto Pick"
+                                    >
+                                        <CheckCircle2 size={11} className="text-emerald-600" />
+                                        <span className="font-bold">Manual Mode</span>
+                                    </button>
                                 )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-                                <span>Target: <strong className="text-blue-700 font-bold">{requiredCount} room(s)</strong></span>
+                                <span>Target: <strong className="text-blue-700 font-bold">{requiredCount} {requiredCount > 1 ? 'rooms' : 'room'}</strong></span>
                                 <span className="text-slate-300">•</span>
                                 <span className="flex items-center gap-1 font-medium text-slate-700 bg-white/90 px-2 py-0.5 rounded border border-slate-200/80 shadow-2xs">
                                     <Calendar size={12} className="text-blue-600" />
@@ -288,13 +316,18 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                 : 'bg-amber-50 text-amber-800 border-amber-300'
                         }`}>
                             {isComplete ? <CheckCircle2 size={15} className="text-emerald-600" /> : <AlertTriangle size={15} className="text-amber-600" />}
-                            <span>{selectedRooms.length} of {requiredCount} Rooms Selected</span>
+                            <span>{selectedRooms.length} of {requiredCount} {requiredCount === 1 ? 'Room' : 'Rooms'} Selected</span>
                         </div>
                         {!isComplete && remainingToPick > 0 && (
                             <span className="text-[11.5px] text-amber-700 font-semibold">
                                 (Pick {remainingToPick} more)
                             </span>
                         )}
+                        <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-md ${
+                            isAuto ? 'bg-blue-100/90 text-blue-700' : 'bg-emerald-100/90 text-emerald-800'
+                        }`}>
+                            {isAuto ? '✨ Auto' : '✓ Manual'}
+                        </span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -598,8 +631,8 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                         ) : (
                             <div className="flex items-center gap-1.5 text-slate-600">
                                 {isComplete ? (
-                                    <span className="text-emerald-700 flex items-center gap-1">
-                                        <CheckCircle2 size={15} /> All {requiredCount} rooms ready ({staySummary.totalRoomNights} Room-Nights)
+                                    <span className="text-emerald-700 flex items-center gap-1 font-semibold">
+                                        <CheckCircle2 size={15} /> {requiredCount === 1 ? `Room ready (${staySummary.totalRoomNights} Night${staySummary.totalRoomNights > 1 ? 's' : ''})` : `All ${requiredCount} rooms ready (${staySummary.totalRoomNights} Room-Nights)`}
                                     </span>
                                 ) : (
                                     <span className="text-amber-700 font-semibold">
@@ -621,10 +654,12 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                         <button
                             type="button"
                             onClick={handleSave}
-                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                            className={`px-5 py-2 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all ${
+                                isAuto ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                            }`}
                         >
                             <Check size={15} />
-                            <span>Confirm Assignment ({selectedRooms.length || requiredCount} Rooms)</span>
+                            <span>Confirm {isAuto ? 'Auto' : 'Manual'} Assignment ({selectedRooms.length || requiredCount} {requiredCount === 1 ? 'Room' : 'Rooms'})</span>
                         </button>
                     </div>
                 </div>

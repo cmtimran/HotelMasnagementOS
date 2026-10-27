@@ -1624,59 +1624,66 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                                                                     );
                                                                 }
 
-                                                                // Single room mode
+                                                                // Single room mode (roomsCount === 1)
                                                                 if (row.isAssign) {
-                                                                    const singleAuto = assignedList[0] || row.roomNumber;
+                                                                    const singleAuto = assignedList[0] || row.roomNumber || 'Auto';
                                                                     return (
-                                                                        <div
-                                                                            className="w-28 h-8 px-1.5 border border-blue-200 bg-blue-50/70 text-blue-800 rounded text-xs flex items-center justify-center cursor-default select-none shadow-2xs mx-auto"
-                                                                            title={`Auto-Allocated: ${singleAuto}`}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setMultiRoomModal({
+                                                                                isOpen: true,
+                                                                                rowId: row.id,
+                                                                                roomType: row.roomType,
+                                                                                requiredCount: 1,
+                                                                                isAutoMode: true
+                                                                            })}
+                                                                            className="w-32 h-8 px-2 border border-blue-300 bg-blue-50/90 hover:bg-blue-100 text-blue-900 rounded-md text-xs flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all group"
+                                                                            title={`Auto-Allocated: Room ${singleAuto}. Click to view or assign manually`}
                                                                         >
-                                                                            <Sparkles size={12} className="text-blue-600 mr-1" />
-                                                                            <span className="text-blue-700 font-extrabold">Auto</span>
-                                                                            <span className="text-slate-600 ml-1 font-mono text-[10.5px]">
-                                                                                ({singleAuto})
+                                                                            <div className="flex items-center gap-1 truncate">
+                                                                                <Sparkles size={12} className="text-blue-600 flex-shrink-0" />
+                                                                                <span className="text-blue-700 font-extrabold">Auto</span>
+                                                                            </div>
+                                                                            <span className="text-[10px] font-mono font-bold text-slate-800 bg-white/90 px-1.5 py-0.5 rounded border border-blue-200/70 truncate max-w-[55px]">
+                                                                                {singleAuto}
                                                                             </span>
-                                                                        </div>
+                                                                        </button>
                                                                     );
                                                                 }
 
+                                                                // Manual single-room mode (!row.isAssign)
+                                                                const singleManual = assignedList[0] || row.roomNumber;
                                                                 return (
-                                                                    <select
-                                                                        value={row.roomNumber}
-                                                                        onChange={e => updateRoomRow(row.id, 'roomNumber', e.target.value)}
-                                                                        className="w-28 h-8 px-1 border border-blue-400 bg-white text-blue-900 rounded text-xs text-center outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs mx-auto"
-                                                                        title="Manual Room Selection"
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setMultiRoomModal({
+                                                                            isOpen: true,
+                                                                            rowId: row.id,
+                                                                            roomType: row.roomType,
+                                                                            requiredCount: 1,
+                                                                            isAutoMode: false
+                                                                        })}
+                                                                        className={`w-32 h-8 px-2 border rounded-md text-xs flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all ${
+                                                                            singleManual
+                                                                                ? 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+                                                                                : 'border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 ring-2 ring-amber-300/60'
+                                                                        }`}
+                                                                        title={`Manual Assignment: Room ${singleManual || 'None'}. Click to pick room`}
                                                                     >
-                                                                        {(() => {
-                                                                            const otherRowsRooms = new Set(
-                                                                                roomsList.filter(other => other.id !== row.id).map(other => other.roomNumber)
-                                                                            );
-                                                                            const report = liveAvailabilityReport;
-                                                                            const matchingStatus = report.allRoomsStatus.filter(st => {
-                                                                                const matchesType = st.room.roomTypeName.toLowerCase().includes(row.roomType.toLowerCase()) ||
-                                                                                                    row.roomType.toLowerCase().includes(st.room.roomTypeName.toLowerCase());
-                                                                                return matchesType;
-                                                                            });
-
-                                                                            const listToDisplay = matchingStatus.length > 0 ? matchingStatus : report.allRoomsStatus;
-
-                                                                            return listToDisplay.map(st => {
-                                                                                const isTakenInOther = otherRowsRooms.has(st.room.number);
-                                                                                const isOccupied = !st.isAvailable || isTakenInOther;
-                                                                                return (
-                                                                                    <option
-                                                                                        key={st.room.id}
-                                                                                        value={st.room.number}
-                                                                                        disabled={isOccupied && st.room.number !== row.roomNumber}
-                                                                                        className={isOccupied ? 'text-red-500 bg-red-50' : 'text-emerald-700 font-semibold'}
-                                                                                    >
-                                                                                        {st.room.number} {isOccupied ? '(Occ)' : '(Free)'}
-                                                                                    </option>
-                                                                                );
-                                                                            });
-                                                                        })()}
-                                                                    </select>
+                                                                        <div className="flex items-center gap-1 truncate">
+                                                                            {singleManual ? (
+                                                                                <CheckCircle2 size={12} className="text-emerald-600 flex-shrink-0" />
+                                                                            ) : (
+                                                                                <AlertTriangle size={12} className="text-amber-600 flex-shrink-0 animate-bounce" />
+                                                                            )}
+                                                                            <span className={singleManual ? 'font-bold text-emerald-800' : 'font-bold text-amber-800'}>
+                                                                                {singleManual ? 'Manual' : 'Select'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <span className="text-[10px] font-mono font-bold text-emerald-950 bg-white/90 px-1.5 py-0.5 rounded border border-emerald-200 truncate max-w-[55px]">
+                                                                            {singleManual || 'Pick'}
+                                                                        </span>
+                                                                    </button>
                                                                 );
                                                             })()}
                                                         </td>
@@ -2832,12 +2839,14 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                         const row = roomsList.find(r => r.id === multiRoomModal.rowId);
                         return row?.roomDatesMap;
                     })()}
-                    onConfirm={(selected, datesMap) => {
+                    onConfirm={(selected, datesMap, isAutoConfirmed) => {
                         if (multiRoomModal.rowId !== null) {
                             setRoomsList(prev => prev.map(r => {
                                 if (r.id !== multiRoomModal.rowId) return r;
+                                const newIsAssign = isAutoConfirmed !== undefined ? isAutoConfirmed : false;
                                 return {
                                     ...r,
+                                    isAssign: newIsAssign,
                                     assignedRooms: selected,
                                     roomNumber: selected[0] || r.roomNumber,
                                     roomDatesMap: datesMap
