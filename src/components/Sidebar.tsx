@@ -261,7 +261,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         { id: 'hotel-info', label: 'Hotel Profile', icon: <Building2 size={12} /> },
                         { id: 'properties', label: 'Chain Properties', icon: <Building2 size={12} />, badge: 'Portfolio', badgeColor: 'bg-indigo-100 text-indigo-700' },
                         { id: 'property-create', label: 'Add Property', icon: <Plus size={12} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
-                        { id: 'holiday-management', label: 'Holiday Calendar', icon: <Calendar size={12} /> },
                     ]
                 }
             ]

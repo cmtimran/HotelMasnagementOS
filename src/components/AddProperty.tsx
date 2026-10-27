@@ -16,6 +16,7 @@ import RoomManagement from './RoomManagement';
 import ConnectingRoomManagement from './ConnectingRoomManagement';
 import TaxVatManagement from './TaxVatManagement';
 import PrinterSettingsManagement from './PrinterSettingsManagement';
+import HolidayManagement from './HolidayManagement';
 
 export interface AddPropertyProps {
     onBack?: () => void;
@@ -549,6 +550,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
 
         // 3. Operations & Financials
         { id: 'operations', label: 'Operations & Policies', icon: <Clock size={15} />, group: 'Policies & Taxes' },
+        { id: 'holidays', label: 'Holiday Calendar', icon: <Calendar size={15} /> },
         { id: 'taxes-vat', label: 'Taxes & VAT', icon: <Percent size={15} /> },
         { id: 'numbering', label: 'Folio & Numbering', icon: <Receipt size={15} /> },
         { id: 'finance', label: 'Bank Accounts & FX', icon: <CreditCard size={15} /> },
@@ -1053,6 +1055,15 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                     {activeTab === 'connecting-rooms' && (
                         <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
                             <ConnectingRoomManagement />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        HOLIDAY CALENDAR & SURCHARGES (HolidayManagement)
+                       ======================================================================== */}
+                    {activeTab === 'holidays' && (
+                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                            <HolidayManagement />
                         </div>
                     )}
 

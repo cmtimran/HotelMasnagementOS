@@ -544,7 +544,7 @@ function App() {
       case 'holiday-management':
       case 'holidays':
       case 'holiday':
-        return <HolidayManagement />;
+        return <GeneralSettings initialTab="holidays" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'taxes-vat':
       case 'tax-vat-settings':
       case 'taxes':
