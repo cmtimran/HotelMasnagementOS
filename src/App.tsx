@@ -68,7 +68,7 @@ import TenantOnboardingWizard from './components/chain/TenantOnboardingWizard';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { initNetworkSync } from './utils/pmsNetworkSync';
 import { syncReservationsFromDB } from './utils/roomInventoryEngine';
-import { Agentation } from 'agentation';
+import { Devnotation } from 'devnotation';
 
 import { useNavigation } from './context/NavigationContext';
 import { usePortal, type UserData } from './context/PortalContext';
@@ -644,7 +644,7 @@ function App() {
     return (
       <>
         <Login onLogin={handleLogin} />
-        {import.meta.env.DEV && <Agentation />}
+        {import.meta.env.DEV && <Devnotation />}
       </>
     );
   }
@@ -672,7 +672,7 @@ function App() {
         subtitle={modalConfig.subtitle}
         sections={modalConfig.sections}
       />
-      {import.meta.env.DEV && <Agentation />}
+      {import.meta.env.DEV && <Devnotation />}
     </div>
   );
 }
