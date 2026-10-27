@@ -2967,35 +2967,6 @@ export const AddReservation: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-
-                            {/* C. Step 2 Bottom Action Bar */}
-                            <div className="flex items-center justify-between pt-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setStep(1)}
-                                    className="h-7 px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs"
-                                >
-                                    ← Back to Room Availability
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (!isGuestProfileComplete) {
-                                            toast.warning('Please enter guest full legal name and mobile number.');
-                                            setStep2Tab('profile');
-                                            return;
-                                        }
-                                        setStep(3);
-                                    }}
-                                    className={`h-7 px-4 rounded text-[11px] font-semibold transition-colors shadow-2xs cursor-pointer ${
-                                        isGuestProfileComplete
-                                            ? 'bg-[#1e3a8a] hover:bg-blue-900 text-white'
-                                            : 'bg-amber-600 hover:bg-amber-700 text-white'
-                                    }`}
-                                >
-                                    Next: Billing &amp; Pay →
-                                </button>
-                            </div>
                         </div>
                     )}
 
@@ -3346,6 +3317,11 @@ export const AddReservation: React.FC = () => {
                                 onClick={() => {
                                     if (step === 1 && hasOverbookingError) {
                                         toast.error('Cannot proceed: Selected rooms exceed available inventory!');
+                                        return;
+                                    }
+                                    if (step === 2 && !isGuestProfileComplete) {
+                                        toast.warning('Please enter guest full legal name and mobile number.');
+                                        setStep2Tab('profile');
                                         return;
                                     }
                                     setStep((step + 1) as any);
