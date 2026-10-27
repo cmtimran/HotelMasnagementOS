@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     User,
     Building2,
@@ -19,8 +19,20 @@ import {
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
 import GlobalOmniSearchModal from './common/GlobalOmniSearchModal';
+import ReservationActionDrawer, { type DrawerMode } from './modals/ReservationActionDrawer';
+import type { AmendBookingData } from './modals/AmendStayModal';
 import { useProperty } from '../context/PropertyContext';
-import { formatToDisplayDate, formatToISODate, setOperatingSystemDate, getOperatingSystemDate } from '../utils/roomInventoryEngine';
+import {
+    formatToDisplayDate,
+    formatToISODate,
+    setOperatingSystemDate,
+    getOperatingSystemDate,
+    getCanonicalRooms,
+    getAllStoredReservations,
+    updateReservationStatusInDB,
+    syncReservationsFromDB,
+    type StoredReservation
+} from '../utils/roomInventoryEngine';
 
 interface HeaderProps {
     activePage: string;
@@ -36,6 +48,57 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const [isPropertyPopoverOpen, setIsPropertyPopoverOpen] = useState(false);
     const [isAlertsPopoverOpen, setIsAlertsPopoverOpen] = useState(false);
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+
+    // Global Reservation Action Drawer state (triggered from OmniSearch or Header actions)
+    const [actionDrawerBooking, setActionDrawerBooking] = useState<AmendBookingData | null>(null);
+    const [actionDrawerMode, setActionDrawerMode] = useState<DrawerMode>('overview');
+    const [isActionDrawerOpen, setIsActionDrawerOpen] = useState(false);
+
+    const allRoomsForDrawer = useMemo(() => {
+        return getCanonicalRooms().map(r => ({
+            id: String(r.id),
+            roomNumber: String(r.number),
+            type: r.name || 'Standard',
+            status: r.status || 'Available'
+        }));
+    }, [isActionDrawerOpen]);
+
+    const handleOpenReservationDetails = (res: StoredReservation, mode: DrawerMode = 'overview') => {
+        const rawStored: any = getAllStoredReservations().find(x => 
+            x.reservationNumber === res.reservationNumber || String(x.id) === String(res.id)
+        ) || res;
+
+        const bookingData: AmendBookingData = {
+            id: String(res.id),
+            reservationNumber: res.reservationNumber,
+            groupCode: res.groupCode,
+            subBookingNumber: res.subBookingNumber,
+            registrationNumber: res.registrationNumber,
+            folioNumber: res.folioNumber,
+            guestName: res.guestName,
+            roomNumber: res.roomNumber,
+            roomType: res.roomType || 'Standard Room',
+            arrivalDate: res.checkIn,
+            departureDate: res.checkOut,
+            nights: Number(res.nights) || 1,
+            adults: Number(res.adults) || 1,
+            children: Number(res.children) || 0,
+            status: res.status || 'confirmed',
+            totalAmount: Number(res.totalAmount) || 0,
+            paidAmount: Number(res.paidAmount) || 0,
+            dueAmount: Number(res.dueAmount) || 0,
+            ratePlan: rawStored.ratePlan || 'Standard Tariff',
+            allocatedRooms: rawStored.allocatedRooms || [res.roomNumber],
+            roomsList: rawStored.roomsList,
+            groupRoomsList: rawStored.groupRoomsList,
+            ...rawStored
+        };
+
+        setActionDrawerBooking(bookingData);
+        setActionDrawerMode(mode);
+        setIsActionDrawerOpen(true);
+        setActivePage('reservations');
+    };
 
     // Global Command Palette Shortcut (Ctrl+K or Cmd+K)
     useEffect(() => {
@@ -563,23 +626,23 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                 setIsDatePopoverOpen(false);
                                 setIsAlertsPopoverOpen(false);
                             }}
-                            className="flex items-center gap-2 px-2 py-1 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-2xs group"
+                            className="flex items-center gap-1.5 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-2xs group"
                             title="User Account"
                         >
-                            <div className="size-7 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs shadow-2xs shrink-0">
+                            <div className="size-6 sm:size-6.5 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10.5px] font-bold shadow-2xs shrink-0">
                                 {userInitial}
                             </div>
-                            <div className="hidden sm:flex flex-col text-left max-w-[120px] leading-tight">
-                                <span className="text-xs text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                            <div className="hidden md:flex flex-col text-left max-w-[95px] leading-tight">
+                                <span className="text-[11px] font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
                                     {user?.name || 'Alexander Vance'}
                                 </span>
-                                <span className="text-[9.5px] font-semibold text-blue-600 truncate">
+                                <span className="text-[9px] font-medium text-slate-400 truncate">
                                     {userRoleDisplay}
                                 </span>
                             </div>
                             <ChevronDown
-                                size={11}
-                                className={`text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                                size={10}
+                                className={`text-slate-400 transition-transform duration-200 shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`}
                             />
                         </button>
 
@@ -669,6 +732,29 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                 isOpen={isSearchModalOpen}
                 onClose={() => setIsSearchModalOpen(false)}
                 setActivePage={setActivePage}
+                onOpenReservationDetails={handleOpenReservationDetails}
+            />
+
+            {/* Unified Enterprise Reservation Action Drawer (Callable globally via OmniSearch or Header) */}
+            <ReservationActionDrawer
+                isOpen={isActionDrawerOpen}
+                onClose={() => {
+                    setIsActionDrawerOpen(false);
+                    setActionDrawerBooking(null);
+                    syncReservationsFromDB();
+                }}
+                booking={actionDrawerBooking}
+                initialMode={actionDrawerMode}
+                allRooms={allRoomsForDrawer}
+                systemDate={getOperatingSystemDate()}
+                onCheckIn={async (resNo) => {
+                    await updateReservationStatusInDB(resNo, 'in-house');
+                    await syncReservationsFromDB();
+                }}
+                onCheckOut={async (resNo) => {
+                    await updateReservationStatusInDB(resNo, 'checked-out');
+                    await syncReservationsFromDB();
+                }}
             />
         </>
     );
