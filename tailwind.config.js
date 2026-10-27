@@ -3,6 +3,7 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./node_modules/devnotation/**/*.{js,cjs,mjs,ts,tsx}",
     "../Devnotation/src/devnotation/**/*.{ts,tsx}",
   ],
   theme: {
