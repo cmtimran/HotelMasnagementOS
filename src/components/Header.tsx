@@ -17,11 +17,13 @@ import {
     ExternalLink,
     Search,
     Shield,
-    ArrowRight
+    ArrowRight,
+    Users
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
 import GlobalOmniSearchModal from './common/GlobalOmniSearchModal';
 import ReservationActionDrawer, { type DrawerMode } from './modals/ReservationActionDrawer';
+import UserProfileModal from './modals/UserProfileModal';
 import type { AmendBookingData } from './modals/AmendStayModal';
 import { useProperty } from '../context/PropertyContext';
 import {
@@ -50,6 +52,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const [isPropertyPopoverOpen, setIsPropertyPopoverOpen] = useState(false);
     const [isAlertsPopoverOpen, setIsAlertsPopoverOpen] = useState(false);
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
     // Global Reservation Action Drawer state (triggered from OmniSearch or Header actions)
     const [actionDrawerBooking, setActionDrawerBooking] = useState<AmendBookingData | null>(null);
@@ -682,6 +685,28 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
 
                                 {/* Account Navigation Actions */}
                                 <div className="p-1.5 space-y-0.5">
+                                    {/* 1. Personal User Profile & Security Modal */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsDropdownOpen(false);
+                                            setIsProfileModalOpen(true);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50/70 rounded-xl flex items-center justify-between transition cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="size-7 rounded-lg bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center transition">
+                                                <User size={13} />
+                                            </div>
+                                            <div>
+                                                <p className="leading-tight font-bold text-slate-900 group-hover:text-blue-700">My Profile & Security</p>
+                                                <p className="text-[10px] text-slate-400 group-hover:text-blue-500 font-normal">Account, password & POS PIN</p>
+                                            </div>
+                                        </div>
+                                        <ArrowRight size={12} className="text-slate-300 group-hover:text-blue-600 transition" />
+                                    </button>
+
+                                    {/* 2. Hotel Staff & Employee Directory */}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -692,11 +717,11 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                     >
                                         <div className="flex items-center gap-2.5">
                                             <div className="size-7 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center transition">
-                                                <User size={13} />
+                                                <Users size={13} />
                                             </div>
                                             <div>
-                                                <p className="leading-tight font-bold">My Profile & Staff</p>
-                                                <p className="text-[10px] text-slate-400 group-hover:text-blue-500 font-normal">Account security & PIN</p>
+                                                <p className="leading-tight font-bold">Staff & Employee Directory</p>
+                                                <p className="text-[10px] text-slate-400 group-hover:text-blue-500 font-normal">Team roster, roles & departments</p>
                                             </div>
                                         </div>
                                         <ArrowRight size={12} className="text-slate-300 group-hover:text-blue-600 transition" />
@@ -803,6 +828,12 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                     await updateReservationStatusInDB(resNo, 'checked-out');
                     await syncReservationsFromDB();
                 }}
+            />
+
+            {/* Logged-in User Profile & Security Modal */}
+            <UserProfileModal
+                isOpen={isProfileModalOpen}
+                onClose={() => setIsProfileModalOpen(false)}
             />
         </>
     );
