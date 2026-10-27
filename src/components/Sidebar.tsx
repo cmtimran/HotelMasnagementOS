@@ -214,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
             title: 'GUESTS',
             items: [
-                { id: 'guest-profile', label: 'Guest Directory', icon: <Users size={14} /> },
+                { id: 'guest-profile', label: 'Guest Profile', icon: <Users size={14} /> },
                 { id: 'service-vouchers', label: 'Gift Vouchers', icon: <Ticket size={14} /> },
                 { id: 'allowance-checker', label: 'Guest Credits', icon: <Wallet size={14} /> },
             ]

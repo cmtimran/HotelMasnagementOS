@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     User, Search, Plus, Star, Phone, Mail,
-    MapPin, Calendar, ShieldCheck,
+    MapPin, ShieldCheck,
     Heart, CheckCircle2,
     Building2, Clock,
     AlertTriangle, ChevronRight, ChevronLeft,
-    Home, Edit3, Utensils, Coffee, Sparkles, Shirt, Wine, Receipt, BedDouble
+    Home, Edit3, Receipt
 } from 'lucide-react';
 import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 
@@ -398,69 +398,80 @@ export const GuestProfile: React.FC = () => {
         const canonicalReservations = getAllStoredReservations();
         const guestNameLower = parseTitleAndName(activeGuest.name).cleanName.toLowerCase().trim();
 
-        // 1. Reservations
-        const matchedRes = canonicalReservations.filter(r => {
+        // 1. Reservations (Real bookings only - zero mock fallback)
+        const matchedRes = canonicalReservations.filter((r: StoredReservation) => {
             const rClean = parseTitleAndName(r.guestName || '').cleanName.toLowerCase().trim();
             return (rClean && (rClean.includes(guestNameLower) || guestNameLower.includes(rClean))) || Boolean(r.phone && (r.phone === activeGuest.phone || (r as any).guestPhone === activeGuest.phone));
         });
 
-        const resItems = matchedRes.length > 0
-            ? matchedRes.map((r, i) => {
-                const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
-                const amount = Number(r.totalAmount) || Number(r.totalRate) || 0;
-                const status = (r.status || 'CONFIRMED').toUpperCase();
-                const badgeColor =
-                    status.includes('CHECKED_IN') || status.includes('CHECKED-IN') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                    status.includes('CHECKED_OUT') || status.includes('CHECKED-OUT') ? 'bg-slate-100 text-slate-700 border-slate-200' :
-                    status.includes('CANCEL') ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                    'bg-blue-50 text-blue-700 border-blue-200';
-                return {
-                    id: `res-${r.id || r.reservationNumber || i}`,
-                    type: 'reservation' as const,
-                    refNumber: r.reservationNumber || `RES-${10000 + i}`,
-                    title: `${r.roomType || 'Deluxe Room'} Booking`,
-                    particulars: `${r.ratePlan || 'Best Available Rate'} • ${r.adults || 1} Adult(s) • ${nights} Nights`,
-                    roomOrLocation: r.roomNumber || r.roomNo || (r.allocatedRooms && r.allocatedRooms[0]) || 'Allocated at Check-In',
-                    dateTime: `${r.checkIn} 14:00`,
-                    amountBDT: amount,
-                    status: status.replace('_', ' '),
-                    statusBadgeColor: badgeColor
-                };
-            })
-            : activeGuest.stayHistory.map((s, i) => ({
-                id: `res-hist-${s.resNumber}-${i}`,
-                type: 'reservation' as const,
-                refNumber: `RES-${s.resNumber}`,
-                title: `${s.roomType} Advance Booking`,
-                particulars: `Best Available Rate • 2 Adults • ${s.nights} Nights`,
-                roomOrLocation: `Room ${s.roomNumber}`,
-                dateTime: `${s.checkIn} 14:00`,
-                amountBDT: s.totalAmountBDT,
-                status: s.status === 'In-House' ? 'CONFIRMED' : 'CHECKED OUT',
-                statusBadgeColor: s.status === 'In-House' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
-            }));
-
-        // 2. Check-Ins & Stays
-        const checkinItems = activeGuest.stayHistory.map((s, i) => {
+        const resItems = matchedRes.map((r: StoredReservation, i: number) => {
+            const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+            const amount = Number(r.totalAmount) || Number(r.totalRate) || 0;
+            const status = (r.status || 'CONFIRMED').toUpperCase();
             const badgeColor =
-                s.status === 'In-House' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                s.status === 'Checked-Out' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                'bg-rose-50 text-rose-700 border-rose-200';
+                status.includes('CHECKED_IN') || status.includes('CHECKED-IN') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                status.includes('CHECKED_OUT') || status.includes('CHECKED-OUT') ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                status.includes('CANCEL') ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                'bg-blue-50 text-blue-700 border-blue-200';
             return {
-                id: `checkin-${s.resNumber}-${i}`,
-                type: 'checkin' as const,
-                refNumber: `REG-${s.resNumber}`,
-                title: `In-House Stay (Room ${s.roomNumber})`,
-                particulars: `${s.checkIn} → ${s.checkOut} (${s.nights} Nights) • ${s.roomType}`,
-                roomOrLocation: `Room ${s.roomNumber}`,
-                dateTime: `${s.checkIn} 14:00`,
-                amountBDT: s.totalAmountBDT,
-                status: s.status,
+                id: `res-${r.id || r.reservationNumber || i}`,
+                type: 'reservation' as const,
+                refNumber: r.reservationNumber || `RES-${r.id || 10000 + i}`,
+                title: `${r.roomType || 'Room'} Reservation`,
+                particulars: `${r.ratePlan || 'Standard Rate'} • ${r.adults || 1} Adult(s) • ${nights} Nts`,
+                roomOrLocation: r.roomNumber || r.roomNo || (Array.isArray(r.allocatedRooms) ? r.allocatedRooms[0] : null) || 'Unassigned',
+                dateTime: `${r.checkIn}`,
+                amountBDT: amount,
+                status: status.replace('_', ' '),
                 statusBadgeColor: badgeColor
             };
         });
 
-        // 3. Outlet Bills (F&B Dining, Room Service KOT, Spa, Laundry, Minibar)
+        // 2. Check-Ins & Stays (Real check-in records only - zero mock fallback)
+        const checkinItems: any[] = [];
+        const seenStayRefs = new Set<string>();
+
+        matchedRes.forEach((r: StoredReservation, i: number) => {
+            const s = (r.status || '').toUpperCase();
+            if (s.includes('CHECKED_IN') || s.includes('CHECKED-IN') || s.includes('CHECKED_OUT') || s.includes('CHECKED-OUT') || s === 'IN-HOUSE') {
+                const ref = String(r.reservationNumber || r.id);
+                seenStayRefs.add(ref);
+                const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+                const isInHouse = s.includes('CHECKED_IN') || s.includes('CHECKED-IN') || s === 'IN-HOUSE';
+                checkinItems.push({
+                    id: `checkin-res-${ref}-${i}`,
+                    type: 'checkin' as const,
+                    refNumber: `REG-${ref}`,
+                    title: `Stay (Room ${r.roomNumber || r.roomNo || 'Assigned'})`,
+                    particulars: `${r.checkIn} → ${r.checkOut} (${nights} Nts)`,
+                    roomOrLocation: r.roomNumber || r.roomNo ? `Room ${r.roomNumber || r.roomNo}` : 'Front Desk',
+                    dateTime: `${r.checkIn}`,
+                    amountBDT: Number(r.totalAmount) || Number(r.totalRate) || 0,
+                    status: isInHouse ? 'In-House' : 'Checked-Out',
+                    statusBadgeColor: isInHouse ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                });
+            }
+        });
+
+        (activeGuest.stayHistory || []).forEach((s, i) => {
+            if (s && s.resNumber && !seenStayRefs.has(String(s.resNumber)) && s.roomNumber && s.checkIn && s.status !== 'In-House') {
+                seenStayRefs.add(String(s.resNumber));
+                checkinItems.push({
+                    id: `checkin-hist-${s.resNumber}-${i}`,
+                    type: 'checkin' as const,
+                    refNumber: `REG-${s.resNumber}`,
+                    title: `Stay (Room ${s.roomNumber})`,
+                    particulars: `${s.checkIn} → ${s.checkOut} (${s.nights} Nts)`,
+                    roomOrLocation: `Room ${s.roomNumber}`,
+                    dateTime: `${s.checkIn}`,
+                    amountBDT: s.totalAmountBDT || 0,
+                    status: s.status,
+                    statusBadgeColor: s.status === 'Checked-Out' ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                });
+            }
+        });
+
+        // 3. Outlet Bills (Real transactions from hotel_folios_v2 ONLY - ZERO mock fallback)
         const savedFoliosRaw = localStorage.getItem('hotel_folios_v2');
         let folioOutletItems: any[] = [];
         if (savedFoliosRaw) {
@@ -469,24 +480,24 @@ export const GuestProfile: React.FC = () => {
                 if (Array.isArray(folios)) {
                     folios.forEach((f: any) => {
                         const nameMatch = f.guestName && (f.guestName.toLowerCase().includes(guestNameLower) || guestNameLower.includes(f.guestName.toLowerCase()));
-                        const roomMatch = activeGuest.stayHistory.some(s => s.roomNumber === f.roomNumber);
+                        const roomMatch = checkinItems.some(c => c.roomOrLocation === `Room ${f.roomNumber}`);
                         if (nameMatch || roomMatch) {
                             (f.transactions || []).forEach((t: any) => {
-                                if (t.category && !['Room', 'Payment', 'Tax'].includes(t.category)) {
+                                if (t.category && !['Room', 'Payment', 'Tax', 'Deposit'].includes(t.category)) {
                                     folioOutletItems.push({
-                                        id: `folio-txn-${t.id}`,
+                                        id: `folio-txn-${t.id || Math.random()}`,
                                         type: 'outlet' as const,
-                                        outletCategory: t.category === 'F&B' ? 'F&B Restaurant' :
-                                            t.category === 'Laundry' ? 'Express Laundry' :
-                                            t.category === 'Spa' ? 'Spa & Wellness' :
-                                            t.category === 'Minibar' ? 'Executive Minibar' : 'Room Service KOT',
+                                        outletCategory: t.category === 'F&B' ? 'Restaurant' :
+                                            t.category === 'Laundry' ? 'Laundry' :
+                                            t.category === 'Spa' ? 'Spa' :
+                                            t.category === 'Minibar' ? 'Minibar' : 'Room Service',
                                         refNumber: t.refNo || `OUT-${t.id}`,
-                                        title: t.particulars || `${t.category} Outlet Bill`,
-                                        particulars: t.description || 'Posted to guest room folio',
-                                        roomOrLocation: f.roomNumber ? `Room ${f.roomNumber}` : 'Hotel Outlet',
-                                        dateTime: t.date || `${activeGuest.lastStayDate} 19:30`,
+                                        title: t.particulars || `${t.category} Charge`,
+                                        particulars: t.description || 'Posted to guest folio',
+                                        roomOrLocation: f.roomNumber ? `Room ${f.roomNumber}` : 'Outlet',
+                                        dateTime: t.date || `${activeGuest.lastStayDate || 'Today'}`,
                                         amountBDT: Math.abs(t.amount || 0),
-                                        status: 'Charged to Folio',
+                                        status: 'Charged',
                                         statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                     });
                                 }
@@ -494,73 +505,16 @@ export const GuestProfile: React.FC = () => {
                         }
                     });
                 }
-            } catch (e) {
-                // ignore
-            }
+            } catch (e) {}
         }
 
-        const generatedOutletItems = activeGuest.stayHistory.flatMap((s, idx) => [
-            {
-                id: `pos-${s.resNumber}-1`,
-                type: 'outlet' as const,
-                outletCategory: 'F&B Restaurant',
-                refNumber: `POS-${s.roomNumber}-${108 + idx * 3}`,
-                title: 'The Palm Court (Main Restaurant)',
-                particulars: 'Dinner Buffet (2 Pax) + Mocktail & Beverage Selection',
-                roomOrLocation: `Room ${s.roomNumber}`,
-                dateTime: `${s.checkIn} 20:30`,
-                amountBDT: 3450,
-                status: 'Charged to Folio',
-                statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            },
-            {
-                id: `kot-${s.resNumber}-2`,
-                type: 'outlet' as const,
-                outletCategory: 'Room Service KOT',
-                refNumber: `KOT-${s.roomNumber}-${204 + idx * 2}`,
-                title: 'In-Room Dining KDS',
-                particulars: 'Midnight Club Sandwich, French Fries & Hot Latte',
-                roomOrLocation: `Room ${s.roomNumber}`,
-                dateTime: `${s.checkIn} 22:45`,
-                amountBDT: 950,
-                status: 'Charged to Folio',
-                statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            },
-            {
-                id: `lnd-${s.resNumber}-3`,
-                type: 'outlet' as const,
-                outletCategory: 'Express Laundry',
-                refNumber: `LND-${s.roomNumber}-${305 + idx * 4}`,
-                title: 'Valet Laundry Service',
-                particulars: '4x Formal Shirts Dry Clean & Steam Press',
-                roomOrLocation: `Room ${s.roomNumber}`,
-                dateTime: `${s.checkIn} 18:15`,
-                amountBDT: 850,
-                status: 'Charged to Folio',
-                statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            },
-            {
-                id: `spa-${s.resNumber}-4`,
-                type: 'outlet' as const,
-                outletCategory: 'Spa & Wellness',
-                refNumber: `SPA-${s.roomNumber}-${401 + idx * 5}`,
-                title: 'Skyline Wellness Spa',
-                particulars: 'Swedish Aromatherapy Body Massage Therapy (60 min)',
-                roomOrLocation: `Room ${s.roomNumber}`,
-                dateTime: `${s.checkIn} 16:30`,
-                amountBDT: 3200,
-                status: 'Settled (Card)',
-                statusBadgeColor: 'bg-blue-50 text-blue-700 border-blue-200'
-            }
-        ]);
-
-        const outletItems = folioOutletItems.length > 0 ? folioOutletItems : generatedOutletItems;
+        const outletItems = folioOutletItems;
 
         const combined = [
             ...resItems,
             ...checkinItems,
             ...outletItems
-        ].sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+        ].sort((a, b) => (b.dateTime || '').localeCompare(a.dateTime || ''));
 
         return {
             reservationsList: resItems,
@@ -716,11 +670,11 @@ export const GuestProfile: React.FC = () => {
             designation: newGuestForm.designation.trim() || undefined,
             corporateTaxId: newGuestForm.corporateTaxId.trim() || undefined,
             billingRoute: newGuestForm.billingRoute,
-            totalStays: 1,
-            totalNights: 2,
-            lifetimeSpendBDT: 15000,
-            lastStayDate: new Date().toISOString().slice(0, 10),
-            loyaltyPoints: 750,
+            totalStays: 0,
+            totalNights: 0,
+            lifetimeSpendBDT: 0,
+            lastStayDate: '-',
+            loyaltyPoints: 0,
             preferences: {
                 roomType: newGuestForm.roomType,
                 floorPreference: newGuestForm.floorPreference,
@@ -732,18 +686,7 @@ export const GuestProfile: React.FC = () => {
                 newspaper: newGuestForm.newspaper,
                 specialNotes: newGuestForm.specialNotes.trim() || 'New guest profile registered via 360 CRM.'
             },
-            stayHistory: [
-                {
-                    resNumber: `RES-${Math.floor(10000 + Math.random() * 90000)}`,
-                    roomNumber: '102',
-                    roomType: newGuestForm.roomType,
-                    checkIn: new Date().toISOString().slice(0, 10),
-                    checkOut: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
-                    nights: 2,
-                    totalAmountBDT: 15000,
-                    status: 'In-House'
-                }
-            ]
+            stayHistory: []
         };
 
         const updatedList = [newRecord, ...guests];
@@ -1000,191 +943,168 @@ export const GuestProfile: React.FC = () => {
                     </div>
 
                     {/* Tab 1: Comprehensive Ledger (Reservations, Check-Ins, Outlet Bills) */}
-                    {activeTab === 'overview' && (
-                        <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3 space-y-3">
-                            {/* Header & Sub-filter pills */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
-                                <div>
-                                    <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
-                                        <Clock size={13} className="text-blue-600" />
-                                        <span>Guest Folio Ledger: Reservations, Stays & Outlet Bills</span>
-                                    </h3>
-                                    <p className="text-[10px] text-gray-500 mt-0.5">
-                                        Track room bookings, check-in registration folios, and all posted restaurant & outlet bills.
-                                    </p>
-                                </div>
+                    {activeTab === 'overview' && (() => {
+                        const displayedItems =
+                            activityFilter === 'all' ? allLedgerItems :
+                            activityFilter === 'reservations' ? reservationsList :
+                            activityFilter === 'checkins' ? checkinsList :
+                            outletBillsList;
 
-                                <div className="inline-flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md border border-gray-200/60 self-start sm:self-auto flex-nowrap">
-                                    {[
-                                        { key: 'all', label: 'All', count: allLedgerItems.length },
-                                        { key: 'reservations', label: 'Reservations', count: reservationsList.length },
-                                        { key: 'checkins', label: 'Stays', count: checkinsList.length },
-                                        { key: 'outlets', label: 'Outlet Bills', count: outletBillsList.length }
-                                    ].map(sub => (
-                                        <button
-                                            key={sub.key}
-                                            onClick={() => setActivityFilter(sub.key as any)}
-                                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
-                                                activityFilter === sub.key
-                                                    ? 'bg-white text-blue-600 shadow-2xs'
-                                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
-                                            }`}
-                                        >
-                                            <span>{sub.label}</span>
-                                            <span className={`text-[9px] px-1 py-0 rounded font-mono ${
-                                                activityFilter === sub.key
-                                                    ? 'bg-blue-50 text-blue-700'
-                                                    : 'bg-gray-200/70 text-gray-600'
-                                            }`}>
-                                                {sub.count}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                        const totalFolioSpend =
+                            reservationsList.reduce((acc: number, r: any) => acc + (r.amountBDT || 0), 0) +
+                            outletBillsList.reduce((acc: number, o: any) => acc + (o.amountBDT || 0), 0);
 
-                            {/* Summary Metrics Strip */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-2 flex items-center gap-2">
-                                    <div className="p-1.5 bg-blue-100 text-blue-700 rounded-md">
-                                        <Calendar size={13} />
-                                    </div>
+                        return (
+                            <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3 space-y-2.5">
+                                {/* Header & Sub-filter pills */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
                                     <div>
-                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Reservations</span>
-                                        <span className="text-xs font-bold text-gray-900">
-                                            {reservationsList.length} Booking{reservationsList.length !== 1 ? 's' : ''}
-                                        </span>
+                                        <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
+                                            <Clock size={13} className="text-blue-600" />
+                                            <span>Guest Folio Ledger: Reservations, Stays & Outlet Bills</span>
+                                        </h3>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">
+                                            Track room bookings, check-in registration folios, and all posted restaurant & outlet bills.
+                                        </p>
                                     </div>
-                                </div>
 
-                                <div className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-2 flex items-center gap-2">
-                                    <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-md">
-                                        <BedDouble size={13} />
-                                    </div>
-                                    <div>
-                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Stays & Nights</span>
-                                        <span className="text-xs font-bold text-gray-900">
-                                            {checkinsList.length} Stay{checkinsList.length !== 1 ? 's' : ''} • {activeGuest.totalNights} Nts
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-amber-50/50 border border-amber-100 rounded-lg p-2 flex items-center gap-2">
-                                    <div className="p-1.5 bg-amber-100 text-amber-700 rounded-md">
-                                        <Utensils size={13} />
-                                    </div>
-                                    <div>
-                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Outlet Bills</span>
-                                        <span className="text-xs font-bold text-amber-800 font-mono">
-                                            {outletBillsList.length} Bills • ৳ {outletBillsList.reduce((acc, c) => acc + c.amountBDT, 0).toLocaleString()}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-2 flex items-center gap-2">
-                                    <div className="p-1.5 bg-purple-100 text-purple-700 rounded-md">
-                                        <Receipt size={13} />
-                                    </div>
-                                    <div>
-                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Folio Total Spend</span>
-                                        <span className="text-xs font-bold text-purple-800 font-mono">
-                                            ৳ {activeGuest.lifetimeSpendBDT.toLocaleString()}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Activity Data Table */}
-                            <div className="overflow-x-auto border border-gray-100 rounded-lg">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-50 border-b border-gray-200 text-[10px] text-gray-500 uppercase tracking-wider">
-                                            <th className="px-3 py-2">Category & Type</th>
-                                            <th className="px-3 py-2">Ref / Bill #</th>
-                                            <th className="px-3 py-2">Service Particulars</th>
-                                            <th className="px-3 py-2">Room / Outlet</th>
-                                            <th className="px-3 py-2">Date & Time</th>
-                                            <th className="px-3 py-2 text-right">Folio Total</th>
-                                            <th className="px-3 py-2 text-right">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 text-[11.5px]">
-                                        {(activityFilter === 'all' ? allLedgerItems :
-                                          activityFilter === 'reservations' ? reservationsList :
-                                          activityFilter === 'checkins' ? checkinsList :
-                                          outletBillsList).map((item) => (
-                                            <tr key={item.id} className="hover:bg-gray-50/70 transition-colors">
-                                                <td className="px-3 py-2">
-                                                    <div className="flex items-center gap-1.5">
-                                                        {item.type === 'reservation' ? (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                                                <Calendar size={10} /> Reservation
-                                                            </span>
-                                                        ) : item.type === 'checkin' ? (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                                <BedDouble size={10} /> Check-In Stay
-                                                            </span>
-                                                        ) : (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                                                {item.outletCategory?.includes('Restaurant') ? <Utensils size={10} /> :
-                                                                 item.outletCategory?.includes('Room Service') ? <Coffee size={10} /> :
-                                                                 item.outletCategory?.includes('Spa') ? <Sparkles size={10} /> :
-                                                                 item.outletCategory?.includes('Laundry') ? <Shirt size={10} /> :
-                                                                 <Wine size={10} />}
-                                                                {item.outletCategory || 'Outlet Bill'}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-
-                                                <td className="px-3 py-2 font-mono font-medium text-gray-900 text-[11px]">
-                                                    {item.refNumber}
-                                                </td>
-
-                                                <td className="px-3 py-2">
-                                                    <div className="font-semibold text-gray-900 text-[11px] leading-tight">
-                                                        {item.title}
-                                                    </div>
-                                                    <div className="text-[10px] text-gray-500 leading-tight mt-0.5">
-                                                        {item.particulars}
-                                                    </div>
-                                                </td>
-
-                                                <td className="px-3 py-2 font-mono text-gray-700 text-[11px]">
-                                                    {item.roomOrLocation}
-                                                </td>
-
-                                                <td className="px-3 py-2 font-mono text-gray-500 text-[10.5px] whitespace-nowrap">
-                                                    {item.dateTime}
-                                                </td>
-
-                                                <td className="px-3 py-2 text-right font-mono font-semibold text-gray-900">
-                                                    ৳ {item.amountBDT.toLocaleString()}
-                                                </td>
-
-                                                <td className="px-3 py-2 text-right">
-                                                    <span className={`px-2 py-0.5 rounded text-[9.5px] font-medium border ${item.statusBadgeColor}`}>
-                                                        {item.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
+                                    <div className="inline-flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md border border-gray-200/60 self-start sm:self-auto flex-nowrap">
+                                        {[
+                                            { key: 'all', label: 'All', count: allLedgerItems.length },
+                                            { key: 'reservations', label: 'Reservations', count: reservationsList.length },
+                                            { key: 'checkins', label: 'Stays', count: checkinsList.length },
+                                            { key: 'outlets', label: 'Outlet Bills', count: outletBillsList.length }
+                                        ].map(sub => (
+                                            <button
+                                                key={sub.key}
+                                                onClick={() => setActivityFilter(sub.key as any)}
+                                                className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                                                    activityFilter === sub.key
+                                                        ? 'bg-white text-blue-600 shadow-2xs'
+                                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+                                                }`}
+                                            >
+                                                <span>{sub.label}</span>
+                                                <span className={`text-[9px] px-1 py-0 rounded font-mono ${
+                                                    activityFilter === sub.key
+                                                        ? 'bg-blue-50 text-blue-700'
+                                                        : 'bg-gray-200/70 text-gray-600'
+                                                }`}>
+                                                    {sub.count}
+                                                </span>
+                                            </button>
                                         ))}
+                                    </div>
+                                </div>
 
-                                        {(activityFilter === 'all' ? allLedgerItems :
-                                          activityFilter === 'reservations' ? reservationsList :
-                                          activityFilter === 'checkins' ? checkinsList :
-                                          outletBillsList).length === 0 && (
-                                            <tr>
-                                                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-xs">
-                                                    No ledger entries found for this filter.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                {/* Summary Metrics Strip - Ultra Compact & Unified */}
+                                <div className="flex flex-wrap items-center justify-between bg-slate-50 border border-slate-200/80 rounded-md px-3 py-1.5 text-[10.5px] gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-gray-500 font-medium">Reservations:</span>
+                                        <span className="font-bold text-gray-900 font-mono">{reservationsList.length}</span>
+                                    </div>
+                                    <div className="h-3 w-px bg-gray-200 hidden sm:block" />
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-gray-500 font-medium">Stays:</span>
+                                        <span className="font-bold text-gray-900 font-mono">{checkinsList.length} ({activeGuest.totalNights || 0} Nts)</span>
+                                    </div>
+                                    <div className="h-3 w-px bg-gray-200 hidden sm:block" />
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-gray-500 font-medium">Outlet Bills:</span>
+                                        <span className="font-bold text-gray-900 font-mono">{outletBillsList.length}</span>
+                                    </div>
+                                    <div className="h-3 w-px bg-gray-200 hidden sm:block" />
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-gray-500 font-medium">Folio Total:</span>
+                                        <span className="font-bold text-emerald-700 font-mono">
+                                            ৳ {totalFolioSpend.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Activity Data Table - Solid, Non-Fragmented High Density Layout */}
+                                <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+                                    {displayedItems.length === 0 ? (
+                                        <div className="py-7 px-4 text-center">
+                                            <Receipt size={22} className="mx-auto mb-1.5 text-gray-300" />
+                                            <p className="text-xs font-semibold text-gray-700">
+                                                {activityFilter === 'all'
+                                                    ? 'No folio transactions or bookings'
+                                                    : `No ${activityFilter === 'reservations' ? 'reservations' : activityFilter === 'checkins' ? 'check-in stays' : 'outlet bills'} recorded`}
+                                            </p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">
+                                                Real room bookings and posted outlet bills will appear here automatically.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-collapse text-[11px]">
+                                                <thead>
+                                                    <tr className="bg-slate-50/90 border-b border-gray-200 text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+                                                        <th className="py-2 px-3 w-[120px]">Type & Ref</th>
+                                                        <th className="py-2 px-3">Service / Particulars</th>
+                                                        <th className="py-2 px-3 w-[100px]">Location</th>
+                                                        <th className="py-2 px-3 w-[85px]">Date</th>
+                                                        <th className="py-2 px-3 text-right w-[110px]">Amount</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {displayedItems.map((item: any) => (
+                                                        <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                                                            <td className="py-2 px-3 align-middle">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-semibold border ${
+                                                                        item.type === 'reservation' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                        item.type === 'checkin' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                                        'bg-amber-50 text-amber-800 border-amber-200'
+                                                                    }`}>
+                                                                        {item.type === 'reservation' ? 'Res' : item.type === 'checkin' ? 'Stay' : 'Outlet'}
+                                                                    </span>
+                                                                    <span className="font-mono text-gray-800 text-[10.5px] font-medium truncate">
+                                                                        {item.refNumber}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+
+                                                            <td className="py-2 px-3 align-middle min-w-[150px]">
+                                                                <div className="font-semibold text-gray-900 truncate leading-snug">
+                                                                    {item.title}
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-500 truncate">
+                                                                    {item.particulars}
+                                                                </div>
+                                                            </td>
+
+                                                            <td className="py-2 px-3 align-middle">
+                                                                <span className="text-[10.5px] font-mono text-gray-700 truncate block">
+                                                                    {item.roomOrLocation}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="py-2 px-3 align-middle">
+                                                                <span className="text-[10px] font-mono text-gray-500 whitespace-nowrap block">
+                                                                    {item.dateTime.slice(0, 10)}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="py-2 px-3 align-middle text-right">
+                                                                <div className="font-mono font-bold text-gray-900 text-[11px]">
+                                                                    ৳ {item.amountBDT.toLocaleString()}
+                                                                </div>
+                                                                <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-medium border ${item.statusBadgeColor} mt-0.5`}>
+                                                                    {item.status}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* Tab 2: Preferences & CRM */}
                     {activeTab === 'preferences' && (
