@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Building2, MapPin, Globe, CreditCard, Star, Clock, Moon, Monitor,
     User, Edit2, Copy, Mail, ShieldCheck, Phone, CheckCircle2, AlertCircle,
     Layers, Check, QrCode, Utensils, ShieldAlert,
     ExternalLink, Activity, Lock, FileCheck, Compass,
     Receipt, Database, Briefcase, Printer, Plus, Trash2, X, Save,
-    Building, BedDouble
+    Building, BedDouble, Camera, Upload, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import SendEmailModal from './SendEmailModal';
 import { getAllStoredReservations, getOperatingSystemDate } from '../utils/roomInventoryEngine';
@@ -39,6 +39,25 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
     const [localTime, setLocalTime] = useState<string>('');
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
+
+    // Property Logo State
+    const [logoUrl, setLogoUrl] = useState<string>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(`hotel_prop_logo_${propId}`);
+            if (saved) return saved;
+        }
+        return (targetProperty?.logo_url || targetProperty?.logoUrl || (settings as any)?.logoUrl || '');
+    });
+    const [isLogoModalOpen, setIsLogoModalOpen] = useState<boolean>(false);
+    const [tempLogoUrl, setTempLogoUrl] = useState<string>('');
+
+    // Tab Scrolling Ref & Handler
+    const tabsContainerRef = useRef<HTMLDivElement>(null);
+    const handleScrollTabs = (direction: 'left' | 'right') => {
+        if (tabsContainerRef.current) {
+            tabsContainerRef.current.scrollBy({ left: direction === 'left' ? -220 : 220, behavior: 'smooth' });
+        }
+    };
 
     // Live Server Metadata & Stats
     const [serverProperty, setServerProperty] = useState<any>(null);
@@ -90,6 +109,43 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
         setTimeout(() => setToastMessage(null), 3500);
     };
 
+    const handleSaveLogo = (newUrl: string) => {
+        setLogoUrl(newUrl);
+        if (typeof window !== 'undefined') {
+            if (newUrl) {
+                localStorage.setItem(`hotel_prop_logo_${propId}`, newUrl);
+            } else {
+                localStorage.removeItem(`hotel_prop_logo_${propId}`);
+            }
+        }
+        const updated = { ...settings, logoUrl: newUrl };
+        setSettings(updated);
+        handleSaveSettingsToDB(updated);
+        setIsLogoModalOpen(false);
+        showToast(newUrl ? 'Property logo updated successfully!' : 'Property logo reset to monogram');
+    };
+
+    const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select a valid image file (PNG, JPG, SVG, WebP).', 'error');
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            showToast('Image size should be less than 2MB.', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            if (base64) {
+                setTempLogoUrl(base64);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
     // Load property details & settings from Backend API with localStorage sync
     const loadPropertyDetails = async () => {
         const baseUrl = getApiBaseUrl();
@@ -124,6 +180,8 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
                     if (Array.isArray(dbSettings.contacts)) setContacts(dbSettings.contacts);
                     if (Array.isArray(dbSettings.emergencyLines)) setEmergencyLines(dbSettings.emergencyLines);
                     if (dbSettings.amenities) setAmenities(dbSettings.amenities);
+                    if (p.logo_url) setLogoUrl(p.logo_url);
+                    else if (dbSettings.logoUrl) setLogoUrl(dbSettings.logoUrl);
                     return;
                 }
             }
@@ -144,6 +202,7 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
                         checkInTime: targetProperty?.check_in_time || parsed.settings.checkInTime || '14:00',
                         checkOutTime: targetProperty?.check_out_time || parsed.settings.checkOutTime || '12:00'
                     }));
+                    if (parsed.settings.logoUrl) setLogoUrl(parsed.settings.logoUrl);
                 }
                 if (Array.isArray(parsed.bankAccounts)) setBankAccounts(parsed.bankAccounts);
                 if (Array.isArray(parsed.posOutlets)) setPosOutlets(parsed.posOutlets);
@@ -160,16 +219,44 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
         loadPropertyDetails();
     }, [propId, activeProperty]);
 
-    // Live Clock with Timezone
+    // Extract valid IANA timezone (e.g. "Asia/Dhaka") from settings.timezone or targetProperty
+    const propertyTimezone = useMemo(() => {
+        const raw = settings?.timezone || targetProperty?.timezone || 'Asia/Dhaka (GMT+06:00)';
+        const clean = raw.split(' ')[0].trim();
+        try {
+            Intl.DateTimeFormat(undefined, { timeZone: clean });
+            return clean;
+        } catch {
+            return 'Asia/Dhaka';
+        }
+    }, [settings?.timezone, targetProperty?.timezone]);
+
+    // Live Clock with exact Property Timezone
     useEffect(() => {
         const updateClock = () => {
             const now = new Date();
-            setLocalTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+            try {
+                const formattedTime = now.toLocaleTimeString('en-US', {
+                    timeZone: propertyTimezone,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+                setLocalTime(formattedTime);
+            } catch {
+                setLocalTime(now.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                }));
+            }
         };
         updateClock();
         const timer = setInterval(updateClock, 1000);
         return () => clearInterval(timer);
-    }, []);
+    }, [propertyTimezone]);
 
     const propName = serverProperty?.name || targetProperty?.name || 'Grand Palace Dhaka (Main Tower)';
     const propCode = serverProperty?.code || targetProperty?.code || 'GPD';
@@ -184,17 +271,17 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
     const propEmail = serverProperty?.email || targetProperty?.email || 'dhaka@grandhospitality.com';
     const propCurrency = serverProperty?.currency || targetProperty?.currency || settings.baseCurrency || 'BDT';
 
-    // Tabs definition with clean icons
+    // Tabs definition with clean icons & space-optimized labels
     const tabs = [
         { id: 'overview', manageTab: 'identity', label: 'Overview', icon: Building2 },
-        { id: 'operations', manageTab: 'operations', label: 'Operations & Hours', icon: Clock },
-        { id: 'policies', manageTab: 'operations', label: 'Policies & Guarantees', icon: ShieldCheck },
-        { id: 'finance', manageTab: 'finance', label: 'Finance, Tax & Bank', icon: CreditCard },
+        { id: 'operations', manageTab: 'operations', label: 'Operations', icon: Clock },
+        { id: 'policies', manageTab: 'operations', label: 'Policies', icon: ShieldCheck },
+        { id: 'finance', manageTab: 'finance', label: 'Finance & Tax', icon: CreditCard },
         { id: 'outlets', manageTab: 'system', label: 'Outlets & POS', icon: Layers, badge: posOutlets.length },
         { id: 'distribution', manageTab: 'system', label: 'Channels & GDS', icon: Globe },
-        { id: 'team', manageTab: 'branding', label: 'Management & Safety', icon: User, badge: contacts.length },
-        { id: 'numbering', manageTab: 'numbering', label: 'Folio & Invoicing', icon: Receipt },
-        { id: 'automation', manageTab: 'communication', label: 'Security & Backup', icon: Monitor },
+        { id: 'team', manageTab: 'branding', label: 'Management', icon: User, badge: contacts.length },
+        { id: 'numbering', manageTab: 'numbering', label: 'Folio & Billing', icon: Receipt },
+        { id: 'automation', manageTab: 'communication', label: 'Security & System', icon: Monitor },
     ];
 
     const currentTabObj = tabs.find(t => t.id === activeTab) || tabs[0];
@@ -415,18 +502,34 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
 
                 {/* Main Identity Area */}
                 <div className="p-5 sm:p-7">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
                         {/* Left: Avatar + Identity */}
-                        <div className="flex items-start sm:items-center gap-4.5 min-w-0">
-                            {/* Modern Hotel Logo Monogram */}
-                            <div className="relative shrink-0">
-                                <div className="size-16 sm:size-20 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-2xl sm:text-3xl tracking-tight shadow-sm ring-4 ring-slate-100">
-                                    {propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}
-                                </div>
+                        <div className="flex items-start sm:items-center gap-4.5 min-w-0 flex-1">
+                            {/* Modern Hotel Logo Monogram with Hover Change Overlay */}
+                            <div className="relative shrink-0 group">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setTempLogoUrl(logoUrl);
+                                        setIsLogoModalOpen(true);
+                                    }}
+                                    className="size-16 sm:size-20 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-2xl sm:text-3xl tracking-tight shadow-sm ring-4 ring-slate-100 overflow-hidden cursor-pointer relative transition-transform hover:scale-[1.02] text-center"
+                                    title="Click to change hotel brand logo"
+                                >
+                                    {logoUrl ? (
+                                        <img src={logoUrl} alt={propName} className="size-full object-cover" />
+                                    ) : (
+                                        <span>{propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}</span>
+                                    )}
+                                    <div className="absolute inset-0 bg-black/55 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Camera size={16} />
+                                        <span className="text-[9px] font-bold mt-0.5 tracking-tight uppercase">Change</span>
+                                    </div>
+                                </button>
                                 <span className="absolute -bottom-1 -right-1 size-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Operating Property"></span>
                             </div>
 
-                            <div className="min-w-0 space-y-1.5">
+                            <div className="min-w-0 flex-1 space-y-1.5">
                                 {/* Badge Row */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80">
@@ -440,33 +543,29 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                         <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                         Live Operational
                                     </span>
-                                    <span className="text-xs text-slate-400 font-medium hidden sm:inline">•</span>
-                                    <span className="text-xs text-slate-500 font-medium hidden sm:inline">
-                                        ID: #{propId} • {targetProperty?.organization_name || 'Grand Hospitality Group'}
-                                    </span>
                                 </div>
 
                                 {/* Hotel Name */}
-                                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug py-0.5 break-words">
                                     {propName}
                                 </h1>
 
                                 {/* Contact & Location Strip */}
                                 <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500 pt-0.5 font-medium">
-                                    <span className="flex items-center gap-1.5">
+                                    <span className="flex items-center gap-1.5 min-w-0">
                                         <MapPin size={13.5} className="text-slate-400 shrink-0" />
                                         <span className="truncate">{propAddress}, {propCity}, {propCountry}</span>
                                     </span>
-                                    <span className="flex items-center gap-1.5">
+                                    <span className="flex items-center gap-1.5 shrink-0">
                                         <Phone size={13.5} className="text-slate-400 shrink-0" />
                                         <span>{propPhone}</span>
                                     </span>
-                                    <span className="flex items-center gap-1.5">
+                                    <span className="flex items-center gap-1.5 shrink-0">
                                         <Mail size={13.5} className="text-slate-400 shrink-0" />
                                         <a href={`mailto:${propEmail}`} className="text-blue-600 hover:underline">{propEmail}</a>
                                     </span>
                                     {Boolean(settings.website) && (
-                                        <span className="flex items-center gap-1.5">
+                                        <span className="flex items-center gap-1.5 shrink-0">
                                             <Globe size={13.5} className="text-slate-400 shrink-0" />
                                             <a
                                                 href={settings.website.startsWith('http') ? settings.website : `https://${settings.website}`}
@@ -484,12 +583,12 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                         </div>
 
                         {/* Right: Live Clock & Actions */}
-                        <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end justify-between gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                        <div className="flex flex-col sm:flex-row xl:flex-col items-start sm:items-center xl:items-end justify-between gap-3 shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
                             {/* Local Clock */}
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-mono shadow-2xs">
-                                <Clock size={13} className="text-blue-600" />
+                                <Clock size={13} className="text-blue-600 shrink-0" />
                                 <span className="font-bold text-slate-900">{localTime}</span>
-                                <span className="text-[10px] text-slate-400">({settings.timezone.split(' ')[0]})</span>
+                                <span className="text-[10px] text-slate-500 font-sans font-semibold">({propertyTimezone})</span>
                             </div>
 
                             {/* Action Buttons */}
@@ -595,34 +694,66 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                     </div>
                 </div>
 
-                {/* Pill Tab Navigation Bar - with hidden scrollbar and high-end styling */}
-                <div className="px-4 py-2 bg-white border-t border-slate-100 flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        const isSelected = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
-                                    isSelected
-                                        ? 'bg-blue-600 text-white shadow-xs font-bold'
-                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                                }`}
-                            >
-                                <Icon size={14} className={isSelected ? 'text-white' : 'text-slate-400'} />
-                                <span>{tab.label}</span>
-                                {tab.badge !== undefined && tab.badge > 0 && (
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                                        isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
-                                    }`}>
-                                        {tab.badge}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
+                {/* Pill Tab Navigation Bar - Scrollable with Navigation Chevrons & Edge Fades */}
+                <div className="relative border-t border-slate-100 bg-white">
+                    {/* Left Scroll Button */}
+                    <button
+                        type="button"
+                        onClick={() => handleScrollTabs('left')}
+                        className="absolute left-1 top-1/2 -translate-y-1/2 z-10 size-7 rounded-lg bg-white/95 shadow-md border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer"
+                        title="Scroll Left"
+                    >
+                        <ChevronLeft size={14} />
+                    </button>
+
+                    {/* Left Edge Gradient Fade */}
+                    <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white via-white/80 to-transparent pointer-events-none z-5" />
+
+                    {/* Scrollable Tabs Track */}
+                    <div
+                        ref={tabsContainerRef}
+                        className="px-8 py-2 flex items-center gap-1.5 overflow-x-auto scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    >
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            const isSelected = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                                        isSelected
+                                            ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent hover:border-slate-200/60'
+                                    }`}
+                                >
+                                    <Icon size={13} className={isSelected ? 'text-white' : 'text-slate-400'} />
+                                    <span>{tab.label}</span>
+                                    {tab.badge !== undefined && tab.badge > 0 && (
+                                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                                            isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                                        }`}>
+                                            {tab.badge}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Right Edge Gradient Fade */}
+                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white via-white/80 to-transparent pointer-events-none z-5" />
+
+                    {/* Right Scroll Button */}
+                    <button
+                        type="button"
+                        onClick={() => handleScrollTabs('right')}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 z-10 size-7 rounded-lg bg-white/95 shadow-md border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer"
+                        title="Scroll Right"
+                    >
+                        <ChevronRight size={14} />
+                    </button>
                 </div>
             </div>
 
@@ -1588,6 +1719,38 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                             {quickEditTab === 'identity' && (
                                 <div className="space-y-3">
                                     <div>
+                                        <label className="font-semibold text-slate-700 block mb-1">Brand Logo Image</label>
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-bold text-slate-600 text-sm shrink-0">
+                                                {logoUrl ? (
+                                                    <img src={logoUrl} alt="Logo" className="size-full object-cover" />
+                                                ) : (
+                                                    <span>{propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}</span>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setTempLogoUrl(logoUrl);
+                                                    setIsLogoModalOpen(true);
+                                                }}
+                                                className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                                            >
+                                                <Camera size={13} className="text-blue-600" />
+                                                <span>{logoUrl ? 'Change / Upload Logo' : 'Upload Brand Logo'}</span>
+                                            </button>
+                                            {logoUrl && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSaveLogo('')}
+                                                    className="text-xs text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                                                >
+                                                    Remove Logo
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
                                         <label className="font-semibold text-slate-700 block mb-1">Hotel Property Name</label>
                                         <input
                                             type="text"
@@ -1984,6 +2147,111 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                             </button>
                         </div>
                     </form>
+                </div>
+            )}
+
+            {/* Change Property Logo Modal */}
+            {isLogoModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+                    <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/70">
+                            <div className="flex items-center gap-2">
+                                <Camera className="size-4 text-blue-600" />
+                                <h3 className="text-sm font-bold text-slate-900">Change Hotel Brand Logo</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsLogoModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-5 space-y-4">
+                            {/* Live Logo Preview Box */}
+                            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                                <div className="size-24 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-3xl tracking-tight shadow-md ring-4 ring-white overflow-hidden mb-2">
+                                    {tempLogoUrl ? (
+                                        <img src={tempLogoUrl} alt="Preview" className="size-full object-cover" />
+                                    ) : (
+                                        <span>{propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}</span>
+                                    )}
+                                </div>
+                                <p className="text-xs font-semibold text-slate-700">{propName}</p>
+                                <p className="text-[11px] text-slate-400">{tempLogoUrl ? 'Custom Logo Preview' : 'Default Monogram Emblem'}</p>
+                            </div>
+
+                            {/* Option 1: File Upload */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                                    Upload Logo from Device
+                                </label>
+                                <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-700 transition shadow-2xs">
+                                    <Upload size={14} className="text-blue-600" />
+                                    <span>Choose Image File (PNG, JPG, SVG, WebP)</span>
+                                    <input
+                                        type="file"
+                                        accept="image/png, image/jpeg, image/svg+xml, image/webp"
+                                        onChange={handleLogoFileUpload}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
+
+                            {/* Option 2: Image URL */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                                    Or Enter Image Web URL
+                                </label>
+                                <input
+                                    type="url"
+                                    placeholder="https://example.com/logo.png"
+                                    value={tempLogoUrl.startsWith('data:') ? '' : tempLogoUrl}
+                                    onChange={(e) => setTempLogoUrl(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-mono"
+                                />
+                            </div>
+
+                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                Recommended dimensions: Square 512×512px or higher. PNG with transparent background works best for guest registration cards and folio invoices.
+                            </p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between">
+                            {logoUrl ? (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSaveLogo('')}
+                                    className="text-xs text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                                >
+                                    Reset to Monogram
+                                </button>
+                            ) : (
+                                <span />
+                            )}
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLogoModalOpen(false)}
+                                    className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSaveLogo(tempLogoUrl)}
+                                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                                >
+                                    Save Logo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 

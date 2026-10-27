@@ -202,7 +202,7 @@ export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     enableWhatsAppConcierge: true,
 
     // 7. Branding & Contacts
-    logoUrl: '',
+    logoUrl: targetProperty?.logo_url || targetProperty?.logoUrl || '',
     facebookUrl: 'https://facebook.com/grandpalacehotel',
     instagramUrl: 'https://instagram.com/grandpalacehotel',
     tripAdvisorUrl: 'https://tripadvisor.com/grandpalacehotel',
