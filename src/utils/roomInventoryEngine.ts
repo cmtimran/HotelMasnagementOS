@@ -757,6 +757,8 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
                         roomTypeName: r.roomTypeName || matchedType?.name || ROOM_TYPE_MAP[String(r.roomTypeId)] || 'Deluxe Double',
                         status: r.status || 'Active',
                         housekeepingStatus: r.housekeepingStatus || 'Clean',
+                        isConnecting: Boolean(r.isConnecting),
+                        connectedTo: r.connectedTo || '',
                         remarks: r.remarks
                     };
                 });
