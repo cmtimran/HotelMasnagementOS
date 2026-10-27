@@ -351,151 +351,153 @@ const RoomTypeManagement = () => {
 
     if (view === 'list') {
         return (
-            <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+            <div className="p-2.5 sm:p-3.5 space-y-3 font-sans animate-in fade-in duration-200">
                 {/* Header */}
                 <PageHeader
                     title="Room Type Master Data"
                     subtitle="Configure hotel room categories, occupancy limits, physical inventory specifications, and base tariffs."
-                    icon={<BedDouble className="size-6 text-primary" />}
+                    icon={<BedDouble className="size-5 text-primary" />}
                     actions={
                         <button
                             onClick={handleAddNew}
-                            className="btn-primary"
+                            className="btn-primary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                         >
-                            <Plus className="size-4 mr-1.5" />
-                            Add Room Type
+                            <Plus className="size-3.5" />
+                            <span>Add Room Type</span>
                         </button>
                     }
                 />
 
                 {/* KPI Metric Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-slate-500">Total Categories</span>
-                            <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
-                                <BedDouble className="size-4" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Categories</span>
+                            <div className="size-7 rounded-lg bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                                <BedDouble className="size-3.5" />
                             </div>
                         </div>
-                        <div className="text-2xl font-black text-slate-900 tracking-tight">{roomTypes.length}</div>
-                        <div className="text-[11px] text-slate-500 font-medium mt-1">Configured room classes</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{roomTypes.length}</div>
+                        <div className="mt-0.5 text-[10px] text-slate-500 font-medium">Configured room classes</div>
                     </div>
 
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-slate-500">Active Room Types</span>
-                            <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                                <CheckCircle2 className="size-4" />
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Active Room Types</span>
+                            <div className="size-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                <CheckCircle2 className="size-3.5" />
                             </div>
                         </div>
-                        <div className="text-2xl font-black text-slate-900 tracking-tight">{activeCount}</div>
-                        <div className="text-[11px] text-emerald-600 font-semibold mt-1">Available for reservations</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{activeCount}</div>
+                        <div className="mt-0.5 text-[10px] text-emerald-600 font-semibold">Available for reservations</div>
                     </div>
 
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-slate-500">Avg Base Tariff</span>
-                            <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                                <DollarSign className="size-4" />
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Avg Base Tariff</span>
+                            <div className="size-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                                <DollarSign className="size-3.5" />
                             </div>
                         </div>
-                        <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{avgTariff.toLocaleString()}</div>
-                        <div className="text-[11px] text-slate-500 font-medium mt-1">Rack rate average</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight font-mono">৳{avgTariff.toLocaleString()}</div>
+                        <div className="mt-0.5 text-[10px] text-slate-500 font-medium">Rack rate average</div>
                     </div>
 
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-slate-500">Connecting Enabled</span>
-                            <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                                <Layers className="size-4" />
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Connecting Enabled</span>
+                            <div className="size-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                                <Layers className="size-3.5" />
                             </div>
                         </div>
-                        <div className="text-2xl font-black text-slate-900 tracking-tight">{connectingCount}</div>
-                        <div className="text-[11px] text-indigo-600 font-semibold mt-1">Joint door room configurations</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{connectingCount}</div>
+                        <div className="mt-0.5 text-[10px] text-indigo-600 font-semibold">Joint door room setups</div>
                     </div>
                 </div>
 
                 {/* Toolbar */}
-                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row gap-3 items-center justify-between">
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row gap-2 items-center justify-between">
                     <div className="relative w-full md:w-80">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 size-3.5" />
                         <input
                             type="text"
                             placeholder="Search by name, code, view..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="input-standard pl-9"
+                            className="input-standard pl-8.5 !h-8 !text-xs"
                         />
                     </div>
                     <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                        <span className="text-xs text-slate-500 font-medium">
+                        <span className="text-[11px] text-slate-500 font-medium">
                             Showing <strong className="text-slate-800">{filteredRoomTypes.length}</strong> of {roomTypes.length}
                         </span>
                     </div>
                 </div>
 
                 {/* Room Type Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredRoomTypes.map(rt => (
-                        <div key={rt.id} className="card-container p-5 flex flex-col justify-between hover:shadow-xs transition group">
+                        <div key={rt.id} className="card-container p-3.5 flex flex-col justify-between hover:shadow-xs transition group">
                             <div>
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className={rt.status === 'Active' ? 'badge-status-active' : 'badge-status-inactive'}>
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`${rt.status === 'Active' ? 'badge-status-active' : 'badge-status-inactive'} text-[10px] py-0.5 px-2`}>
                                             {rt.status}
                                         </span>
-                                        <span className="badge-code">
+                                        <span className="badge-code text-[10px] py-0.5 px-1.5">
                                             {rt.shortCode}
                                         </span>
                                     </div>
-                                    <div className="flex gap-1.5 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
+                                    <div className="flex gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
                                         <button
                                             onClick={() => handleEdit(rt)}
-                                            className="btn-icon"
+                                            className="btn-icon size-7"
                                             title="Edit Room Type"
                                         >
-                                            <Edit2 className="size-3.5" />
+                                            <Edit2 className="size-3 text-slate-600" />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(rt.id)}
-                                            className="btn-icon-danger"
+                                            className="btn-icon-danger size-7"
                                             title="Delete Room Type"
                                         >
-                                            <Trash2 className="size-3.5" />
+                                            <Trash2 className="size-3 text-rose-500" />
                                         </button>
                                     </div>
                                 </div>
 
-                                <h3 className="text-base text-slate-900 leading-snug">{rt.name}</h3>
-                                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{rt.description}</p>
+                                <h3 className="text-sm font-semibold text-slate-900 leading-snug">{rt.name}</h3>
+                                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{rt.description}</p>
 
-                                <div className="mt-4 flex flex-wrap gap-1.5">
+                                <div className="mt-3 flex flex-wrap gap-1">
                                     {rt.amenities.slice(0, 4).map(a => (
-                                        <span key={a} className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium border border-slate-200/80">
+                                        <span key={a} className="text-[9.5px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium border border-slate-200/80">
                                             {a}
                                         </span>
                                     ))}
                                     {rt.amenities.length > 4 && (
-                                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md font-medium">
+                                        <span className="text-[9.5px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
                                             +{rt.amenities.length - 4} more
                                         </span>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 border-t border-slate-100 pt-3.5 mt-4">
+                            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mt-3">
                                 <div>
-                                    <span className="block text-[10px] uppercase text-slate-400 tracking-wider">Occupancy</span>
-                                    <span className="font-semibold text-slate-800">{rt.baseAdult}A, {rt.baseChild}C (Max {rt.totalCapacity})</span>
+                                    <span className="block text-[9px] uppercase text-slate-400 tracking-wider">Occupancy</span>
+                                    <span className="font-semibold text-slate-800 text-xs">{rt.baseAdult}A, {rt.baseChild}C (Max {rt.totalCapacity})</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block text-[10px] uppercase text-slate-400 tracking-wider">Base Tariff</span>
-                                    <span className="font-mono text-primary text-sm">৳{rt.basePrice.toLocaleString()}</span>
+                                    <span className="block text-[9px] uppercase text-slate-400 tracking-wider">Base Tariff</span>
+                                    <span className="font-mono text-primary font-bold text-xs">৳{rt.basePrice.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
+            </div>
+        );
             </div>
         );
     }

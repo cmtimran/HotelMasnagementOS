@@ -355,34 +355,34 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
     const oooCount = rooms.filter(r => r.status === 'Out of Order' || r.status === 'Maintenance').length;
 
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 font-sans animate-in fade-in duration-300">
+        <div className="p-2.5 sm:p-3.5 space-y-3 font-sans animate-in fade-in duration-200">
             {/* Header */}
             <PageHeader
                 title={view === 'list' ? 'Physical Room Inventory' : (formData.id === 0 ? 'Add Physical Room' : `Edit Room ${formData.number}`)}
                 subtitle={view === 'list' ? 'Manage property room master, floor distributions, door locks & housekeeping status.' : 'Configure room details, technical devices and status'}
-                icon={<Building2 className="size-6 text-primary" />}
+                icon={<Building2 className="size-5 text-primary" />}
                 actions={
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2">
                         {onBack && (
-                            <button onClick={onBack} className="btn-secondary">
+                            <button onClick={onBack} className="btn-secondary !h-8 !py-1 !px-3 text-xs">
                                 Back
                             </button>
                         )}
                         {view === 'list' ? (
                             <button
                                 onClick={handleAddNew}
-                                className="btn-primary"
+                                className="btn-primary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                             >
-                                <Plus className="size-4 mr-1.5" />
-                                Add New Room
+                                <Plus className="size-3.5" />
+                                <span>Add New Room</span>
                             </button>
                         ) : (
                             <button
                                 onClick={() => setView('list')}
-                                className="btn-secondary"
+                                className="btn-secondary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                             >
-                                <ChevronLeft className="size-4 mr-1.5" />
-                                Return to List
+                                <ChevronLeft className="size-3.5" />
+                                <span>Return to List</span>
                             </button>
                         )}
                     </div>
@@ -392,79 +392,79 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
             {view === 'list' && (
                 <>
                     {/* KPI Metric Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-slate-500">Total Rooms</span>
-                                <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
-                                    <Building2 className="size-4" />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                        <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Rooms</span>
+                                <div className="size-7 rounded-lg bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                                    <Building2 className="size-3.5" />
                                 </div>
                             </div>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight">{rooms.length}</div>
-                            <div className="text-[11px] text-slate-500 font-medium mt-1">Physical inventory units</div>
+                            <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{rooms.length}</div>
+                            <div className="mt-0.5 text-[10px] text-slate-500 font-medium">Physical inventory units</div>
                         </div>
 
-                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-slate-500">Clean / Inspected</span>
-                                <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                                    <CheckCircle2 className="size-4" />
+                        <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Clean / Inspected</span>
+                                <div className="size-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                    <CheckCircle2 className="size-3.5" />
                                 </div>
                             </div>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight">{cleanCount}</div>
-                            <div className="text-[11px] text-emerald-600 font-semibold mt-1">Ready for check-in</div>
+                            <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{cleanCount}</div>
+                            <div className="mt-0.5 text-[10px] text-emerald-600 font-semibold">Ready for check-in</div>
                         </div>
 
-                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-slate-500">Dirty / Turn-down</span>
-                                <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                                    <Sparkles className="size-4" />
+                        <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Dirty / Turn-down</span>
+                                <div className="size-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                                    <Sparkles className="size-3.5" />
                                 </div>
                             </div>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight">{dirtyCount}</div>
-                            <div className="text-[11px] text-amber-700 font-semibold mt-1">Pending housekeeping</div>
+                            <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{dirtyCount}</div>
+                            <div className="mt-0.5 text-[10px] text-amber-700 font-semibold">Pending housekeeping</div>
                         </div>
 
-                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-slate-500">Out of Order (OOO)</span>
-                                <div className="size-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                                    <AlertTriangle className="size-4" />
+                        <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Out of Order (OOO)</span>
+                                <div className="size-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                                    <AlertTriangle className="size-3.5" />
                                 </div>
                             </div>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight">{oooCount}</div>
-                            <div className="text-[11px] text-rose-600 font-semibold mt-1">Maintenance / Blocked</div>
+                            <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{oooCount}</div>
+                            <div className="mt-0.5 text-[10px] text-rose-600 font-semibold">Maintenance / Blocked</div>
                         </div>
                     </div>
 
                     {/* Filters & Floor Tabs Toolbar */}
-                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3">
-                        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
+                        <div className="flex flex-col md:flex-row gap-2 items-center justify-between">
                             <div className="relative w-full md:w-80">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 size-3.5" />
                                 <input
                                     type="text"
                                     placeholder="Search by room #, name, extension..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="input-standard pl-9"
+                                    className="input-standard pl-8.5 !h-8 !text-xs"
                                 />
                             </div>
-                            <div className="flex items-center gap-2 w-full md:w-auto justify-end text-xs text-slate-500 font-medium">
+                            <div className="flex items-center gap-2 w-full md:w-auto justify-end text-[11px] text-slate-500 font-medium">
                                 Showing <strong className="text-slate-800">{filteredRooms.length}</strong> of {rooms.length} rooms
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-100">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                             {/* Floor Filter */}
-                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                            <div className="flex flex-wrap items-center gap-1 text-xs">
                                 <span className="text-[10px] text-slate-400 uppercase tracking-wider mr-1">Floor:</span>
                                 <button
                                     onClick={() => setSelectedFloor('all')}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
                                         selectedFloor === 'all'
-                                            ? 'bg-primary text-white shadow-xs'
+                                            ? 'bg-primary text-white shadow-2xs'
                                             : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                                     }`}
                                 >
@@ -474,9 +474,9 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                     <button
                                         key={floor.id}
                                         onClick={() => setSelectedFloor(String(floor.id))}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
                                             selectedFloor === String(floor.id)
-                                                ? 'bg-primary text-white shadow-xs'
+                                                ? 'bg-primary text-white shadow-2xs'
                                                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                                         }`}
                                     >
@@ -486,13 +486,13 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                             </div>
 
                             {/* Status Filter */}
-                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                            <div className="flex flex-wrap items-center gap-1 text-xs">
                                 <span className="text-[10px] text-slate-400 uppercase tracking-wider mr-1">Status:</span>
                                 <button
                                     onClick={() => setSelectedStatus('all')}
-                                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition ${
+                                    className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition ${
                                         selectedStatus === 'all'
-                                            ? 'bg-slate-900 text-white shadow-xs'
+                                            ? 'bg-slate-900 text-white shadow-2xs'
                                             : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                                     }`}
                                 >
@@ -502,9 +502,9 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                     <button
                                         key={st}
                                         onClick={() => setSelectedStatus(st)}
-                                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition ${
+                                        className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition ${
                                             selectedStatus === st
-                                                ? 'bg-slate-900 text-white shadow-xs'
+                                                ? 'bg-slate-900 text-white shadow-2xs'
                                                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                                         }`}
                                     >
@@ -517,57 +517,57 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
 
                     {/* Room Grid */}
                     {filteredRooms.length === 0 ? (
-                        <div className="card-container p-12 text-center text-slate-400">
-                            <Building2 className="size-8 mx-auto mb-2 text-slate-300" />
+                        <div className="card-container p-8 text-center text-slate-400 text-xs">
+                            <Building2 className="size-7 mx-auto mb-2 text-slate-300" />
                             No rooms match the current search or filter criteria.
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                             {filteredRooms.map(room => {
                                 const roomType = availableRoomTypes.find(t => String(t.id) === room.roomTypeId);
                                 const floor = availableFloors.find(f => String(f.id) === room.floorId);
 
                                 return (
-                                    <div key={room.id} className="card-container p-4 hover:shadow-xs transition relative flex flex-col justify-between group">
+                                    <div key={room.id} className="card-container p-3 hover:shadow-xs transition relative flex flex-col justify-between group">
                                         <div>
-                                            <div className="flex justify-between items-start mb-2">
+                                            <div className="flex justify-between items-start mb-1.5">
                                                 <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <h3 className="text-lg text-slate-900 tracking-tight font-mono">{room.number}</h3>
-                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] border ${getStatusColor(room.status)}`}>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <h3 className="text-base text-slate-900 tracking-tight font-mono font-bold">{room.number}</h3>
+                                                        <span className={`px-1.5 py-0.5 rounded-md text-[9.5px] border ${getStatusColor(room.status)}`}>
                                                             {room.status}
                                                         </span>
                                                     </div>
-                                                    <p className="text-xs text-primary font-semibold mt-0.5">{roomType?.name || 'Standard'}</p>
+                                                    <p className="text-[11px] text-primary font-semibold mt-0.5">{roomType?.name || 'Standard'}</p>
                                                 </div>
 
                                                 <div className="flex gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
-                                                    <button onClick={() => handleEdit(room)} className="btn-icon" title="Edit Room">
-                                                        <Edit2 className="size-3.5" />
+                                                    <button onClick={() => handleEdit(room)} className="btn-icon size-6" title="Edit Room">
+                                                        <Edit2 className="size-3 text-slate-600" />
                                                     </button>
-                                                    <button onClick={() => handleDelete(room.id)} className="btn-icon-danger" title="Delete Room">
-                                                        <Trash2 className="size-3.5" />
+                                                    <button onClick={() => handleDelete(room.id)} className="btn-icon-danger size-6" title="Delete Room">
+                                                        <Trash2 className="size-3 text-rose-500" />
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div className="space-y-1.5 my-3 text-xs text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
-                                                <div className="flex items-center justify-between text-[11px]">
+                                            <div className="space-y-1 my-2 text-xs text-slate-600 bg-slate-50/80 p-2 rounded-lg border border-slate-200/80">
+                                                <div className="flex items-center justify-between text-[10px]">
                                                     <span className="text-slate-400">Location:</span>
                                                     <span className="font-semibold text-slate-800">{floor?.name.split(' (')[0] || `Floor ${room.floorId}`}</span>
                                                 </div>
-                                                <div className="flex items-center justify-between text-[11px]">
+                                                <div className="flex items-center justify-between text-[10px]">
                                                     <span className="text-slate-400">Lock RFID:</span>
                                                     <span className="font-mono text-slate-700">{room.lockId || `KEY-${room.number}`}</span>
                                                 </div>
-                                                <div className="flex items-center justify-between text-[11px]">
+                                                <div className="flex items-center justify-between text-[10px]">
                                                     <span className="text-slate-400">Phone Ext:</span>
                                                     <span className="font-mono font-semibold text-slate-700">{room.phoneExt || `2${room.number}`}</span>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-[10px]">
                                             <span className={`px-2 py-0.5 rounded-full ${getHousekeepingBadge(room.housekeepingStatus)}`}>
                                                 HK: {room.housekeepingStatus}
                                             </span>

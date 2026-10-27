@@ -978,10 +978,10 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
     };
 
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans">
+        <div className="p-2.5 sm:p-3.5 space-y-3 font-sans animate-in fade-in duration-200">
             {/* Toast Notification */}
             {toastMessage && (
-                <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-semibold animate-bounce">
+                <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-xs font-semibold animate-bounce">
                     <Sparkles size={14} className="text-amber-400" />
                     <span>{toastMessage}</span>
                 </div>
@@ -991,31 +991,31 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             <PageHeader
                 title="Property Structure & Amenities Master"
                 subtitle="Manage wings, towers, floor levels, room capacity, and dynamic life safety assets with duplicate-free short codes"
-                icon={<Building2 className="size-6 text-primary" />}
+                icon={<Building2 className="size-5 text-primary" />}
                 actions={
                     <div className="flex items-center gap-2">
                         {mainTab === 'buildings' && (
                             <button
                                 onClick={handleOpenAddBuilding}
-                                className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                                className="btn-primary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                             >
-                                <Plus size={15} /> Add Building
+                                <Plus size={14} /> Add Building
                             </button>
                         )}
                         {mainTab === 'floors' && (
                             <button
                                 onClick={() => handleOpenAddFloor()}
-                                className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                                className="btn-primary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                             >
-                                <Plus size={15} /> Add Floor
+                                <Plus size={14} /> Add Floor
                             </button>
                         )}
                         {mainTab === 'amenities' && (
                             <button
                                 onClick={handleOpenAddAmenity}
-                                className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                                className="btn-primary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                             >
-                                <Plus size={15} /> Add Amenity / Safety Asset
+                                <Plus size={14} /> Add Amenity / Safety Asset
                             </button>
                         )}
                     </div>
@@ -1023,64 +1023,64 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
             />
 
             {/* 4 Standardized Thesis KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Buildings</span>
-                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
-                            <Building2 size={16} />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Buildings</span>
+                        <div className="size-7 rounded-lg bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Building2 size={14} />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{buildingMetrics.totalBuildings}</div>
-                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{buildingMetrics.activeBuildings} Active Wings</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{buildingMetrics.totalBuildings}</div>
+                    <div className="mt-0.5 text-[10px] text-emerald-600 font-semibold">{buildingMetrics.activeBuildings} Active Wings</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Floor Levels</span>
-                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                            <Layers size={16} />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Floor Levels</span>
+                        <div className="size-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <Layers size={14} />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{buildingMetrics.totalFloors}</div>
-                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Configured levels</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{buildingMetrics.totalFloors}</div>
+                    <div className="mt-0.5 text-[10px] text-slate-400 font-medium">Configured levels</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Life Safety & Assets</span>
-                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                            <ShieldCheck size={16} />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Life Safety & Assets</span>
+                        <div className="size-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <ShieldCheck size={14} />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{amenitiesCatalog.length}</div>
-                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{buildingMetrics.totalSafetyAssets} Safety Assets</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{amenitiesCatalog.length}</div>
+                    <div className="mt-0.5 text-[10px] text-emerald-600 font-semibold">{buildingMetrics.totalSafetyAssets} Safety Assets</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Room Inventory</span>
-                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                            <BedDouble size={16} />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Room Inventory</span>
+                        <div className="size-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <BedDouble size={14} />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{buildingMetrics.totalRooms}</div>
-                    <div className="mt-1 text-[11px] text-primary font-semibold">Total Physical Keys</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{buildingMetrics.totalRooms}</div>
+                    <div className="mt-0.5 text-[10px] text-primary font-semibold">Total Physical Keys</div>
                 </div>
             </div>
 
             {/* Navigation Tabs Bar */}
-            <div className="bg-white p-2 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
+            <div className="bg-white p-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1 p-0.5 bg-slate-100/80 rounded-lg">
                     <button
                         onClick={() => setMainTab('buildings')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             mainTab === 'buildings'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-primary shadow-2xs font-bold'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
-                        <Building2 size={14} />
+                        <Building2 size={13} />
                         <span>Buildings</span>
                         <span className="badge-code !py-0 !px-1.5 !text-[10px]">
                             {buildings.length}
@@ -1088,13 +1088,13 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     </button>
                     <button
                         onClick={() => setMainTab('floors')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             mainTab === 'floors'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-primary shadow-2xs font-bold'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
-                        <Layers size={14} />
+                        <Layers size={13} />
                         <span>Floors</span>
                         <span className="badge-code !py-0 !px-1.5 !text-[10px]">
                             {floors.length}
@@ -1102,13 +1102,13 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     </button>
                     <button
                         onClick={() => setMainTab('amenities')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             mainTab === 'amenities'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-primary shadow-2xs font-bold'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
-                        <ShieldCheck size={14} className="text-emerald-600" />
+                        <ShieldCheck size={13} className="text-emerald-600" />
                         <span>Amenities & Safety</span>
                         <span className="badge-code !py-0 !px-1.5 !text-[10px]">
                             {amenitiesCatalog.length}
@@ -1116,13 +1116,13 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
                     </button>
                     <button
                         onClick={() => setMainTab('matrix')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             mainTab === 'matrix'
-                                ? 'bg-white text-primary shadow-xs font-bold'
+                                ? 'bg-white text-primary shadow-2xs font-bold'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
-                        <Compass size={14} />
+                        <Compass size={13} />
                         <span>Matrix</span>
                     </button>
                 </div>
@@ -1137,9 +1137,9 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
             {/* TAB CONTENT 1: BUILDINGS MASTER */}
             {mainTab === 'buildings' && (
-                <div className="flex-1 flex flex-col p-4">
+                <div className="flex-1 flex flex-col p-1 sm:p-2 space-y-3">
                     {/* Control Bar: Search & Filters */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
                         <div className="flex flex-wrap items-center gap-2 flex-1">
                             {/* Live Search */}
                             <div className="relative flex-1 min-w-[220px] max-w-sm">
@@ -1465,9 +1465,9 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
             {/* TAB CONTENT 2: FLOOR MANAGEMENT */}
             {mainTab === 'floors' && (
-                <div className="flex-1 flex flex-col p-4">
+                <div className="flex-1 flex flex-col p-1 sm:p-2 space-y-3">
                     {/* Control Bar: Filters & Search */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
                         <div className="flex flex-wrap items-center gap-2 flex-1">
                             {/* Search */}
                             <div className="relative flex-1 min-w-[200px] max-w-xs">
@@ -1827,9 +1827,9 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
 
             {/* TAB CONTENT 3: AMENITIES & LIFE SAFETY MASTER */}
             {mainTab === 'amenities' && (
-                <div className="flex-1 flex flex-col p-4">
+                <div className="flex-1 flex flex-col p-1 sm:p-2 space-y-3">
                     {/* Control Bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
                         <div className="flex flex-wrap items-center gap-2 flex-1">
                             {/* Search */}
                             <div className="relative flex-1 min-w-[200px] max-w-sm">

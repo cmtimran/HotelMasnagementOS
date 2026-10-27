@@ -310,94 +310,94 @@ export default function HolidayManagement() {
     };
 
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans">
+        <div className="p-2 sm:p-3 space-y-3 font-sans animate-in fade-in duration-200">
             {/* Standard Page Header */}
             <PageHeader
                 title="Holiday & Peak Governance"
                 subtitle="Statutory public holidays, high-demand peak gala dates, room rate surge multipliers & staff overtime wage rules"
-                icon={<CalendarDays className="size-6 text-primary" />}
+                icon={<CalendarDays className="size-5 text-primary" />}
                 actions={
                     <button
                         type="button"
                         onClick={handleOpenCreate}
-                        className="btn-primary flex items-center gap-2 cursor-pointer"
+                        className="btn-primary flex items-center gap-1.5 cursor-pointer !py-1.5 !text-xs"
                     >
-                        <Plus className="size-4" />
+                        <Plus className="size-3.5" />
                         <span>Add Holiday / Peak Day</span>
                     </button>
                 }
             />
 
-            {/* 4 Standardized Thesis KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+            {/* 4 Compact Standardized Thesis KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Calendar Holidays</span>
-                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
-                            <Calendar className="size-4" />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Calendar Holidays</span>
+                        <div className="size-7 rounded-lg bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <Calendar className="size-3.5" />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{stats.total}</div>
-                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{stats.activeCount} Active Observances</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{stats.total}</div>
+                    <div className="mt-0.5 text-[10px] text-emerald-600 font-semibold">{stats.activeCount} Active Observances</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Surge Rate Peaks</span>
-                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                            <TrendingUp className="size-4" />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Surge Rate Peaks</span>
+                        <div className="size-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <TrendingUp className="size-3.5" />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{stats.surgeDays} Days</div>
-                    <div className="mt-1 text-[11px] text-amber-600/90 font-medium">Dynamic revenue yield dates</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{stats.surgeDays} Days</div>
+                    <div className="mt-0.5 text-[10px] text-amber-600 font-medium">Yield surge dates</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Double Wage (2x)</span>
-                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                            <DollarSign className="size-4" />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Double Wage (2x)</span>
+                        <div className="size-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <DollarSign className="size-3.5" />
                         </div>
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{stats.doubleWageDays} Days</div>
-                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Statutory overtime pay required</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{stats.doubleWageDays} Days</div>
+                    <div className="mt-0.5 text-[10px] text-slate-400 font-medium">Overtime wage pay</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Next Observance</span>
-                        <div className="size-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                            <Clock className="size-4" />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Next Observance</span>
+                        <div className="size-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                            <Clock className="size-3.5" />
                         </div>
                     </div>
-                    <div className="mt-2 text-lg font-black text-slate-900 tracking-tight truncate max-w-[180px]">
+                    <div className="mt-1 text-sm font-bold text-slate-900 tracking-tight truncate max-w-[160px]">
                         {filteredHolidays[0]?.name || 'None Scheduled'}
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-400 font-medium">
+                    <div className="mt-0.5 text-[10px] text-slate-400 font-medium">
                         {filteredHolidays[0]?.startDate || 'N/A'}
                     </div>
                 </div>
             </div>
 
-            {/* Standardized Search & Filter Toolbar */}
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap gap-3 items-center justify-between">
-                <div className="relative flex-1 min-w-[240px] max-w-md">
-                    <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Standardized Compact Search & Filter Toolbar */}
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap gap-2 items-center justify-between">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search holidays, codes, notes..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="input-standard pl-10"
+                        className="input-standard pl-8.5 !h-8 !text-xs"
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
                     {/* Year Filter */}
                     <select
                         value={yearFilter}
                         onChange={e => setYearFilter(e.target.value)}
-                        className="select-standard !py-1.5 !text-xs !w-auto"
+                        className="select-standard !py-1 !h-8 !text-xs !w-auto"
                     >
                         <option value="ALL">All Years</option>
                         <option value="2025">Year 2025</option>
@@ -409,7 +409,7 @@ export default function HolidayManagement() {
                     <select
                         value={categoryFilter}
                         onChange={e => setCategoryFilter(e.target.value)}
-                        className="select-standard !py-1.5 !text-xs !w-auto"
+                        className="select-standard !py-1 !h-8 !text-xs !w-auto"
                     >
                         <option value="ALL">All Categories</option>
                         <option value="PUBLIC">Public Statutory</option>
@@ -422,7 +422,7 @@ export default function HolidayManagement() {
                     <button
                         type="button"
                         onClick={() => setSurgeOnly(!surgeOnly)}
-                        className={`px-3 py-1.5 text-xs rounded-xl border font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                        className={`px-2.5 py-1 text-xs rounded-lg border font-semibold flex items-center gap-1.5 transition cursor-pointer h-8 ${
                             surgeOnly
                                 ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs'
                                 : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
@@ -438,21 +438,21 @@ export default function HolidayManagement() {
             <div className="table-container">
                 <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 uppercase tracking-wider">
-                            <th className="py-3.5 px-4">Holiday / Event</th>
-                            <th className="py-3.5 px-4">Code</th>
-                            <th className="py-3.5 px-4">Date Range & Duration</th>
-                            <th className="py-3.5 px-4">Category</th>
-                            <th className="py-3.5 px-4">Rate & MLOS</th>
-                            <th className="py-3.5 px-4">Staff Wage & Duty</th>
-                            <th className="py-3.5 px-4 text-center">Status</th>
-                            <th className="py-3.5 px-4 text-right">Actions</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 uppercase tracking-wider text-[11px]">
+                            <th className="py-2 px-3">Holiday / Event</th>
+                            <th className="py-2 px-3">Code</th>
+                            <th className="py-2 px-3">Date Range & Duration</th>
+                            <th className="py-2 px-3">Category</th>
+                            <th className="py-2 px-3">Rate & MLOS</th>
+                            <th className="py-2 px-3">Staff Wage & Duty</th>
+                            <th className="py-2 px-3 text-center">Status</th>
+                            <th className="py-2 px-3 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredHolidays.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
+                                <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
                                     No holidays found matching your filters.
                                 </td>
                             </tr>
@@ -464,97 +464,97 @@ export default function HolidayManagement() {
                                         key={item.id}
                                         className="hover:bg-slate-50/70 transition group"
                                     >
-                                        <td className="py-3.5 px-4">
-                                            <div className="text-slate-900">
+                                        <td className="py-2 px-3">
+                                            <div className="text-slate-900 font-medium">
                                                 {item.name}
                                             </div>
                                             {item.description && (
-                                                <div className="text-[11px] text-slate-400 line-clamp-1 max-w-[280px]">
+                                                <div className="text-[10px] text-slate-400 line-clamp-1 max-w-[260px]">
                                                     {item.description}
                                                 </div>
                                             )}
                                         </td>
 
-                                        <td className="py-3.5 px-4">
-                                            <span className="badge-code">
+                                        <td className="py-2 px-3">
+                                            <span className="badge-code text-[10px] py-0.5 px-1.5">
                                                 {item.code}
                                             </span>
                                         </td>
 
-                                        <td className="py-3.5 px-4">
-                                            <div className="text-slate-900 font-semibold font-mono">
+                                        <td className="py-2 px-3">
+                                            <div className="text-slate-900 font-semibold font-mono text-[11px]">
                                                 {item.startDate === item.endDate
                                                     ? item.startDate
                                                     : `${item.startDate} → ${item.endDate}`}
                                             </div>
-                                            <div className="text-[11px] text-slate-400 font-medium">
+                                            <div className="text-[10px] text-slate-400 font-medium">
                                                 {item.daysCount} {item.daysCount === 1 ? 'day' : 'days duration'}
                                             </div>
                                         </td>
 
-                                        <td className="py-3.5 px-4">
+                                        <td className="py-2 px-3">
                                             <span
-                                                className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${catBadge.bg}`}
+                                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${catBadge.bg}`}
                                             >
                                                 {catBadge.label}
                                             </span>
                                         </td>
 
-                                        <td className="py-3.5 px-4">
+                                        <td className="py-2 px-3">
                                             {item.hasSurgeRate ? (
                                                 <div>
-                                                    <span className="text-amber-600 font-bold">
+                                                    <span className="text-amber-600 font-bold text-xs">
                                                         {item.rateMultiplier}x Rate (+{Math.round((item.rateMultiplier - 1) * 100)}% Surge)
                                                     </span>
-                                                    <div className="text-[11px] text-slate-400 font-medium">
+                                                    <div className="text-[10px] text-slate-400 font-medium">
                                                         Min Stay: {item.minStayNights}N
                                                         {item.mandatoryGala && ` • Gala: +$${item.galaDinnerFee}`}
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <span className="text-slate-400 font-normal">
+                                                <span className="text-slate-400 font-normal text-xs">
                                                     Standard Rate (1.0x)
                                                 </span>
                                             )}
                                         </td>
 
-                                        <td className="py-3.5 px-4">
-                                            <div className="font-semibold text-slate-800">
+                                        <td className="py-2 px-3">
+                                            <div className="font-semibold text-slate-800 text-xs">
                                                 {item.staffWageMultiplier}x Overtime Pay
                                             </div>
-                                            <div className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                                            <div className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
                                                 {item.compOffCredit && <span>+ Comp Off •</span>}
                                                 <span className="capitalize">{item.minimumStaffingAlert.toLowerCase().replace('_', ' ')}</span>
                                             </div>
                                         </td>
 
-                                        <td className="py-3.5 px-4 text-center">
+                                        <td className="py-2 px-3 text-center">
                                             <button
                                                 type="button"
                                                 onClick={() => handleToggleStatus(item.id)}
-                                                className={item.status === 'ACTIVE' ? 'badge-status-active cursor-pointer' : 'badge-status-inactive cursor-pointer'}
+                                                className={`${item.status === 'ACTIVE' ? 'badge-status-active' : 'badge-status-inactive'} cursor-pointer text-[10px] py-0.5 px-2`}
                                             >
                                                 {item.status}
                                             </button>
                                         </td>
 
-                                        <td className="py-3.5 px-4 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
+                                        <td className="py-2 px-3 text-right">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleOpenEdit(item)}
-                                                    className="btn-icon"
+                                                    className="btn-icon size-7"
                                                     title="Edit Holiday"
                                                 >
-                                                    <Edit2 className="size-3.5" />
+                                                    <Edit2 className="size-3 text-slate-600" />
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDelete(item.id, item.name)}
-                                                    className="btn-icon-danger"
+                                                    className="btn-icon-danger size-7"
                                                     title="Delete Holiday"
                                                 >
-                                                    <Trash2 className="size-3.5" />
+                                                    <Trash2 className="size-3 text-rose-500" />
                                                 </button>
                                             </div>
                                         </td>

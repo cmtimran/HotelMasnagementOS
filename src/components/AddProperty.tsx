@@ -1017,7 +1017,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         AMENITIES & FACILITIES (BuildingManagement initialTab="amenities")
                        ======================================================================== */}
                     {activeTab === 'amenities' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <BuildingManagement initialTab="amenities" />
                         </div>
                     )}
@@ -1026,7 +1026,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         FLOORS & WINGS (BuildingManagement initialTab="buildings")
                        ======================================================================== */}
                     {activeTab === 'floors-wings' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <BuildingManagement initialTab="buildings" />
                         </div>
                     )}
@@ -1035,7 +1035,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         ROOM TYPES (RoomTypeManagement)
                        ======================================================================== */}
                     {activeTab === 'room-types' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <RoomTypeManagement />
                         </div>
                     )}
@@ -1044,7 +1044,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         ALL ROOMS (RoomManagement)
                        ======================================================================== */}
                     {activeTab === 'rooms' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <RoomManagement onBack={() => setActiveTab('identity')} />
                         </div>
                     )}
@@ -1053,7 +1053,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         CONNECTING ROOMS (ConnectingRoomManagement)
                        ======================================================================== */}
                     {activeTab === 'connecting-rooms' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <ConnectingRoomManagement />
                         </div>
                     )}
@@ -1062,7 +1062,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         HOLIDAY CALENDAR & SURCHARGES (HolidayManagement)
                        ======================================================================== */}
                     {activeTab === 'holidays' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <HolidayManagement />
                         </div>
                     )}
@@ -1071,7 +1071,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         TAXES & VAT (TaxVatManagement)
                        ======================================================================== */}
                     {activeTab === 'taxes-vat' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <TaxVatManagement />
                         </div>
                     )}
@@ -1208,7 +1208,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         PRINTER SETTINGS (PrinterSettingsManagement)
                        ======================================================================== */}
                     {activeTab === 'printer-settings' && (
-                        <div className="p-3 sm:p-4 space-y-4 animate-in fade-in duration-150">
+                        <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <PrinterSettingsManagement />
                         </div>
                     )}

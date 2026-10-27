@@ -734,7 +734,7 @@ export default function TaxVatManagement() {
     }, [simBaseAmount, simQty, simDiscount, builderLines, masters]);
 
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 font-sans pb-16">
+        <div className="p-2.5 sm:p-3.5 space-y-3 font-sans animate-in fade-in duration-200">
             {/* Toast Alert */}
             {toast && (
                 <div
@@ -751,15 +751,15 @@ export default function TaxVatManagement() {
             <PageHeader
                 title="Taxes, VAT & Service Charges"
                 subtitle="Multi-tier tax masters, rule configurations, live compounding simulator, and channel mappings"
-                icon={<Percent className="size-6 text-primary" />}
+                icon={<Percent className="size-5 text-primary" />}
                 actions={
                     activeTab === 'masters' ? (
                         <button
                             type="button"
                             onClick={() => openCreateMaster()}
-                            className="btn-primary flex items-center gap-1.5 cursor-pointer"
+                            className="btn-primary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                         >
-                            <Plus className="size-4" />
+                            <Plus className="size-3.5" />
                             <span>Add Tax Master</span>
                         </button>
                     ) : null
@@ -767,63 +767,63 @@ export default function TaxVatManagement() {
             />
 
             {/* 4 Standardized Thesis KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tax Masters</span>
-                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
-                            <ShieldCheck className="size-4" />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Tax Masters</span>
+                        <div className="size-7 rounded-lg bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                            <ShieldCheck className="size-3.5" />
                         </div>
                     </div>
-                    <div className="mt-2 text-xl text-slate-800 tracking-tight">{masters.length}</div>
-                    <div className="mt-1 text-[11px] text-emerald-600 font-semibold">{masters.filter(m => m.status === 'Active').length} Active Masters</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{masters.length}</div>
+                    <div className="mt-0.5 text-[10px] text-emerald-600 font-semibold">{masters.filter(m => m.status === 'Active').length} Active Masters</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Configurations</span>
-                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                            <Layers className="size-4" />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Configurations</span>
+                        <div className="size-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <Layers className="size-3.5" />
                         </div>
                     </div>
-                    <div className="mt-2 text-xl text-slate-800 tracking-tight">{configurations.length}</div>
-                    <div className="mt-1 text-[11px] text-slate-400 font-medium">Bundled tax profiles</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{configurations.length}</div>
+                    <div className="mt-0.5 text-[10px] text-slate-400 font-medium">Bundled tax profiles</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Formula</span>
-                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                            <Calculator className="size-4" />
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Active Formula</span>
+                        <div className="size-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <Calculator className="size-3.5" />
                         </div>
                     </div>
-                    <div className="mt-2 text-xl text-slate-800 tracking-tight">{builderLines.length} Lines</div>
-                    <div className="mt-1 text-[11px] text-amber-600 font-medium">In builder workspace</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{builderLines.length} Lines</div>
+                    <div className="mt-0.5 text-[10px] text-amber-600 font-medium">In builder workspace</div>
                 </div>
 
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Simulated Tax</span>
-                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-mono">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Simulated Tax</span>
+                        <div className="size-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-mono font-bold">
                             ৳
                         </div>
                     </div>
-                    <div className="mt-2 text-xl text-slate-800 tracking-tight font-mono">
+                    <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight font-mono">
                         ৳ {simulationResult.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-500 font-medium">Grand: ৳ {simulationResult.grand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="mt-0.5 text-[10px] text-slate-500 font-medium">Grand: ৳ {simulationResult.grand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
             </div>
 
             {/* Standardized Navigation Tabs */}
-            <div className="bg-white p-2 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
+            <div className="bg-white p-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1 p-0.5 bg-slate-100/80 rounded-lg">
                     <button
                         type="button"
                         onClick={() => setActiveTab('builder')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             activeTab === 'builder'
-                                ? 'bg-white text-slate-900 shadow-xs'
+                                ? 'bg-white text-slate-900 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -834,9 +834,9 @@ export default function TaxVatManagement() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('configurations')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             activeTab === 'configurations'
-                                ? 'bg-white text-slate-900 shadow-xs'
+                                ? 'bg-white text-slate-900 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -850,9 +850,9 @@ export default function TaxVatManagement() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('masters')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             activeTab === 'masters'
-                                ? 'bg-white text-slate-900 shadow-xs'
+                                ? 'bg-white text-slate-900 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -866,9 +866,9 @@ export default function TaxVatManagement() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('allocations')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                             activeTab === 'allocations'
-                                ? 'bg-white text-slate-900 shadow-xs'
+                                ? 'bg-white text-slate-900 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >
@@ -882,17 +882,17 @@ export default function TaxVatManagement() {
             {/* TAB 1: RULE BUILDER & LIVE SIMULATOR                          */}
             {/* ============================================================== */}
             {activeTab === 'builder' && (
-                <div className="space-y-6">
+                <div className="space-y-3">
                     {/* Builder Header Bar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs text-slate-700">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-700 font-medium">
                                 Active Rule Configuration:
                             </span>
                             <select
                                 value={activeConfigId}
                                 onChange={e => handleConfigDropdownChange(e.target.value)}
-                                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none"
+                                className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none"
                             >
                                 {configurations.map(c => (
                                     <option key={c.id} value={c.id}>
@@ -903,7 +903,7 @@ export default function TaxVatManagement() {
                             <button
                                 type="button"
                                 onClick={handleNewConfigBuilder}
-                                className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1 font-semibold transition"
+                                className="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1 font-semibold transition"
                             >
                                 <Plus className="size-3" />
                                 <span>New Draft</span>
@@ -914,21 +914,21 @@ export default function TaxVatManagement() {
                             <button
                                 type="button"
                                 onClick={handleSaveBuilder}
-                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                                className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 transition"
                             >
-                                <Save className="size-4" />
+                                <Save className="size-3.5" />
                                 <span>Save Tax Rule</span>
                             </button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
                         {/* Left Column: Rule Pipeline Builder (7 Cols) */}
-                        <div className="lg:col-span-7 space-y-4">
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
-                                <div className="border-b border-slate-100 pb-3">
-                                    <div className="text-sm text-slate-900 flex items-center gap-2">
-                                        <SlidersHorizontal className="size-4 text-rose-600" />
+                        <div className="lg:col-span-7 space-y-3">
+                            <div className="bg-white p-3 rounded-xl border border-slate-200/90 space-y-3 shadow-2xs">
+                                <div className="border-b border-slate-100 pb-2">
+                                    <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                        <SlidersHorizontal className="size-3.5 text-rose-600" />
                                         <span>Tax Execution Pipeline & Order</span>
                                     </div>
                                     <p className="text-[11px] text-slate-400 mt-0.5">
@@ -1094,20 +1094,20 @@ export default function TaxVatManagement() {
                         </div>
 
                         {/* Right Column: Interactive Live Simulator (5 Cols) - Light Theme */}
-                        <div className="lg:col-span-5 space-y-4">
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 space-y-4 shadow-2xs hover:shadow-xs transition">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="lg:col-span-5 space-y-3">
+                            <div className="bg-white p-3 rounded-xl border border-slate-200/90 space-y-3 shadow-2xs hover:shadow-xs transition">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                                     <div className="flex items-center gap-2">
-                                        <div className="size-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                                            <Calculator className="size-4" />
+                                        <div className="size-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                                            <Calculator className="size-3.5" />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm text-slate-800">Live Bill & Tax Simulator</h3>
-                                            <p className="text-[11px] text-slate-400">Real-time statutory tax evaluation in BDT (৳)</p>
+                                            <h3 className="text-xs font-semibold text-slate-800">Live Bill & Tax Simulator</h3>
+                                            <p className="text-[10px] text-slate-400">Real-time statutory tax evaluation in BDT (৳)</p>
                                         </div>
                                     </div>
-                                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold flex items-center gap-1.5">
-                                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold flex items-center gap-1">
+                                        <span className="size-1 rounded-full bg-emerald-500 animate-pulse" />
                                         Live Reactive
                                     </span>
                                 </div>
@@ -1231,49 +1231,49 @@ export default function TaxVatManagement() {
             {/* TAB 2: CONFIGURATIONS LIST                                    */}
             {/* ============================================================== */}
             {activeTab === 'configurations' && (
-                <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
                         <div>
-                            <h2 className="text-sm text-slate-900">
+                            <h2 className="text-xs font-semibold text-slate-900">
                                 Master Tax Configurations
                             </h2>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-[11px] text-slate-500">
                                 Defined rule pipelines available for property and channel assignment.
                             </p>
                         </div>
                         <button
                             type="button"
                             onClick={handleNewConfigBuilder}
-                            className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                            className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
                         >
-                            <Plus className="size-4" />
+                            <Plus className="size-3.5" />
                             <span>Create New Configuration</span>
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {configurations.map(cfg => (
                             <div
                                 key={cfg.id}
-                                className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-4 shadow-xs hover:border-rose-300 transition"
+                                className="bg-white p-3.5 rounded-xl border border-slate-200/90 flex flex-col justify-between space-y-3 shadow-2xs hover:border-rose-300 transition"
                             >
                                 <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="px-2 py-0.5 rounded font-mono text-xs bg-slate-100 text-slate-700 border border-slate-200">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-slate-100 text-slate-700 border border-slate-200">
                                             {cfg.code}
                                         </span>
                                         <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                             {cfg.status}
                                         </span>
                                     </div>
-                                    <h3 className="text-slate-900 text-sm mb-1">
+                                    <h3 className="text-slate-900 text-xs font-semibold mb-0.5">
                                         {cfg.name}
                                     </h3>
-                                    <p className="text-xs text-slate-400 line-clamp-2">{cfg.remarks}</p>
+                                    <p className="text-[11px] text-slate-400 line-clamp-2">{cfg.remarks}</p>
 
                                     {/* Lines Preview */}
-                                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
-                                        <div className="text-[10px] text-slate-400 uppercase">
+                                    <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1">
+                                        <div className="text-[10px] text-slate-400 uppercase font-semibold">
                                             Pipeline Steps ({cfg.lines.length}):
                                         </div>
                                         {cfg.lines.map((l, i) => {
@@ -1281,12 +1281,12 @@ export default function TaxVatManagement() {
                                             return (
                                                 <div
                                                     key={i}
-                                                    className="text-xs text-slate-600 flex items-center justify-between"
+                                                    className="text-[11px] text-slate-600 flex items-center justify-between"
                                                 >
                                                     <span>
                                                         {i + 1}. {m?.name || 'Tax'}
                                                     </span>
-                                                    <span className="font-mono text-rose-600 font-semibold">
+                                                    <span className="font-mono text-rose-600 font-semibold text-[11px]">
                                                         {m?.rate}% ({l.calculationBasis === 'RUNNING_SUBTOTAL' ? 'Compound' : 'Flat'})
                                                     </span>
                                                 </div>
@@ -1295,14 +1295,14 @@ export default function TaxVatManagement() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                                <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100">
                                     <button
                                         type="button"
                                         onClick={() => handleDuplicateConfig(cfg)}
-                                        className="size-8 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center transition"
+                                        className="size-7 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center transition cursor-pointer"
                                         title="Duplicate Configuration"
                                     >
-                                        <Copy className="size-4" />
+                                        <Copy className="size-3.5" />
                                     </button>
                                     <button
                                         type="button"
@@ -1310,18 +1310,18 @@ export default function TaxVatManagement() {
                                             selectConfigForBuilder(cfg);
                                             setActiveTab('builder');
                                         }}
-                                        className="size-8 rounded-lg hover:bg-slate-100 text-rose-600 flex items-center justify-center transition"
+                                        className="size-7 rounded-lg hover:bg-slate-100 text-rose-600 flex items-center justify-center transition cursor-pointer"
                                         title="Open in Builder"
                                     >
-                                        <Edit2 className="size-4" />
+                                        <Edit2 className="size-3.5" />
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handleDeleteConfig(cfg.id, cfg.name)}
-                                        className="size-8 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center justify-center transition"
+                                        className="size-7 rounded-lg hover:bg-rose-50 text-rose-600 flex items-center justify-center transition cursor-pointer"
                                         title="Delete Configuration"
                                     >
-                                        <Trash2 className="size-4" />
+                                        <Trash2 className="size-3.5" />
                                     </button>
                                 </div>
                             </div>
@@ -1334,51 +1334,51 @@ export default function TaxVatManagement() {
             {/* TAB 3: TAX MASTERS                                            */}
             {/* ============================================================== */}
             {activeTab === 'masters' && (
-                <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
                         <div>
-                            <h2 className="text-sm text-slate-900">
+                            <h2 className="text-xs font-semibold text-slate-900">
                                 Master Tax & Surcharge Catalog
                             </h2>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-[11px] text-slate-500">
                                 Statutory tax components (VAT, Service Charges, Municipality Fees, Sustainability Levies).
                             </p>
                         </div>
                         <button
                             type="button"
                             onClick={openCreateMaster}
-                            className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                            className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
                         >
-                            <Plus className="size-4" />
+                            <Plus className="size-3.5" />
                             <span>Add Tax Master</span>
                         </button>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
-                                    <th className="py-3 px-4">Tax Name</th>
-                                    <th className="py-3 px-4">Code</th>
-                                    <th className="py-3 px-4">Category</th>
-                                    <th className="py-3 px-4 text-right">Tax Rate (%)</th>
-                                    <th className="py-3 px-4">Statutory Section</th>
-                                    <th className="py-3 px-4 text-center">Status</th>
-                                    <th className="py-3 px-4 text-right">Actions</th>
+                                <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                                    <th className="py-2 px-3">Tax Name</th>
+                                    <th className="py-2 px-3">Code</th>
+                                    <th className="py-2 px-3">Category</th>
+                                    <th className="py-2 px-3 text-right">Tax Rate (%)</th>
+                                    <th className="py-2 px-3">Statutory Section</th>
+                                    <th className="py-2 px-3 text-center">Status</th>
+                                    <th className="py-2 px-3 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {masters.map(m => (
                                     <tr key={m.id} className="hover:bg-slate-50/70 transition">
-                                        <td className="py-3 px-4 font-semibold text-slate-800">
+                                        <td className="py-2 px-3 font-semibold text-slate-800">
                                             {m.name}
                                         </td>
-                                        <td className="py-3 px-4 font-mono font-medium text-slate-700">
-                                            <span className="px-2 py-0.5 bg-slate-100 rounded border border-slate-200 text-xs">
+                                        <td className="py-2 px-3 font-mono font-medium text-slate-700">
+                                            <span className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-[10px]">
                                                 {m.code}
                                             </span>
                                         </td>
-                                        <td className="py-3 px-4">
+                                        <td className="py-2 px-3">
                                             <span
                                                 className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                                                     m.category === 'VAT'
@@ -1391,30 +1391,30 @@ export default function TaxVatManagement() {
                                                 {m.category.replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td className="py-3 px-4 text-right font-mono font-semibold text-rose-600 text-xs">
+                                        <td className="py-2 px-3 text-right font-mono font-semibold text-rose-600 text-xs">
                                             {m.rate.toFixed(2)}%
                                         </td>
-                                        <td className="py-3 px-4 text-slate-500">{m.section || '—'}</td>
-                                        <td className="py-3 px-4 text-center">
+                                        <td className="py-2 px-3 text-slate-500 text-[11px]">{m.section || '—'}</td>
+                                        <td className="py-2 px-3 text-center">
                                             <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                 {m.status}
                                             </span>
                                         </td>
-                                        <td className="py-3 px-4 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
+                                        <td className="py-2 px-3 text-right">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <button
                                                     type="button"
                                                     onClick={() => openEditMaster(m)}
-                                                    className="size-7 rounded hover:bg-slate-100 text-slate-600 flex items-center justify-center transition"
+                                                    className="size-6 rounded hover:bg-slate-100 text-slate-600 flex items-center justify-center transition cursor-pointer"
                                                 >
-                                                    <Edit2 className="size-3.5" />
+                                                    <Edit2 className="size-3" />
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeleteMaster(m.id, m.name)}
-                                                    className="size-7 rounded hover:bg-rose-50 text-rose-600 flex items-center justify-center transition"
+                                                    className="size-6 rounded hover:bg-rose-50 text-rose-600 flex items-center justify-center transition cursor-pointer"
                                                 >
-                                                    <Trash2 className="size-3.5" />
+                                                    <Trash2 className="size-3" />
                                                 </button>
                                             </div>
                                         </td>
@@ -1430,31 +1430,31 @@ export default function TaxVatManagement() {
             {/* TAB 4: CHANNELS & BRANCHES                                     */}
             {/* ============================================================== */}
             {activeTab === 'allocations' && (
-                <div className="space-y-6">
+                <div className="space-y-3">
                     {/* Channel Mappings Form */}
                     <form
                         onSubmit={handleSaveChannelMapping}
-                        className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs"
+                        className="bg-white p-3.5 rounded-xl border border-slate-200/90 space-y-3 shadow-2xs"
                     >
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                             <div>
-                                <h3 className="text-sm text-slate-900">
+                                <h3 className="text-xs font-semibold text-slate-900">
                                     Global Channel Default Tax Policies
                                 </h3>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-[11px] text-slate-500">
                                     Set which tax rule automatically applies when billing via specific hotel operating channels.
                                 </p>
                             </div>
                             <button
                                 type="submit"
-                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                                className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
                             >
-                                <Save className="size-4" />
+                                <Save className="size-3.5" />
                                 <span>Save Channel Policies</span>
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                                     Front Desk & Rooms
@@ -1464,7 +1464,7 @@ export default function TaxVatManagement() {
                                     onChange={e =>
                                         setChannelMapping({ ...channelMapping, dineInConfigId: e.target.value })
                                     }
-                                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                 >
                                     {configurations.map(c => (
                                         <option key={c.id} value={c.id}>
@@ -1483,7 +1483,7 @@ export default function TaxVatManagement() {
                                     onChange={e =>
                                         setChannelMapping({ ...channelMapping, roomServiceConfigId: e.target.value })
                                     }
-                                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                 >
                                     {configurations.map(c => (
                                         <option key={c.id} value={c.id}>
@@ -1502,7 +1502,7 @@ export default function TaxVatManagement() {
                                     onChange={e =>
                                         setChannelMapping({ ...channelMapping, banquetConfigId: e.target.value })
                                     }
-                                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg"
                                 >
                                     {configurations.map(c => (
                                         <option key={c.id} value={c.id}>
@@ -1513,7 +1513,7 @@ export default function TaxVatManagement() {
                             </div>
                         </div>
 
-                        <label className="flex items-center gap-2 pt-2 cursor-pointer">
+                        <label className="flex items-center gap-2 pt-1 cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={channelMapping.allowPosOverride}
@@ -1529,12 +1529,12 @@ export default function TaxVatManagement() {
                     </form>
 
                     {/* Branch Tax Allocations & BIN Table */}
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 space-y-3 shadow-2xs">
                         <div>
-                            <h3 className="text-sm text-slate-900">
+                            <h3 className="text-xs font-semibold text-slate-900">
                                 Property / Branch Tax BIN Allocations
                             </h3>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-[11px] text-slate-500">
                                 Statutory Business Identification Numbers (BIN) and custom localized tax rules per property.
                             </p>
                         </div>
@@ -1542,35 +1542,35 @@ export default function TaxVatManagement() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
-                                        <th className="py-3 px-4">Property Name</th>
-                                        <th className="py-3 px-4">Property Code</th>
-                                        <th className="py-3 px-4">Tax BIN Registration #</th>
-                                        <th className="py-3 px-4">Assigned Tax Rule</th>
-                                        <th className="py-3 px-4 text-right">Actions</th>
+                                    <tr className="bg-slate-50/80 border-b border-slate-200/90 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                                        <th className="py-2 px-3">Property Name</th>
+                                        <th className="py-2 px-3">Property Code</th>
+                                        <th className="py-2 px-3">Tax BIN Registration #</th>
+                                        <th className="py-2 px-3">Assigned Tax Rule</th>
+                                        <th className="py-2 px-3 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {branchAllocations.map(br => (
                                         <tr key={br.id} className="hover:bg-slate-50/70">
-                                            <td className="py-3 px-4 font-semibold text-slate-800">
+                                            <td className="py-2 px-3 font-semibold text-slate-800">
                                                 {br.name}
                                             </td>
-                                            <td className="py-3 px-4 font-mono text-slate-700">
+                                            <td className="py-2 px-3 font-mono text-slate-700 text-[11px]">
                                                 {br.code}
                                             </td>
-                                            <td className="py-3 px-4 font-mono font-semibold text-rose-600">
+                                            <td className="py-2 px-3 font-mono font-semibold text-rose-600 text-[11px]">
                                                 {br.branchBinNumber || '—'}
                                             </td>
-                                            <td className="py-3 px-4 text-slate-600">
+                                            <td className="py-2 px-3 text-slate-600">
                                                 {configurations.find(c => c.id === br.dineInConfigId)?.name ||
                                                     'Global Standard Rule'}
                                             </td>
-                                            <td className="py-3 px-4 text-right">
+                                            <td className="py-2 px-3 text-right">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateBranchTax(br)}
-                                                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold transition"
+                                                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-semibold transition cursor-pointer"
                                                 >
                                                     Sync BIN
                                                 </button>

@@ -213,93 +213,93 @@ const ConnectingRoomManagement = () => {
 
     if (view === 'list') {
         return (
-            <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+            <div className="p-2.5 sm:p-3.5 space-y-3 font-sans animate-in fade-in duration-200">
                 {/* Standard Page Header */}
                 <PageHeader
                     title="Connecting & Joint Rooms"
                     subtitle="Virtual interconnecting suites, parent-child inventory locks & synchronized pricing"
-                    icon={<Layers className="size-6 text-primary" />}
+                    icon={<Layers className="size-5 text-primary" />}
                     actions={
                         <button
                             onClick={handleAddNew}
-                            className="btn-primary flex items-center gap-2 cursor-pointer"
+                            className="btn-primary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer"
                         >
-                            <Plus size={15} /> Add Connecting Suite
+                            <Plus size={14} /> <span>Add Connecting Suite</span>
                         </button>
                     }
                 />
 
                 {/* 4 Standardized Thesis KPI Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Suites</span>
-                            <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
-                                <Layers size={16} />
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Suites</span>
+                            <div className="size-7 rounded-lg bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                                <Layers size={14} />
                             </div>
                         </div>
-                        <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{totalSuites}</div>
-                        <div className="mt-1 text-[11px] text-slate-400 font-medium">Configured suites</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{totalSuites}</div>
+                        <div className="mt-0.5 text-[10px] text-slate-400 font-medium">Configured suites</div>
                     </div>
 
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Suites</span>
-                            <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                                <ShieldCheck size={16} />
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Active Suites</span>
+                            <div className="size-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                <ShieldCheck size={14} />
                             </div>
                         </div>
-                        <div className="mt-2 text-2xl font-black text-emerald-600 tracking-tight">{activeSuites}</div>
-                        <div className="mt-1 text-[11px] text-emerald-600/80 font-medium">Bookable across PMS</div>
+                        <div className="mt-1 text-lg font-bold text-emerald-600 tracking-tight">{activeSuites}</div>
+                        <div className="mt-0.5 text-[10px] text-emerald-600 font-semibold">Bookable across PMS</div>
                     </div>
 
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Linked Units</span>
-                            <div className="size-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                                <LinkIcon size={16} />
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Linked Units</span>
+                            <div className="size-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                                <LinkIcon size={14} />
                             </div>
                         </div>
-                        <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight">{totalLinkedRooms}</div>
-                        <div className="mt-1 text-[11px] text-slate-400 font-medium">Physical rooms assigned</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight">{totalLinkedRooms}</div>
+                        <div className="mt-0.5 text-[10px] text-slate-400 font-medium">Physical rooms assigned</div>
                     </div>
 
-                    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-2xs hover:shadow-xs transition">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Tariff</span>
-                            <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-mono">
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Average Tariff</span>
+                            <div className="size-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-mono font-bold">
                                 ৳
                             </div>
                         </div>
-                        <div className="mt-2 text-2xl font-black text-slate-900 tracking-tight font-mono">
+                        <div className="mt-1 text-lg font-bold text-slate-900 tracking-tight font-mono">
                             ৳{avgTariff.toLocaleString()}
                         </div>
-                        <div className="mt-1 text-[11px] text-slate-400 font-medium">Mean rate per night</div>
+                        <div className="mt-0.5 text-[10px] text-slate-400 font-medium">Mean rate per night</div>
                     </div>
                 </div>
 
                 {/* Standardized Search & Filter Toolbar */}
-                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap gap-3 items-center justify-between">
-                    <div className="relative flex-1 min-w-[240px] max-w-md">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap gap-2 items-center justify-between">
+                    <div className="relative flex-1 min-w-[200px] max-w-sm">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                         <input
                             type="text"
                             placeholder="Search suites, room numbers..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="input-standard pl-10"
+                            className="input-standard pl-8.5 !h-8 !text-xs"
                         />
                     </div>
 
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                            <Filter size={13} className="text-slate-400" />
+                            <Filter size={12} className="text-slate-400" />
                             <span>Status:</span>
                         </div>
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as any)}
-                            className="select-standard !py-1.5 !text-xs !w-auto"
+                            className="select-standard !py-1 !h-8 !text-xs !w-auto"
                         >
                             <option value="all">All Statuses ({totalSuites})</option>
                             <option value="Active">Active ({activeSuites})</option>
@@ -309,9 +309,9 @@ const ConnectingRoomManagement = () => {
                 </div>
 
                 {/* Suites Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredConnectingRooms.length === 0 ? (
-                        <div className="col-span-full card-container p-12 text-center text-slate-400">
+                        <div className="col-span-full card-container p-8 text-center text-slate-400 text-xs">
                             No connecting suites found matching your search.
                         </div>
                     ) : (
@@ -320,45 +320,45 @@ const ConnectingRoomManagement = () => {
                             const displayPrice = room.pricingStrategy === 'Fixed Rate' && room.fixedPrice ? room.fixedPrice : sumPrice;
 
                             return (
-                                <div key={room.id} className="card-container p-5 flex flex-col justify-between hover:border-primary/40 transition">
+                                <div key={room.id} className="card-container p-3.5 flex flex-col justify-between hover:border-primary/40 transition">
                                     <div>
-                                        <div className="flex justify-between items-start mb-3">
-                                            <span className={room.status === 'Active' ? 'badge-status-active' : 'badge-status-inactive'}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className={`${room.status === 'Active' ? 'badge-status-active' : 'badge-status-inactive'} text-[10px] py-0.5 px-2`}>
                                                 {room.status}
                                             </span>
-                                            <div className="flex gap-1.5">
+                                            <div className="flex gap-1">
                                                 <button
                                                     onClick={() => handleEdit(room)}
-                                                    className="btn-icon"
+                                                    className="btn-icon size-6"
                                                     title="Edit Suite"
                                                 >
-                                                    <Edit2 size={14} />
+                                                    <Edit2 size={13} className="text-slate-600" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(room.id)}
-                                                    className="btn-icon-danger"
+                                                    className="btn-icon-danger size-6"
                                                     title="Delete Suite"
                                                 >
-                                                    <Trash2 size={14} />
+                                                    <Trash2 size={13} className="text-rose-500" />
                                                 </button>
                                             </div>
                                         </div>
 
-                                        <h3 className="text-base text-slate-900 leading-snug">{room.name}</h3>
+                                        <h3 className="text-sm font-semibold text-slate-900 leading-snug">{room.name}</h3>
 
-                                        <div className="mt-3.5 space-y-2 bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
-                                            <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                                                <LinkIcon size={12} className="text-primary" /> Linked Physical Units
+                                        <div className="mt-2.5 space-y-1.5 bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/70">
+                                            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1 font-semibold">
+                                                <LinkIcon size={11} className="text-primary" /> Linked Physical Units
                                             </div>
                                             {room.componentRooms.map((comp, idx) => (
                                                 <div key={idx} className="text-xs text-slate-700 flex items-center justify-between">
-                                                    <span className="font-semibold text-slate-800">
+                                                    <span className="font-semibold text-slate-800 text-[11px]">
                                                         {comp.count || comp.roomNumbers?.length || 1}x {getRoomTypeName(comp.roomTypeId)}
                                                     </span>
                                                     {comp.roomNumbers && comp.roomNumbers.length > 0 && (
                                                         <div className="flex flex-wrap gap-1 justify-end">
                                                             {comp.roomNumbers.map((num) => (
-                                                                <span key={num} className="badge-code">
+                                                                <span key={num} className="badge-code text-[10px] py-0.5 px-1.5">
                                                                     #{num}
                                                                 </span>
                                                             ))}
@@ -369,14 +369,14 @@ const ConnectingRoomManagement = () => {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 border-t border-slate-100 pt-3.5 mt-4">
+                                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mt-3">
                                         <div>
-                                            <span className="block text-[10px] uppercase text-slate-400">Rate Strategy</span>
-                                            <span className="font-semibold text-slate-800">{room.pricingStrategy}</span>
+                                            <span className="block text-[9px] uppercase text-slate-400">Rate Strategy</span>
+                                            <span className="font-semibold text-slate-800 text-xs">{room.pricingStrategy}</span>
                                         </div>
                                         <div className="text-right">
-                                            <span className="block text-[10px] uppercase text-slate-400">Effective Rate</span>
-                                            <span className="font-mono text-emerald-600 text-sm">৳{displayPrice.toLocaleString()}</span>
+                                            <span className="block text-[9px] uppercase text-slate-400">Effective Rate</span>
+                                            <span className="font-mono text-emerald-600 font-bold text-xs">৳{displayPrice.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -390,9 +390,9 @@ const ConnectingRoomManagement = () => {
 
     // FORM / CREATE VIEW
     return (
-        <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
+        <div className="p-2.5 sm:p-3.5 max-w-4xl mx-auto space-y-3 font-sans animate-in fade-in duration-200">
             {/* Form Page Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200/90">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/90">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setView('list')}
