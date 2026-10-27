@@ -25,7 +25,7 @@ const Dashboard: React.FC = () => {
     // Live Database State
     const [rooms, setRooms] = useState(() => getCanonicalRooms());
     const [reservations, setReservations] = useState(() => getAllStoredReservations());
-    const [statusFilter, setStatusFilter] = useState<'all' | 'clean' | 'occupied' | 'reserved' | 'dirty' | 'maintenance'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'clean' | 'occupied' | 'reserved' | 'dirty' | 'maintenance' | 'inspected'>('all');
     const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
 
     const handleUpdateHousekeeping = async (roomNo: string, newStatus: 'Clean' | 'Dirty' | 'Inspected') => {
@@ -164,6 +164,12 @@ const Dashboard: React.FC = () => {
 
         const cancellationsToday = reservations.filter(r => r.status === 'cancelled').length;
 
+        // Accurate physical housekeeping metrics across all inventory
+        const hkClean = rooms.filter(r => (r.housekeepingStatus || 'Clean').toLowerCase() === 'clean' && r.status !== 'Out of Order' && r.status !== 'Maintenance').length;
+        const hkDirty = rooms.filter(r => (r.housekeepingStatus || '').toLowerCase() === 'dirty' && r.status !== 'Out of Order' && r.status !== 'Maintenance').length;
+        const hkInspected = rooms.filter(r => (r.housekeepingStatus || '').toLowerCase() === 'inspected' && r.status !== 'Out of Order' && r.status !== 'Maintenance').length;
+        const hkOOO = rooms.filter(r => r.status === 'Out of Order' || r.status === 'Maintenance').length;
+
         return {
             totalRooms,
             occupiedCount,
@@ -185,13 +191,14 @@ const Dashboard: React.FC = () => {
                 occupied: occupiedCount,
                 reserved: reservedCount,
                 dirty: dirtyCount,
-                maintenance: oooCount
+                maintenance: oooCount,
+                inspected: hkInspected
             },
             housekeeping: {
-                clean: cleanCount,
-                dirty: dirtyCount,
-                inspected: rooms.filter(r => r.housekeepingStatus === 'Inspected').length,
-                ooo: oooCount
+                clean: hkClean,
+                dirty: hkDirty,
+                inspected: hkInspected,
+                ooo: hkOOO
             },
             arrivalsToday
         };
@@ -266,23 +273,48 @@ const Dashboard: React.FC = () => {
 
                 {/* Front Desk Activity */}
                 <div className="card-container p-4 flex flex-col justify-between">
-                    <span className="text-slate-500 text-[11px] uppercase tracking-wider mb-2">Front Desk Activity</span>
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Front Desk Activity</span>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('front-desk')}
+                            className="text-[11px] text-primary hover:text-primary-hover font-semibold inline-flex items-center gap-0.5 cursor-pointer"
+                        >
+                            <span>Front Desk Hub</span>
+                            <ArrowUpRight size={12} />
+                        </button>
+                    </div>
                     <div className="grid grid-cols-3 gap-2 flex-1">
-                        <div className="flex flex-col items-center justify-center p-2 bg-emerald-50/70 rounded-xl border border-emerald-100">
-                            <LogIn size={16} className="text-emerald-600 mb-1" />
-                            <span className="text-base text-slate-900 leading-tight">{metrics.arrivalsCount}</span>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('reservations')}
+                            className="flex flex-col items-center justify-center p-2 bg-emerald-50/70 hover:bg-emerald-100/70 rounded-xl border border-emerald-100 transition-all cursor-pointer text-center group shadow-2xs hover:shadow-xs"
+                            title="View Today's Expected Arrivals"
+                        >
+                            <LogIn size={16} className="text-emerald-600 mb-1 group-hover:scale-110 transition-transform" />
+                            <span className="text-base text-slate-900 leading-tight font-bold font-mono">{metrics.arrivalsCount}</span>
                             <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Arrivals</span>
-                        </div>
-                        <div className="flex flex-col items-center justify-center p-2 bg-amber-50/70 rounded-xl border border-amber-100">
-                            <LogOut size={16} className="text-amber-600 mb-1" />
-                            <span className="text-base text-slate-900 leading-tight">{metrics.departsCount}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('front-desk')}
+                            className="flex flex-col items-center justify-center p-2 bg-amber-50/70 hover:bg-amber-100/70 rounded-xl border border-amber-100 transition-all cursor-pointer text-center group shadow-2xs hover:shadow-xs"
+                            title="View Pending Departures in Front Desk Hub"
+                        >
+                            <LogOut size={16} className="text-amber-600 mb-1 group-hover:scale-110 transition-transform" />
+                            <span className="text-base text-slate-900 leading-tight font-bold font-mono">{metrics.departsCount}</span>
                             <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Departs</span>
-                        </div>
-                        <div className="flex flex-col items-center justify-center p-2 bg-blue-50/70 rounded-xl border border-blue-100">
-                            <BedDouble size={16} className="text-primary mb-1" />
-                            <span className="text-base text-slate-900 leading-tight">{metrics.inHouseCount}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('room-rack')}
+                            className="flex flex-col items-center justify-center p-2 bg-blue-50/70 hover:bg-blue-100/70 rounded-xl border border-blue-100 transition-all cursor-pointer text-center group shadow-2xs hover:shadow-xs"
+                            title="View In-House Guests in Room Rack"
+                        >
+                            <BedDouble size={16} className="text-primary mb-1 group-hover:scale-110 transition-transform" />
+                            <span className="text-base text-slate-900 leading-tight font-bold font-mono">{metrics.inHouseCount}</span>
                             <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">In-House</span>
-                        </div>
+                        </button>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-2 text-center font-medium">{metrics.departsCount} Pending Departures</p>
                 </div>
@@ -317,8 +349,12 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Cancellation Watch */}
-                <div className="card-container p-4 border-rose-200/80 bg-rose-50/20 flex flex-col items-center justify-center relative">
-                    <div className="absolute top-3 right-3 p-1.5 bg-rose-100 text-rose-600 rounded-lg">
+                <div 
+                    onClick={() => setActivePage('cancelled')}
+                    className="card-container p-4 border-rose-200/80 bg-rose-50/20 hover:bg-rose-50/50 transition-all flex flex-col items-center justify-center relative cursor-pointer group shadow-2xs hover:shadow-xs"
+                    title="Click to view Cancelled Reservations"
+                >
+                    <div className="absolute top-3 right-3 p-1.5 bg-rose-100 text-rose-600 rounded-lg group-hover:scale-110 transition-transform">
                         <Ban size={14} />
                     </div>
                     <span className="text-3xl font-black text-slate-900 leading-none">{metrics.cancellationsToday}</span>
@@ -387,18 +423,129 @@ const Dashboard: React.FC = () => {
 
                 {/* Housekeeping Live Overview */}
                 <div className="card-container p-4 flex flex-col justify-between">
-                    <span className="text-slate-500 text-[11px] uppercase tracking-wider mb-2">Housekeeping Status</span>
-                    <div className="flex h-3 w-full rounded-full overflow-hidden mb-2 bg-slate-100">
-                        <div style={{ width: `${metrics.totalRooms > 0 ? Math.round((metrics.housekeeping.clean / metrics.totalRooms) * 100) : 50}%` }} className="bg-emerald-500" title="Clean"></div>
-                        <div style={{ width: `${metrics.totalRooms > 0 ? Math.round((metrics.housekeeping.dirty / metrics.totalRooms) * 100) : 25}%` }} className="bg-amber-500" title="Dirty"></div>
-                        <div style={{ width: `${metrics.totalRooms > 0 ? Math.round((metrics.housekeeping.inspected / metrics.totalRooms) * 100) : 15}%` }} className="bg-blue-400" title="Inspected"></div>
-                        <div style={{ width: `${metrics.totalRooms > 0 ? Math.round((metrics.housekeeping.ooo / metrics.totalRooms) * 100) : 10}%` }} className="bg-rose-500" title="OOO"></div>
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">Housekeeping Status</span>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('housekeeping')}
+                            className="text-[11px] text-primary hover:text-primary-hover font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Open Housekeeping Management Board"
+                        >
+                            <span>Housekeeping Hub</span>
+                            <ArrowUpRight size={12} />
+                        </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 font-medium">
-                        <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-emerald-500"></div> Clean ({metrics.housekeeping.clean})</div>
-                        <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-amber-500"></div> Dirty ({metrics.housekeeping.dirty})</div>
-                        <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-blue-400"></div> Inspected ({metrics.housekeeping.inspected})</div>
-                        <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-rose-500"></div> Maintenance ({metrics.housekeeping.ooo})</div>
+
+                    {/* Interactive Progress Bar */}
+                    <div className="flex h-3 w-full rounded-full overflow-hidden mb-2.5 bg-slate-100 p-0.5 border border-slate-200/60 shadow-2xs" title="Click any segment to filter matrix below">
+                        <div 
+                            onClick={() => setStatusFilter(statusFilter === 'clean' ? 'all' : 'clean')}
+                            style={{ width: `${metrics.totalRooms > 0 ? (metrics.housekeeping.clean / metrics.totalRooms) * 100 : 75}%` }} 
+                            className="bg-emerald-500 hover:bg-emerald-600 transition-all rounded-l-full cursor-pointer" 
+                            title={`Clean: ${metrics.housekeeping.clean} rooms (Click to filter)`}
+                        />
+                        <div 
+                            onClick={() => setStatusFilter(statusFilter === 'dirty' ? 'all' : 'dirty')}
+                            style={{ width: `${metrics.totalRooms > 0 ? (metrics.housekeeping.dirty / metrics.totalRooms) * 100 : 0}%` }} 
+                            className="bg-amber-500 hover:bg-amber-600 transition-all cursor-pointer" 
+                            title={`Dirty: ${metrics.housekeeping.dirty} rooms (Click to filter)`}
+                        />
+                        <div 
+                            onClick={() => setStatusFilter(statusFilter === 'inspected' ? 'all' : 'inspected')}
+                            style={{ width: `${metrics.totalRooms > 0 ? (metrics.housekeeping.inspected / metrics.totalRooms) * 100 : 0}%` }} 
+                            className="bg-blue-400 hover:bg-blue-500 transition-all cursor-pointer" 
+                            title={`Inspected: ${metrics.housekeeping.inspected} rooms (Click to filter)`}
+                        />
+                        <div 
+                            onClick={() => setStatusFilter(statusFilter === 'maintenance' ? 'all' : 'maintenance')}
+                            style={{ width: `${metrics.totalRooms > 0 ? (metrics.housekeeping.ooo / metrics.totalRooms) * 100 : 10}%` }} 
+                            className="bg-rose-500 hover:bg-rose-600 transition-all rounded-r-full cursor-pointer" 
+                            title={`Out of Order / Maintenance: ${metrics.housekeeping.ooo} rooms (Click to filter)`}
+                        />
+                    </div>
+
+                    {/* Interactive 2x2 Status Buttons */}
+                    <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter(statusFilter === 'clean' ? 'all' : 'clean')}
+                            className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left ${
+                                statusFilter === 'clean'
+                                    ? 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/30 shadow-xs'
+                                    : 'bg-emerald-50/70 hover:bg-emerald-100/70 border-emerald-100 text-emerald-800'
+                            }`}
+                            title="Click to filter Clean rooms"
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <span className={`size-2 rounded-full ${statusFilter === 'clean' ? 'bg-white' : 'bg-emerald-500'}`} />
+                                Clean
+                            </span>
+                            <span className="font-mono text-xs font-bold">{metrics.housekeeping.clean}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter(statusFilter === 'dirty' ? 'all' : 'dirty')}
+                            className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left ${
+                                statusFilter === 'dirty'
+                                    ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-500/30 shadow-xs'
+                                    : 'bg-amber-50/70 hover:bg-amber-100/70 border-amber-100 text-amber-800'
+                            }`}
+                            title="Click to filter Dirty rooms"
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <span className={`size-2 rounded-full ${statusFilter === 'dirty' ? 'bg-white' : 'bg-amber-500'}`} />
+                                Dirty
+                            </span>
+                            <span className="font-mono text-xs font-bold">{metrics.housekeeping.dirty}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter(statusFilter === 'inspected' ? 'all' : 'inspected')}
+                            className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left ${
+                                statusFilter === 'inspected'
+                                    ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-500/30 shadow-xs'
+                                    : 'bg-blue-50/70 hover:bg-blue-100/70 border-blue-100 text-blue-800'
+                            }`}
+                            title="Click to filter Inspected rooms"
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <span className={`size-2 rounded-full ${statusFilter === 'inspected' ? 'bg-white' : 'bg-blue-500'}`} />
+                                Inspected
+                            </span>
+                            <span className="font-mono text-xs font-bold">{metrics.housekeeping.inspected}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter(statusFilter === 'maintenance' ? 'all' : 'maintenance')}
+                            className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left ${
+                                statusFilter === 'maintenance'
+                                    ? 'bg-rose-600 text-white border-rose-600 ring-2 ring-rose-500/30 shadow-xs'
+                                    : 'bg-rose-50/70 hover:bg-rose-100/70 border-rose-100 text-rose-800'
+                            }`}
+                            title="Click to filter Maintenance / Out of Order rooms"
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <span className={`size-2 rounded-full ${statusFilter === 'maintenance' ? 'bg-white' : 'bg-rose-500'}`} />
+                                Maintenance
+                            </span>
+                            <span className="font-mono text-xs font-bold">{metrics.housekeeping.ooo}</span>
+                        </button>
+                    </div>
+
+                    {/* Footer quick link */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2 text-[10.5px]">
+                        <span className="text-slate-400 font-medium">Click status to filter matrix</span>
+                        <button
+                            type="button"
+                            onClick={() => setActivePage('housekeeping')}
+                            className="text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                        >
+                            <Sparkles size={11} />
+                            <span>Housekeeping Grid</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -464,6 +611,14 @@ const Dashboard: React.FC = () => {
                                 <span className="size-1.5 rounded-full bg-amber-500"></span>
                                 Dirty ({metrics.counts.dirty})
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter('inspected')}
+                                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1 ${statusFilter === 'inspected' ? 'bg-blue-600 text-white shadow-2xs' : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'}`}
+                            >
+                                <span className="size-1.5 rounded-full bg-blue-500"></span>
+                                Inspected ({metrics.counts.inspected || metrics.housekeeping.inspected})
+                            </button>
                             {metrics.counts.maintenance > 0 && (
                                 <button
                                     type="button"
@@ -479,7 +634,13 @@ const Dashboard: React.FC = () => {
                         {/* Room Grid */}
                         <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
                             {metrics.roomStatusList
-                                .filter(r => statusFilter === 'all' || r.status === statusFilter)
+                                .filter(r => {
+                                    if (statusFilter === 'all') return true;
+                                    if (statusFilter === 'inspected') return (r.housekeepingStatus || '').toLowerCase() === 'inspected';
+                                    if (statusFilter === 'dirty') return r.status === 'dirty' || (r.housekeepingStatus || '').toLowerCase() === 'dirty';
+                                    if (statusFilter === 'clean') return r.status === 'clean' || (r.housekeepingStatus || '').toLowerCase() === 'clean';
+                                    return r.status === statusFilter;
+                                })
                                 .map((room) => (
                                     <div
                                         key={room.number}
