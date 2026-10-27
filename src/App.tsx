@@ -627,7 +627,7 @@ function App() {
     return (
       <>
         <Login onLogin={handleLogin} />
-        {import.meta.env.DEV && <Devnotation />}
+        <Devnotation />
       </>
     );
   }
@@ -655,7 +655,7 @@ function App() {
         subtitle={modalConfig.subtitle}
         sections={modalConfig.sections}
       />
-      {import.meta.env.DEV && <Devnotation />}
+      <Devnotation />
     </div>
   );
 }
