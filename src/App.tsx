@@ -587,7 +587,7 @@ function App() {
         return <MasterDataConfig onNavigate={setActivePage} />;
       case 'policy-management':
       case 'policy-settings':
-        return <PolicyManagement onNavigate={setActivePage} />;
+        return <GeneralSettings initialTab="operations" onNavigate={setActivePage} currentUser={currentUser} />;
       case 'general-settings':
       case 'system-settings':
         return <GeneralSettings onNavigate={setActivePage} currentUser={currentUser} />;
