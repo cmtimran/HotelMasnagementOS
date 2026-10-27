@@ -61,6 +61,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import { initNetworkSync } from './utils/pmsNetworkSync';
 import { syncReservationsFromDB } from './utils/roomInventoryEngine';
 import { Devnotation } from 'devnotation';
+import 'devnotation/style.css';
 
 import { useNavigation } from './context/NavigationContext';
 import { usePortal, type UserData } from './context/PortalContext';
