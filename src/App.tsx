@@ -94,6 +94,26 @@ function App() {
   useEffect(() => {
     initNetworkSync();
     syncReservationsFromDB().catch(console.error);
+
+    // Auto-heal Devnotation toolbar position if dragged off-screen or corrupted in localStorage
+    try {
+      const savedPos = localStorage.getItem('devnotation_toolbar_pos_v2');
+      if (savedPos) {
+        const parsed = JSON.parse(savedPos);
+        if (
+          typeof parsed.x !== 'number' ||
+          typeof parsed.y !== 'number' ||
+          parsed.x < 0 ||
+          parsed.y < 0 ||
+          parsed.x > (window.innerWidth || 1920) - 50 ||
+          parsed.y > (window.innerHeight || 1080) - 40
+        ) {
+          localStorage.removeItem('devnotation_toolbar_pos_v2');
+        }
+      }
+    } catch {
+      localStorage.removeItem('devnotation_toolbar_pos_v2');
+    }
   }, []);
 
   // Sync session across multiple browser tabs
@@ -633,30 +653,32 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#fafafc] font-sans text-slate-900">
-      <Sidebar
-        activePage={activePage}
-        setActivePage={setActivePage}
-        isCollapsed={isSidebarCollapsed}
-        toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-      />
-      <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden transition-all duration-300">
-        <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0 [&>*]:w-full [&>*]:min-w-0">
-          <ErrorBoundary onReset={() => setActivePage('dashboard')}>
-            {renderContent()}
-          </ErrorBoundary>
+    <>
+      <div className="flex h-screen overflow-hidden bg-[#fafafc] font-sans text-slate-900">
+        <Sidebar
+          activePage={activePage}
+          setActivePage={setActivePage}
+          isCollapsed={isSidebarCollapsed}
+          toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
+        <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden transition-all duration-300">
+          <Header activePage={activePage} setActivePage={setActivePage} onLogout={handleLogout} user={currentUser} />
+          <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#fafafc] flex flex-col min-h-0 [&>*]:w-full [&>*]:min-w-0">
+            <ErrorBoundary onReset={() => setActivePage('dashboard')}>
+              {renderContent()}
+            </ErrorBoundary>
+          </div>
         </div>
+        <GenericSectionModal
+          isOpen={modalConfig.isOpen}
+          onClose={closeModal}
+          title={modalConfig.title}
+          subtitle={modalConfig.subtitle}
+          sections={modalConfig.sections}
+        />
       </div>
-      <GenericSectionModal
-        isOpen={modalConfig.isOpen}
-        onClose={closeModal}
-        title={modalConfig.title}
-        subtitle={modalConfig.subtitle}
-        sections={modalConfig.sections}
-      />
       <Devnotation />
-    </div>
+    </>
   );
 }
 

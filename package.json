@@ -18,7 +18,7 @@
     "autoprefixer": "^10.4.23",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
-    "devnotation": "^1.0.3",
+    "devnotation": "^1.0.4",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "html2canvas": "^1.4.1",
