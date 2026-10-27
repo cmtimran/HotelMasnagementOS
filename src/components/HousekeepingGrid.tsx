@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Sparkles, BedDouble, AlertCircle, Users, CheckCircle2, XCircle, Clock, RefreshCw, X, Edit3 } from 'lucide-react';
-import { getCanonicalRooms, broadcastPMSEvent, subscribeToPMSEvents, updateRoomHousekeepingInDB } from '../utils/roomInventoryEngine';
+import { getCanonicalRooms, getAllStoredReservations, getOperatingSystemDate, broadcastPMSEvent, subscribeToPMSEvents, updateRoomHousekeepingInDB } from '../utils/roomInventoryEngine';
 import { dispatchPMSNetworkEvent } from '../utils/pmsNetworkSync';
 import { getApiBaseUrl } from '../utils/apiUrl';
 import PageHeader from './common/PageHeader';
@@ -95,23 +95,73 @@ const HousekeepingGrid = () => {
 
     const fetchRooms = useCallback(async () => {
         setIsSyncing(true);
+        const storedRes = getAllStoredReservations();
+        const opDate = getOperatingSystemDate();
+
+        const getRoomBookingNote = (roomNum: string) => {
+            const active = storedRes.find(res => {
+                const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+                if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed') {
+                    return false;
+                }
+                const matches = String(res.roomNumber) === roomNum ||
+                    String(res.roomNo) === roomNum ||
+                    (Array.isArray(res.allocatedRooms) && res.allocatedRooms.some((x: any) => String(x) === roomNum)) ||
+                    (Array.isArray(res.roomsList) && res.roomsList.some((rm: any) => String(rm.roomNumber) === roomNum)) ||
+                    (Array.isArray(res.groupRoomsList) && res.groupRoomsList.some((rm: any) => String(rm.roomNumber) === roomNum));
+                if (!matches) return false;
+                const checkIn = String(res.checkIn || res.arrivalDate || '');
+                const checkOut = String(res.checkOut || res.departureDate || '');
+                return (checkIn <= opDate && checkOut > opDate) || (checkIn === opDate);
+            });
+            if (active) {
+                const rawStatus = String(active.status || '').toLowerCase();
+                const isInHouse = rawStatus === 'in-house' || rawStatus === 'arrived';
+                return isInHouse ? `In-House: ${active.guestName}` : `Arrival Today: ${active.guestName}`;
+            }
+
+            const upcoming = storedRes.find(res => {
+                const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+                if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed') {
+                    return false;
+                }
+                const matches = String(res.roomNumber) === roomNum ||
+                    String(res.roomNo) === roomNum ||
+                    (Array.isArray(res.allocatedRooms) && res.allocatedRooms.some((x: any) => String(x) === roomNum)) ||
+                    (Array.isArray(res.roomsList) && res.roomsList.some((rm: any) => String(rm.roomNumber) === roomNum)) ||
+                    (Array.isArray(res.groupRoomsList) && res.groupRoomsList.some((rm: any) => String(rm.roomNumber) === roomNum));
+                if (!matches) return false;
+                const checkIn = String(res.checkIn || res.arrivalDate || '');
+                return checkIn > opDate;
+            });
+            if (upcoming) {
+                const dateLabel = (upcoming.checkIn || upcoming.arrivalDate)?.slice(5);
+                return `Upcoming (${dateLabel}): ${upcoming.guestName}`;
+            }
+            return undefined;
+        };
+
         try {
             const res = await fetch(`${API_BASE}/api/rooms`, {
                 headers: { 'x-property-id': '1' }
             });
             const json = await res.json();
             if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                const mapped: HousekeepingRoom[] = json.data.map((r: any) => ({
-                    id: r.id,
-                    roomNumber: String(r.roomNo || r.room_number || r.number),
-                    floor: Number(r.floor) || 1,
-                    roomType: r.roomType || 'Standard Room',
-                    status: mapStatus(r.hkStatus),
-                    assignedTo: r.floor === 1 ? 'Fatima' : r.floor === 2 ? 'Rahima' : r.floor === 3 ? 'Salma' : 'Akhtar',
-                    priority: r.hkStatus === 'dirty' ? 'high' : 'normal',
-                    lastCleaned: r.hkStatus === 'clean' ? '10:30 AM' : undefined,
-                    notes: r.foStatus === 'occupied' ? 'In-House Guest' : r.foStatus === 'due_out' ? 'Departure Today' : r.foStatus === 'reserved' ? 'Reserved' : undefined
-                }));
+                const mapped: HousekeepingRoom[] = json.data.map((r: any) => {
+                    const rNum = String(r.roomNo || r.room_number || r.number);
+                    const bookingNote = getRoomBookingNote(rNum);
+                    return {
+                        id: r.id,
+                        roomNumber: rNum,
+                        floor: Number(r.floor) || 1,
+                        roomType: r.roomType || 'Standard Room',
+                        status: mapStatus(r.hkStatus),
+                        assignedTo: r.floor === 1 ? 'Fatima' : r.floor === 2 ? 'Rahima' : r.floor === 3 ? 'Salma' : 'Akhtar',
+                        priority: r.hkStatus === 'dirty' ? 'high' : 'normal',
+                        lastCleaned: r.hkStatus === 'clean' ? '10:30 AM' : undefined,
+                        notes: bookingNote || (r.foStatus === 'occupied' ? 'In-House Guest' : r.foStatus === 'due_out' ? 'Departure Today' : r.foStatus === 'reserved' ? 'Reserved' : undefined)
+                    };
+                });
                 setRooms(mapped);
                 setIsSyncing(false);
                 return;
@@ -122,15 +172,19 @@ const HousekeepingGrid = () => {
 
         // Fallback to local canonical rooms
         const canonical = getCanonicalRooms();
-        const fallback: HousekeepingRoom[] = canonical.map((r, i) => ({
-            id: r.id,
-            roomNumber: r.number,
-            floor: parseInt(r.floorId, 10) || 1,
-            roomType: r.roomTypeName || 'Standard Room',
-            status: mapStatus(r.housekeepingStatus),
-            assignedTo: r.floorId === '1' ? 'Fatima' : r.floorId === '2' ? 'Rahima' : 'Salma',
-            priority: i % 4 === 0 ? 'high' : 'normal'
-        }));
+        const fallback: HousekeepingRoom[] = canonical.map((r, i) => {
+            const bookingNote = getRoomBookingNote(r.number);
+            return {
+                id: r.id,
+                roomNumber: r.number,
+                floor: parseInt(r.floorId, 10) || 1,
+                roomType: r.roomTypeName || 'Standard Room',
+                status: mapStatus(r.housekeepingStatus),
+                assignedTo: r.floorId === '1' ? 'Fatima' : r.floorId === '2' ? 'Rahima' : 'Salma',
+                priority: i % 4 === 0 ? 'high' : 'normal',
+                notes: bookingNote
+            };
+        });
         setRooms(fallback);
         setIsSyncing(false);
     }, []);

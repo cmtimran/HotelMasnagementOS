@@ -6,7 +6,9 @@ import {
     getCanonicalRooms,
     getDynamicRoomTypes,
     syncReservationsFromDB,
-    syncRoomTypesAndRoomsFromDB
+    syncRoomTypesAndRoomsFromDB,
+    getOperatingSystemDate,
+    subscribeToPMSEvents
 } from '../utils/roomInventoryEngine';
 
 const RevenueDashboard = () => {
@@ -15,18 +17,28 @@ const RevenueDashboard = () => {
     const [roomTypes, setRoomTypes] = useState(() => getDynamicRoomTypes());
 
     useEffect(() => {
-        syncReservationsFromDB().then(res => {
-            if (res.length > 0) setReservations(res);
-        }).catch(() => {});
-        syncRoomTypesAndRoomsFromDB(1).then(({ roomTypes: rt, rooms: r }) => {
-            if (rt.length > 0) setRoomTypes(rt);
-            if (r.length > 0) setRooms(r);
-        }).catch(() => {});
+        const reload = () => {
+            syncReservationsFromDB().then(res => {
+                if (res.length > 0) setReservations(res);
+            }).catch(() => {});
+            syncRoomTypesAndRoomsFromDB(1).then(({ roomTypes: rt, rooms: r }) => {
+                if (rt.length > 0) setRoomTypes(rt);
+                if (r.length > 0) setRooms(r);
+            }).catch(() => {});
+        };
+
+        reload();
+
+        const unsub = subscribeToPMSEvents(() => {
+            setReservations(getAllStoredReservations());
+            reload();
+        });
+        return () => unsub();
     }, []);
 
     const analytics = useMemo(() => {
         const activeRes = reservations.filter(r => r.status !== 'CANCELLED' && r.status !== 'NO_SHOW');
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = getOperatingSystemDate();
         const currentMonthPrefix = todayStr.slice(0, 7);
         const currentYearPrefix = todayStr.slice(0, 4);
 
@@ -38,7 +50,7 @@ const RevenueDashboard = () => {
         let occupiedTodayCount = 0;
 
         activeRes.forEach(r => {
-            const total = Number(r.totalRate) || 0;
+            const total = Number(r.totalAmount) || Number(r.totalRate) || 0;
             const ratePerNight = Number(r.ratePerNight) || total;
             totalRoomRevenue += total;
             if (Array.isArray(r.selectedExtras)) {
@@ -68,7 +80,7 @@ const RevenueDashboard = () => {
         const inHouseCount = Math.max(occupiedTodayCount, activeRes.filter(r => r.status === 'CHECKED_IN').length);
         const occupancyRate = Math.min(100, Math.round((inHouseCount / totalRooms) * 100));
         const adr = activeRes.length > 0
-            ? Math.round(activeRes.reduce((acc, r) => acc + (Number(r.ratePerNight) || Number(r.totalRate) || 0), 0) / activeRes.length)
+            ? Math.round(activeRes.reduce((acc, r) => acc + (Number(r.ratePerNight) || Number(r.totalAmount) || Number(r.totalRate) || 0), 0) / activeRes.length)
             : 0;
         const revpar = Math.round((adr * occupancyRate) / 100);
 
@@ -90,7 +102,7 @@ const RevenueDashboard = () => {
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 const label = `${monthNames[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
                 const existing = monthMap.get(key) || { month: label, revenue: 0, count: 0 };
-                existing.revenue += Number(r.totalRate) || 0;
+                existing.revenue += Number(r.totalAmount) || Number(r.totalRate) || 0;
                 existing.count += 1;
                 monthMap.set(key, existing);
             }
@@ -112,9 +124,9 @@ const RevenueDashboard = () => {
         activeRes.forEach(r => {
             const key = r.roomType || 'Standard';
             const curr = typeStats.get(key) || { type: key, revenue: 0, bookings: 0, totalRateSum: 0 };
-            curr.revenue += Number(r.totalRate) || 0;
+            curr.revenue += Number(r.totalAmount) || Number(r.totalRate) || 0;
             curr.bookings += 1;
-            curr.totalRateSum += Number(r.ratePerNight) || Number(r.totalRate) || 0;
+            curr.totalRateSum += Number(r.ratePerNight) || Number(r.totalAmount) || Number(r.totalRate) || 0;
             typeStats.set(key, curr);
         });
         const topRoomTypes = Array.from(typeStats.values())

@@ -5,7 +5,7 @@ import {
     Heart, CheckCircle2,
     Building2, Printer, Clock
 } from 'lucide-react';
-import { getAllStoredReservations, syncReservationsFromDB, type StoredReservation } from '../utils/roomInventoryEngine';
+import { getAllStoredReservations, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 
 export interface GuestRecord {
     id: number;
@@ -53,16 +53,16 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
     reservations.forEach((r, idx) => {
         const key = (r.guestName || `Guest ${idx + 1}`).trim().toLowerCase();
         const nights = Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
-        const spend = Number(r.totalRate) || 0;
+        const spend = Number(r.totalAmount) || Number(r.totalRate) || 0;
         const stayItem: GuestRecord['stayHistory'][0] = {
             resNumber: String(r.reservationNumber || r.id),
-            roomNumber: r.roomNo || '101',
+            roomNumber: r.roomNumber || r.roomNo || (Array.isArray(r.allocatedRooms) ? r.allocatedRooms[0] : '101'),
             roomType: r.roomType || 'Deluxe',
             checkIn: r.checkIn,
             checkOut: r.checkOut,
             nights,
             totalAmountBDT: spend,
-            status: r.status === 'CANCELLED' ? 'Cancelled' : r.status === 'CHECKED_OUT' ? 'Checked-Out' : 'In-House'
+            status: r.status === 'CANCELLED' ? 'Cancelled' : r.status === 'CHECKED_OUT' || r.status === 'checked-out' ? 'Checked-Out' : 'In-House'
         };
 
         const existing = map.get(key);
@@ -80,8 +80,8 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
                 id: idx + 1,
                 title: r.guestName.startsWith('Dr.') ? 'Dr.' : r.guestName.startsWith('Ms.') ? 'Ms.' : 'Mr.',
                 name: r.guestName.replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.)\s*/i, ''),
-                phone: r.guestPhone || '+880 1711-000000',
-                email: r.guestEmail || `${r.guestName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                phone: r.phone || r.guestPhone || '+880 1711-000000',
+                email: r.email || r.guestEmail || `${r.guestName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
                 vipTier: spend > 50000 ? 'Gold' : r.bookingSource === 'Corporate' ? 'Corporate VIP' : 'Regular',
                 nationality: r.nationality || 'Bangladesh',
                 idType: r.passportNo ? 'Passport' : 'National ID (NID)',
@@ -121,15 +121,30 @@ export const GuestProfile: React.FC = () => {
     });
 
     useEffect(() => {
-        syncReservationsFromDB().then(res => {
-            if (res.length > 0) {
-                const derived = deriveGuestsFromReservations(res);
-                if (derived.length > 0) setGuests(derived);
-            }
-        }).catch(() => {});
+        const refreshGuests = () => {
+            syncReservationsFromDB().then(res => {
+                if (res.length > 0) {
+                    const derived = deriveGuestsFromReservations(res);
+                    if (derived.length > 0) setGuests(derived);
+                }
+            }).catch(() => {
+                const fallback = getAllStoredReservations();
+                if (fallback.length > 0) {
+                    const derived = deriveGuestsFromReservations(fallback);
+                    if (derived.length > 0) setGuests(derived);
+                }
+            });
+        };
+
+        refreshGuests();
+
+        const unsub = subscribeToPMSEvents(() => {
+            refreshGuests();
+        });
+        return () => unsub();
     }, []);
 
-    const [selectedGuestId, setSelectedGuestId] = useState<number>(1);
+    const [selectedGuestId, setSelectedGuestId] = useState<number>(() => guests[0]?.id || 1);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTierFilter, setSelectedTierFilter] = useState<string>('ALL');
     const [activeTab, setActiveTab] = useState<'overview' | 'preferences' | 'vault' | 'corporate'>('overview');

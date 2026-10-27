@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { useNavigation } from '../context/NavigationContext';
+import { useProperty } from '../context/PropertyContext';
 import {
     getCanonicalRooms,
     getAllStoredReservations,
@@ -21,6 +22,7 @@ import { toast } from '../context/ToastContext';
 
 const Dashboard: React.FC = () => {
     const { setActivePage } = useNavigation();
+    const { activeProperty } = useProperty();
 
     // Live Database State
     const [rooms, setRooms] = useState(() => getCanonicalRooms());
@@ -43,8 +45,9 @@ const Dashboard: React.FC = () => {
     };
 
     useEffect(() => {
+        const propId = activeProperty?.id || 1;
         // Initial sync from central relational database
-        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(([dbData, dbRes]) => {
+        Promise.all([syncRoomTypesAndRoomsFromDB(propId), syncReservationsFromDB(propId)]).then(([dbData, dbRes]) => {
             if (dbData?.rooms && dbData.rooms.length > 0) setRooms(dbData.rooms);
             if (dbRes && dbRes.length > 0) setReservations(dbRes);
         });
@@ -52,10 +55,10 @@ const Dashboard: React.FC = () => {
         // Real-time event subscription
         const unsub = subscribeToPMSEvents(() => {
             setRooms(getCanonicalRooms());
-            setReservations(getAllStoredReservations());
+            setReservations(getAllStoredReservations(propId));
         });
         return () => unsub();
-    }, []);
+    }, [activeProperty?.id]);
 
     // Operating System Date (realtime synchronized)
     const [todayStr, setTodayStr] = useState<string>(() => getOperatingSystemDate());
@@ -76,12 +79,16 @@ const Dashboard: React.FC = () => {
 
         const activeReservations = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'voided');
 
-        const arrivalsToday = activeReservations.filter(r => r.checkIn === todayStr);
-        const departsToday = activeReservations.filter(r => r.checkOut === todayStr && (r.status === 'in-house' || r.status === 'arrived'));
+        const arrivalsToday = activeReservations.filter(r => (r.checkIn || r.arrivalDate) === todayStr);
+        const upcomingArrivals = activeReservations.filter(r => (r.checkIn || r.arrivalDate) > todayStr);
+        const departsToday = activeReservations.filter(r => (r.checkOut || r.departureDate) === todayStr && (r.status === 'in-house' || r.status === 'arrived'));
         const inHouseGuests = activeReservations.filter(r => r.status === 'in-house' || r.status === 'arrived');
 
         // Build active reservation map for today
         const activeResMap = new Map<string, any>();
+        // Build upcoming future reservation map
+        const upcomingResMap = new Map<string, any>();
+
         activeReservations.forEach(res => {
             const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
             if (rawStatus === 'cancelled' || rawStatus === 'voided' || rawStatus === 'checked-out' || rawStatus === 'completed') {
@@ -90,7 +97,6 @@ const Dashboard: React.FC = () => {
             const checkIn = String(res.checkIn || res.arrivalDate || '');
             const checkOut = String(res.checkOut || res.departureDate || '');
             const isCoveringToday = (checkIn <= todayStr && checkOut > todayStr) || (checkIn === todayStr);
-            if (!isCoveringToday) return;
 
             const roomNumbers = [
                 ...(Array.isArray(res.allocatedRooms) ? res.allocatedRooms : []),
@@ -100,16 +106,25 @@ const Dashboard: React.FC = () => {
                 res.roomNo
             ].filter(Boolean).map(String);
 
-            roomNumbers.forEach(rm => {
-                if (!activeResMap.has(rm)) {
-                    activeResMap.set(rm, res);
-                }
-            });
+            if (isCoveringToday) {
+                roomNumbers.forEach(rm => {
+                    if (!activeResMap.has(rm)) {
+                        activeResMap.set(rm, res);
+                    }
+                });
+            } else if (checkIn > todayStr) {
+                roomNumbers.forEach(rm => {
+                    if (!upcomingResMap.has(rm)) {
+                        upcomingResMap.set(rm, res);
+                    }
+                });
+            }
         });
 
         // Dynamic Room Status Matrix
         const roomStatusList = rooms.map(room => {
             const res = activeResMap.get(String(room.number));
+            const upcoming = !res ? upcomingResMap.get(String(room.number)) : undefined;
             let status: 'clean' | 'dirty' | 'occupied' | 'reserved' | 'maintenance' = 'clean';
             if (room.status === 'Out of Order' || room.status === 'Maintenance') {
                 status = 'maintenance';
@@ -129,6 +144,20 @@ const Dashboard: React.FC = () => {
                 floorId: room.floorId || (room.number.length >= 3 ? room.number[0] : '1'),
                 housekeepingStatus: room.housekeepingStatus || 'Clean',
                 status,
+                hasUpcoming: Boolean(upcoming),
+                upcomingRes: upcoming ? {
+                    id: upcoming.id,
+                    reservationNumber: upcoming.reservationNumber,
+                    guestName: upcoming.guestName,
+                    phone: upcoming.phone || upcoming.mobile || '—',
+                    checkIn: upcoming.checkIn || upcoming.arrivalDate,
+                    checkOut: upcoming.checkOut || upcoming.departureDate,
+                    status: upcoming.status,
+                    vip: upcoming.vip,
+                    totalAmount: upcoming.totalAmount || 0,
+                    paidAmount: upcoming.paidAmount || 0,
+                    dueAmount: upcoming.dueAmount || 0
+                } : null,
                 activeRes: res ? {
                     id: res.id,
                     reservationNumber: res.reservationNumber,
@@ -176,6 +205,7 @@ const Dashboard: React.FC = () => {
             reservedCount,
             occupancyRate,
             arrivalsCount: arrivalsToday.length,
+            upcomingCount: upcomingArrivals.length,
             departsCount: departsToday.length,
             inHouseCount: inHouseGuests.length,
             totalRevenue,
@@ -289,10 +319,17 @@ const Dashboard: React.FC = () => {
                             type="button"
                             onClick={() => setActivePage('reservations')}
                             className="flex flex-col items-center justify-center p-2 bg-emerald-50/70 hover:bg-emerald-100/70 rounded-xl border border-emerald-100 transition-all cursor-pointer text-center group shadow-2xs hover:shadow-xs"
-                            title="View Today's Expected Arrivals"
+                            title={`Arrivals: Today ${metrics.arrivalsCount}, Upcoming ${metrics.upcomingCount}`}
                         >
                             <LogIn size={16} className="text-emerald-600 mb-1 group-hover:scale-110 transition-transform" />
-                            <span className="text-base text-slate-900 leading-tight font-bold font-mono">{metrics.arrivalsCount}</span>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-base text-slate-900 leading-tight font-bold font-mono">{metrics.arrivalsCount}</span>
+                                {metrics.upcomingCount > 0 && (
+                                    <span className="text-[10px] text-emerald-700 font-mono font-bold" title={`${metrics.upcomingCount} upcoming bookings`}>
+                                        +{metrics.upcomingCount}
+                                    </span>
+                                )}
+                            </div>
                             <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Arrivals</span>
                         </button>
                         <button
@@ -646,13 +683,16 @@ const Dashboard: React.FC = () => {
                                         key={room.number}
                                         onClick={() => setSelectedRoom(room)}
                                         className={`${getStatusColor(room.status)} h-8.5 rounded-lg flex flex-col items-center justify-center text-xs font-mono font-bold cursor-pointer hover:scale-105 active:scale-95 transition-all relative shadow-2xs group`}
-                                        title={`Room ${room.number}: ${room.roomType} (${room.status.toUpperCase()})${room.activeRes ? ` • Guest: ${room.activeRes.guestName}` : ''}`}
+                                        title={`Room ${room.number}: ${room.roomType} (${room.status.toUpperCase()})${room.activeRes ? ` • Guest: ${room.activeRes.guestName}` : room.upcomingRes ? ` • Upcoming: ${room.upcomingRes.checkIn} (${room.upcomingRes.guestName})` : ''}`}
                                     >
                                         <span>{room.number}</span>
                                         {room.status === 'maintenance' && <Wrench size={8} className="absolute top-1 right-1 text-white" />}
                                         {room.status === 'dirty' && <span className="absolute top-1 right-1 size-1.5 bg-amber-200 rounded-full"></span>}
                                         {room.status === 'occupied' && <span className="absolute top-1 right-1 size-1.5 bg-blue-300 rounded-full"></span>}
                                         {room.status === 'reserved' && <Clock size={8} className="absolute top-1 right-1 text-white" />}
+                                        {room.status !== 'reserved' && room.status !== 'occupied' && room.hasUpcoming && (
+                                            <span className="absolute top-1 right-1 size-2 bg-blue-300 rounded-full ring-1 ring-white" title={`Upcoming Arrival: ${room.upcomingRes?.checkIn} (${room.upcomingRes?.guestName})`} />
+                                        )}
                                     </div>
                                 ))}
                         </div>
@@ -684,25 +724,29 @@ const Dashboard: React.FC = () => {
                         </button>
                     </div>
                     <div className="space-y-2">
-                        {reservations.slice(0, 4).map((res) => (
-                            <div key={res.id} className="flex items-center gap-2.5 p-2 bg-slate-50/80 rounded-xl border border-slate-100">
-                                <div className={`size-7 rounded-lg flex items-center justify-center text-xs shrink-0 ${res.vip && res.vip !== 'None' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-100 text-primary'}`}>
-                                    <User size={13} />
+                        {reservations.length > 0 ? (
+                            reservations.slice(0, 5).map((res) => (
+                                <div key={res.id} className="flex items-center gap-2.5 p-2 bg-slate-50/80 rounded-xl border border-slate-100">
+                                    <div className={`size-7 rounded-lg flex items-center justify-center text-xs shrink-0 ${res.vip && res.vip !== 'None' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-100 text-primary'}`}>
+                                        <User size={13} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="text-xs text-slate-900 truncate">{res.guestName}</h4>
+                                        <p className="text-[10px] text-slate-400 font-medium">Room {res.roomNumber || res.roomNo || '101'} • Arr: {res.checkIn || res.arrivalDate}</p>
+                                    </div>
+                                    <span className={`text-[10px] font-semibold px-2 py-0.5 border rounded-full capitalize shadow-2xs ${res.status === 'in-house' || res.status === 'arrived'
+                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                        : res.status === 'hold'
+                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        }`}>
+                                        {res.status}
+                                    </span>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="text-xs text-slate-900 truncate">{res.guestName}</h4>
-                                    <p className="text-[10px] text-slate-400 font-medium">Room {res.roomNumber} • {res.roomType}</p>
-                                </div>
-                                <span className={`text-[10px] font-semibold px-2 py-0.5 border rounded-full capitalize shadow-2xs ${res.status === 'in-house' || res.status === 'arrived'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                    : res.status === 'hold'
-                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    }`}>
-                                    {res.status}
-                                </span>
-                            </div>
-                        ))}
+                            ))
+                        ) : (
+                            <p className="text-xs text-slate-400 p-2 text-center">No active bookings recorded</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -813,6 +857,41 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
+                            ) : selectedRoom.upcomingRes ? (
+                                <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <Clock size={13} className="text-blue-700 shrink-0" />
+                                            <span className="text-xs font-bold text-slate-900 truncate">
+                                                Upcoming: {selectedRoom.upcomingRes.guestName}
+                                            </span>
+                                        </div>
+                                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold shrink-0">
+                                            {selectedRoom.upcomingRes.reservationNumber}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 text-[10.5px] text-slate-600 pt-1.5 border-t border-blue-100/70">
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Arriving Date</span>
+                                            <span className="font-semibold text-slate-800">{selectedRoom.upcomingRes.checkIn}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Departure</span>
+                                            <span className="font-semibold text-slate-800">{selectedRoom.upcomingRes.checkOut}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Contact</span>
+                                            <span className="font-medium text-slate-700">{selectedRoom.upcomingRes.phone || '—'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Tariff Total</span>
+                                            <span className="font-mono font-bold text-slate-800">
+                                                ৳{Number(selectedRoom.upcomingRes.totalAmount || 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
                                 /* If Vacant */
                                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
@@ -859,6 +938,31 @@ const Dashboard: React.FC = () => {
                                             className="btn-primary text-xs h-8 px-3"
                                         >
                                             <span>Open in Room Rack</span>
+                                            <ArrowRight size={13} />
+                                        </button>
+                                    </>
+                                ) : selectedRoom.upcomingRes ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedRoom(null);
+                                                setActivePage('reservations');
+                                            }}
+                                            className="btn-secondary text-xs h-8 px-3"
+                                        >
+                                            <FileText size={13} />
+                                            <span>View Booking</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedRoom(null);
+                                                setActivePage('front-desk');
+                                            }}
+                                            className="btn-primary text-xs h-8 px-3"
+                                        >
+                                            <span>Front Desk</span>
                                             <ArrowRight size={13} />
                                         </button>
                                     </>

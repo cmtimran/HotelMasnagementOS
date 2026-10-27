@@ -17,7 +17,11 @@ import {
     getOperatingSystemDate,
     formatToDisplayDate,
     generateRegistrationNumber,
-    generateFolioNumber
+    generateFolioNumber,
+    getAllStoredReservations,
+    saveStoredReservations,
+    broadcastPMSEvent,
+    subscribeToPMSEvents
 } from '../utils/roomInventoryEngine';
 import type {
     RoomServicesBundle,
@@ -186,10 +190,15 @@ export const FrontDesk: React.FC = () => {
     // Data State (synced with localStorage & database)
     const [reservations, setReservations] = useState<FrontDeskGuestRecord[]>(() => {
         try {
-            const stored = localStorage.getItem('hotel_reservations_v2');
-            if (stored !== null) {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed)) {
+            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
+            const stored = getAllStoredReservations(activePropertyId);
+            if (Array.isArray(stored) && stored.length > 0) {
+                return mapToFrontDeskRecords(stored);
+            }
+            const localV2 = localStorage.getItem('hotel_reservations_v2');
+            if (localV2 !== null) {
+                const parsed = JSON.parse(localV2);
+                if (Array.isArray(parsed) && parsed.length > 0) {
                     return mapToFrontDeskRecords(parsed);
                 }
             }
@@ -200,32 +209,49 @@ export const FrontDesk: React.FC = () => {
     });
 
     // Sync with PostgreSQL Database on Mount and on Real-Time Events
-    useEffect(() => {
-        const fetchDB = async () => {
-            try {
-                const dbList = await syncReservationsFromDB();
-                if (Array.isArray(dbList)) {
-                    setReservations(mapToFrontDeskRecords(dbList));
+    const fetchDB = React.useCallback(async () => {
+        try {
+            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
+            const dbList = await syncReservationsFromDB(activePropertyId);
+            if (Array.isArray(dbList) && dbList.length > 0) {
+                setReservations(mapToFrontDeskRecords(dbList));
+            } else {
+                const fallback = getAllStoredReservations(activePropertyId);
+                if (fallback.length > 0) {
+                    setReservations(mapToFrontDeskRecords(fallback));
                 }
-            } catch (err) {
-                console.warn('FrontDesk DB sync fallback:', err);
             }
-        };
+        } catch (err) {
+            console.warn('FrontDesk DB sync fallback:', err);
+            const fallback = getAllStoredReservations();
+            if (fallback.length > 0) {
+                setReservations(mapToFrontDeskRecords(fallback));
+            }
+        }
+    }, []);
 
+    useEffect(() => {
         fetchDB();
 
+        const unsub = subscribeToPMSEvents(() => {
+            fetchDB();
+        });
         const handleSyncEvent = () => fetchDB();
         window.addEventListener('hotel_pms_sync_event', handleSyncEvent);
-        return () => window.removeEventListener('hotel_pms_sync_event', handleSyncEvent);
-    }, []);
+        return () => {
+            unsub();
+            window.removeEventListener('hotel_pms_sync_event', handleSyncEvent);
+        };
+    }, [fetchDB]);
 
     // Save back to localStorage and PostgreSQL DB (Single Targeted DB Update)
     const persistReservations = (updated: FrontDeskGuestRecord[], changedItem?: { id: string | number; status: string }) => {
         setReservations(updated);
         try {
             const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
-            localStorage.setItem(`hotel_reservations_prop_${activePropertyId}`, JSON.stringify(updated));
+            saveStoredReservations(updated as any, activePropertyId);
             localStorage.setItem('hotel_reservations_v2', JSON.stringify(updated));
+            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             // Trigger database update only for the specific reservation that changed
             if (changedItem?.id && changedItem?.status) {
                 updateReservationStatusInDB(changedItem.id, changedItem.status);
@@ -376,7 +402,7 @@ export const FrontDesk: React.FC = () => {
         else if (activeTab === 'in-house') base = inHouseList;
         else if (activeTab === 'departures') {
             // Include due departures or already checked out today
-            base = reservations.filter(r => r.status === 'checked-out' || (r.status === 'in-house' && r.checkOut <= '2026-07-01'));
+            base = reservations.filter(r => r.status === 'checked-out' || ((r.status === 'in-house' || r.status === 'arrived') && r.checkOut <= systemDateISO));
         }
 
         return base.filter(r => {
@@ -395,7 +421,7 @@ export const FrontDesk: React.FC = () => {
 
             return matchesSearch && matchesSource && matchesPayment;
         });
-    }, [activeTab, arrivalsList, inHouseList, departuresList, reservations, searchTerm, filterSource, filterPayment]);
+    }, [activeTab, arrivalsList, inHouseList, departuresList, reservations, searchTerm, filterSource, filterPayment, systemDateISO]);
 
     // Handlers
     const handleOpenCheckInModal = (record: FrontDeskGuestRecord) => {
@@ -749,12 +775,9 @@ export const FrontDesk: React.FC = () => {
                         </span>
                         <button
                             type="button"
-                            onClick={() => {
-                                const stored = localStorage.getItem('hotel_reservations_v2');
-                                if (stored) setReservations(JSON.parse(stored));
-                            }}
+                            onClick={() => fetchDB()}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
-                            title="Refresh Data"
+                            title="Refresh Data from Database"
                         >
                             <RefreshCw size={13} />
                         </button>
@@ -826,7 +849,7 @@ export const FrontDesk: React.FC = () => {
                                 {currentTabList.length > 0 ? (
                                     currentTabList.map(item => {
                                         const earlyEval = evaluateEarlyCheckIn(item.eta || '12:00');
-                                        const isDueDeparture = item.checkOut <= '2026-07-01' && item.status === 'in-house';
+                                        const isDueDeparture = item.checkOut <= systemDateISO && (item.status === 'in-house' || item.status === 'arrived');
                                         const isCheckedOut = item.status === 'checked-out';
 
                                         return (

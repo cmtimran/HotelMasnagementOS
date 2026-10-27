@@ -40,6 +40,12 @@ apiRouter.use('/rooms', roomRoutes);
 apiRouter.use('/reports', reportRoutes);
 apiRouter.use('/realtime', realtimeRoutes);
 
+// Direct folios alias so /api/folios and /api/folios/:id work identically to /api/accounting/folios
+apiRouter.use('/folios', (req, res, next) => {
+  req.url = '/folios' + (req.url === '/' ? '' : req.url);
+  accountingRoutes(req, res, next);
+});
+
 // Relational Multi-Hotel & Enterprise Modules
 apiRouter.use('/properties', propertyRoutes);
 apiRouter.use('/accounting', accountingRoutes);

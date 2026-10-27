@@ -5,7 +5,7 @@ import {
     RefreshCw, Printer,
     Landmark, Play
 } from 'lucide-react';
-import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB, getOperatingSystemDate, setOperatingSystemDate } from '../utils/roomInventoryEngine';
+import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB, getOperatingSystemDate, setOperatingSystemDate, subscribeToPMSEvents } from '../utils/roomInventoryEngine';
 import { getApiBaseUrl } from '../utils/apiUrl';
 
 interface AuditStep {
@@ -63,14 +63,23 @@ export const NightAuditAutomation: React.FC = () => {
     const [rooms] = useState(() => getCanonicalRooms());
 
     useEffect(() => {
-        syncReservationsFromDB().then(res => {
-            if (res.length > 0) setReservations(res);
-        }).catch(() => {});
+        const reload = () => {
+            syncReservationsFromDB().then(res => {
+                if (res.length > 0) setReservations(res);
+            }).catch(() => {});
+        };
+        reload();
+
+        const unsub = subscribeToPMSEvents(() => {
+            setReservations(getAllStoredReservations());
+            reload();
+        });
+        return () => unsub();
     }, []);
 
     const glPostings = useMemo<GLPosting[]>(() => {
         const active = reservations.filter(r => r.status !== 'CANCELLED' && r.status !== 'NO_SHOW');
-        const roomRev = active.reduce((sum, r) => sum + (Number(r.ratePerNight) || Math.round((Number(r.totalRate) || 0) / 2)), 0);
+        const roomRev = active.reduce((sum, r) => sum + (Number(r.ratePerNight) || Math.round((Number(r.totalAmount) || Number(r.totalRate) || 0) / Math.max(1, Number(r.nights) || 1))), 0);
         const fnbRev = Math.round(roomRev * 0.22);
         const hkRev = Math.round(roomRev * 0.05);
         const trnRev = active.reduce((sum, r) => {

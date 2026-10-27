@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Building2, Eye, CheckCircle2, User, Calendar, ExternalLink, Plus, Sparkles
+    Building2, Eye, CheckCircle2, User, Calendar, ExternalLink, Plus, Sparkles, Clock
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { 
@@ -28,16 +28,21 @@ export interface ArchitecturalRoom {
     ratePerNight: number;
     reservationId?: number | string;
     reservationNumber?: string;
+    upcomingGuestName?: string;
+    upcomingCheckIn?: string;
+    upcomingCheckOut?: string;
+    upcomingReservationId?: number | string;
+    upcomingReservationNumber?: string;
     x: number;
     y: number;
     width: number;
     height: number;
 }
 
-const deriveArchitecturalRooms = (): ArchitecturalRoom[] => {
+const deriveArchitecturalRooms = (targetDate?: string): ArchitecturalRoom[] => {
     const canonical = getCanonicalRooms();
     const storedRes = getAllStoredReservations();
-    const opDate = getOperatingSystemDate();
+    const opDate = targetDate || getOperatingSystemDate();
 
     const floorGroups: Record<number, typeof canonical> = {};
     canonical.forEach(r => {
@@ -71,6 +76,26 @@ const deriveArchitecturalRooms = (): ArchitecturalRoom[] => {
                 return (checkIn <= opDate && checkOut > opDate) || (checkIn === opDate);
             });
 
+            // Match upcoming reservation arriving after opDate
+            const upcomingRes = !activeRes ? storedRes.filter(res => {
+                const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+                if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed' || rawStatus === 'no-show') {
+                    return false;
+                }
+                const matchingRoom = (Array.isArray(res.roomsList) && res.roomsList.find((rm: any) => String(rm.roomNumber) === r.number)) ||
+                                     (Array.isArray(res.groupRoomsList) && res.groupRoomsList.find((rm: any) => String(rm.roomNumber) === r.number));
+
+                const matchesRoom = matchingRoom ||
+                    String(res.roomNumber) === r.number ||
+                    String(res.roomNo) === r.number ||
+                    (Array.isArray(res.allocatedRooms) && res.allocatedRooms.some((x: any) => String(x) === r.number));
+
+                if (!matchesRoom) return false;
+
+                const checkIn = String(matchingRoom?.checkInDate || matchingRoom?.checkIn || res.checkIn || res.arrivalDate || '');
+                return checkIn > opDate;
+            }).sort((a, b) => String(a.checkIn || '').localeCompare(String(b.checkIn || '')))[0] : undefined;
+
             let status: ArchitecturalRoom['status'] = 'VACANT_CLEAN';
             if (r.status === 'Out of Order' || r.status === 'Maintenance') {
                 status = 'OUT_OF_ORDER';
@@ -102,11 +127,16 @@ const deriveArchitecturalRooms = (): ArchitecturalRoom[] => {
                 guestName: activeRes ? activeRes.guestName : undefined,
                 checkIn: activeRes ? (activeRes.checkIn || activeRes.arrivalDate) : undefined,
                 checkOut: activeRes ? (activeRes.checkOut || activeRes.departureDate) : undefined,
-                folioBalanceBDT: activeRes ? (activeRes.dueAmount || 0) : 0,
+                folioBalanceBDT: activeRes ? (Number(activeRes.dueAmount) || 0) : 0,
                 housekeeper: r.housekeepingStatus === 'Clean' ? 'Fatima Begum (Floor 1)' : 'Housekeeping Duty Staff',
                 ratePerNight: r.baseRate || 6500,
                 reservationId: activeRes?.id,
                 reservationNumber: activeRes?.reservationNumber,
+                upcomingGuestName: upcomingRes?.guestName,
+                upcomingCheckIn: upcomingRes ? (upcomingRes.checkIn || upcomingRes.arrivalDate) : undefined,
+                upcomingCheckOut: upcomingRes ? (upcomingRes.checkOut || upcomingRes.departureDate) : undefined,
+                upcomingReservationId: upcomingRes?.id,
+                upcomingReservationNumber: upcomingRes?.reservationNumber,
                 x,
                 y,
                 width,
@@ -120,18 +150,33 @@ const deriveArchitecturalRooms = (): ArchitecturalRoom[] => {
 
 export const FloorPlan: React.FC = () => {
     const { setActivePage } = useNavigation();
-    const [rooms, setRooms] = useState<ArchitecturalRoom[]>(() => deriveArchitecturalRooms());
+    const [planDate, setPlanDate] = useState<string>(() => getOperatingSystemDate());
+    const [rooms, setRooms] = useState<ArchitecturalRoom[]>(() => deriveArchitecturalRooms(planDate));
+
+    useEffect(() => {
+        const handleSync = (e: any) => {
+            if (e?.detail?.type === 'SYSTEM_DATE_CHANGED' && e?.detail?.systemDate) {
+                setPlanDate(e.detail.systemDate);
+            }
+        };
+        window.addEventListener('hotel_pms_sync_event', handleSync);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
+    }, []);
+
+    useEffect(() => {
+        setRooms(deriveArchitecturalRooms(planDate));
+    }, [planDate]);
 
     useEffect(() => {
         Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
-            setRooms(deriveArchitecturalRooms());
+            setRooms(deriveArchitecturalRooms(planDate));
         });
 
         const unsub = subscribeToPMSEvents(() => {
-            setRooms(deriveArchitecturalRooms());
+            setRooms(deriveArchitecturalRooms(planDate));
         });
         return () => unsub();
-    }, []);
+    }, [planDate]);
 
     const [selectedFloor, setSelectedFloor] = useState<number>(1);
     const [selectedRoom, setSelectedRoom] = useState<ArchitecturalRoom | null>(null);
@@ -383,6 +428,34 @@ export const FloorPlan: React.FC = () => {
                                                 {room.checkOut ? `Out: ${room.checkOut}` : ''}
                                             </text>
                                         </g>
+                                    ) : room.upcomingGuestName ? (
+                                        <g>
+                                            <rect
+                                                x={room.x + 8}
+                                                y={room.y + 46}
+                                                width={room.width - 16}
+                                                height={16}
+                                                fill="#dbeafe"
+                                                rx={3}
+                                            />
+                                            <text
+                                                x={room.x + 12}
+                                                y={room.y + 57}
+                                                fill="#1e40af"
+                                                fontSize="8.5"
+                                                fontWeight="bold"
+                                            >
+                                                Next: {room.upcomingCheckIn?.slice(5)} ({room.upcomingGuestName.split(' ')[0]})
+                                            </text>
+                                            <text
+                                                x={room.x + 10}
+                                                y={room.y + 75}
+                                                fill="#64748b"
+                                                fontSize="8.5"
+                                            >
+                                                {style.label}
+                                            </text>
+                                        </g>
                                     ) : (
                                         <text
                                             x={room.x + 10}
@@ -490,6 +563,35 @@ export const FloorPlan: React.FC = () => {
                                             className="py-1 px-2 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[10.5px] cursor-pointer shadow-2xs flex items-center gap-1"
                                         >
                                             <span>Front Desk</span>
+                                            <ExternalLink size={11} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Guest Details - If Upcoming Reservation Scheduled */}
+                            {selectedRoom.status !== 'OCCUPIED' && selectedRoom.status !== 'RESERVED' && selectedRoom.upcomingGuestName && (
+                                <div className="bg-blue-50/80 p-2.5 rounded-lg border border-blue-200 space-y-1.5">
+                                    <span className="text-[9.5px] text-blue-800 uppercase tracking-wide font-bold flex items-center gap-1.5">
+                                        <Clock size={12} className="text-blue-700" />
+                                        <span>Upcoming Scheduled Booking</span>
+                                    </span>
+                                    <p className="text-gray-900 text-xs font-bold">{selectedRoom.upcomingGuestName}</p>
+                                    <div className="flex items-center justify-between text-[10.5px] text-gray-600 font-mono pt-1">
+                                        <span>Arriving: {selectedRoom.upcomingCheckIn}</span>
+                                    </div>
+                                    {selectedRoom.upcomingReservationNumber && (
+                                        <div className="text-[10px] text-blue-700 font-mono font-semibold pt-1 border-t border-blue-200/60">
+                                            Booking Ref: {selectedRoom.upcomingReservationNumber}
+                                        </div>
+                                    )}
+                                    <div className="pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePage('front-desk')}
+                                            className="w-full py-1 px-2 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[10.5px] font-semibold cursor-pointer shadow-2xs flex items-center justify-center gap-1"
+                                        >
+                                            <span>View in Front Desk</span>
                                             <ExternalLink size={11} />
                                         </button>
                                     </div>

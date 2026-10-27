@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, BedDouble, Sparkles, User, Calendar, 
     MapPin, Plus, RefreshCw, LayoutGrid, List, CheckCircle2, 
-    Wrench, ArrowRight, X, ExternalLink, Phone, Building2
+    Wrench, ArrowRight, X, ExternalLink, Phone, Building2, Clock
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
@@ -37,6 +37,11 @@ export interface RoomRackItem {
     reservationNumber?: string;
     buildingId?: string;
     buildingName?: string;
+    upcomingGuestName?: string;
+    upcomingCheckIn?: string;
+    upcomingCheckOut?: string;
+    upcomingReservationId?: number | string;
+    upcomingReservationNumber?: string;
 }
 
 const getBuildingNameById = (bId: string): string => {
@@ -52,17 +57,17 @@ const getBuildingNameById = (bId: string): string => {
     return 'Main Tower';
 };
 
-const deriveRoomsFromInventory = (): RoomRackItem[] => {
+const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
     const canonical = getCanonicalRooms();
     const storedRes = getAllStoredReservations();
-    const opDate = getOperatingSystemDate();
+    const opDate = targetDate || getOperatingSystemDate();
 
     return canonical.map(r => {
         const floorNum = parseInt(r.floorId, 10) || parseInt(r.number[0], 10) || 1;
         const buildingId = String(r.buildingId || (parseInt(String(r.number)[0], 10) >= 4 ? '2' : '1'));
         const buildingName = (r as any).buildingName || getBuildingNameById(buildingId);
         
-        // Match active reservations covering today or arriving today
+        // Match active reservations covering target date or arriving target date
         const activeRes = storedRes.find(res => {
             const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
             if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed') {
@@ -80,6 +85,24 @@ const deriveRoomsFromInventory = (): RoomRackItem[] => {
             const checkOut = String(res.checkOut || res.departureDate || '');
             return (checkIn <= opDate && checkOut > opDate) || (checkIn === opDate);
         });
+
+        // Match upcoming future reservations arriving after opDate (sorted earliest first)
+        const upcomingRes = !activeRes ? storedRes.filter(res => {
+            const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+            if (rawStatus === 'cancelled' || rawStatus === 'void' || rawStatus === 'checked-out' || rawStatus === 'completed') {
+                return false;
+            }
+            const matchesRoom = String(res.roomNumber) === r.number ||
+                String(res.roomNo) === r.number ||
+                (Array.isArray(res.allocatedRooms) && res.allocatedRooms.some((x: any) => String(x) === r.number)) ||
+                (Array.isArray(res.roomsList) && res.roomsList.some((rm: any) => String(rm.roomNumber) === r.number)) ||
+                (Array.isArray(res.groupRoomsList) && res.groupRoomsList.some((rm: any) => String(rm.roomNumber) === r.number));
+
+            if (!matchesRoom) return false;
+
+            const checkIn = String(res.checkIn || res.arrivalDate || '');
+            return checkIn > opDate;
+        }).sort((a, b) => String(a.checkIn || '').localeCompare(String(b.checkIn || '')))[0] : undefined;
 
         let status: RoomRackItem['status'] = 'clean';
         if (r.status === 'Out of Order' || r.status === 'Maintenance') {
@@ -117,7 +140,12 @@ const deriveRoomsFromInventory = (): RoomRackItem[] => {
             housekeeper: r.housekeepingStatus === 'Clean' ? 'Housekeeping Assigned' : 'Duty Staff',
             maintenanceReason: r.status === 'Out of Order' ? (r.remarks || 'Under Maintenance') : undefined,
             reservationId: activeRes?.id,
-            reservationNumber: activeRes?.reservationNumber
+            reservationNumber: activeRes?.reservationNumber,
+            upcomingGuestName: upcomingRes?.guestName,
+            upcomingCheckIn: upcomingRes ? (upcomingRes.checkIn || upcomingRes.arrivalDate) : undefined,
+            upcomingCheckOut: upcomingRes ? (upcomingRes.checkOut || upcomingRes.departureDate) : undefined,
+            upcomingReservationId: upcomingRes?.id,
+            upcomingReservationNumber: upcomingRes?.reservationNumber
         };
     });
 };
@@ -125,19 +153,36 @@ const deriveRoomsFromInventory = (): RoomRackItem[] => {
 export const RoomRack: React.FC = () => {
     const { setActivePage } = useNavigation();
 
+    // Operating System Date & Rack Date
+    const [rackDate, setRackDate] = useState<string>(() => getOperatingSystemDate());
+
     // Rooms State dynamically synchronized with central database
-    const [rooms, setRooms] = useState<RoomRackItem[]>(() => deriveRoomsFromInventory());
+    const [rooms, setRooms] = useState<RoomRackItem[]>(() => deriveRoomsFromInventory(rackDate));
+
+    useEffect(() => {
+        const handleSync = (e: any) => {
+            if (e?.detail?.type === 'SYSTEM_DATE_CHANGED' && e?.detail?.systemDate) {
+                setRackDate(e.detail.systemDate);
+            }
+        };
+        window.addEventListener('hotel_pms_sync_event', handleSync);
+        return () => window.removeEventListener('hotel_pms_sync_event', handleSync);
+    }, []);
+
+    useEffect(() => {
+        setRooms(deriveRoomsFromInventory(rackDate));
+    }, [rackDate]);
 
     useEffect(() => {
         Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
-            setRooms(deriveRoomsFromInventory());
+            setRooms(deriveRoomsFromInventory(rackDate));
         });
 
         const unsub = subscribeToPMSEvents(() => {
-            setRooms(deriveRoomsFromInventory());
+            setRooms(deriveRoomsFromInventory(rackDate));
         });
         return () => unsub();
-    }, []);
+    }, [rackDate]);
 
     const persistRooms = (updated: RoomRackItem[]) => {
         setRooms(updated);
@@ -385,6 +430,21 @@ export const RoomRack: React.FC = () => {
 
                 {/* Header Actions */}
                 <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    {/* Operating Date Selector */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg border border-slate-200 px-2.5 h-8 text-xs font-semibold text-slate-700 shadow-2xs">
+                        <Calendar size={13} className="text-blue-700" />
+                        <span className="text-[11px] text-slate-500">Date:</span>
+                        <input
+                            type="date"
+                            value={rackDate}
+                            onChange={(e) => {
+                                if (e.target.value) setRackDate(e.target.value);
+                            }}
+                            className="bg-transparent text-xs font-mono font-bold text-slate-900 outline-none cursor-pointer"
+                            title="Select date to inspect room rack occupancy"
+                        />
+                    </div>
+
                     {/* View Switcher */}
                     <div className="flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 h-8 items-center">
                         <button
@@ -712,6 +772,39 @@ export const RoomRack: React.FC = () => {
                                                             <Calendar size={10} /> Departs: {room.checkoutDate}
                                                         </p>
                                                     </div>
+                                                ) : room.status === 'reserved' && room.guestName ? (
+                                                    <div className="bg-amber-50/80 border border-amber-200/90 p-2 rounded-lg text-xs">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[9.5px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                                                                <Clock size={10} /> Arriving Today
+                                                            </span>
+                                                            <span className="text-[9px] font-mono bg-amber-100 text-amber-900 px-1 py-0.2 rounded font-semibold">
+                                                                {room.reservationNumber || 'RES'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-amber-950 truncate font-semibold flex items-center gap-1 mt-1">
+                                                            <User size={11} className="text-amber-700 shrink-0" />
+                                                            <span>{room.guestName}</span>
+                                                        </p>
+                                                    </div>
+                                                ) : room.upcomingGuestName ? (
+                                                    <div className="bg-blue-50/80 border border-blue-200/90 p-2 rounded-lg text-xs">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[9.5px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1">
+                                                                <Clock size={10} /> Upcoming Arrival
+                                                            </span>
+                                                            <span className="text-[9px] font-mono bg-blue-100 text-blue-800 px-1 py-0.2 rounded font-semibold">
+                                                                {room.upcomingCheckIn}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-blue-950 truncate font-semibold flex items-center gap-1 mt-1">
+                                                            <User size={11} className="text-blue-600 shrink-0" />
+                                                            <span>{room.upcomingGuestName}</span>
+                                                        </p>
+                                                        <p className="text-[9.5px] text-blue-600 font-mono mt-0.5">
+                                                            {room.upcomingReservationNumber}
+                                                        </p>
+                                                    </div>
                                                 ) : room.status === 'ooo' ? (
                                                     <div className="bg-slate-100 p-1.5 rounded-lg text-[10px] text-slate-600 flex items-center gap-1.5">
                                                         <Wrench size={11} className="text-slate-500" />
@@ -784,7 +877,7 @@ export const RoomRack: React.FC = () => {
                                                 <span className={`w-2 h-2 rounded-full ${theme.dot}`}></span>
                                             </div>
                                             <p className="text-[9.5px] font-medium text-slate-500 truncate mt-1">
-                                                {room.status === 'occupied' ? (room.guestName || 'Occupied') : room.roomType}
+                                                {room.status === 'occupied' ? (room.guestName || 'Occupied') : room.upcomingGuestName ? `Next: ${room.upcomingCheckIn?.slice(5)} (${room.upcomingGuestName.split(' ')[0]})` : room.roomType}
                                             </p>
                                             <div className="flex items-center justify-between text-[9px] mt-1 pt-1 border-t border-slate-100">
                                                 <span className="text-slate-700">৳{room.rate}</span>
@@ -951,6 +1044,45 @@ export const RoomRack: React.FC = () => {
                                     <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px] text-amber-900 font-medium">
                                         <span>Expected Stay:</span>
                                         <span className="font-mono font-bold text-slate-800">{selectedRoom.checkIn} → {selectedRoom.checkoutDate}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Scheduled Future Reservation Information */}
+                            {selectedRoom.status !== 'occupied' && selectedRoom.status !== 'reserved' && selectedRoom.upcomingGuestName && (
+                                <div className="bg-blue-50/90 border border-blue-200/90 rounded-xl p-3.5 space-y-2.5 text-xs text-blue-950 shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] text-blue-800 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                            <Clock size={13} className="text-blue-700" />
+                                            <span>Scheduled Future Reservation</span>
+                                        </span>
+                                        <span className="px-2 py-0.5 bg-blue-200/70 text-blue-900 rounded-full text-[10px] font-bold">
+                                            Arr: {selectedRoom.upcomingCheckIn}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-0.5">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center font-bold text-xs">
+                                                {selectedRoom.upcomingGuestName ? selectedRoom.upcomingGuestName.slice(0, 2).toUpperCase() : 'GU'}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-900 text-sm leading-tight">{selectedRoom.upcomingGuestName}</div>
+                                                <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                                                    <span>Ref: {selectedRoom.upcomingReservationNumber}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePage('front-desk')}
+                                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10.5px] font-semibold cursor-pointer shadow-2xs"
+                                        >
+                                            View Front Desk
+                                        </button>
+                                    </div>
+                                    <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-[11px] text-blue-900 font-medium">
+                                        <span>Scheduled Period:</span>
+                                        <span className="font-mono font-bold text-slate-800">{selectedRoom.upcomingCheckIn} → {selectedRoom.upcomingCheckOut}</span>
                                     </div>
                                 </div>
                             )}
