@@ -55,6 +55,13 @@ export interface EmergencyLine {
     phone: string;
 }
 
+export interface SocialMediaLink {
+    id: string;
+    platform: string;
+    url: string;
+    handle?: string;
+}
+
 export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     // 1. General & Location
     legalEntity: 'Grand Hospitality Bangladesh PLC',
@@ -202,10 +209,17 @@ export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     enableWhatsAppConcierge: true,
 
     // 7. Branding & Contacts
-    logoUrl: targetProperty?.logo_url || targetProperty?.logoUrl || '',
-    facebookUrl: 'https://facebook.com/grandpalacehotel',
-    instagramUrl: 'https://instagram.com/grandpalacehotel',
-    tripAdvisorUrl: 'https://tripadvisor.com/grandpalacehotel',
+    logoUrl: targetProperty?.logo_url || targetProperty?.logoUrl || targetProperty?.settings?.logoUrl || '',
+    facebookUrl: targetProperty?.facebook_url || targetProperty?.facebookUrl || targetProperty?.settings?.facebookUrl || '',
+    instagramUrl: targetProperty?.instagram_url || targetProperty?.instagramUrl || targetProperty?.settings?.instagramUrl || '',
+    tripAdvisorUrl: targetProperty?.tripadvisor_url || targetProperty?.tripAdvisorUrl || targetProperty?.settings?.tripAdvisorUrl || '',
+    socialLinks: (targetProperty?.settings?.socialLinks && Array.isArray(targetProperty?.settings?.socialLinks))
+        ? targetProperty.settings.socialLinks
+        : [
+            ...(targetProperty?.facebook_url || targetProperty?.settings?.facebookUrl ? [{ id: 'soc-fb', platform: 'Facebook', url: targetProperty?.facebook_url || targetProperty?.settings?.facebookUrl, handle: '' }] : []),
+            ...(targetProperty?.instagram_url || targetProperty?.settings?.instagramUrl ? [{ id: 'soc-ig', platform: 'Instagram', url: targetProperty?.instagram_url || targetProperty?.settings?.instagramUrl, handle: '' }] : []),
+            ...(targetProperty?.tripadvisor_url || targetProperty?.settings?.tripAdvisorUrl ? [{ id: 'soc-ta', platform: 'TripAdvisor', url: targetProperty?.tripadvisor_url || targetProperty?.settings?.tripAdvisorUrl, handle: '' }] : [])
+        ],
 
     // 8. Backup & Security
     autoCloudBackup: true,
@@ -311,6 +325,22 @@ const AddProperty: React.FC<AddPropertyProps> = ({
         'Wheelchair Access': true
     });
 
+    const [socialLinks, setSocialLinks] = useState<SocialMediaLink[]>(() => {
+        const existing = targetProperty?.settings?.socialLinks;
+        if (Array.isArray(existing) && existing.length > 0) return existing;
+        const initialList: SocialMediaLink[] = [];
+        const fb = targetProperty?.facebook_url || targetProperty?.facebookUrl || targetProperty?.settings?.facebookUrl;
+        const ig = targetProperty?.instagram_url || targetProperty?.instagramUrl || targetProperty?.settings?.instagramUrl;
+        const ta = targetProperty?.tripadvisor_url || targetProperty?.tripAdvisorUrl || targetProperty?.settings?.tripAdvisorUrl;
+        if (fb) initialList.push({ id: 'soc-1', platform: 'Facebook', url: fb, handle: '@facebook' });
+        if (ig) initialList.push({ id: 'soc-2', platform: 'Instagram', url: ig, handle: '@instagram' });
+        if (ta) initialList.push({ id: 'soc-3', platform: 'TripAdvisor', url: ta, handle: '@tripadvisor' });
+        return initialList.length > 0 ? initialList : [
+            { id: 'soc-1', platform: 'Facebook', url: '', handle: '' },
+            { id: 'soc-2', platform: 'Instagram', url: '', handle: '' }
+        ];
+    });
+
     // Hydrate when active property changes
     useEffect(() => {
         if (isCreateMode) return;
@@ -346,6 +376,8 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                 if (Array.isArray(parsed.contacts)) setContacts(parsed.contacts);
                 if (Array.isArray(parsed.emergencyLines)) setEmergencyLines(parsed.emergencyLines);
                 if (parsed.amenities) setAmenities(parsed.amenities);
+                if (Array.isArray(parsed.socialLinks)) setSocialLinks(parsed.socialLinks);
+                else if (Array.isArray(parsed.settings?.socialLinks)) setSocialLinks(parsed.settings.socialLinks);
             } else {
                 setSettings(getDefaultUnifiedSettings(p));
             }
@@ -378,6 +410,17 @@ const AddProperty: React.FC<AddPropertyProps> = ({
             const currencyCode = settings.baseCurrency.slice(0, 3).toUpperCase();
             const timeZoneClean = settings.timezone.split(' ')[0] || 'Asia/Dhaka';
 
+            const fbUrl = socialLinks.find(s => s.platform.toLowerCase().includes('facebook'))?.url || settings.facebookUrl || '';
+            const igUrl = socialLinks.find(s => s.platform.toLowerCase().includes('instagram'))?.url || settings.instagramUrl || '';
+            const taUrl = socialLinks.find(s => s.platform.toLowerCase().includes('tripadvisor'))?.url || settings.tripAdvisorUrl || '';
+            const mergedSettings = {
+                ...settings,
+                facebookUrl: fbUrl,
+                instagramUrl: igUrl,
+                tripAdvisorUrl: taUrl,
+                socialLinks
+            };
+
             if (isCreateMode) {
                 const res = await fetch(`${baseUrl}/api/properties`, {
                     method: 'POST',
@@ -405,7 +448,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                     const createdId = data.data?.id || 1;
                     localStorage.setItem(
                         `hotel_unified_settings_prop_${createdId}`,
-                        JSON.stringify({ settings, bankAccounts, posOutlets, contacts, emergencyLines, amenities })
+                        JSON.stringify({ settings: mergedSettings, bankAccounts, posOutlets, contacts, emergencyLines, amenities, socialLinks })
                     );
                     showToast(`Property "${propName}" created successfully!`, { type: 'success' });
                     await refreshProperties();
@@ -436,12 +479,13 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         checkInTime: settings.checkInTime,
                         checkOutTime: settings.checkOutTime,
                         settings: {
-                            ...settings,
+                            ...mergedSettings,
                             bankAccounts,
                             posOutlets,
                             contacts,
                             emergencyLines,
                             amenities,
+                            socialLinks,
                             updatedAt: new Date().toISOString()
                         }
                     })
@@ -450,12 +494,13 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                 localStorage.setItem(
                     propStorageKey,
                     JSON.stringify({
-                        settings,
+                        settings: mergedSettings,
                         bankAccounts,
                         posOutlets,
                         contacts,
                         emergencyLines,
                         amenities,
+                        socialLinks,
                         updatedAt: new Date().toISOString()
                     })
                 );
@@ -2537,31 +2582,141 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                         </div>
                                     ))}
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4">
-                                    <FormField label="Facebook URL">
-                                        <Input
-                                            value={settings.facebookUrl}
-                                            onChange={(e: any) =>
-                                                setSettings({ ...settings, facebookUrl: e.target.value })
+                                {/* Dynamic Official Social Media & Online Profiles */}
+                                <div className="mt-5 pt-3.5 border-t border-gray-100">
+                                    <div className="flex items-center justify-between mb-2.5 pb-1 border-b border-gray-100">
+                                        <div>
+                                            <h3 className="text-xs text-gray-800 uppercase tracking-tight font-bold flex items-center gap-1.5">
+                                                <Globe size={14} className="text-blue-600" />
+                                                <span>Official Social Media & Online Profiles</span>
+                                            </h3>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">
+                                                Add dynamic social channels, review platforms, and links for marketing and folio branding
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setSocialLinks(prev => [
+                                                    ...prev,
+                                                    {
+                                                        id: `soc-${Date.now()}`,
+                                                        platform: 'Facebook',
+                                                        url: '',
+                                                        handle: ''
+                                                    }
+                                                ])
                                             }
-                                        />
-                                    </FormField>
-                                    <FormField label="Instagram URL">
-                                        <Input
-                                            value={settings.instagramUrl}
-                                            onChange={(e: any) =>
-                                                setSettings({ ...settings, instagramUrl: e.target.value })
-                                            }
-                                        />
-                                    </FormField>
-                                    <FormField label="TripAdvisor URL">
-                                        <Input
-                                            value={settings.tripAdvisorUrl}
-                                            onChange={(e: any) =>
-                                                setSettings({ ...settings, tripAdvisorUrl: e.target.value })
-                                            }
-                                        />
-                                    </FormField>
+                                            className="px-2.5 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 font-semibold cursor-pointer"
+                                        >
+                                            <Plus size={12} /> Add Social Link
+                                        </button>
+                                    </div>
+
+                                    {socialLinks.length === 0 ? (
+                                        <div className="py-4 text-center border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                                            <p className="text-xs text-gray-400">No social media links configured yet.</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSocialLinks([
+                                                        { id: `soc-${Date.now()}-1`, platform: 'Facebook', url: '', handle: '@facebook' },
+                                                        { id: `soc-${Date.now()}-2`, platform: 'Instagram', url: '', handle: '@instagram' },
+                                                        { id: `soc-${Date.now()}-3`, platform: 'TripAdvisor', url: '', handle: '@tripadvisor' }
+                                                    ]);
+                                                }}
+                                                className="mt-1.5 text-xs text-blue-600 hover:underline font-semibold cursor-pointer"
+                                            >
+                                                + Add Standard Channels (Facebook, Instagram, TripAdvisor)
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-3 overflow-x-auto">
+                                            <table className="w-full border-spacing-x-2 border-separate text-xs">
+                                                <thead>
+                                                    <tr className="text-left">
+                                                        <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2 w-44">
+                                                            Platform Channel
+                                                        </th>
+                                                        <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2 w-48">
+                                                            Handle / Label
+                                                        </th>
+                                                        <th className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider pb-2">
+                                                            Direct URL
+                                                        </th>
+                                                        <th className="w-8"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {socialLinks.map((s, idx) => (
+                                                        <tr key={s.id || idx}>
+                                                            <td className="pb-1.5">
+                                                                <select
+                                                                    className="w-full h-7 py-0.5 px-2 text-xs bg-white border border-gray-200 rounded-md outline-none text-gray-800 font-semibold"
+                                                                    value={s.platform}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...socialLinks];
+                                                                        updated[idx] = { ...updated[idx], platform: e.target.value };
+                                                                        setSocialLinks(updated);
+                                                                    }}
+                                                                >
+                                                                    <option value="Facebook">Facebook</option>
+                                                                    <option value="Instagram">Instagram</option>
+                                                                    <option value="TripAdvisor">TripAdvisor</option>
+                                                                    <option value="YouTube">YouTube</option>
+                                                                    <option value="LinkedIn">LinkedIn</option>
+                                                                    <option value="X (Twitter)">X (Twitter)</option>
+                                                                    <option value="TikTok">TikTok</option>
+                                                                    <option value="Google Business">Google Maps / Business</option>
+                                                                    <option value="WhatsApp">WhatsApp Concierge</option>
+                                                                    <option value="Website">Official Website</option>
+                                                                    <option value="Custom">Custom Channel</option>
+                                                                </select>
+                                                            </td>
+                                                            <td className="pb-1.5">
+                                                                <Input
+                                                                    className="!h-7 !py-1 text-xs"
+                                                                    placeholder="@hotelhandle"
+                                                                    value={s.handle || ''}
+                                                                    onChange={(e: any) => {
+                                                                        const updated = [...socialLinks];
+                                                                        updated[idx] = { ...updated[idx], handle: e.target.value };
+                                                                        setSocialLinks(updated);
+                                                                    }}
+                                                                />
+                                                            </td>
+                                                            <td className="pb-1.5">
+                                                                <Input
+                                                                    className="!h-7 !py-1 text-xs font-mono"
+                                                                    placeholder="https://..."
+                                                                    value={s.url}
+                                                                    onChange={(e: any) => {
+                                                                        const updated = [...socialLinks];
+                                                                        updated[idx] = { ...updated[idx], url: e.target.value };
+                                                                        setSocialLinks(updated);
+                                                                    }}
+                                                                />
+                                                            </td>
+                                                            <td className="pb-1.5 text-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setSocialLinks(prev =>
+                                                                            prev.filter((_, i) => i !== idx)
+                                                                        )
+                                                                    }
+                                                                    className="text-gray-300 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                                                                    title="Remove link"
+                                                                >
+                                                                    <Trash2 size={13} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

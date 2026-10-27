@@ -46,7 +46,7 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
             const saved = localStorage.getItem(`hotel_prop_logo_${propId}`);
             if (saved) return saved;
         }
-        return (targetProperty?.logo_url || targetProperty?.logoUrl || (settings as any)?.logoUrl || '');
+        return (targetProperty?.logo_url || targetProperty?.logoUrl || targetProperty?.settings?.logoUrl || '');
     });
     const [isLogoModalOpen, setIsLogoModalOpen] = useState<boolean>(false);
     const [tempLogoUrl, setTempLogoUrl] = useState<string>('');
@@ -1414,6 +1414,61 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Official Social Media & Online Brand Channels */}
+                        <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white shadow-2xs space-y-0">
+                            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <Globe size={15} className="text-blue-600" />
+                                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                                        Official Social Media & Brand Profiles
+                                    </span>
+                                </div>
+                                <span className="text-xs text-slate-500 font-mono">
+                                    {((settings as any).socialLinks?.filter((s: any) => s.url)?.length || 0)} Configured
+                                </span>
+                            </div>
+
+                            <div className="p-4">
+                                {((settings as any).socialLinks && (settings as any).socialLinks.filter((s: any) => s.url).length > 0) ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {((settings as any).socialLinks.filter((s: any) => s.url)).map((s: any, idx: number) => (
+                                            <a
+                                                key={s.id || idx}
+                                                href={s.url.startsWith('http') ? s.url : `https://${s.url}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="p-3 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/30 transition flex items-center justify-between group cursor-pointer"
+                                            >
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs font-bold text-slate-900">{s.platform}</span>
+                                                        {s.handle && (
+                                                            <span className="text-[11px] text-slate-400 font-mono truncate">{s.handle}</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] text-blue-600 truncate mt-0.5">{s.url}</p>
+                                                </div>
+                                                <ExternalLink size={12} className="text-slate-400 group-hover:text-blue-600 transition shrink-0 ml-2" />
+                                            </a>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-6 text-slate-400 text-xs">
+                                        <p>No social media channels configured yet.</p>
+                                        {onManageProperty && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onManageProperty('branding')}
+                                                className="mt-2 text-blue-600 hover:underline font-semibold cursor-pointer"
+                                            >
+                                                + Configure Social Links (Branding & Contacts)
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
