@@ -3,26 +3,40 @@ import {
     User, Search, Plus, Star, Phone, Mail,
     MapPin, Calendar, ShieldCheck,
     Heart, CheckCircle2,
-    Building2, Printer, Clock
+    Building2, Printer, Clock,
+    AlertTriangle, ChevronRight, ChevronLeft,
+    Home
 } from 'lucide-react';
 import { getAllStoredReservations, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 
 export interface GuestRecord {
     id: number;
-    title: 'Mr.' | 'Mrs.' | 'Ms.' | 'Dr.' | 'Prof.';
+    title: 'Mr.' | 'Mrs.' | 'Ms.' | 'Dr.' | 'Prof.' | 'Engr.';
     name: string;
     phone: string;
+    altPhone?: string;
     email: string;
     vipTier: 'Regular' | 'Silver' | 'Gold' | 'Platinum VIP' | 'Corporate VIP';
     nationality: string;
-    idType: 'National ID (NID)' | 'Passport' | 'Driving License';
+    idType: 'National ID (NID)' | 'Passport' | 'Driving License' | 'Diplomatic ID';
     idNumber: string;
+    idExpiry?: string;
+    issuingCountry?: string;
     dob: string;
     gender: 'Male' | 'Female' | 'Other';
     homeCity: string;
     homeCountry: string;
+    address?: string;
+    postalCode?: string;
+    emergencyContact?: {
+        name: string;
+        relationship: string;
+        phone: string;
+    };
     company?: string;
     designation?: string;
+    corporateTaxId?: string;
+    billingRoute?: 'Self-Pay (Guest Folio)' | 'Bill to Company (BTC / City Ledger)' | 'Travel Agent / OTA Voucher';
     totalStays: number;
     totalNights: number;
     lifetimeSpendBDT: number;
@@ -30,9 +44,12 @@ export interface GuestRecord {
     loyaltyPoints: number;
     preferences: {
         roomType: string;
-        floorPreference: 'High Floor' | 'Ground Floor' | 'Quiet Corner';
+        floorPreference: 'High Floor' | 'Ground Floor' | 'Quiet Corner' | 'Away from Elevator' | 'Near Elevator';
+        bedType?: 'King Bed' | 'Twin Beds' | 'Single Bed';
         pillowType: 'Feather / Down' | 'Orthopedic' | 'Hypoallergenic';
+        smoking?: 'Non-Smoking' | 'Smoking';
         dietary: string;
+        allergies?: string;
         newspaper: string;
         specialNotes: string;
     };
@@ -47,6 +64,19 @@ export interface GuestRecord {
         status: 'Checked-Out' | 'In-House' | 'Cancelled';
     }[];
 }
+
+const calculateAge = (dobString: string): number => {
+    if (!dobString) return 0;
+    const birthDate = new Date(dobString);
+    if (isNaN(birthDate.getTime())) return 0;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return Math.max(0, age);
+};
 
 const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestRecord[] => {
     const map = new Map<string, GuestRecord>();
@@ -79,19 +109,31 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
             map.set(key, {
                 id: idx + 1,
                 title: r.guestName.startsWith('Dr.') ? 'Dr.' : r.guestName.startsWith('Ms.') ? 'Ms.' : 'Mr.',
-                name: r.guestName.replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.)\s*/i, ''),
+                name: r.guestName.replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Engr\.)\s*/i, ''),
                 phone: r.phone || r.guestPhone || '+880 1711-000000',
+                altPhone: '+880 1819-000000',
                 email: r.email || r.guestEmail || `${r.guestName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
                 vipTier: spend > 50000 ? 'Gold' : r.bookingSource === 'Corporate' ? 'Corporate VIP' : 'Regular',
                 nationality: r.nationality || 'Bangladesh',
                 idType: r.passportNo ? 'Passport' : 'National ID (NID)',
                 idNumber: r.passportNo || r.nidNumber || `KYC-${10000 + idx}`,
+                idExpiry: '2030-12-31',
+                issuingCountry: r.nationality || 'Bangladesh',
                 dob: '1988-05-15',
                 gender: 'Male',
                 homeCity: 'Dhaka',
                 homeCountry: r.nationality || 'Bangladesh',
+                address: 'House 42, Road 11, Banani',
+                postalCode: '1213',
+                emergencyContact: {
+                    name: 'Family Contact',
+                    relationship: 'Spouse',
+                    phone: '+880 1712-345678'
+                },
                 company: r.bookingSource === 'Corporate' ? 'Corporate Partner' : undefined,
                 designation: r.bookingSource === 'Corporate' ? 'Executive' : undefined,
+                corporateTaxId: r.bookingSource === 'Corporate' ? 'BIN-00294819-2024' : undefined,
+                billingRoute: r.bookingSource === 'Corporate' ? 'Bill to Company (BTC / City Ledger)' : 'Self-Pay (Guest Folio)',
                 totalStays: 1,
                 totalNights: nights,
                 lifetimeSpendBDT: spend,
@@ -100,8 +142,11 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
                 preferences: {
                     roomType: r.roomType || 'Deluxe Double',
                     floorPreference: 'High Floor',
+                    bedType: 'King Bed',
                     pillowType: 'Feather / Down',
+                    smoking: 'Non-Smoking',
                     dietary: 'Standard Halal',
+                    allergies: 'None',
                     newspaper: 'The Daily Star',
                     specialNotes: r.notes || 'Registered via Reservation PMS.'
                 },
@@ -152,19 +197,48 @@ export const GuestProfile: React.FC = () => {
 
     // Modal state for adding a guest
     const [showAddGuestModal, setShowAddGuestModal] = useState(false);
-    const [newGuestForm, setNewGuestForm] = useState({
+    const [modalTab, setModalTab] = useState<'kyc' | 'contact' | 'preferences' | 'corporate'>('kyc');
+
+    const initialGuestForm = {
         title: 'Mr.' as GuestRecord['title'],
         name: '',
-        phone: '',
-        email: '',
+        gender: 'Male' as GuestRecord['gender'],
+        dob: '1992-05-15',
         nationality: 'Bangladesh',
         idType: 'National ID (NID)' as GuestRecord['idType'],
         idNumber: '',
+        idExpiry: '2030-12-31',
+        issuingCountry: 'Bangladesh',
+
+        phone: '',
+        altPhone: '',
+        email: '',
+        address: '',
+        homeCity: 'Dhaka',
+        homeCountry: 'Bangladesh',
+        postalCode: '1212',
+        emergencyName: '',
+        emergencyRelation: 'Spouse',
+        emergencyPhone: '',
+
+        roomType: 'Deluxe King',
+        floorPreference: 'High Floor' as GuestRecord['preferences']['floorPreference'],
+        bedType: 'King Bed' as NonNullable<GuestRecord['preferences']['bedType']>,
+        pillowType: 'Feather / Down' as GuestRecord['preferences']['pillowType'],
+        smoking: 'Non-Smoking' as NonNullable<GuestRecord['preferences']['smoking']>,
+        dietary: 'Standard Halal',
+        allergies: 'None',
+        newspaper: 'The Daily Star',
+
         vipTier: 'Regular' as GuestRecord['vipTier'],
         company: '',
         designation: '',
+        corporateTaxId: '',
+        billingRoute: 'Self-Pay (Guest Folio)' as NonNullable<GuestRecord['billingRoute']>,
         specialNotes: ''
-    });
+    };
+
+    const [newGuestForm, setNewGuestForm] = useState(initialGuestForm);
 
     useEffect(() => {
         localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(guests));
@@ -192,45 +266,60 @@ export const GuestProfile: React.FC = () => {
 
     const handleCreateGuest = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newGuestForm.name || !newGuestForm.phone) {
-            alert('Please enter guest name and phone number.');
+        if (!newGuestForm.name.trim() || !newGuestForm.phone.trim()) {
+            alert('Please enter guest full legal name and primary phone number.');
             return;
         }
 
         const newRecord: GuestRecord = {
             id: Date.now(),
             title: newGuestForm.title,
-            name: newGuestForm.name,
-            phone: newGuestForm.phone,
-            email: newGuestForm.email || 'guest@hospitality.com',
+            name: newGuestForm.name.trim(),
+            phone: newGuestForm.phone.trim(),
+            altPhone: newGuestForm.altPhone.trim() || undefined,
+            email: newGuestForm.email.trim() || `${newGuestForm.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
             vipTier: newGuestForm.vipTier,
-            nationality: newGuestForm.nationality,
+            nationality: newGuestForm.nationality.trim() || 'Bangladesh',
             idType: newGuestForm.idType,
-            idNumber: newGuestForm.idNumber || 'NID-PENDING',
-            dob: '1990-01-01',
-            gender: 'Male',
-            homeCity: 'Dhaka',
-            homeCountry: newGuestForm.nationality,
-            company: newGuestForm.company,
-            designation: newGuestForm.designation,
+            idNumber: newGuestForm.idNumber.trim() || `KYC-${Math.floor(10000 + Math.random() * 90000)}`,
+            idExpiry: newGuestForm.idExpiry || '2030-12-31',
+            issuingCountry: newGuestForm.issuingCountry || newGuestForm.nationality || 'Bangladesh',
+            dob: newGuestForm.dob || '1990-01-01',
+            gender: newGuestForm.gender,
+            homeCity: newGuestForm.homeCity.trim() || 'Dhaka',
+            homeCountry: newGuestForm.homeCountry.trim() || newGuestForm.nationality || 'Bangladesh',
+            address: newGuestForm.address.trim() || undefined,
+            postalCode: newGuestForm.postalCode.trim() || undefined,
+            emergencyContact: newGuestForm.emergencyName.trim() ? {
+                name: newGuestForm.emergencyName.trim(),
+                relationship: newGuestForm.emergencyRelation || 'Family',
+                phone: newGuestForm.emergencyPhone.trim() || newGuestForm.phone.trim()
+            } : undefined,
+            company: newGuestForm.company.trim() || undefined,
+            designation: newGuestForm.designation.trim() || undefined,
+            corporateTaxId: newGuestForm.corporateTaxId.trim() || undefined,
+            billingRoute: newGuestForm.billingRoute,
             totalStays: 1,
             totalNights: 2,
             lifetimeSpendBDT: 15000,
             lastStayDate: new Date().toISOString().slice(0, 10),
-            loyaltyPoints: 500,
+            loyaltyPoints: 750,
             preferences: {
-                roomType: 'Deluxe King',
-                floorPreference: 'High Floor',
-                pillowType: 'Feather / Down',
-                dietary: 'Standard Halal',
-                newspaper: 'The Daily Star',
-                specialNotes: newGuestForm.specialNotes || 'New guest profile registered.'
+                roomType: newGuestForm.roomType,
+                floorPreference: newGuestForm.floorPreference,
+                bedType: newGuestForm.bedType,
+                pillowType: newGuestForm.pillowType,
+                smoking: newGuestForm.smoking,
+                dietary: newGuestForm.dietary,
+                allergies: newGuestForm.allergies.trim() || 'None',
+                newspaper: newGuestForm.newspaper,
+                specialNotes: newGuestForm.specialNotes.trim() || 'New guest profile registered via 360 CRM.'
             },
             stayHistory: [
                 {
                     resNumber: `RES-${Math.floor(10000 + Math.random() * 90000)}`,
                     roomNumber: '102',
-                    roomType: 'Deluxe King',
+                    roomType: newGuestForm.roomType,
                     checkIn: new Date().toISOString().slice(0, 10),
                     checkOut: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
                     nights: 2,
@@ -243,20 +332,9 @@ export const GuestProfile: React.FC = () => {
         setGuests(prev => [newRecord, ...prev]);
         setSelectedGuestId(newRecord.id);
         setShowAddGuestModal(false);
-        setNewGuestForm({
-            title: 'Mr.',
-            name: '',
-            phone: '',
-            email: '',
-            nationality: 'Bangladesh',
-            idType: 'National ID (NID)',
-            idNumber: '',
-            vipTier: 'Regular',
-            company: '',
-            designation: '',
-            specialNotes: ''
-        });
-        showToast(`Guest profile created for ${newRecord.name}`);
+        setNewGuestForm(initialGuestForm);
+        setModalTab('kyc');
+        showToast(`Guest 360 profile created for ${newRecord.title} ${newRecord.name}`);
     };
 
     return (
@@ -412,11 +490,16 @@ export const GuestProfile: React.FC = () => {
                                     </span>
                                 </div>
 
-                                <div className="flex items-center gap-4 text-[11px] text-gray-500 mt-1 flex-wrap">
+                                <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-1 flex-wrap">
                                     <span className="flex items-center gap-1">
                                         <Phone size={11} className="text-gray-400" />
                                         <span className="font-mono">{activeGuest.phone}</span>
                                     </span>
+                                    {activeGuest.altPhone && (
+                                        <span className="flex items-center gap-1 font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 text-[10px]">
+                                            <Phone size={9} /> WA: {activeGuest.altPhone}
+                                        </span>
+                                    )}
                                     <span className="flex items-center gap-1">
                                         <Mail size={11} className="text-gray-400" />
                                         <span>{activeGuest.email}</span>
@@ -425,6 +508,18 @@ export const GuestProfile: React.FC = () => {
                                         <MapPin size={11} className="text-gray-400" />
                                         <span>{activeGuest.homeCity}, {activeGuest.homeCountry}</span>
                                     </span>
+                                    {activeGuest.address && (
+                                        <span className="flex items-center gap-1 text-gray-600">
+                                            <Home size={11} className="text-gray-400" />
+                                            <span>{activeGuest.address}</span>
+                                        </span>
+                                    )}
+                                    {activeGuest.emergencyContact && (
+                                        <span className="flex items-center gap-1 text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 text-[10px]">
+                                            <AlertTriangle size={9} />
+                                            <span>Emergency: {activeGuest.emergencyContact.name} ({activeGuest.emergencyContact.relationship}) {activeGuest.emergencyContact.phone}</span>
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -541,7 +636,7 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 2: Preferences & CRM */}
                     {activeTab === 'preferences' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
+                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
                                 <Heart size={13} className="text-rose-500" />
                                 <span>Hospitality Preferences & Personalization</span>
                             </h3>
@@ -549,30 +644,55 @@ export const GuestProfile: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
                                     <span className="text-[9.5px] text-gray-400 uppercase">Preferred Room Type & Location</span>
-                                    <p className="text-gray-900">{activeGuest.preferences.roomType}</p>
-                                    <span className="inline-block mt-1 px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[9.5px] font-semibold">
-                                        {activeGuest.preferences.floorPreference}
-                                    </span>
+                                    <p className="text-gray-900 font-semibold">{activeGuest.preferences.roomType}</p>
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                        <span className="inline-block px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[9.5px] font-semibold">
+                                            {activeGuest.preferences.floorPreference}
+                                        </span>
+                                        <span className="inline-block px-1.5 py-0.2 rounded bg-slate-200 text-slate-800 text-[9.5px] font-semibold">
+                                            {activeGuest.preferences.smoking || 'Non-Smoking'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] text-gray-400 uppercase">Pillow & Bedding Preference</span>
-                                    <p className="text-gray-900">{activeGuest.preferences.pillowType}</p>
-                                    <p className="text-[10px] text-gray-400">Housekeeping auto-provisions on check-in</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Pillow & Bedding Setup</span>
+                                    <p className="text-gray-900 font-semibold">{activeGuest.preferences.bedType || 'King Bed'} • {activeGuest.preferences.pillowType}</p>
+                                    <p className="text-[10px] text-gray-400">Housekeeping auto-provisions linens & pillows upon check-in</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
-                                    <span className="text-[9.5px] text-gray-400 uppercase">Dietary Requirements & Allergens</span>
-                                    <p className="text-gray-900">{activeGuest.preferences.dietary}</p>
-                                    <p className="text-[10px] text-gray-400">Notified to Executive Chef & Room Service</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Dietary Requirements</span>
+                                    <p className="text-gray-900 font-semibold">{activeGuest.preferences.dietary}</p>
+                                    <p className="text-[10px] text-gray-400">Auto-notified to Executive Chef, Room Service & KDS</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
                                     <span className="text-[9.5px] text-gray-400 uppercase">Morning Newspaper Subscription</span>
-                                    <p className="text-gray-900">{activeGuest.preferences.newspaper}</p>
+                                    <p className="text-gray-900 font-semibold">{activeGuest.preferences.newspaper}</p>
                                     <p className="text-[10px] text-gray-400">Delivered to door at 06:30 AM</p>
                                 </div>
                             </div>
+
+                            {activeGuest.preferences.allergies && activeGuest.preferences.allergies !== 'None' ? (
+                                <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 flex items-start gap-2.5">
+                                    <AlertTriangle size={16} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <h4 className="text-rose-900 text-xs font-bold">Medical Alert & Guest Allergies Recorded</h4>
+                                        <p className="text-[11px] text-rose-800 mt-0.5">
+                                            <strong>Allergen Notice:</strong> {activeGuest.preferences.allergies}
+                                        </p>
+                                        <p className="text-[10px] text-rose-600 mt-1">
+                                            Kitchen Display System (KDS), Dining POS, and Housekeeping supervisors are automatically flagged for cross-contamination safety.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-2.5 bg-emerald-50/70 rounded-lg border border-emerald-200 flex items-center gap-2">
+                                    <CheckCircle2 size={14} className="text-emerald-600 flex-shrink-0" />
+                                    <span className="text-[11px] text-emerald-800">No medical allergies or dietary restrictions recorded for this guest profile.</span>
+                                </div>
+                            )}
 
                             <div className="bg-blue-50/60 p-3 rounded-lg border border-blue-200">
                                 <span className="text-[9.5px] text-blue-800 uppercase block mb-1">General Manager & Concierge Notes</span>
@@ -586,36 +706,58 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 3: ID & Verification Vault */}
                     {activeTab === 'vault' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
+                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
                                 <ShieldCheck size={13} className="text-emerald-600" />
                                 <span>KYC & Document Verification Records</span>
                             </h3>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                                     <span className="text-[9.5px] text-gray-400 uppercase block">Document Type</span>
-                                    <p className="text-gray-900 text-xs mt-0.5">{activeGuest.idType}</p>
+                                    <p className="text-gray-900 text-xs mt-0.5 font-semibold">{activeGuest.idType}</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                                     <span className="text-[9.5px] text-gray-400 uppercase block">Document Number</span>
-                                    <p className="font-mono text-gray-900 text-xs mt-0.5">{activeGuest.idNumber}</p>
+                                    <p className="font-mono text-gray-900 text-xs mt-0.5 font-semibold">{activeGuest.idNumber}</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <span className="text-[9.5px] text-gray-400 uppercase block">Issuing Country / Authority</span>
-                                    <p className="text-gray-900 text-xs mt-0.5">{activeGuest.nationality}</p>
+                                    <span className="text-[9.5px] text-gray-400 uppercase block">Date of Birth & Gender</span>
+                                    <p className="text-gray-900 text-xs mt-0.5 font-semibold">
+                                        {activeGuest.dob} ({calculateAge(activeGuest.dob)} yrs) • {activeGuest.gender}
+                                    </p>
+                                </div>
+
+                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                    <span className="text-[9.5px] text-gray-400 uppercase block">Issuing Authority / Country</span>
+                                    <p className="text-gray-900 text-xs mt-0.5 font-semibold">{activeGuest.issuingCountry || activeGuest.nationality}</p>
+                                    {activeGuest.idExpiry && (
+                                        <span className="text-[9.5px] text-emerald-700 block mt-0.5">Expires: {activeGuest.idExpiry} (Active)</span>
+                                    )}
                                 </div>
                             </div>
+
+                            {activeGuest.address && (
+                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 flex items-start gap-2">
+                                    <Home size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-400 uppercase block">Verified Residential Address</span>
+                                        <p className="text-gray-900 text-xs mt-0.5 font-medium">
+                                            {activeGuest.address}, {activeGuest.homeCity} {activeGuest.postalCode ? `- ${activeGuest.postalCode}` : ''}, {activeGuest.homeCountry}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
                                     <CheckCircle2 size={16} />
                                 </div>
                                 <div>
-                                    <h4 className="text-emerald-900 text-xs">SB Police Verification & Foreigner Registration Clearance</h4>
+                                    <h4 className="text-emerald-900 text-xs font-bold">SB Police Verification & Foreigner Registration Clearance</h4>
                                     <p className="text-[10.5px] text-emerald-700 mt-0.5">
-                                        Identity verified against National Database on initial check-in. Fully compliant with Special Branch hotel ledger requirements.
+                                        Identity verified against National Database on initial check-in. Fully compliant with Special Branch hotel ledger and immigration audit requirements.
                                     </p>
                                 </div>
                             </div>
@@ -625,27 +767,39 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 4: Corporate Profile */}
                     {activeTab === 'corporate' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
+                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
                                 <Building2 size={13} className="text-blue-600" />
                                 <span>Corporate Affiliation & City Ledger Agreement</span>
                             </h3>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
                                     <span className="text-[9.5px] text-gray-400 uppercase">Affiliated Company</span>
-                                    <p className="text-gray-900 text-xs">{activeGuest.company || 'Not affiliated with a corporate account'}</p>
+                                    <p className="text-gray-900 text-xs font-semibold">{activeGuest.company || 'Not affiliated with a corporate account'}</p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
                                     <span className="text-[9.5px] text-gray-400 uppercase">Designation</span>
-                                    <p className="text-gray-900 text-xs">{activeGuest.designation || 'Individual Traveler'}</p>
+                                    <p className="text-gray-900 text-xs font-semibold">{activeGuest.designation || 'Individual Traveler'}</p>
+                                </div>
+
+                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
+                                    <span className="text-[9.5px] text-gray-400 uppercase">Corporate Tax / BIN ID</span>
+                                    <p className="text-gray-900 text-xs font-mono font-semibold">{activeGuest.corporateTaxId || 'N/A'}</p>
                                 </div>
                             </div>
 
                             <div className="p-3 bg-blue-50/70 rounded-lg border border-blue-200 space-y-1">
-                                <span className="text-[9.5px] text-blue-800 uppercase">Billing Instruction & Direct City Ledger</span>
-                                <p className="text-[11px] text-blue-900 leading-relaxed">
-                                    Authorized for Direct Billing under Master Services Agreement (MSA #CORP-2026-99). Room and laundry billable to company account; all personal incidentals to be settled at checkout.
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9.5px] text-blue-800 uppercase font-bold">Billing Instruction & Settlement Route</span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded bg-blue-600 text-white font-semibold">
+                                        {activeGuest.billingRoute || (activeGuest.company ? 'Bill to Company (BTC / City Ledger)' : 'Self-Pay (Guest Folio)')}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-blue-900 leading-relaxed mt-1">
+                                    {activeGuest.billingRoute?.includes('Bill to Company') || activeGuest.company
+                                        ? 'Authorized for Direct Billing under Master Services Agreement (MSA #CORP-2026-99). Room and laundry billable to company city ledger account; all personal incidentals to be settled at checkout.'
+                                        : 'Standard individual guest folio settlement. All room charges, taxes, and incidentals to be settled by guest upon departure via credit card, cash, or MFS.'}
                                 </p>
                             </div>
                         </div>
@@ -655,143 +809,615 @@ export const GuestProfile: React.FC = () => {
 
             {/* Add Guest Modal */}
             {showAddGuestModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-100">
-                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-lg w-full p-4 space-y-3">
-                        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                            <h3 className="text-sm text-gray-900">Register New Guest Profile</h3>
-                            <button onClick={() => setShowAddGuestModal(false)} className="text-gray-400 hover:text-gray-700">✕</button>
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full flex flex-col max-h-[92vh] overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="px-4 py-3 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300">
+                                    <User size={16} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-bold text-white tracking-tight">Register New Guest Profile</h3>
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 border border-blue-400/40 text-blue-200 uppercase font-semibold">
+                                            Enterprise 360° CRM
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-300">
+                                        5-Star Hotel KYC, Special Branch compliance, stay personalization & corporate ledger
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAddGuestModal(false)}
+                                className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer text-xs"
+                            >
+                                ✕
+                            </button>
                         </div>
 
-                        <form onSubmit={handleCreateGuest} className="space-y-2.5">
-                            <div className="grid grid-cols-3 gap-2">
-                                <div>
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Title</label>
-                                    <select
-                                        value={newGuestForm.title}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, title: e.target.value as any })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                    >
-                                        <option>Mr.</option>
-                                        <option>Mrs.</option>
-                                        <option>Ms.</option>
-                                        <option>Dr.</option>
-                                        <option>Prof.</option>
-                                    </select>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Full Legal Name</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Aniya Nusrat"
-                                        value={newGuestForm.name}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, name: e.target.value })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Mobile Phone</label>
-                                    <input
-                                        type="tel"
-                                        placeholder="+880 1711-XXXXXX"
-                                        value={newGuestForm.phone}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, phone: e.target.value })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Email Address</label>
-                                    <input
-                                        type="email"
-                                        placeholder="guest@domain.com"
-                                        value={newGuestForm.email}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, email: e.target.value })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">ID Document Type</label>
-                                    <select
-                                        value={newGuestForm.idType}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, idType: e.target.value as any })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                    >
-                                        <option value="National ID (NID)">National ID (NID)</option>
-                                        <option value="Passport">Passport</option>
-                                        <option value="Driving License">Driving License</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">ID / Passport Number</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Document number"
-                                        value={newGuestForm.idNumber}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">VIP Tier</label>
-                                    <select
-                                        value={newGuestForm.vipTier}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, vipTier: e.target.value as any })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                    >
-                                        <option value="Regular">Regular Guest</option>
-                                        <option value="Silver">Silver Member</option>
-                                        <option value="Gold">Gold VIP</option>
-                                        <option value="Platinum VIP">Platinum VIP</option>
-                                        <option value="Corporate VIP">Corporate VIP</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Corporate Affiliation</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Standard Chartered, Chevron"
-                                        value={newGuestForm.company}
-                                        onChange={e => setNewGuestForm({ ...newGuestForm, company: e.target.value })}
-                                        className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Special Preferences / Notes</label>
-                                <textarea
-                                    placeholder="Guest preferences, allergies, VIP requirements..."
-                                    value={newGuestForm.specialNotes}
-                                    onChange={e => setNewGuestForm({ ...newGuestForm, specialNotes: e.target.value })}
-                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
-                                    rows={2}
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
+                        {/* Step Navigation Tabs Bar */}
+                        <div className="bg-slate-50 border-b border-gray-200 px-3 py-1.5 flex items-center justify-between gap-1 flex-shrink-0 overflow-x-auto no-scrollbar">
+                            {[
+                                { id: 'kyc', step: '1', label: 'Identity & Legal KYC', icon: ShieldCheck },
+                                { id: 'contact', step: '2', label: 'Contact & Address', icon: MapPin },
+                                { id: 'preferences', step: '3', label: 'Stay & F&B', icon: Heart },
+                                { id: 'corporate', step: '4', label: 'Corporate & Billing', icon: Building2 },
+                            ].map(tab => (
                                 <button
+                                    key={tab.id}
                                     type="button"
-                                    onClick={() => setShowAddGuestModal(false)}
-                                    className="h-7 px-3 border border-gray-300 rounded text-xs font-semibold hover:bg-gray-50"
+                                    onClick={() => setModalTab(tab.id as any)}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                                        modalTab === tab.id
+                                            ? 'bg-blue-600 text-white shadow-xs'
+                                            : 'text-gray-600 hover:bg-gray-200/70 hover:text-gray-900'
+                                    }`}
                                 >
-                                    Cancel
+                                    <tab.icon size={13} />
+                                    <span>{tab.label}</span>
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold"
-                                >
-                                    Save Guest 360 Profile
-                                </button>
+                            ))}
+                        </div>
+
+                        {/* Form Body */}
+                        <form onSubmit={handleCreateGuest} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                                {/* TAB 1: IDENTITY & LEGAL KYC */}
+                                {modalTab === 'kyc' && (
+                                    <div className="space-y-3 animate-in fade-in duration-100">
+                                        <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 flex items-start gap-2">
+                                            <ShieldCheck size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                                            <div className="text-[11px] text-blue-900 leading-relaxed">
+                                                <strong>Legal SB Police Form & Immigration Clearance:</strong> Accurately capture guest identification details required for hotel guest register compliance and immigration audit.
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Title</label>
+                                                <select
+                                                    value={newGuestForm.title}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, title: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>Mr.</option>
+                                                    <option>Mrs.</option>
+                                                    <option>Ms.</option>
+                                                    <option>Dr.</option>
+                                                    <option>Prof.</option>
+                                                    <option>Engr.</option>
+                                                </select>
+                                            </div>
+                                            <div className="sm:col-span-3">
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                    Full Legal Name <span className="text-rose-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="As per Passport / National ID"
+                                                    value={newGuestForm.name}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, name: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Gender</label>
+                                                <div className="grid grid-cols-3 gap-1.5 h-8">
+                                                    {(['Male', 'Female', 'Other'] as const).map(g => (
+                                                        <button
+                                                            key={g}
+                                                            type="button"
+                                                            onClick={() => setNewGuestForm({ ...newGuestForm, gender: g })}
+                                                            className={`h-full rounded border text-xs font-semibold cursor-pointer transition-colors ${
+                                                                newGuestForm.gender === g
+                                                                    ? 'bg-blue-600 border-blue-600 text-white'
+                                                                    : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                                                            }`}
+                                                        >
+                                                            {g}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-[10.5px] font-semibold text-gray-700">Date of Birth</label>
+                                                    <span className="text-[10px] text-blue-700 font-semibold bg-blue-50 px-1.5 rounded">
+                                                        Age: {calculateAge(newGuestForm.dob)} yrs {calculateAge(newGuestForm.dob) >= 18 ? '(Adult)' : '(Minor)'}
+                                                    </span>
+                                                </div>
+                                                <input
+                                                    type="date"
+                                                    value={newGuestForm.dob}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, dob: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-[10.5px] font-semibold text-gray-700">Nationality</label>
+                                                <div className="flex items-center gap-1 text-[9.5px]">
+                                                    <span className="text-gray-400">Quick:</span>
+                                                    {['Bangladesh', 'India', 'USA', 'UK', 'Canada', 'UAE'].map(nat => (
+                                                        <button
+                                                            key={nat}
+                                                            type="button"
+                                                            onClick={() => setNewGuestForm({ ...newGuestForm, nationality: nat === 'USA' ? 'United States' : nat === 'UK' ? 'United Kingdom' : nat })}
+                                                            className="text-blue-600 hover:underline cursor-pointer"
+                                                        >
+                                                            {nat}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Bangladesh, United States, United Kingdom"
+                                                value={newGuestForm.nationality}
+                                                onChange={e => setNewGuestForm({ ...newGuestForm, nationality: e.target.value })}
+                                                className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">ID Document Type</label>
+                                                <select
+                                                    value={newGuestForm.idType}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, idType: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option value="National ID (NID)">National ID (NID)</option>
+                                                    <option value="Passport">Passport</option>
+                                                    <option value="Driving License">Driving License</option>
+                                                    <option value="Diplomatic ID">Diplomatic ID</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Document Number</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="NID / Passport No."
+                                                    value={newGuestForm.idNumber}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">ID Expiry Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={newGuestForm.idExpiry}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, idExpiry: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* TAB 2: CONTACT, ADDRESS & EMERGENCY */}
+                                {modalTab === 'contact' && (
+                                    <div className="space-y-3 animate-in fade-in duration-100">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                    Primary Mobile Phone <span className="text-rose-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    placeholder="+880 1711-XXXXXX"
+                                                    value={newGuestForm.phone}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, phone: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                    WhatsApp / Alt Mobile Phone
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    placeholder="+880 1819-XXXXXX"
+                                                    value={newGuestForm.altPhone}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, altPhone: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                Email Address (for Digital Folio & Invoices)
+                                            </label>
+                                            <input
+                                                type="email"
+                                                placeholder="guest@domain.com"
+                                                value={newGuestForm.email}
+                                                onChange={e => setNewGuestForm({ ...newGuestForm, email: e.target.value })}
+                                                className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                Residential / Street Address
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="House/Apt, Road, Area, Sector..."
+                                                value={newGuestForm.address}
+                                                onChange={e => setNewGuestForm({ ...newGuestForm, address: e.target.value })}
+                                                className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">City / Town</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Dhaka"
+                                                    value={newGuestForm.homeCity}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, homeCity: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Postal / Zip Code</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. 1212"
+                                                    value={newGuestForm.postalCode}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, postalCode: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Country of Residence</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Bangladesh"
+                                                    value={newGuestForm.homeCountry}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, homeCountry: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Emergency Contact Group */}
+                                        <div className="p-3 bg-rose-50/60 rounded-lg border border-rose-200 space-y-2">
+                                            <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900">
+                                                <AlertTriangle size={14} className="text-rose-600" />
+                                                <span>Emergency Contact & Duty of Care</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                <div>
+                                                    <label className="block text-[10px] font-semibold text-rose-800 mb-0.5">Contact Person Name</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Full Name"
+                                                        value={newGuestForm.emergencyName}
+                                                        onChange={e => setNewGuestForm({ ...newGuestForm, emergencyName: e.target.value })}
+                                                        className="w-full h-7 px-2 bg-white border border-rose-200 rounded text-xs outline-none focus:border-rose-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-semibold text-rose-800 mb-0.5">Relationship</label>
+                                                    <select
+                                                        value={newGuestForm.emergencyRelation}
+                                                        onChange={e => setNewGuestForm({ ...newGuestForm, emergencyRelation: e.target.value })}
+                                                        className="w-full h-7 px-2 bg-white border border-rose-200 rounded text-xs outline-none focus:border-rose-500"
+                                                    >
+                                                        <option>Spouse</option>
+                                                        <option>Parent</option>
+                                                        <option>Child</option>
+                                                        <option>Sibling</option>
+                                                        <option>Colleague</option>
+                                                        <option>Friend</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-semibold text-rose-800 mb-0.5">Emergency Phone</label>
+                                                    <input
+                                                        type="tel"
+                                                        placeholder="+880 1712-XXXXXX"
+                                                        value={newGuestForm.emergencyPhone}
+                                                        onChange={e => setNewGuestForm({ ...newGuestForm, emergencyPhone: e.target.value })}
+                                                        className="w-full h-7 px-2 bg-white border border-rose-200 rounded text-xs font-mono outline-none focus:border-rose-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* TAB 3: STAY PREFERENCES & F&B / ALLERGENS */}
+                                {modalTab === 'preferences' && (
+                                    <div className="space-y-3 animate-in fade-in duration-100">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Preferred Room Type</label>
+                                                <select
+                                                    value={newGuestForm.roomType}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, roomType: e.target.value })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>Deluxe King</option>
+                                                    <option>Deluxe Double</option>
+                                                    <option>Deluxe Twin</option>
+                                                    <option>Executive Suite</option>
+                                                    <option>Presidential Suite</option>
+                                                    <option>Standard Single</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Floor & Location</label>
+                                                <select
+                                                    value={newGuestForm.floorPreference}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, floorPreference: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>High Floor</option>
+                                                    <option>Ground Floor</option>
+                                                    <option>Quiet Corner</option>
+                                                    <option>Away from Elevator</option>
+                                                    <option>Near Elevator</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Bed Setup</label>
+                                                <select
+                                                    value={newGuestForm.bedType}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, bedType: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>King Bed</option>
+                                                    <option>Twin Beds</option>
+                                                    <option>Single Bed</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Pillow Menu</label>
+                                                <select
+                                                    value={newGuestForm.pillowType}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, pillowType: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>Feather / Down</option>
+                                                    <option>Orthopedic</option>
+                                                    <option>Hypoallergenic</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Smoking Policy</label>
+                                                <select
+                                                    value={newGuestForm.smoking}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, smoking: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>Non-Smoking</option>
+                                                    <option>Smoking</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-[10.5px] font-semibold text-gray-700">Dietary Requirements</label>
+                                                </div>
+                                                <select
+                                                    value={newGuestForm.dietary}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, dietary: e.target.value })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>Standard Halal</option>
+                                                    <option>Pure Vegetarian</option>
+                                                    <option>Vegan</option>
+                                                    <option>Gluten-Free</option>
+                                                    <option>Jain Diet</option>
+                                                    <option>Diabetic / Low Sodium</option>
+                                                    <option>No Special Diet</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Morning Newspaper</label>
+                                                <select
+                                                    value={newGuestForm.newspaper}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, newspaper: e.target.value })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option>The Daily Star</option>
+                                                    <option>Prothom Alo</option>
+                                                    <option>Financial Times</option>
+                                                    <option>None / Digital Only</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-[10.5px] font-semibold text-gray-700">
+                                                    Allergies & Medical Notices
+                                                </label>
+                                                <div className="flex items-center gap-1 text-[9.5px]">
+                                                    <span className="text-gray-400">Quick:</span>
+                                                    {['None', 'Peanuts', 'Seafood', 'Lactose', 'Feathers', 'Wheelchair'].map(al => (
+                                                        <button
+                                                            key={al}
+                                                            type="button"
+                                                            onClick={() => setNewGuestForm({ ...newGuestForm, allergies: al === 'None' ? 'None' : `${al} Allergy` })}
+                                                            className="text-rose-600 hover:underline cursor-pointer"
+                                                        >
+                                                            {al}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Peanut Allergy, Shellfish Allergy, Wheelchair required..."
+                                                value={newGuestForm.allergies}
+                                                onChange={e => setNewGuestForm({ ...newGuestForm, allergies: e.target.value })}
+                                                className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-rose-500"
+                                            />
+                                            {newGuestForm.allergies && newGuestForm.allergies !== 'None' && (
+                                                <p className="text-[10.5px] text-amber-700 mt-1 flex items-center gap-1 bg-amber-50 p-1.5 rounded border border-amber-200">
+                                                    <AlertTriangle size={12} className="text-amber-600 flex-shrink-0" />
+                                                    <span>Chef & Housekeeping supervisor will receive high-priority alerts upon check-in.</span>
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* TAB 4: CORPORATE & VIP BILLING */}
+                                {modalTab === 'corporate' && (
+                                    <div className="space-y-3 animate-in fade-in duration-100">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">VIP Loyalty Tier</label>
+                                                <select
+                                                    value={newGuestForm.vipTier}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, vipTier: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option value="Regular">Regular Guest</option>
+                                                    <option value="Silver">Silver Member</option>
+                                                    <option value="Gold">Gold VIP</option>
+                                                    <option value="Platinum VIP">Platinum VIP</option>
+                                                    <option value="Corporate VIP">Corporate VIP</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Billing Settlement Route</label>
+                                                <select
+                                                    value={newGuestForm.billingRoute}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, billingRoute: e.target.value as any })}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                >
+                                                    <option value="Self-Pay (Guest Folio)">Self-Pay (Guest Folio at Checkout)</option>
+                                                    <option value="Bill to Company (BTC / City Ledger)">Bill to Company (BTC / City Ledger)</option>
+                                                    <option value="Travel Agent / OTA Voucher">Travel Agent / OTA Voucher</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Corporate Affiliation / Company</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Chevron, Standard Chartered, Beximco"
+                                                    value={newGuestForm.company}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, company: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Designation / Title</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Managing Director, Country Lead"
+                                                    value={newGuestForm.designation}
+                                                    onChange={e => setNewGuestForm({ ...newGuestForm, designation: e.target.value })}
+                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                Corporate Tax ID / BIN / Trade License (for Tax Invoices)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. BIN-00294819-2024"
+                                                value={newGuestForm.corporateTaxId}
+                                                onChange={e => setNewGuestForm({ ...newGuestForm, corporateTaxId: e.target.value })}
+                                                className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                General Manager & Concierge Special Notes
+                                            </label>
+                                            <textarea
+                                                placeholder="VIP amenities, flight schedule, special handling instructions..."
+                                                value={newGuestForm.specialNotes}
+                                                onChange={e => setNewGuestForm({ ...newGuestForm, specialNotes: e.target.value })}
+                                                className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                rows={2}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-shrink-0">
+                                <span className="text-[10px] text-gray-500">
+                                    <span className="text-rose-500 font-bold">*</span> Name & Phone required. Other fields optional.
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddGuestModal(false)}
+                                        className="h-8 px-3 border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 rounded text-xs font-semibold cursor-pointer transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    {modalTab !== 'kyc' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (modalTab === 'corporate') setModalTab('preferences');
+                                                else if (modalTab === 'preferences') setModalTab('contact');
+                                                else if (modalTab === 'contact') setModalTab('kyc');
+                                            }}
+                                            className="h-8 px-3 border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 rounded text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                                        >
+                                            <ChevronLeft size={13} />
+                                            <span>Back</span>
+                                        </button>
+                                    )}
+                                    {modalTab !== 'corporate' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (modalTab === 'kyc') setModalTab('contact');
+                                                else if (modalTab === 'contact') setModalTab('preferences');
+                                                else if (modalTab === 'preferences') setModalTab('corporate');
+                                            }}
+                                            className="h-8 px-3 bg-gray-800 hover:bg-gray-900 text-white rounded text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                                        >
+                                            <span>Next</span>
+                                            <ChevronRight size={13} />
+                                        </button>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center gap-1.5 shadow-xs transition-colors"
+                                    >
+                                        <CheckCircle2 size={13} />
+                                        <span>Save Guest 360 Profile</span>
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
