@@ -62,6 +62,9 @@ import {
 import {
     calculateReservationTaxes
 } from '../utils/taxCalculationEngine';
+import {
+    getDayHolidayDetails
+} from '../utils/holidayHelper';
 
 interface TimelineBooking {
     id: string;
@@ -322,7 +325,7 @@ export const StayView: React.FC = () => {
         localStorage.setItem('hotel_unassigned_v2', JSON.stringify(unassignedList));
     }, [unassignedList]);
 
-    // Generate days array based on startDate and daysWindow
+    // Generate days array based on startDate and daysWindow with full Holiday awareness
     const days = useMemo(() => {
         const list = [];
         const parts = startDate.split('-').map(Number);
@@ -336,9 +339,7 @@ export const StayView: React.FC = () => {
             const m = String(current.getMonth() + 1).padStart(2, '0');
             const d = String(current.getDate()).padStart(2, '0');
             const iso = `${y}-${m}-${d}`;
-            const dayOfWeek = current.toLocaleDateString('en-US', { weekday: 'short' });
-            const dayNum = current.getDate();
-            const isWeekend = current.getDay() === 5 || current.getDay() === 6; // Friday or Saturday (Holiday/Weekend)
+            const holidayDetails = getDayHolidayDetails(iso);
             const isToday = iso === operatingDateStr;
             const isPast = iso < operatingDateStr;
             const isFuture = iso > operatingDateStr;
@@ -346,13 +347,22 @@ export const StayView: React.FC = () => {
             list.push({
                 index: i,
                 date: iso,
-                dayName: dayOfWeek,
-                num: dayNum,
-                isWeekend,
+                dayName: holidayDetails.dayName,
+                num: holidayDetails.dayNum,
+                monthShort: holidayDetails.monthName,
+                fullDateStr: holidayDetails.fullFormattedDate,
+                isWeekend: holidayDetails.isWeekend,
+                weekendName: holidayDetails.weekendName,
+                calendarHoliday: holidayDetails.calendarHoliday,
+                isHoliday: holidayDetails.isHoliday,
+                holidayTitle: holidayDetails.holidayTitle,
+                categoryBadge: holidayDetails.categoryBadge,
+                hasSurgeRate: holidayDetails.hasSurgeRate,
+                rateMultiplier: holidayDetails.rateMultiplier,
+                holidayDescription: holidayDetails.description,
                 isToday,
                 isPast,
-                isFuture,
-                monthShort: current.toLocaleDateString('en-US', { month: 'short' })
+                isFuture
             });
         }
         return list;
@@ -422,16 +432,39 @@ export const StayView: React.FC = () => {
     const roomTree: BuildingNode[] = useMemo(() => {
         const canonical = getCanonicalRooms();
         const buildingNames: Record<string, string> = {
-            '1': 'Building 1 (Main Tower)',
-            '2': 'Building 2 (Annex & Suites)'
+            '1': 'Building 1',
+            '2': 'Building 2'
         };
         const floorNames: Record<string, string> = {
-            '1': 'Floor 1 (Executive)',
-            '2': 'Floor 2 (Standard & Deluxe)',
-            '3': 'Floor 3 (Deluxe & Superior)',
-            '4': 'Floor 4 (Club & Suites)',
-            '5': 'Floor 5 (Presidential & Deluxe)'
+            '1': 'Floor 1',
+            '2': 'Floor 2',
+            '3': 'Floor 3',
+            '4': 'Floor 4',
+            '5': 'Floor 5'
         };
+
+        try {
+            const savedB = localStorage.getItem('hotel_buildings_v2');
+            if (savedB) {
+                const bList = JSON.parse(savedB);
+                if (Array.isArray(bList)) {
+                    bList.forEach((b: any) => {
+                        const k = String(b.id || '');
+                        if (k && (b.title || b.name)) buildingNames[k] = b.title || b.name;
+                    });
+                }
+            }
+            const savedF = localStorage.getItem('hotel_floors_v2');
+            if (savedF) {
+                const fList = JSON.parse(savedF);
+                if (Array.isArray(fList)) {
+                    fList.forEach((f: any) => {
+                        const k = String(f.id || f.number || '');
+                        if (k && f.name) floorNames[k] = f.name;
+                    });
+                }
+            }
+        } catch {}
 
         const buildingMap = new Map<string, Map<string, RoomNode[]>>();
 
@@ -1034,6 +1067,26 @@ export const StayView: React.FC = () => {
             window.removeEventListener('resize', handleDismissHover);
         };
     }, [hoveredBooking]);
+
+    // Hover tooltip state for StayView date column headers & holidays
+    const [hoveredDate, setHoveredDate] = useState<{
+        day: (typeof days)[0];
+        rect: { top: number; left: number; right: number; bottom: number; width: number; height: number };
+    } | null>(null);
+    const dateHoverTimerRef = useRef<any>(null);
+
+    // Dismiss date hover tooltip on window scroll or resize
+    useEffect(() => {
+        const handleDismissDateHover = () => {
+            if (hoveredDate) setHoveredDate(null);
+        };
+        window.addEventListener('scroll', handleDismissDateHover, true);
+        window.addEventListener('resize', handleDismissDateHover);
+        return () => {
+            window.removeEventListener('scroll', handleDismissDateHover, true);
+            window.removeEventListener('resize', handleDismissDateHover);
+        };
+    }, [hoveredDate]);
 
     // Open Unified Reservation Action Drawer on Normal Click
     const handleOpenDetailsDrawer = (booking: TimelineBooking) => {
@@ -2209,19 +2262,45 @@ export const StayView: React.FC = () => {
                                     <div
                                         key={d.index}
                                         style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
-                                        className={`px-0.5 py-0.5 border-r text-center flex-shrink-0 transition-colors overflow-hidden ${d.isToday
+                                        onMouseEnter={(e) => {
+                                            if (dateHoverTimerRef.current) clearTimeout(dateHoverTimerRef.current);
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            setHoveredDate({
+                                                day: d,
+                                                rect: {
+                                                    top: rect.top,
+                                                    left: rect.left,
+                                                    right: rect.right,
+                                                    bottom: rect.bottom,
+                                                    width: rect.width,
+                                                    height: rect.height
+                                                }
+                                            });
+                                        }}
+                                        onMouseLeave={() => {
+                                            if (dateHoverTimerRef.current) clearTimeout(dateHoverTimerRef.current);
+                                            dateHoverTimerRef.current = setTimeout(() => {
+                                                setHoveredDate(null);
+                                            }, 100);
+                                        }}
+                                        title={d.isHoliday 
+                                            ? `🎉 ${d.holidayTitle || 'Holiday'}\n📅 ${d.fullDateStr}${d.hasSurgeRate ? `\n⚡ Rate Surge: ${d.rateMultiplier}x` : ''}${d.holidayDescription ? `\nℹ️ ${d.holidayDescription}` : ''}`
+                                            : `📅 ${d.fullDateStr}`
+                                        }
+                                        className={`px-0.5 py-0.5 border-r text-center flex-shrink-0 transition-colors overflow-hidden cursor-pointer select-none relative group ${d.isToday
                                             ? 'bg-blue-100/95 text-blue-900 font-black border-b-2 border-b-blue-600 border-r-blue-200'
                                             : d.isPast
                                                 ? 'bg-slate-200/95 text-slate-600 font-semibold border-b border-slate-300 border-r-slate-300/80'
-                                                : d.isWeekend
+                                                : (d.isWeekend || d.isHoliday)
                                                     ? 'bg-[#ffcccc] text-[#991b1b] border-b border-rose-300 border-r-rose-200'
                                                     : 'bg-gray-50/90 text-gray-700 font-medium border-b border-gray-200 border-r-gray-200'
                                             }`}
                                     >
-                                        <div className="text-[8.5px] uppercase tracking-wider font-semibold opacity-85 leading-none truncate">
-                                            {d.dayName}
+                                        <div className="text-[8.5px] uppercase tracking-wider font-semibold opacity-85 leading-none truncate flex items-center justify-center gap-0.5">
+                                            <span>{d.dayName}</span>
+                                            {d.calendarHoliday && <span className="text-[7.5px] text-amber-700 leading-none" title={d.holidayTitle || undefined}>★</span>}
                                         </div>
-                                        <div className="text-[12px] leading-tight mt-0.5">
+                                        <div className="text-[12px] leading-tight mt-0.5 font-bold">
                                             {d.num}
                                         </div>
                                     </div>
@@ -2279,7 +2358,8 @@ export const StayView: React.FC = () => {
                                                             <div
                                                                 key={d.index}
                                                                 style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
-                                                                className={`px-0.5 border-r flex items-center justify-center flex-shrink-0 min-h-[22px] overflow-hidden ${d.isToday ? 'bg-blue-50/40 border-r-blue-100' : d.isPast ? 'bg-slate-200/50 border-r-slate-200' : d.isWeekend ? 'bg-[#ffebeb]/50 border-r-rose-100' : 'bg-gray-50/30 border-r-gray-100'
+                                                                title={d.isHoliday ? `${d.holidayTitle} • ${d.date}` : undefined}
+                                                                className={`px-0.5 border-r flex items-center justify-center flex-shrink-0 min-h-[22px] overflow-hidden ${d.isToday ? 'bg-blue-50/40 border-r-blue-100' : d.isPast ? 'bg-slate-200/50 border-r-slate-200' : (d.isWeekend || d.isHoliday) ? 'bg-[#ffebeb]/50 border-r-rose-100' : 'bg-gray-50/30 border-r-gray-100'
                                                                     }`}
                                                             >
                                                                 <div className="flex items-center justify-center gap-[2px]">
@@ -2408,11 +2488,12 @@ export const StayView: React.FC = () => {
                                                                         }) : null);
                                                                     }
                                                                 }}
+                                                                title={d.isHoliday ? `${d.holidayTitle} • ${d.date}` : undefined}
                                                                 className={`border-r flex-shrink-0 transition-colors relative ${d.isToday
                                                                     ? 'bg-blue-50/50 border-r-blue-100/80 cursor-pointer hover:bg-blue-100/40'
                                                                     : d.isPast
                                                                         ? 'bg-[#e2e8f0]/80 border-r-slate-300/60 cursor-not-allowed'
-                                                                        : d.isWeekend
+                                                                        : (d.isWeekend || d.isHoliday)
                                                                             ? 'bg-[#ffebeb]/70 border-r-rose-100/80 cursor-pointer hover:bg-rose-100/40'
                                                                             : 'border-r-gray-100 cursor-pointer hover:bg-blue-100/40'
                                                                     }`}
@@ -3235,6 +3316,75 @@ export const StayView: React.FC = () => {
                                 Click bar for drawer actions
                             </span>
                             <span>Drag edge to resize Stay</span>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Hover Tooltip for Date Headers / Holidays */}
+            {hoveredDate && createPortal(
+                <div
+                    className="fixed z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95"
+                    style={{
+                        top: `${Math.min(window.innerHeight - 170, hoveredDate.rect.bottom + 6)}px`,
+                        left: `${Math.min(Math.max(12, hoveredDate.rect.left + hoveredDate.rect.width / 2 - 130), window.innerWidth - 275)}px`,
+                        width: '260px'
+                    }}
+                >
+                    <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700/80 p-3 text-xs">
+                        {/* Header badge & ISO date */}
+                        <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                hoveredDate.day.calendarHoliday 
+                                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40' 
+                                    : hoveredDate.day.isWeekend
+                                        ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
+                                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            }`}>
+                                {hoveredDate.day.categoryBadge}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                                {hoveredDate.day.date}
+                            </span>
+                        </div>
+
+                        {/* Holiday Title / Body */}
+                        <div className="mt-2 space-y-1">
+                            {hoveredDate.day.isHoliday ? (
+                                <>
+                                    <div className="text-[12px] font-bold text-amber-300 flex items-start gap-1.5 leading-snug">
+                                        <span className="text-sm">🎉</span>
+                                        <span>{hoveredDate.day.holidayTitle}</span>
+                                    </div>
+                                    {hoveredDate.day.holidayDescription && (
+                                        <p className="text-[10px] text-slate-300 mt-1 leading-relaxed">
+                                            {hoveredDate.day.holidayDescription}
+                                        </p>
+                                    )}
+                                    {hoveredDate.day.hasSurgeRate && (
+                                        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[10px] font-semibold border border-amber-400/30">
+                                            <span>⚡</span>
+                                            <span>Surge Rate Multiplier: {hoveredDate.day.rateMultiplier}x</span>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-[11.5px] font-semibold text-slate-200">
+                                    {hoveredDate.day.fullDateStr}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer day and operating indicator */}
+                        <div className="mt-2.5 pt-1.5 border-t border-slate-800 text-[9.5px] text-slate-400 flex items-center justify-between">
+                            <span>{hoveredDate.day.dayName}, {hoveredDate.day.num} {hoveredDate.day.monthShort}</span>
+                            {hoveredDate.day.isToday && (
+                                <span className="text-blue-400 font-bold flex items-center gap-1">
+                                    <span className="size-1.5 rounded-full bg-blue-400 animate-ping"></span>
+                                    System Today
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>,

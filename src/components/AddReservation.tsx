@@ -56,6 +56,7 @@ import {
     getRoomTypeCapacity
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
+import { useProperty } from '../context/PropertyContext';
 import { getApiBaseUrl } from '../utils/apiUrl';
 import {
     calculateReservationTaxes,
@@ -92,6 +93,8 @@ interface PaymentRow {
 }
 export const AddReservation: React.FC = () => {
     const { setActivePage } = useNavigation();
+    const { activeProperty } = useProperty();
+    const currencyCode = activeProperty?.currency || 'BDT';
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     // ==========================================
@@ -1199,7 +1202,7 @@ export const AddReservation: React.FC = () => {
                                 }`}>
                                 {step > 1 ? <Check size={11} className="stroke-[3]" /> : '1'}
                             </div>
-                            <span className="truncate tracking-tight">1. Check Availability</span>
+                            <span className="truncate tracking-tight font-medium">Check Availability</span>
                         </button>
 
                         {/* Step 2 */}
@@ -1221,7 +1224,7 @@ export const AddReservation: React.FC = () => {
                                 }`}>
                                 {step > 2 ? <Check size={11} className="stroke-[3]" /> : '2'}
                             </div>
-                            <span className="truncate tracking-tight">2. Guest Profile</span>
+                            <span className="truncate tracking-tight font-medium">Guest Profile</span>
                         </button>
 
                         {/* Step 3 */}
@@ -1239,7 +1242,7 @@ export const AddReservation: React.FC = () => {
                                 }`}>
                                 3
                             </div>
-                            <span className="truncate tracking-tight">3. Billing &amp; Pay</span>
+                            <span className="truncate tracking-tight font-medium">Billing &amp; Pay</span>
                         </button>
                     </div>
                 </div>
@@ -1458,12 +1461,12 @@ export const AddReservation: React.FC = () => {
                                         <thead>
                                             <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                                 <th className="p-2 pl-3 w-44">Room Type</th>
-                                                <th className="p-2 w-20 text-center">Rooms</th>
+                                                <th className="p-2 w-16 text-center" title="Rooms count (checks live inventory availability)">Rooms</th>
                                                 <th className="p-2 w-36">Rate Plan</th>
                                                 <th className="p-2 w-36 text-center">Room</th>
-                                                <th className="p-2 w-14 text-center">Adult</th>
+                                                <th className="p-2 w-14 text-center" title="Adult capacity per room">Adult</th>
                                                 <th className="p-2 w-28 text-center">Child</th>
-                                                <th className="p-2 w-24 text-right">Tariff (BDT)</th>
+                                                <th className="p-2 w-24 text-right">Tariff ({currencyCode})</th>
                                                 <th className="p-2 w-24 text-right">Total</th>
                                                 <th className="p-2 pr-3 w-44 text-right whitespace-nowrap">Actions</th>
                                             </tr>
@@ -1536,8 +1539,8 @@ export const AddReservation: React.FC = () => {
 
                                                             if (isDedicatedSingle) {
                                                                 return (
-                                                                    <div className="flex flex-col items-center justify-center">
-                                                                        <span className="w-12 h-7 flex items-center justify-center bg-slate-50 border border-slate-300 rounded text-[11px] text-slate-800 shadow-2xs">
+                                                                    <div className="flex items-center justify-center">
+                                                                        <span className="w-12 h-7 flex items-center justify-center bg-slate-50 border border-slate-300 rounded text-[11px] font-bold text-slate-800 shadow-2xs" title="1 Room (Single Dedicated)">
                                                                             1
                                                                         </span>
                                                                     </div>
@@ -1545,7 +1548,7 @@ export const AddReservation: React.FC = () => {
                                                             }
 
                                                             return (
-                                                                <div className="flex flex-col items-center">
+                                                                <div className="flex items-center justify-center">
                                                                     <input
                                                                         type="number"
                                                                         min={1}
@@ -1564,14 +1567,12 @@ export const AddReservation: React.FC = () => {
                                                                                 updateRoomRow(row.id, 'roomsCount', raw);
                                                                             }
                                                                         }}
-                                                                        className={`w-14 h-7 px-1 border rounded text-[11px] text-center outline-none transition-all ${isExceeded
+                                                                        title={`Rooms to book: ${row.roomsCount} (Max available in inventory: ${maxAllowed}, ${freeLeft} remaining unassigned)`}
+                                                                        className={`w-12 h-7 px-1 border rounded text-[11px] text-center font-bold outline-none transition-all ${isExceeded
                                                                             ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-400'
-                                                                            : 'border-gray-200 focus:border-blue-500'
+                                                                            : 'border-gray-200 focus:border-blue-500 bg-white'
                                                                             }`}
                                                                     />
-                                                                    <span className={`text-[8.5px] font-semibold mt-0.5 whitespace-nowrap ${isExceeded ? 'text-red-600 font-bold' : 'text-slate-500'}`} title="Maximum capacity for this row">
-                                                                        Max: {maxAllowed} ({freeLeft} free)
-                                                                    </span>
                                                                 </div>
                                                             );
                                                         })()}
@@ -1745,18 +1746,17 @@ export const AddReservation: React.FC = () => {
                                                         const capacity = getRoomTypeCapacity(row.roomType);
                                                         return (
                                                             <>
-                                                                <td className="p-1.5">
-                                                                    <div className="flex flex-col items-center">
+                                                                <td className="p-1.5 text-center">
+                                                                    <div className="flex items-center justify-center">
                                                                         <input
                                                                             type="number"
                                                                             min={1}
                                                                             max={capacity.maxAdults}
                                                                             value={row.adults}
                                                                             onChange={e => updateRoomRow(row.id, 'adults', Number(e.target.value))}
-                                                                            className="w-12 h-7 px-1 border border-gray-200 rounded text-[11px] font-semibold text-center outline-none focus:border-blue-500"
-                                                                            title={`Adults: 1 to ${capacity.maxAdults} for ${row.roomType}`}
+                                                                            className="w-12 h-7 px-1 border border-gray-200 rounded text-[11px] font-semibold text-center outline-none focus:border-blue-500 bg-white"
+                                                                            title={`Adults: 1 to ${capacity.maxAdults} (Max capacity for ${row.roomType})`}
                                                                         />
-                                                                        <span className="text-[9px] text-slate-400">Max {capacity.maxAdults}</span>
                                                                     </div>
                                                                 </td>
                                                                 <td className="p-1.5 text-center">
@@ -2057,7 +2057,7 @@ export const AddReservation: React.FC = () => {
                                 </button>
 
                                 <div className="text-xs text-gray-600">
-                                    Total Estimated: <strong className="text-gray-900 font-mono text-sm font-bold">{grossTotal.toFixed(2)}</strong> BDT
+                                    Total Estimated: <strong className="text-gray-900 font-mono text-sm font-bold">{grossTotal.toFixed(2)}</strong> {currencyCode}
                                 </div>
                             </div>
                         </div>
@@ -2780,10 +2780,23 @@ export const AddReservation: React.FC = () => {
 
                 {/* Footer Action Buttons */}
                 <div className="bg-gray-50/90 border-t border-gray-200 px-4 py-2 flex items-center justify-between select-none">
-                    <div className="text-[11px] text-gray-500">
-                        {step === 1 && `Rooms: ${totalRoomsCount} | Check-in: ${checkIn}`}
-                        {step === 2 && `Guest: ${guestName || 'Not entered'} | Phone: ${mobile || 'N/A'}`}
-                        {step === 3 && `Payable: ৳${finalPayable.toFixed(2)} | Paid: ৳${totalPaid.toFixed(2)} | Due: ৳${totalDue.toFixed(2)}`}
+                    <div className="flex items-center gap-2.5">
+                        {step === 1 && (
+                            <button
+                                type="button"
+                                onClick={handleAddRoomRow}
+                                className="h-7 px-3 bg-white border border-blue-400 hover:border-blue-600 hover:bg-blue-50 text-blue-700 rounded text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs active:scale-[0.98]"
+                                title="Add another room row"
+                            >
+                                <Plus size={13} className="text-blue-600 stroke-[2.5]" />
+                                <span>Add Room</span>
+                            </button>
+                        )}
+                        <div className="text-[11px] text-gray-500">
+                            {step === 1 && `Rooms: ${totalRoomsCount} | Check-in: ${checkIn}`}
+                            {step === 2 && `Guest: ${guestName || 'Not entered'} | Phone: ${mobile || 'N/A'}`}
+                            {step === 3 && `Payable: ৳${finalPayable.toFixed(2)} | Paid: ৳${totalPaid.toFixed(2)} | Due: ৳${totalDue.toFixed(2)}`}
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-1.5">

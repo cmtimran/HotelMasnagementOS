@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
+import { getStoredHolidays, STORAGE_KEY_HOLIDAYS } from '../utils/holidayHelper';
 
 export type HolidayCategory =
     | 'PUBLIC'
@@ -48,196 +49,14 @@ export interface HolidayItem {
     createdAt?: string;
 }
 
-const STORAGE_KEY = 'hotel_holidays_v1';
-
-const INITIAL_HOLIDAYS: HolidayItem[] = [
-    {
-        id: 'hol-001',
-        code: 'NY-GALA-26',
-        name: "New Year's Eve & Grand Gala",
-        category: 'PEAK_GALA',
-        startDate: '2026-12-31',
-        endDate: '2027-01-02',
-        daysCount: 3,
-        hasSurgeRate: true,
-        rateMultiplier: 1.50,
-        minStayNights: 2,
-        mandatoryGala: true,
-        galaDinnerFee: 120,
-        staffWageMultiplier: 2.5,
-        compOffCredit: true,
-        minimumStaffingAlert: 'MAX_PRESENCE',
-        status: 'ACTIVE',
-        description: "High occupancy seasonal peak. Compulsory rooftop ballroom gala & fireworks package.",
-    },
-    {
-        id: 'hol-002',
-        code: 'LANG-DAY-26',
-        name: 'International Mother Language Day',
-        category: 'PUBLIC',
-        startDate: '2026-02-21',
-        endDate: '2026-02-21',
-        daysCount: 1,
-        hasSurgeRate: false,
-        rateMultiplier: 1.0,
-        minStayNights: 1,
-        mandatoryGala: false,
-        galaDinnerFee: 0,
-        staffWageMultiplier: 2.0,
-        compOffCredit: true,
-        minimumStaffingAlert: 'STANDARD',
-        status: 'ACTIVE',
-        description: 'Statutory government holiday. Standard rooms with diplomatic morning protocol.',
-    },
-    {
-        id: 'hol-003',
-        code: 'EID-FITR-26',
-        name: 'Eid-ul-Fitr Grand Holidays',
-        category: 'RELIGIOUS',
-        startDate: '2026-03-20',
-        endDate: '2026-03-23',
-        daysCount: 4,
-        hasSurgeRate: true,
-        rateMultiplier: 1.35,
-        minStayNights: 2,
-        mandatoryGala: false,
-        galaDinnerFee: 0,
-        staffWageMultiplier: 2.0,
-        compOffCredit: true,
-        minimumStaffingAlert: 'HIGH_ALERT',
-        status: 'ACTIVE',
-        description: 'Major family vacation peak. High occupancy banquet and buffet dining operations.',
-    },
-    {
-        id: 'hol-004',
-        code: 'INDEP-26',
-        name: 'Independence & National Day',
-        category: 'PUBLIC',
-        startDate: '2026-03-26',
-        endDate: '2026-03-26',
-        daysCount: 1,
-        hasSurgeRate: false,
-        rateMultiplier: 1.0,
-        minStayNights: 1,
-        mandatoryGala: false,
-        galaDinnerFee: 0,
-        staffWageMultiplier: 2.0,
-        compOffCredit: true,
-        minimumStaffingAlert: 'STANDARD',
-        status: 'ACTIVE',
-        description: 'National commemoration. State diplomatic flags hoisted and security heightened.',
-    },
-    {
-        id: 'hol-005',
-        code: 'LABOR-26',
-        name: 'International Workers & Labor Day',
-        category: 'PUBLIC',
-        startDate: '2026-05-01',
-        endDate: '2026-05-01',
-        daysCount: 1,
-        hasSurgeRate: false,
-        rateMultiplier: 1.0,
-        minStayNights: 1,
-        mandatoryGala: false,
-        galaDinnerFee: 0,
-        staffWageMultiplier: 2.0,
-        compOffCredit: true,
-        minimumStaffingAlert: 'STANDARD',
-        status: 'ACTIVE',
-        description: 'Statutory labor day. Roster compensation applied per labor court regulation.',
-    },
-    {
-        id: 'hol-006',
-        code: 'EID-ADHA-26',
-        name: 'Eid-ul-Adha Holidays',
-        category: 'RELIGIOUS',
-        startDate: '2026-05-27',
-        endDate: '2026-05-30',
-        daysCount: 4,
-        hasSurgeRate: true,
-        rateMultiplier: 1.30,
-        minStayNights: 2,
-        mandatoryGala: false,
-        galaDinnerFee: 0,
-        staffWageMultiplier: 2.0,
-        compOffCredit: true,
-        minimumStaffingAlert: 'HIGH_ALERT',
-        status: 'ACTIVE',
-        description: 'Festival period with high suite bookings and specialized culinary menu rotations.',
-    },
-    {
-        id: 'hol-007',
-        code: 'SUMMER-PEAK-26',
-        name: 'Mid-Summer Tourism High Season',
-        category: 'PEAK_GALA',
-        startDate: '2026-08-01',
-        endDate: '2026-08-08',
-        daysCount: 8,
-        hasSurgeRate: true,
-        rateMultiplier: 1.25,
-        minStayNights: 3,
-        mandatoryGala: false,
-        galaDinnerFee: 0,
-        staffWageMultiplier: 1.5,
-        compOffCredit: false,
-        minimumStaffingAlert: 'HIGH_ALERT',
-        status: 'ACTIVE',
-        description: 'International travel peak period with heightened pool & wellness activities.',
-    },
-    {
-        id: 'hol-008',
-        code: 'VICTORY-26',
-        name: 'Victory Day Festival',
-        category: 'PUBLIC',
-        startDate: '2026-12-16',
-        endDate: '2026-12-16',
-        daysCount: 1,
-        hasSurgeRate: false,
-        rateMultiplier: 1.0,
-        minStayNights: 1,
-        mandatoryGala: false,
-        galaDinnerFee: 0,
-        staffWageMultiplier: 2.0,
-        compOffCredit: true,
-        minimumStaffingAlert: 'STANDARD',
-        status: 'ACTIVE',
-        description: 'National holiday with celebratory executive brunch at the Grand Dining Hall.',
-    },
-    {
-        id: 'hol-009',
-        code: 'XMAS-26',
-        name: 'Christmas Eve & Winter Holidays',
-        category: 'RELIGIOUS',
-        startDate: '2026-12-24',
-        endDate: '2026-12-26',
-        daysCount: 3,
-        hasSurgeRate: true,
-        rateMultiplier: 1.45,
-        minStayNights: 2,
-        mandatoryGala: true,
-        galaDinnerFee: 95,
-        staffWageMultiplier: 2.5,
-        compOffCredit: true,
-        minimumStaffingAlert: 'MAX_PRESENCE',
-        status: 'ACTIVE',
-        description: 'Global holiday with festive Christmas Eve dinner buffet and gingerbread lobby house.',
-    }
-];
-
 export default function HolidayManagement() {
     const [holidays, setHolidays] = useState<HolidayItem[]>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            return saved ? JSON.parse(saved) : INITIAL_HOLIDAYS;
-        } catch (e) {
-            console.error('Failed to parse saved holidays:', e);
-            return INITIAL_HOLIDAYS;
-        }
+        return getStoredHolidays();
     });
 
     useEffect(() => {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(holidays));
+            localStorage.setItem(STORAGE_KEY_HOLIDAYS, JSON.stringify(holidays));
         } catch (e) {
             console.error('Failed to save holidays:', e);
         }
