@@ -124,7 +124,17 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
     // Status-Driven Document Printing States
     const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
-    const [activePrintDoc, setActivePrintDoc] = useState<'reg_card' | 'voucher' | 'folio' | 'cancellation' | null>(null);
+    const [activePrintDoc, setActivePrintDoc] = useState<
+        | 'reg_card'
+        | 'voucher'
+        | 'folio'
+        | 'cancellation'
+        | 'group_invoice'
+        | 'group_voucher'
+        | 'group_prereg'
+        | 'batch_grc'
+        | null
+    >(null);
 
     // Synchronize mode when initialMode or booking changes
     useEffect(() => {
@@ -424,6 +434,73 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const totalTax = activeTaxCalc.totalTaxAmount || 0;
     const baseAmount = currentBaseAmount;
     const dailyRate = Math.round(baseAmount / Math.max(1, nights));
+
+    // Multi-Room / Group Reservation Flag & Financial Aggregates
+    const isMultiRoomGroup = Boolean(booking.groupCode) || (booking.roomsList && booking.roomsList.length > 1) || resolvedGroupRooms.length > 1;
+
+    const groupFinancials = useMemo(() => {
+        if (!isMultiRoomGroup) {
+            return {
+                totalRooms: 1,
+                totalPax: (activeRoom.adults ?? booking.adults ?? 2) + (activeRoom.children ?? booking.children ?? 0),
+                totalNights: origNights,
+                totalBase: baseAmount,
+                totalTax: totalTax,
+                serviceCharge: serviceCharge,
+                vatAmount: vatAmount,
+                grandTotal: totalAmount,
+                paidAmount: paidAmount,
+                dueAmount: dueAmount,
+                rooms: [{
+                    ...activeRoom,
+                    effectiveRate: standardDaily,
+                    effectiveNights: origNights,
+                    effectiveBase: baseAmount,
+                    effectivePax: (activeRoom.adults ?? booking.adults ?? 2) + (activeRoom.children ?? booking.children ?? 0),
+                    displayResNo: activeSubBookingNo
+                }]
+            };
+        }
+
+        let totalBase = 0;
+        let totalPax = 0;
+        const roomRows = resolvedGroupRooms.map((rm: any, idx: number) => {
+            const rRate = Number(rm.rate || rm.avgDailyRate || booking.avgDailyRate || getStandardDailyRateForRoom(rm.roomNumber, rm.roomType));
+            const rNights = Number(rm.nights || booking.nights || 1);
+            const rBase = rRate * rNights;
+            const rPax = Number(rm.adults ?? 2) + Number(rm.children ?? 0);
+            totalBase += rBase;
+            totalPax += rPax;
+            const rResNo = rm.reservationNumber || rm.subBookingNumber || (resolvedGroupRooms.length > 1 ? `${booking.reservationNumber}-${String(idx + 1).padStart(2, '0')}` : booking.reservationNumber);
+            return {
+                ...rm,
+                effectiveRate: rRate,
+                effectiveNights: rNights,
+                effectiveBase: rBase,
+                effectivePax: rPax,
+                displayResNo: rResNo
+            };
+        });
+
+        const taxCalc = calculateReservationTaxes(totalBase, isTaxApplicable, taxConfigId);
+        const grpPaid = Number(booking.paidAmount || 0);
+        const grpTotal = taxCalc.grandTotal;
+        const grpDue = Math.max(0, grpTotal - grpPaid);
+
+        return {
+            totalRooms: resolvedGroupRooms.length,
+            totalPax,
+            totalNights: origNights,
+            totalBase,
+            totalTax: taxCalc.totalTaxAmount,
+            serviceCharge: taxCalc.serviceChargeAmount,
+            vatAmount: taxCalc.vatAmount,
+            grandTotal: grpTotal,
+            paidAmount: grpPaid,
+            dueAmount: grpDue,
+            rooms: roomRows
+        };
+    }, [isMultiRoomGroup, resolvedGroupRooms, booking, activeRoom, origNights, baseAmount, totalTax, serviceCharge, vatAmount, totalAmount, paidAmount, dueAmount, isTaxApplicable, taxConfigId, standardDaily, activeSubBookingNo]);
 
     // Handle departure change in amend mode (with overbooking collision guard)
     const handleDepartureChange = (newDep: string) => {
@@ -1244,9 +1321,10 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
                                             {/* Status-Driven Dropdown Menu */}
                                             {isPrintMenuOpen && (
-                                                <div className="absolute left-0 bottom-full mb-1.5 w-60 bg-[#0a235c] border border-blue-400/30 rounded-xl shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100 text-[10px]">
-                                                    <div className="px-3 py-1.5 text-[8.5px] uppercase tracking-wider font-bold text-blue-200/80 border-b border-blue-400/20 flex items-center justify-between">
-                                                        <span>Printable Documents</span>
+                                                <div className="absolute left-0 bottom-full mb-1.5 w-72 bg-[#0a235c] border border-blue-400/30 rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 text-[10px]">
+                                                    {/* Room Level Section */}
+                                                    <div className="px-3 py-1 text-[8.5px] uppercase tracking-wider font-bold text-blue-200/80 border-b border-blue-400/20 flex items-center justify-between">
+                                                        <span>Room {activeRoomNum} Documents</span>
                                                         <span className="px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-200 font-mono text-[8px]">{activeStatus}</span>
                                                     </div>
                                                     <button
@@ -1255,12 +1333,12 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             setActivePrintDoc('reg_card');
                                                             setIsPrintMenuOpen(false);
                                                         }}
-                                                        className="w-full px-3 py-2 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
+                                                        className="w-full px-3 py-1.5 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
                                                     >
                                                         <FileText size={13} className="text-emerald-300 shrink-0" />
                                                         <div>
                                                             <div className="font-semibold text-white">Registration Card (GRC)</div>
-                                                            <div className="text-[8.5px] text-blue-200/70 leading-tight">Arrival registration form for guest signature</div>
+                                                            <div className="text-[8.5px] text-blue-200/70 leading-tight">Arrival registration form for Room {activeRoomNum}</div>
                                                         </div>
                                                     </button>
                                                     <button
@@ -1269,7 +1347,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             setActivePrintDoc('voucher');
                                                             setIsPrintMenuOpen(false);
                                                         }}
-                                                        className="w-full px-3 py-2 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
+                                                        className="w-full px-3 py-1.5 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
                                                     >
                                                         <FileText size={13} className="text-amber-300 shrink-0" />
                                                         <div>
@@ -1283,7 +1361,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             setActivePrintDoc('folio');
                                                             setIsPrintMenuOpen(false);
                                                         }}
-                                                        className="w-full px-3 py-2 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors"
+                                                        className={`w-full px-3 py-1.5 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors ${isMultiRoomGroup ? 'border-b border-blue-500/10' : ''}`}
                                                     >
                                                         <Printer size={13} className="text-blue-300 shrink-0" />
                                                         <div>
@@ -1293,6 +1371,72 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                             <div className="text-[8.5px] text-blue-200/70 leading-tight">Room tariff, postings & payment ledger</div>
                                                         </div>
                                                     </button>
+
+                                                    {/* Group Level Documents Section */}
+                                                    {isMultiRoomGroup && (
+                                                        <>
+                                                            <div className="mt-1 px-3 py-1 text-[8.5px] uppercase tracking-wider font-bold text-amber-300 bg-amber-500/15 border-y border-amber-400/20 flex items-center justify-between">
+                                                                <span>Group Documents ({resolvedGroupRooms.length} Rooms)</span>
+                                                                <span className="font-mono text-[8px] text-amber-200">{booking.groupCode || 'GROUP'}</span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setActivePrintDoc('group_invoice');
+                                                                    setIsPrintMenuOpen(false);
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-white hover:bg-indigo-600/40 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
+                                                            >
+                                                                <Layers size={13} className="text-indigo-300 shrink-0" />
+                                                                <div>
+                                                                    <div className="font-semibold text-white">Group Master Invoice</div>
+                                                                    <div className="text-[8.5px] text-blue-200/70 leading-tight">Consolidated tax bill for all {resolvedGroupRooms.length} rooms</div>
+                                                                </div>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setActivePrintDoc('group_voucher');
+                                                                    setIsPrintMenuOpen(false);
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-white hover:bg-indigo-600/40 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
+                                                            >
+                                                                <FileText size={13} className="text-sky-300 shrink-0" />
+                                                                <div>
+                                                                    <div className="font-semibold text-white">Group Confirmation Voucher</div>
+                                                                    <div className="text-[8.5px] text-blue-200/70 leading-tight">Rooming summary & corporate booking slip</div>
+                                                                </div>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setActivePrintDoc('group_prereg');
+                                                                    setIsPrintMenuOpen(false);
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-white hover:bg-indigo-600/40 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
+                                                            >
+                                                                <Users size={13} className="text-emerald-300 shrink-0" />
+                                                                <div>
+                                                                    <div className="font-semibold text-white">Group Pre-Reg & Rooming List</div>
+                                                                    <div className="text-[8.5px] text-blue-200/70 leading-tight">Tabular arrival sign-off sheet for rapid check-in</div>
+                                                                </div>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setActivePrintDoc('batch_grc');
+                                                                    setIsPrintMenuOpen(false);
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-white hover:bg-purple-600/40 flex items-center gap-2 cursor-pointer transition-colors"
+                                                            >
+                                                                <Printer size={13} className="text-purple-300 shrink-0" />
+                                                                <div>
+                                                                    <div className="font-semibold text-white">Batch Print All GRCs</div>
+                                                                    <div className="text-[8.5px] text-blue-200/70 leading-tight">1-click print individual GRC for each room</div>
+                                                                </div>
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -2114,7 +2258,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                 </div>
             </div>
 
-            {/* Status-Driven Printable Document Modal (GRC, Voucher, Folio Statement) */}
+            {/* Status-Driven Printable Document Modal (GRC, Voucher, Folio Statement, Group Master Invoice, Group Pre-Reg) */}
             {activePrintDoc && (
                 <div className="fixed inset-0 z-[120] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150">
                     <style>{`
@@ -2126,16 +2270,20 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 visibility: visible !important;
                             }
                             #hotel-printable-document {
-                                position: fixed !important;
+                                position: absolute !important;
                                 left: 0 !important;
                                 top: 0 !important;
                                 width: 100% !important;
                                 margin: 0 !important;
-                                padding: 24px !important;
+                                padding: 20px !important;
                                 background: white !important;
                                 color: black !important;
                                 border: none !important;
                                 box-shadow: none !important;
+                            }
+                            .page-break {
+                                page-break-after: always !important;
+                                break-after: page !important;
                             }
                             .no-print {
                                 display: none !important;
@@ -2143,7 +2291,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         }
                     `}</style>
 
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full overflow-hidden flex flex-col my-auto max-h-[92vh] animate-in zoom-in-95 duration-150">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden flex flex-col my-auto max-h-[92vh] animate-in zoom-in-95 duration-150">
                         {/* Modal Header Bar (no-print) */}
                         <div className="px-5 py-3 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 no-print border-b border-slate-800 flex-shrink-0">
                             <div className="flex items-center gap-2">
@@ -2151,11 +2299,19 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                 <span className="text-xs font-bold uppercase tracking-wider">Document Preview</span>
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 font-semibold font-mono">
                                     {activePrintDoc === 'reg_card'
-                                        ? 'Guest Registration Card (GRC)'
+                                        ? `Room ${activeRoomNum} GRC`
                                         : activePrintDoc === 'voucher'
-                                        ? 'Booking Confirmation Voucher'
+                                        ? `Room ${activeRoomNum} Voucher`
                                         : activePrintDoc === 'cancellation'
                                         ? 'Cancellation Slip'
+                                        : activePrintDoc === 'group_invoice'
+                                        ? `Group Master Tax Invoice (${groupFinancials.totalRooms} Rooms)`
+                                        : activePrintDoc === 'group_voucher'
+                                        ? `Group Confirmation Voucher (${groupFinancials.totalRooms} Rooms)`
+                                        : activePrintDoc === 'group_prereg'
+                                        ? `Group Pre-Reg & Rooming Sheet (${groupFinancials.totalRooms} Rooms)`
+                                        : activePrintDoc === 'batch_grc'
+                                        ? `Batch Print All GRCs (${groupFinancials.totalRooms} Rooms)`
                                         : isCurrentActiveCheckedOut
                                         ? 'Tax Invoice'
                                         : 'Guest Folio Statement'}
@@ -2163,34 +2319,82 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                             </div>
 
                             {/* Document Switcher Tabs */}
-                            <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg text-[10px]">
-                                <button
-                                    type="button"
-                                    onClick={() => setActivePrintDoc('reg_card')}
-                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
-                                        activePrintDoc === 'reg_card' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                                    }`}
-                                >
-                                    Reg Card
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActivePrintDoc('voucher')}
-                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
-                                        activePrintDoc === 'voucher' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                                    }`}
-                                >
-                                    Voucher
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActivePrintDoc('folio')}
-                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
-                                        activePrintDoc === 'folio' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                                    }`}
-                                >
-                                    Folio Bill
-                                </button>
+                            <div className="flex flex-wrap items-center gap-1 bg-slate-800 p-1 rounded-lg text-[10px]">
+                                {/* Room Specific Tabs */}
+                                <div className="flex items-center gap-0.5 pr-1 border-r border-slate-700">
+                                    <span className="text-[8.5px] text-slate-400 font-semibold px-1">Room {activeRoomNum}:</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActivePrintDoc('reg_card')}
+                                        className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                                            activePrintDoc === 'reg_card' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        Reg Card
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActivePrintDoc('voucher')}
+                                        className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                                            activePrintDoc === 'voucher' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        Voucher
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActivePrintDoc('folio')}
+                                        className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                                            activePrintDoc === 'folio' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        Folio Bill
+                                    </button>
+                                </div>
+
+                                {/* Group Specific Tabs */}
+                                {isMultiRoomGroup && (
+                                    <div className="flex items-center gap-0.5 pl-1">
+                                        <span className="text-[8.5px] text-amber-300 font-semibold px-1">Group ({resolvedGroupRooms.length}R):</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePrintDoc('group_invoice')}
+                                            className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                                                activePrintDoc === 'group_invoice' ? 'bg-indigo-600 text-white shadow-xs' : 'text-amber-200 hover:text-white hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            Master Invoice
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePrintDoc('group_voucher')}
+                                            className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                                                activePrintDoc === 'group_voucher' ? 'bg-indigo-600 text-white shadow-xs' : 'text-amber-200 hover:text-white hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            Group Voucher
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePrintDoc('group_prereg')}
+                                            className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                                                activePrintDoc === 'group_prereg' ? 'bg-indigo-600 text-white shadow-xs' : 'text-amber-200 hover:text-white hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            Rooming Pre-Reg
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePrintDoc('batch_grc')}
+                                            className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                                                activePrintDoc === 'batch_grc' ? 'bg-purple-600 text-white shadow-xs' : 'text-purple-200 hover:text-white hover:bg-slate-700'
+                                            }`}
+                                            title="Print individual registration cards for all rooms with page breaks"
+                                        >
+                                            Batch GRCs
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex items-center gap-2">
@@ -2215,36 +2419,28 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
 
                         {/* Printable Paper Area */}
                         <div className="p-6 overflow-y-auto bg-slate-100 flex-1">
-                            <div id="hotel-printable-document" className="bg-white p-8 rounded-xl border border-slate-300 shadow-xs max-w-2xl mx-auto text-slate-800 font-sans text-xs space-y-4">
-                                {/* Letterhead */}
-                                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
-                                    <div>
-                                        <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
-                                        <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
-                                        <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
-                                        <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
-                                            {activePrintDoc === 'reg_card'
-                                                ? 'GUEST REGISTRATION CARD (GRC)'
-                                                : activePrintDoc === 'voucher'
-                                                ? 'BOOKING CONFIRMATION VOUCHER'
-                                                : activePrintDoc === 'cancellation'
-                                                ? 'CANCELLATION SLIP'
-                                                : isCurrentActiveCheckedOut
-                                                ? 'TAX INVOICE & FINAL FOLIO'
-                                                : 'GUEST FOLIO STATEMENT'}
-                                        </span>
-                                        <div className="font-mono text-xs font-bold text-slate-900 mt-1">Ref: {activeSubBookingNo}</div>
-                                        {activeRegNo && <div className="font-mono text-[10.5px] text-emerald-700 font-semibold">Reg: {activeRegNo}</div>}
-                                        <div className="text-[10px] text-slate-500 mt-0.5">Date: {operatingSystemDate}</div>
-                                    </div>
-                                </div>
-
-                                {/* REGISTRATION CARD CONTENT */}
+                            <div id="hotel-printable-document" className="bg-white p-8 rounded-xl border border-slate-300 shadow-xs max-w-3xl mx-auto text-slate-800 font-sans text-xs space-y-4">
+                                
+                                {/* 1. SINGLE ROOM REGISTRATION CARD (GRC) */}
                                 {activePrintDoc === 'reg_card' && (
                                     <div className="space-y-4">
+                                        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                            <div>
+                                                <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                                <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                                    GUEST REGISTRATION CARD (GRC)
+                                                </span>
+                                                <div className="font-mono text-xs font-bold text-slate-900 mt-1">Ref: {activeSubBookingNo}</div>
+                                                {activeRegNo && <div className="font-mono text-[10.5px] text-emerald-700 font-semibold">Reg: {activeRegNo}</div>}
+                                                <div className="text-[10px] text-slate-500 mt-0.5">Date: {operatingSystemDate}</div>
+                                            </div>
+                                        </div>
+
                                         <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Guest Personal Details</span>
@@ -2282,9 +2478,25 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
                                 )}
 
-                                {/* BOOKING CONFIRMATION VOUCHER CONTENT */}
+                                {/* 2. SINGLE ROOM CONFIRMATION VOUCHER */}
                                 {activePrintDoc === 'voucher' && (
                                     <div className="space-y-4">
+                                        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                            <div>
+                                                <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                                <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                                    BOOKING CONFIRMATION VOUCHER
+                                                </span>
+                                                <div className="font-mono text-xs font-bold text-slate-900 mt-1">Ref: {activeSubBookingNo}</div>
+                                                <div className="text-[10px] text-slate-500 mt-0.5">Date: {operatingSystemDate}</div>
+                                            </div>
+                                        </div>
+
                                         <div className="bg-blue-50/60 p-4 rounded-lg border border-blue-200 grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-blue-800 block">Lead Guest</span>
@@ -2345,9 +2557,29 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
                                 )}
 
-                                {/* FOLIO STATEMENT / TAX INVOICE CONTENT */}
+                                {/* 3. SINGLE ROOM FOLIO STATEMENT / TAX INVOICE */}
                                 {(activePrintDoc === 'folio' || activePrintDoc === 'cancellation') && (
                                     <div className="space-y-4">
+                                        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                            <div>
+                                                <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                                <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                                    {activePrintDoc === 'cancellation'
+                                                        ? 'CANCELLATION SLIP'
+                                                        : isCurrentActiveCheckedOut
+                                                        ? 'TAX INVOICE & FINAL FOLIO'
+                                                        : 'GUEST FOLIO STATEMENT'}
+                                                </span>
+                                                <div className="font-mono text-xs font-bold text-slate-900 mt-1">Ref: {activeSubBookingNo}</div>
+                                                <div className="text-[10px] text-slate-500 mt-0.5">Date: {operatingSystemDate}</div>
+                                            </div>
+                                        </div>
+
                                         <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Guest Details</span>
@@ -2423,6 +2655,416 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                         </div>
                                     </div>
                                 )}
+
+                                {/* 4. GROUP MASTER TAX INVOICE & FOLIO */}
+                                {activePrintDoc === 'group_invoice' && (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                            <div>
+                                                <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                                <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: accounts@grandpalace.com</p>
+                                                <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="inline-block px-2.5 py-1 rounded bg-indigo-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                                    GROUP MASTER TAX INVOICE
+                                                </span>
+                                                <div className="font-mono text-xs font-bold text-slate-900 mt-1">
+                                                    Group Ref: {booking.groupCode || `GRP-${booking.reservationNumber}`}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 mt-0.5">Invoice Date: {operatingSystemDate}</div>
+                                                <div className="text-[10px] text-indigo-700 font-semibold font-mono">Total Inventory: {groupFinancials.totalRooms} Rooms</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-500 block">Billed To (Group / Corporate Account)</span>
+                                                <p className="text-sm font-bold text-slate-900">{booking.companyName || booking.guestName}</p>
+                                                <p className="text-xs text-slate-700">Lead Contact: {booking.guestName}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                            </div>
+                                            <div className="space-y-1 text-right">
+                                                <span className="text-[10px] uppercase font-bold text-slate-500 block">Master Group Stay Details</span>
+                                                <p className="text-xs text-slate-800">
+                                                    Check-In: <span className="font-bold font-mono">{booking.arrivalDate || bookingAny.checkIn}</span>
+                                                </p>
+                                                <p className="text-xs text-slate-800">
+                                                    Check-Out: <span className="font-bold font-mono">{booking.departureDate || bookingAny.checkOut}</span>
+                                                </p>
+                                                <p className="text-xs text-slate-700">Stay Duration: {origNights} Nights</p>
+                                                <p className="text-xs text-slate-700 font-medium">Total Guest Pax: {groupFinancials.totalPax} Guests</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Itemized Room Charges Table */}
+                                        <div className="space-y-1.5">
+                                            <div className="text-[11px] font-bold text-slate-900 uppercase tracking-wide">
+                                                Itemized Room Tariff Breakdown ({groupFinancials.totalRooms} Rooms)
+                                            </div>
+                                            <table className="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
+                                                <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                                    <tr>
+                                                        <th className="p-2 text-left w-14">Room #</th>
+                                                        <th className="p-2 text-left">Category & Rate Plan</th>
+                                                        <th className="p-2 text-left">Lead Occupant</th>
+                                                        <th className="p-2 text-center">Pax</th>
+                                                        <th className="p-2 text-center">Nights</th>
+                                                        <th className="p-2 text-right">Daily Rate</th>
+                                                        <th className="p-2 text-right">Total Tariff</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {groupFinancials.rooms.map((rm: any, idx: number) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50">
+                                                            <td className="p-2 font-mono font-bold text-blue-800">
+                                                                {rm.roomNumber || `Unassigned (${idx + 1})`}
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <div className="font-semibold text-slate-800">{rm.roomType}</div>
+                                                                <div className="text-[9.5px] text-slate-500">{rm.ratePlan || 'Standard Rate'}</div>
+                                                            </td>
+                                                            <td className="p-2 text-slate-800">
+                                                                <div className="font-medium">{rm.guestName || booking.guestName}</div>
+                                                                <div className="text-[9px] font-mono text-slate-400">{rm.displayResNo}</div>
+                                                            </td>
+                                                            <td className="p-2 text-center text-slate-600 font-mono text-[11px]">
+                                                                {rm.effectivePax}
+                                                            </td>
+                                                            <td className="p-2 text-center text-slate-600 font-mono text-[11px]">
+                                                                {rm.effectiveNights}
+                                                            </td>
+                                                            <td className="p-2 text-right font-mono text-slate-700">
+                                                                ৳ {rm.effectiveRate.toLocaleString()}
+                                                            </td>
+                                                            <td className="p-2 text-right font-mono font-bold text-slate-900">
+                                                                ৳ {rm.effectiveBase.toLocaleString()}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Financial Summary */}
+                                        <div className="flex justify-between items-start pt-2">
+                                            <div className="max-w-xs text-[10px] text-slate-500 space-y-1">
+                                                <p className="font-semibold text-slate-700 uppercase">Payment Instructions / Remittance:</p>
+                                                <p>Prime Bank Ltd, Gulshan Branch, Dhaka</p>
+                                                <p className="font-mono">Account: 1100-2233-4401 (BDT)</p>
+                                                <p className="font-mono">Routing No: 175272635 • Swift: PRBLBDDH</p>
+                                            </div>
+
+                                            <div className="w-72 space-y-1.5 text-xs bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-600">Total Room Tariff:</span>
+                                                    <span className="font-mono font-bold">৳ {groupFinancials.totalBase.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-slate-600">
+                                                    <span>Service Charge (10%):</span>
+                                                    <span className="font-mono">৳ {groupFinancials.serviceCharge.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-slate-600">
+                                                    <span>VAT / Tax (15%):</span>
+                                                    <span className="font-mono">৳ {groupFinancials.vatAmount.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between font-bold text-slate-900 border-t border-slate-300 pt-1">
+                                                    <span>Master Gross Amount:</span>
+                                                    <span className="font-mono">৳ {groupFinancials.grandTotal.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-emerald-700 font-semibold">
+                                                    <span>Master Paid / Deposit:</span>
+                                                    <span className="font-mono">৳ {groupFinancials.paidAmount.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-rose-700 font-black border-t border-slate-300 pt-1 text-sm">
+                                                    <span>Balance Outstanding:</span>
+                                                    <span className="font-mono">৳ {groupFinancials.dueAmount.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-10 flex justify-between items-end border-t border-slate-300">
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-semibold">
+                                                Authorized Accounts / Cashier
+                                            </div>
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-bold">
+                                                Group Representative Signature
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 5. GROUP BOOKING CONFIRMATION VOUCHER */}
+                                {activePrintDoc === 'group_voucher' && (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                            <div>
+                                                <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                                <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                                <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: reservations@grandpalace.com</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                                    GROUP CONFIRMATION VOUCHER
+                                                </span>
+                                                <div className="font-mono text-xs font-bold text-slate-900 mt-1">
+                                                    Group Ref: {booking.groupCode || `GRP-${booking.reservationNumber}`}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 mt-0.5">Date: {operatingSystemDate}</div>
+                                                <div className="text-[10px] text-emerald-700 font-bold">Status: CONFIRMED</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-sky-50/70 p-4 rounded-lg border border-sky-200 grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-sky-800 block">Organizer / Corporate Entity</span>
+                                                <p className="text-sm font-bold text-slate-900">{booking.companyName || booking.guestName}</p>
+                                                <p className="text-xs text-slate-700">Contact Person: {booking.guestName}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                            </div>
+                                            <div className="space-y-1 text-right">
+                                                <span className="text-[10px] uppercase font-bold text-sky-800 block">Group Stay Period</span>
+                                                <p className="text-xs text-slate-800 font-medium">
+                                                    Arrival: <span className="font-bold font-mono">{booking.arrivalDate || bookingAny.checkIn}</span> (14:00)
+                                                </p>
+                                                <p className="text-xs text-slate-800 font-medium">
+                                                    Departure: <span className="font-bold font-mono">{booking.departureDate || bookingAny.checkOut}</span> (12:00)
+                                                </p>
+                                                <p className="text-xs text-slate-700">Duration: {origNights} Nights • Total Rooms: {groupFinancials.totalRooms}</p>
+                                                <p className="text-xs text-slate-700 font-medium">Total Occupancy: {groupFinancials.totalPax} Guests</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <div className="text-[11px] font-bold text-slate-900 uppercase tracking-wide">
+                                                Consolidated Group Rooming & Allocation List
+                                            </div>
+                                            <table className="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
+                                                <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                                    <tr>
+                                                        <th className="p-2 text-left w-14">Room #</th>
+                                                        <th className="p-2 text-left">Room Category</th>
+                                                        <th className="p-2 text-left">Rate Plan</th>
+                                                        <th className="p-2 text-left">Assigned Guest</th>
+                                                        <th className="p-2 text-center">Pax</th>
+                                                        <th className="p-2 text-right">Daily Tariff</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {groupFinancials.rooms.map((rm: any, idx: number) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50">
+                                                            <td className="p-2 font-mono font-bold text-blue-800">
+                                                                {rm.roomNumber || `Unassigned (${idx + 1})`}
+                                                            </td>
+                                                            <td className="p-2 font-semibold text-slate-800">{rm.roomType}</td>
+                                                            <td className="p-2 text-slate-600">{rm.ratePlan || 'Standard Rate'}</td>
+                                                            <td className="p-2 font-medium text-slate-800">{rm.guestName || booking.guestName}</td>
+                                                            <td className="p-2 text-center font-mono text-[11px]">{rm.effectivePax}</td>
+                                                            <td className="p-2 text-right font-mono font-bold text-slate-900">
+                                                                ৳ {rm.effectiveRate.toLocaleString()}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[10px] text-slate-600 space-y-1 leading-relaxed">
+                                            <p className="font-bold text-slate-700 uppercase">Group Check-In & Hotel Rules:</p>
+                                            <p>1. Fast Check-in: Please present the Group Pre-Registration Sheet signed by the coordinator at reception.</p>
+                                            <p>2. Buffet breakfast is included for registered guests at The Palm Restaurant (06:30 AM – 10:30 AM).</p>
+                                            <p>3. Baggage handling and luggage tags will be coordinated at the concierge desk upon coach arrival.</p>
+                                        </div>
+
+                                        <div className="pt-8 flex justify-between items-end border-t border-slate-300">
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-semibold">
+                                                Head of Reservations
+                                            </div>
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-bold">
+                                                Group Tour Leader / Escort
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 6. GROUP PRE-REGISTRATION & ROOMING ARRIVAL LIST */}
+                                {activePrintDoc === 'group_prereg' && (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                            <div>
+                                                <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                                <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                                <p className="text-[10px] text-slate-500">Front Office Operations • Express Group Check-In</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="inline-block px-2.5 py-1 rounded bg-emerald-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                                    GROUP PRE-REGISTRATION SHEET
+                                                </span>
+                                                <div className="font-mono text-xs font-bold text-slate-900 mt-1">
+                                                    Group: {booking.groupCode || `GRP-${booking.reservationNumber}`}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 mt-0.5">Arrival Date: {booking.arrivalDate || bookingAny.checkIn}</div>
+                                                <div className="text-[10px] text-emerald-800 font-bold font-mono">
+                                                    {groupFinancials.totalRooms} Rooms • {groupFinancials.totalPax} Guests
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-200 flex justify-between items-center text-xs">
+                                            <div>
+                                                <span className="text-[10px] uppercase font-bold text-emerald-800 block">Group / Entity Name</span>
+                                                <span className="font-bold text-slate-900 text-sm">{booking.companyName || booking.guestName}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[10px] uppercase font-bold text-emerald-800 block">Tour Escort / Lead</span>
+                                                <span className="font-semibold text-slate-800">{booking.guestName} ({booking.phone || bookingAny.mobile || '—'})</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <div className="text-[10.5px] font-bold text-slate-900 uppercase tracking-wide flex justify-between items-center">
+                                                <span>Fast Check-in Rooming & Signature List</span>
+                                                <span className="text-[9.5px] text-slate-500 font-normal">All occupants must verify ID & sign below</span>
+                                            </div>
+                                            <table className="w-full text-xs border border-slate-300 rounded-lg overflow-hidden">
+                                                <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300">
+                                                    <tr>
+                                                        <th className="p-2 text-center w-8">#</th>
+                                                        <th className="p-2 text-center w-14">Room</th>
+                                                        <th className="p-2 text-left">Room Category</th>
+                                                        <th className="p-2 text-left">Guest Name</th>
+                                                        <th className="p-2 text-center w-10">Pax</th>
+                                                        <th className="p-2 text-left w-32">NID / Passport #</th>
+                                                        <th className="p-2 text-left w-28">Mobile Contact</th>
+                                                        <th className="p-2 text-center w-32">Guest Signature</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-200">
+                                                    {groupFinancials.rooms.map((rm: any, idx: number) => (
+                                                        <tr key={idx} className="h-9">
+                                                            <td className="p-1.5 text-center font-mono text-[11px] text-slate-500">{idx + 1}</td>
+                                                            <td className="p-1.5 text-center font-mono font-bold text-blue-900 bg-blue-50/30">
+                                                                {rm.roomNumber || `RM-${idx + 1}`}
+                                                            </td>
+                                                            <td className="p-1.5 font-medium text-slate-700">{rm.roomType}</td>
+                                                            <td className="p-1.5 font-bold text-slate-900">{rm.guestName || booking.guestName}</td>
+                                                            <td className="p-1.5 text-center font-mono text-[11px]">{rm.effectivePax}</td>
+                                                            <td className="p-1.5 border-b border-dotted border-slate-300 text-slate-400 font-mono text-[10px]">
+                                                                ________________
+                                                            </td>
+                                                            <td className="p-1.5 border-b border-dotted border-slate-300 text-slate-400 font-mono text-[10px]">
+                                                                ________________
+                                                            </td>
+                                                            <td className="p-1.5 border-b border-dotted border-slate-400 text-center text-slate-300">
+                                                                ✕
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[10px] text-slate-600 leading-relaxed">
+                                            <p className="font-bold text-slate-700 uppercase">Coordinator Declaration & Room Handover:</p>
+                                            <p>
+                                                I, the undersigned Group Leader / Organizer, confirm receipt of keycards for the above-listed {groupFinancials.totalRooms} rooms. I undertake responsibility for adhering to hotel safety policies, checkout schedule (12:00 PM), and incidental settlements.
+                                            </p>
+                                        </div>
+
+                                        <div className="pt-8 flex justify-between items-end border-t border-slate-300">
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-semibold">
+                                                Duty Manager / Front Office
+                                            </div>
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-bold">
+                                                Group Tour Leader Signature
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 7. BATCH PRINT ALL INDIVIDUAL GRCs */}
+                                {activePrintDoc === 'batch_grc' && (
+                                    <div className="space-y-6">
+                                        {groupFinancials.rooms.map((rm: any, rIdx: number) => {
+                                            const rmNum = rm.roomNumber || `Unassigned (${rIdx + 1})`;
+                                            const rmGuest = rm.guestName || booking.guestName;
+                                            const rmRes = rm.displayResNo || `${booking.reservationNumber}-${String(rIdx + 1).padStart(2, '0')}`;
+                                            return (
+                                                <div key={rIdx} className="space-y-4">
+                                                    <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                                        <div>
+                                                            <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                                            <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                                            <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                                                GUEST REGISTRATION CARD (GRC)
+                                                            </span>
+                                                            <div className="font-mono text-xs font-bold text-slate-900 mt-1">Ref: {rmRes}</div>
+                                                            <div className="text-[10px] text-purple-700 font-semibold font-mono">
+                                                                Group Room {rIdx + 1} of {groupFinancials.totalRooms}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                                        <div className="space-y-1">
+                                                            <span className="text-[10px] uppercase font-bold text-slate-500 block">Guest Personal Details</span>
+                                                            <p className="text-sm font-bold text-slate-900">{rmGuest}</p>
+                                                            <p className="text-xs text-slate-700">Group Ref: {booking.groupCode || booking.reservationNumber}</p>
+                                                            <p className="text-xs text-slate-700">Pax: {rm.effectivePax} Guest(s)</p>
+                                                            <p className="text-xs text-slate-700">Phone: _______________________</p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="text-[10px] uppercase font-bold text-slate-500 block">Stay Allocation</span>
+                                                            <p className="text-sm font-bold text-blue-700 font-mono">Room {rmNum} — {rm.roomType}</p>
+                                                            <p className="text-xs text-slate-700">Rate Plan: {rm.ratePlan || 'Standard Rate'}</p>
+                                                            <p className="text-xs text-slate-700 font-medium">
+                                                                Check-In: <span className="font-bold">{booking.arrivalDate || bookingAny.checkIn}</span> (14:00)
+                                                            </p>
+                                                            <p className="text-xs text-slate-700 font-medium">
+                                                                Check-Out: <span className="font-bold">{booking.departureDate || bookingAny.checkOut}</span> (12:00)
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-200 text-[10px] text-slate-600 space-y-1 leading-relaxed">
+                                                        <p className="font-bold text-slate-700 uppercase">Terms, Conditions & Hotel Regulations:</p>
+                                                        <p>1. Check-out time is 12:00 PM. Late check-out is subject to room availability and standard tariff.</p>
+                                                        <p>2. Safe deposit lockers are provided in all rooms. The hotel does not accept liability for money or valuables left in rooms.</p>
+                                                        <p>3. I certify that all personal and identification details stated above are accurate and valid.</p>
+                                                    </div>
+
+                                                    <div className="pt-8 flex justify-between items-end border-t border-slate-300">
+                                                        <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-semibold">
+                                                            Front Desk Receptionist
+                                                        </div>
+                                                        <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-bold">
+                                                            Guest Signature
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Page break element for batch print */}
+                                                    {rIdx < groupFinancials.rooms.length - 1 && (
+                                                        <>
+                                                            <div className="hidden print:block page-break" style={{ pageBreakAfter: 'always', breakAfter: 'page', height: 0 }} />
+                                                            <div className="block print:hidden my-6 border-b-2 border-dashed border-slate-300 relative text-center">
+                                                                <span className="bg-slate-100 px-3 text-[10px] font-mono text-slate-500 uppercase">
+                                                                    — Page Break for Room {rIdx + 1} of {groupFinancials.totalRooms} —
+                                                                </span>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
                             </div>
                         </div>
                     </div>
