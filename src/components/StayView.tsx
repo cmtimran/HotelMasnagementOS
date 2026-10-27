@@ -19,7 +19,7 @@ import {
     Link2
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
-import { getConnectingRoomsMap } from '../utils/connectingRoomHelper';
+import { getConnectingRoomsMap, syncConnectingRoomsFromDB } from '../utils/connectingRoomHelper';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
 import type { AmendBookingData } from './modals/AmendStayModal';
@@ -211,8 +211,18 @@ export const StayView: React.FC = () => {
         }
     }, [activeProperty?.currency]);
 
-    // Dynamic Connecting Rooms Resolution Map from General Settings
-    const connectingRoomsMap = useMemo(() => getConnectingRoomsMap(), []);
+    // Dynamic Canonical Rooms & Connecting Rooms Version
+    const [roomsVersion, setRoomsVersion] = useState(0);
+
+    // Dynamic Connecting Rooms Resolution Map from General Settings & DB
+    const connectingRoomsMap = useMemo(() => getConnectingRoomsMap(), [roomsVersion]);
+
+    useEffect(() => {
+        syncConnectingRoomsFromDB().then(() => setRoomsVersion(v => v + 1)).catch(() => {});
+        const handleConnUpdate = () => setRoomsVersion(v => v + 1);
+        window.addEventListener('hotel_connecting_rooms_updated', handleConnUpdate);
+        return () => window.removeEventListener('hotel_connecting_rooms_updated', handleConnUpdate);
+    }, []);
 
     // Current System Operating Date state (realtime synchronized with Header & Night Audit)
     const [operatingDateStr, setOperatingDateStr] = useState<string>(() => getOperatingSystemDate());
@@ -248,6 +258,7 @@ export const StayView: React.FC = () => {
         startIndex: number;
         endIndex: number;
         rect?: DOMRect;
+        connectPartner?: boolean;
     } | null>(null);
 
     // Drag-to-select range state
@@ -453,7 +464,6 @@ export const StayView: React.FC = () => {
     }, [colWidth, daysWindow]);
 
     // Dynamic Canonical Rooms Structure (All 34 Rooms across 5 Floors)
-    const [roomsVersion, setRoomsVersion] = useState(0);
     const roomTree: BuildingNode[] = useMemo(() => {
         const canonical = getCanonicalRooms();
         const buildingNames: Record<string, string> = {
@@ -2484,13 +2494,26 @@ export const StayView: React.FC = () => {
                                                                     {room.roomNumber}
                                                                 </span>
                                                                 {room.connectingWith && (
-                                                                    <span
-                                                                        className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[7.5px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 flex-shrink-0 cursor-help"
-                                                                        title={`Connecting Room: Connected with Room ${room.connectingWith} (${room.connectingDoorType || 'Connecting Door'})${room.connectingMutualBlock ? ' • Mutual Block Active' : ''}`}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const todayIdx = days.findIndex(d => d.isToday);
+                                                                            const idx = todayIdx >= 0 ? todayIdx : 0;
+                                                                            setSelectedRange({
+                                                                                room: room.roomNumber,
+                                                                                startIndex: idx,
+                                                                                endIndex: idx,
+                                                                                connectPartner: true
+                                                                            });
+                                                                            setIsQuickReservationOpen(true);
+                                                                        }}
+                                                                        className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[7.5px] font-mono font-bold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200/80 hover:border-indigo-600 flex-shrink-0 cursor-pointer transition-colors"
+                                                                        title={`Click to Book Connecting Suite: Room ${room.roomNumber} + Room ${room.connectingWith} (${room.connectingDoorType || 'Connecting Door'})`}
                                                                     >
                                                                         <Link2 size={7} className="stroke-[2.5]" />
                                                                         <span>{room.connectingWith}</span>
-                                                                    </span>
+                                                                    </button>
                                                                 )}
                                                                 <span className="text-[9.5px] text-gray-500 truncate ml-0.5">
                                                                     {room.type}
@@ -3184,7 +3207,8 @@ export const StayView: React.FC = () => {
                         checkOut: endIso,
                         nights: stayNights,
                         startIndex: selectedRange?.startIndex,
-                        endIndex: selectedRange?.endIndex
+                        endIndex: selectedRange?.endIndex,
+                        connectPartner: selectedRange?.connectPartner
                     };
                 })()}
                 onReserve={(_newBooking) => {
