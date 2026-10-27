@@ -438,7 +438,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     // Multi-Room / Group Reservation Flag & Financial Aggregates
     const isMultiRoomGroup = Boolean(booking.groupCode) || (booking.roomsList && booking.roomsList.length > 1) || resolvedGroupRooms.length > 1;
 
-    const groupFinancials = useMemo(() => {
+    const groupFinancials = (() => {
         if (!isMultiRoomGroup) {
             return {
                 totalRooms: 1,
@@ -500,7 +500,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             dueAmount: grpDue,
             rooms: roomRows
         };
-    }, [isMultiRoomGroup, resolvedGroupRooms, booking, activeRoom, origNights, baseAmount, totalTax, serviceCharge, vatAmount, totalAmount, paidAmount, dueAmount, isTaxApplicable, taxConfigId, standardDaily, activeSubBookingNo]);
+    })();
 
     // Handle departure change in amend mode (with overbooking collision guard)
     const handleDepartureChange = (newDep: string) => {
