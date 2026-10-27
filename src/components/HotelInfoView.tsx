@@ -500,11 +500,11 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                 {/* Subtle Luxury Gradient Accent Line */}
                 <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-amber-500"></div>
 
-                {/* Main Identity Area */}
-                <div className="p-5 sm:p-7">
-                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+                {/* Main Identity Area (Compact Modern Header) */}
+                <div className="p-3.5 sm:p-4.5">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 sm:gap-4">
                         {/* Left: Avatar + Identity */}
-                        <div className="flex items-start sm:items-center gap-4.5 min-w-0 flex-1">
+                        <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
                             {/* Modern Hotel Logo Monogram with Hover Change Overlay */}
                             <div className="relative shrink-0 group">
                                 <button
@@ -513,7 +513,7 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                         setTempLogoUrl(logoUrl);
                                         setIsLogoModalOpen(true);
                                     }}
-                                    className="size-16 sm:size-20 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-2xl sm:text-3xl tracking-tight shadow-sm ring-4 ring-slate-100 overflow-hidden cursor-pointer relative transition-transform hover:scale-[1.02] text-center"
+                                    className="size-13 sm:size-15 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-700 to-slate-900 text-white flex items-center justify-center font-black text-xl sm:text-2xl tracking-tight shadow-sm ring-2 ring-slate-100 overflow-hidden cursor-pointer relative transition-transform hover:scale-[1.02] text-center"
                                     title="Click to change hotel brand logo"
                                 >
                                     {logoUrl ? (
@@ -522,51 +522,51 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                         <span>{propName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'GH'}</span>
                                     )}
                                     <div className="absolute inset-0 bg-black/55 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Camera size={16} />
-                                        <span className="text-[9px] font-bold mt-0.5 tracking-tight uppercase">Change</span>
+                                        <Camera size={14} />
+                                        <span className="text-[8px] font-bold mt-0.5 tracking-tight uppercase">Change</span>
                                     </div>
                                 </button>
-                                <span className="absolute -bottom-1 -right-1 size-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Operating Property"></span>
+                                <span className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Operating Property"></span>
                             </div>
 
-                            <div className="min-w-0 flex-1 space-y-1.5">
+                            <div className="min-w-0 flex-1 space-y-1">
                                 {/* Badge Row */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80">
-                                        <Star size={11} className="fill-amber-500 text-amber-500" />
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80">
+                                        <Star size={10} className="fill-amber-500 text-amber-500" />
                                         <span>{propGrade}</span>
                                     </span>
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold font-mono bg-slate-100 text-slate-700 border border-slate-200">
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10.5px] font-bold font-mono bg-slate-100 text-slate-700 border border-slate-200">
                                         {propCode}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                         Live Operational
                                     </span>
                                 </div>
 
                                 {/* Hotel Name */}
-                                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug py-0.5 break-words">
+                                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug py-0.5 break-words">
                                     {propName}
                                 </h1>
 
                                 {/* Contact & Location Strip */}
-                                <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500 pt-0.5 font-medium">
-                                    <span className="flex items-center gap-1.5 min-w-0">
-                                        <MapPin size={13.5} className="text-slate-400 shrink-0" />
+                                <div className="flex flex-wrap items-center gap-y-0.5 gap-x-3.5 text-[11px] text-slate-500 font-medium">
+                                    <span className="flex items-center gap-1 min-w-0">
+                                        <MapPin size={12} className="text-slate-400 shrink-0" />
                                         <span className="truncate">{propAddress}, {propCity}, {propCountry}</span>
                                     </span>
-                                    <span className="flex items-center gap-1.5 shrink-0">
-                                        <Phone size={13.5} className="text-slate-400 shrink-0" />
+                                    <span className="flex items-center gap-1 shrink-0">
+                                        <Phone size={12} className="text-slate-400 shrink-0" />
                                         <span>{propPhone}</span>
                                     </span>
-                                    <span className="flex items-center gap-1.5 shrink-0">
-                                        <Mail size={13.5} className="text-slate-400 shrink-0" />
+                                    <span className="flex items-center gap-1 shrink-0">
+                                        <Mail size={12} className="text-slate-400 shrink-0" />
                                         <a href={`mailto:${propEmail}`} className="text-blue-600 hover:underline">{propEmail}</a>
                                     </span>
                                     {Boolean(settings.website) && (
-                                        <span className="flex items-center gap-1.5 shrink-0">
-                                            <Globe size={13.5} className="text-slate-400 shrink-0" />
+                                        <span className="flex items-center gap-1 shrink-0">
+                                            <Globe size={12} className="text-slate-400 shrink-0" />
                                             <a
                                                 href={settings.website.startsWith('http') ? settings.website : `https://${settings.website}`}
                                                 target="_blank"
@@ -574,7 +574,7 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                                 className="text-slate-600 hover:text-blue-600 flex items-center gap-1"
                                             >
                                                 <span>{settings.website}</span>
-                                                <ExternalLink size={10} />
+                                                <ExternalLink size={9.5} />
                                             </a>
                                         </span>
                                     )}
@@ -583,23 +583,23 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                         </div>
 
                         {/* Right: Live Clock & Actions */}
-                        <div className="flex flex-col sm:flex-row xl:flex-col items-start sm:items-center xl:items-end justify-between gap-3 shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
+                        <div className="flex flex-col sm:flex-row xl:flex-col items-start sm:items-center xl:items-end justify-between gap-2.5 shrink-0 pt-1.5 xl:pt-0 border-t xl:border-t-0 border-slate-100">
                             {/* Local Clock */}
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-mono shadow-2xs">
-                                <Clock size={13} className="text-blue-600 shrink-0" />
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-mono shadow-2xs">
+                                <Clock size={12} className="text-blue-600 shrink-0" />
                                 <span className="font-bold text-slate-900">{localTime}</span>
                                 <span className="text-[10px] text-slate-500 font-sans font-semibold">({propertyTimezone})</span>
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                                 <button
                                     type="button"
                                     onClick={() => setIsQuickEditOpen(true)}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                                     title="Quick Edit Hotel Profile"
                                 >
-                                    <Edit2 size={13} />
+                                    <Edit2 size={12} />
                                     <span>Quick Edit</span>
                                 </button>
 
@@ -607,10 +607,10 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                     <button
                                         type="button"
                                         onClick={() => onManageProperty(currentTabObj.manageTab)}
-                                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                                         title="Open Multi-Step Setup Wizard"
                                     >
-                                        <Building size={13} className="text-slate-500" />
+                                        <Building size={12} className="text-slate-500" />
                                         <span>Advanced Setup</span>
                                     </button>
                                 )}
@@ -618,78 +618,86 @@ Total Inventory: ${propRooms} Rooms (${propertyStats.totalBuildings} Buildings, 
                                 <button
                                     type="button"
                                     onClick={handleCopyInfo}
-                                    className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                                     title="Copy Property Fact Sheet"
                                 >
-                                    {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} className="text-slate-400" />}
+                                    {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} className="text-slate-400" />}
                                     <span>{copied ? 'Copied' : 'Factsheet'}</span>
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={handlePrintFactSheet}
-                                    className="p-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                                    className="p-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-lg text-xs font-medium transition-colors cursor-pointer"
                                     title="Print Property Sheet"
                                 >
-                                    <Printer size={14} className="text-slate-500" />
+                                    <Printer size={13} className="text-slate-500" />
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => setIsEmailModalOpen(true)}
-                                    className="p-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                                    className="p-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-lg text-xs font-medium transition-colors cursor-pointer"
                                     title="Email Profile"
                                 >
-                                    <Mail size={14} className="text-slate-500" />
+                                    <Mail size={13} className="text-slate-500" />
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Modern Operational Stats Ribbon */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 bg-slate-50/50 border-t border-slate-100 text-xs">
-                    <div className="p-4 flex items-center gap-3.5">
-                        <div className="size-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
-                            <BedDouble size={18} />
+                {/* Ultra-Compact Operational Stats Ribbon */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 bg-slate-50/60 border-t border-slate-100">
+                    <div className="px-3.5 py-2 flex items-center gap-2.5">
+                        <div className="size-7.5 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/80 shadow-2xs">
+                            <BedDouble size={14} />
                         </div>
-                        <div>
-                            <p className="text-[11px] font-medium text-slate-500">Physical Rooms</p>
-                            <p className="text-base font-bold text-slate-900 font-mono">{propRooms} Rooms</p>
-                            <p className="text-[10px] text-emerald-600 font-medium">100% Active in DB</p>
-                        </div>
-                    </div>
-
-                    <div className="p-4 flex items-center gap-3.5">
-                        <div className="size-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
-                            <Building2 size={18} />
-                        </div>
-                        <div>
-                            <p className="text-[11px] font-medium text-slate-500">Premises Layout</p>
-                            <p className="text-base font-bold text-slate-900 font-mono">{propertyStats.totalBuildings} Wings • {propertyStats.totalFloors} Floors</p>
-                            <p className="text-[10px] text-slate-500">Main Tower & Annex</p>
+                        <div className="min-w-0 flex-1 leading-tight">
+                            <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider truncate">Physical Rooms</span>
+                                <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200/60 shrink-0">100% DB</span>
+                            </div>
+                            <p className="text-xs sm:text-[13px] font-bold text-slate-900 font-mono truncate mt-0.5">{propRooms} Rooms</p>
                         </div>
                     </div>
 
-                    <div className="p-4 flex items-center gap-3.5">
-                        <div className="size-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
-                            <Clock size={18} />
+                    <div className="px-3.5 py-2 flex items-center gap-2.5">
+                        <div className="size-7.5 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100/80 shadow-2xs">
+                            <Building2 size={14} />
                         </div>
-                        <div>
-                            <p className="text-[11px] font-medium text-slate-500">Check-In / Check-Out</p>
-                            <p className="text-base font-bold text-slate-900 font-mono">{settings.checkInTime} In • {settings.checkOutTime} Out</p>
-                            <p className="text-[10px] text-slate-500">Night Audit {settings.nightAuditTime}</p>
+                        <div className="min-w-0 flex-1 leading-tight">
+                            <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider truncate">Premises Layout</span>
+                                <span className="text-[9px] text-slate-500 font-medium shrink-0">Tower & Annex</span>
+                            </div>
+                            <p className="text-xs sm:text-[13px] font-bold text-slate-900 font-mono truncate mt-0.5">{propertyStats.totalBuildings} Wings • {propertyStats.totalFloors} Floors</p>
                         </div>
                     </div>
 
-                    <div className="p-4 flex items-center gap-3.5">
-                        <div className="size-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                            <CreditCard size={18} />
+                    <div className="px-3.5 py-2 flex items-center gap-2.5">
+                        <div className="size-7.5 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100/80 shadow-2xs">
+                            <Clock size={14} />
                         </div>
-                        <div>
-                            <p className="text-[11px] font-medium text-slate-500">Tax & Currency</p>
-                            <p className="text-base font-bold text-slate-900 font-mono">{propCurrency} (৳) • {settings.vatPercentage}% VAT</p>
-                            <p className="text-[10px] text-slate-500">{settings.serviceChargePercentage}% Service Charge</p>
+                        <div className="min-w-0 flex-1 leading-tight">
+                            <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider truncate">Check-In / Out</span>
+                                <span className="text-[9px] text-slate-500 font-medium shrink-0">Audit {settings.nightAuditTime}</span>
+                            </div>
+                            <p className="text-xs sm:text-[13px] font-bold text-slate-900 font-mono truncate mt-0.5">{settings.checkInTime} In • {settings.checkOutTime} Out</p>
+                        </div>
+                    </div>
+
+                    <div className="px-3.5 py-2 flex items-center gap-2.5">
+                        <div className="size-7.5 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100/80 shadow-2xs">
+                            <CreditCard size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1 leading-tight">
+                            <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider truncate">Tax & Currency</span>
+                                <span className="text-[9px] text-slate-500 font-medium shrink-0">{settings.serviceChargePercentage}% SC</span>
+                            </div>
+                            <p className="text-xs sm:text-[13px] font-bold text-slate-900 font-mono truncate mt-0.5">{propCurrency} (৳) • {settings.vatPercentage}% VAT</p>
                         </div>
                     </div>
                 </div>
