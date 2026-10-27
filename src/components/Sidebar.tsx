@@ -447,7 +447,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         // Submenu / Accordion parent
                                         if (item.children) {
                                             const isOpen = searchQuery ? true : openDropdowns[item.label];
-                                            const hasActiveChild = item.children.some(c => c.id === activePage);
+                                            const hasActiveChild = item.children.some(c =>
+                                                c.id === activePage ||
+                                                (c.id === 'hotel-info' && activePage === 'hotel-profile') ||
+                                                (c.id === 'taxes-vat' && activePage === 'tax-vat-settings') ||
+                                                (c.id === 'properties' && activePage === 'multi-property')
+                                            );
 
                                             return (
                                                 <div key={iIdx} className="space-y-0.5">
@@ -476,8 +481,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                             {item.children.map((sub, subIdx) => {
                                                                 const isSubActive =
                                                                     activePage === sub.id ||
-                                                                    (sub.id === 'general-settings' &&
-                                                                        ['hotel-info', 'hotel-profile', 'edit-property'].includes(activePage));
+                                                                    (sub.id === 'hotel-info' && activePage === 'hotel-profile') ||
+                                                                    (sub.id === 'taxes-vat' && activePage === 'tax-vat-settings') ||
+                                                                    (sub.id === 'properties' && activePage === 'multi-property');
                                                                 return (
                                                                     <button
                                                                         key={subIdx}
