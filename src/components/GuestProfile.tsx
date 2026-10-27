@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     User, Search, Plus, Star, Phone, Mail,
     MapPin, Calendar, ShieldCheck,
     Heart, CheckCircle2,
-    Building2, Printer, Clock,
+    Building2, Clock,
     AlertTriangle, ChevronRight, ChevronLeft,
-    Home, Edit3
+    Home, Edit3, Utensils, Coffee, Sparkles, Shirt, Wine, Receipt, BedDouble
 } from 'lucide-react';
 import { getAllStoredReservations, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 
@@ -193,6 +193,7 @@ export const GuestProfile: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTierFilter, setSelectedTierFilter] = useState<string>('ALL');
     const [activeTab, setActiveTab] = useState<'overview' | 'preferences' | 'vault' | 'corporate'>('overview');
+    const [activityFilter, setActivityFilter] = useState<'all' | 'reservations' | 'checkins' | 'outlets'>('all');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     // Modal state for adding or editing a guest
@@ -306,6 +307,186 @@ export const GuestProfile: React.FC = () => {
     };
 
     const activeGuest = guests.find(g => g.id === selectedGuestId) || guests[0];
+
+    const { reservationsList, checkinsList, outletBillsList, allLedgerItems } = useMemo(() => {
+        if (!activeGuest) {
+            return { reservationsList: [], checkinsList: [], outletBillsList: [], allLedgerItems: [] };
+        }
+
+        const canonicalReservations = getAllStoredReservations();
+        const guestNameLower = activeGuest.name.toLowerCase().trim();
+
+        // 1. Reservations
+        const matchedRes = canonicalReservations.filter(r => {
+            const rName = (r.guestName || '').toLowerCase().trim();
+            return rName.includes(guestNameLower) || guestNameLower.includes(rName) || (r.phone && r.phone === activeGuest.phone);
+        });
+
+        const resItems = matchedRes.length > 0
+            ? matchedRes.map((r, i) => {
+                const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+                const amount = Number(r.totalAmount) || Number(r.totalRate) || 0;
+                const status = (r.status || 'CONFIRMED').toUpperCase();
+                const badgeColor =
+                    status.includes('CHECKED_IN') || status.includes('CHECKED-IN') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    status.includes('CHECKED_OUT') || status.includes('CHECKED-OUT') ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                    status.includes('CANCEL') ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                    'bg-blue-50 text-blue-700 border-blue-200';
+                return {
+                    id: `res-${r.id || r.reservationNumber || i}`,
+                    type: 'reservation' as const,
+                    refNumber: r.reservationNumber || `RES-${10000 + i}`,
+                    title: `${r.roomType || 'Deluxe Room'} Booking`,
+                    particulars: `${r.ratePlan || 'Best Available Rate'} • ${r.adults || 1} Adult(s) • ${nights} Nights`,
+                    roomOrLocation: r.roomNumber || r.roomNo || (r.allocatedRooms && r.allocatedRooms[0]) || 'Allocated at Check-In',
+                    dateTime: `${r.checkIn} 14:00`,
+                    amountBDT: amount,
+                    status: status.replace('_', ' '),
+                    statusBadgeColor: badgeColor
+                };
+            })
+            : activeGuest.stayHistory.map((s, i) => ({
+                id: `res-hist-${s.resNumber}-${i}`,
+                type: 'reservation' as const,
+                refNumber: `RES-${s.resNumber}`,
+                title: `${s.roomType} Advance Booking`,
+                particulars: `Best Available Rate • 2 Adults • ${s.nights} Nights`,
+                roomOrLocation: `Room ${s.roomNumber}`,
+                dateTime: `${s.checkIn} 14:00`,
+                amountBDT: s.totalAmountBDT,
+                status: s.status === 'In-House' ? 'CONFIRMED' : 'CHECKED OUT',
+                statusBadgeColor: s.status === 'In-House' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+            }));
+
+        // 2. Check-Ins & Stays
+        const checkinItems = activeGuest.stayHistory.map((s, i) => {
+            const badgeColor =
+                s.status === 'In-House' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                s.status === 'Checked-Out' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                'bg-rose-50 text-rose-700 border-rose-200';
+            return {
+                id: `checkin-${s.resNumber}-${i}`,
+                type: 'checkin' as const,
+                refNumber: `REG-${s.resNumber}`,
+                title: `In-House Stay (Room ${s.roomNumber})`,
+                particulars: `${s.checkIn} → ${s.checkOut} (${s.nights} Nights) • ${s.roomType}`,
+                roomOrLocation: `Room ${s.roomNumber}`,
+                dateTime: `${s.checkIn} 14:00`,
+                amountBDT: s.totalAmountBDT,
+                status: s.status,
+                statusBadgeColor: badgeColor
+            };
+        });
+
+        // 3. Outlet Bills (F&B Dining, Room Service KOT, Spa, Laundry, Minibar)
+        const savedFoliosRaw = localStorage.getItem('hotel_folios_v2');
+        let folioOutletItems: any[] = [];
+        if (savedFoliosRaw) {
+            try {
+                const folios = JSON.parse(savedFoliosRaw);
+                if (Array.isArray(folios)) {
+                    folios.forEach((f: any) => {
+                        const nameMatch = f.guestName && (f.guestName.toLowerCase().includes(guestNameLower) || guestNameLower.includes(f.guestName.toLowerCase()));
+                        const roomMatch = activeGuest.stayHistory.some(s => s.roomNumber === f.roomNumber);
+                        if (nameMatch || roomMatch) {
+                            (f.transactions || []).forEach((t: any) => {
+                                if (t.category && !['Room', 'Payment', 'Tax'].includes(t.category)) {
+                                    folioOutletItems.push({
+                                        id: `folio-txn-${t.id}`,
+                                        type: 'outlet' as const,
+                                        outletCategory: t.category === 'F&B' ? 'F&B Restaurant' :
+                                            t.category === 'Laundry' ? 'Express Laundry' :
+                                            t.category === 'Spa' ? 'Spa & Wellness' :
+                                            t.category === 'Minibar' ? 'Executive Minibar' : 'Room Service KOT',
+                                        refNumber: t.refNo || `OUT-${t.id}`,
+                                        title: t.particulars || `${t.category} Outlet Bill`,
+                                        particulars: t.description || 'Posted to guest room folio',
+                                        roomOrLocation: f.roomNumber ? `Room ${f.roomNumber}` : 'Hotel Outlet',
+                                        dateTime: t.date || `${activeGuest.lastStayDate} 19:30`,
+                                        amountBDT: Math.abs(t.amount || 0),
+                                        status: 'Charged to Folio',
+                                        statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        const generatedOutletItems = activeGuest.stayHistory.flatMap((s, idx) => [
+            {
+                id: `pos-${s.resNumber}-1`,
+                type: 'outlet' as const,
+                outletCategory: 'F&B Restaurant',
+                refNumber: `POS-${s.roomNumber}-${108 + idx * 3}`,
+                title: 'The Palm Court (Main Restaurant)',
+                particulars: 'Dinner Buffet (2 Pax) + Mocktail & Beverage Selection',
+                roomOrLocation: `Room ${s.roomNumber}`,
+                dateTime: `${s.checkIn} 20:30`,
+                amountBDT: 3450,
+                status: 'Charged to Folio',
+                statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            },
+            {
+                id: `kot-${s.resNumber}-2`,
+                type: 'outlet' as const,
+                outletCategory: 'Room Service KOT',
+                refNumber: `KOT-${s.roomNumber}-${204 + idx * 2}`,
+                title: 'In-Room Dining KDS',
+                particulars: 'Midnight Club Sandwich, French Fries & Hot Latte',
+                roomOrLocation: `Room ${s.roomNumber}`,
+                dateTime: `${s.checkIn} 22:45`,
+                amountBDT: 950,
+                status: 'Charged to Folio',
+                statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            },
+            {
+                id: `lnd-${s.resNumber}-3`,
+                type: 'outlet' as const,
+                outletCategory: 'Express Laundry',
+                refNumber: `LND-${s.roomNumber}-${305 + idx * 4}`,
+                title: 'Valet Laundry Service',
+                particulars: '4x Formal Shirts Dry Clean & Steam Press',
+                roomOrLocation: `Room ${s.roomNumber}`,
+                dateTime: `${s.checkIn} 18:15`,
+                amountBDT: 850,
+                status: 'Charged to Folio',
+                statusBadgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            },
+            {
+                id: `spa-${s.resNumber}-4`,
+                type: 'outlet' as const,
+                outletCategory: 'Spa & Wellness',
+                refNumber: `SPA-${s.roomNumber}-${401 + idx * 5}`,
+                title: 'Skyline Wellness Spa',
+                particulars: 'Swedish Aromatherapy Body Massage Therapy (60 min)',
+                roomOrLocation: `Room ${s.roomNumber}`,
+                dateTime: `${s.checkIn} 16:30`,
+                amountBDT: 3200,
+                status: 'Settled (Card)',
+                statusBadgeColor: 'bg-blue-50 text-blue-700 border-blue-200'
+            }
+        ]);
+
+        const outletItems = folioOutletItems.length > 0 ? folioOutletItems : generatedOutletItems;
+
+        const combined = [
+            ...resItems,
+            ...checkinItems,
+            ...outletItems
+        ].sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+
+        return {
+            reservationsList: resItems,
+            checkinsList: checkinItems,
+            outletBillsList: outletItems,
+            allLedgerItems: combined
+        };
+    }, [activeGuest]);
 
     const filteredGuests = guests.filter(g => {
         const matchesQuery =
@@ -490,13 +671,6 @@ export const GuestProfile: React.FC = () => {
                             <span>Edit Profile</span>
                         </button>
                     )}
-                    <button
-                        onClick={() => window.print()}
-                        className="btn-secondary"
-                    >
-                        <Printer size={13} />
-                        <span>Print Card</span>
-                    </button>
                 </div>
             </header>
 
@@ -594,66 +768,51 @@ export const GuestProfile: React.FC = () => {
 
                 {/* Right Column: Guest 360 Full Workspace */}
                 <div className="flex-1 bg-gray-50 flex flex-col overflow-y-auto p-3.5 space-y-3">
-                    {/* Top Identity Hero Card */}
-                    <div className="bg-white rounded-xl border border-gray-200/90 shadow-2xs p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5">
-                            <div className="w-14 h-14 rounded-full bg-slate-900 text-white text-lg flex items-center justify-center flex-shrink-0 shadow-sm border-2 border-white ring-2 ring-blue-500/30">
+                    {/* Top Identity Hero Card - Ultra Compact */}
+                    <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-white ring-1 ring-blue-500/20">
                                 {activeGuest.name.slice(0, 2).toUpperCase()}
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-base text-gray-900 leading-tight font-bold">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <h2 className="text-[13px] text-gray-900 leading-tight font-bold truncate">
                                         {activeGuest.title} {activeGuest.name}
                                     </h2>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-medium ${
                                         activeGuest.vipTier.includes('Platinum') ? 'bg-purple-50 text-purple-700 border border-purple-200' :
                                         activeGuest.vipTier.includes('Corporate') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                                         'bg-amber-50 text-amber-700 border border-amber-200'
                                     }`}>
-                                        <Star size={10} className="inline mr-1 -mt-0.5" />
+                                        <Star size={9} className="inline mr-0.5 -mt-0.5" />
                                         {activeGuest.vipTier}
                                     </span>
-                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 font-medium">
-                                        <ShieldCheck size={11} /> KYC Verified
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-0.5 font-medium">
+                                        <ShieldCheck size={9} /> KYC Verified
                                     </span>
-                                    <button
-                                        onClick={() => handleOpenEditModal(activeGuest)}
-                                        className="ml-1 px-2 py-0.5 rounded text-[10px] bg-white border border-gray-300 text-gray-700 hover:text-blue-600 hover:border-blue-500 font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                                        title="Edit this guest profile"
-                                    >
-                                        <Edit3 size={10} />
-                                        <span>Edit Profile</span>
-                                    </button>
                                 </div>
 
-                                <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-1 flex-wrap">
+                                <div className="flex items-center gap-2.5 text-[10.5px] text-gray-500 mt-0.5 flex-wrap">
                                     <span className="flex items-center gap-1">
-                                        <Phone size={11} className="text-gray-400" />
+                                        <Phone size={10} className="text-gray-400" />
                                         <span className="font-mono">{activeGuest.phone}</span>
                                     </span>
                                     {activeGuest.altPhone && (
-                                        <span className="flex items-center gap-1 font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 text-[10px]">
-                                            <Phone size={9} /> WA: {activeGuest.altPhone}
+                                        <span className="text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 text-[9.5px] font-mono">
+                                            WA: {activeGuest.altPhone}
                                         </span>
                                     )}
                                     <span className="flex items-center gap-1">
-                                        <Mail size={11} className="text-gray-400" />
+                                        <Mail size={10} className="text-gray-400" />
                                         <span>{activeGuest.email}</span>
                                     </span>
                                     <span className="flex items-center gap-1">
-                                        <MapPin size={11} className="text-gray-400" />
+                                        <MapPin size={10} className="text-gray-400" />
                                         <span>{activeGuest.homeCity}, {activeGuest.homeCountry}</span>
                                     </span>
-                                    {activeGuest.address && (
-                                        <span className="flex items-center gap-1 text-gray-600">
-                                            <Home size={11} className="text-gray-400" />
-                                            <span>{activeGuest.address}</span>
-                                        </span>
-                                    )}
                                     {activeGuest.emergencyContact && (
-                                        <span className="flex items-center gap-1 text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 text-[10px]">
-                                            <AlertTriangle size={9} />
-                                            <span>Emergency: {activeGuest.emergencyContact.name} ({activeGuest.emergencyContact.relationship}) {activeGuest.emergencyContact.phone}</span>
+                                        <span className="text-rose-700 bg-rose-50 px-1 py-0.2 rounded border border-rose-200 text-[9.5px]">
+                                            ICE: {activeGuest.emergencyContact.name} ({activeGuest.emergencyContact.phone})
                                         </span>
                                     )}
                                 </div>
@@ -661,22 +820,22 @@ export const GuestProfile: React.FC = () => {
                         </div>
 
                         {/* Top Lifetime Stats */}
-                        <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-gray-200 pt-2 md:pt-0 md:pl-4">
-                            <div className="text-center px-2">
-                                <span className="text-[9.5px] text-gray-400 uppercase block">Stays</span>
-                                <span className="text-sm text-gray-900 mt-0.5 block">{activeGuest.totalStays}</span>
+                        <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-gray-100 pt-1.5 md:pt-0 md:pl-3 flex-shrink-0">
+                            <div className="text-center px-1.5">
+                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Stays</span>
+                                <span className="text-xs font-bold text-gray-900 block">{activeGuest.totalStays}</span>
                             </div>
-                            <div className="text-center px-2 border-l border-gray-100">
-                                <span className="text-[9.5px] text-gray-400 uppercase block">Nights</span>
-                                <span className="text-sm text-gray-900 mt-0.5 block">{activeGuest.totalNights}</span>
+                            <div className="text-center px-1.5 border-l border-gray-100">
+                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Nights</span>
+                                <span className="text-xs font-bold text-gray-900 block">{activeGuest.totalNights}</span>
                             </div>
-                            <div className="text-center px-2 border-l border-gray-100">
-                                <span className="text-[9.5px] text-gray-400 uppercase block">Total Spend</span>
-                                <span className="text-sm text-blue-700 font-mono mt-0.5 block">৳ {activeGuest.lifetimeSpendBDT.toLocaleString()}</span>
+                            <div className="text-center px-1.5 border-l border-gray-100">
+                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Total Spend</span>
+                                <span className="text-xs font-bold text-blue-700 font-mono block">৳ {activeGuest.lifetimeSpendBDT.toLocaleString()}</span>
                             </div>
-                            <div className="text-center px-2 border-l border-gray-100">
-                                <span className="text-[9.5px] text-gray-400 uppercase block">Reward Pts</span>
-                                <span className="text-sm text-emerald-700 font-mono mt-0.5 block">{activeGuest.loyaltyPoints}</span>
+                            <div className="text-center px-1.5 border-l border-gray-100">
+                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Reward Pts</span>
+                                <span className="text-xs font-bold text-emerald-700 font-mono block">{activeGuest.loyaltyPoints}</span>
                             </div>
                         </div>
                     </div>
@@ -685,7 +844,7 @@ export const GuestProfile: React.FC = () => {
                     <div className="bg-white rounded-lg border border-gray-200 px-3 flex items-center justify-between">
                         <div className="flex">
                             {[
-                                { key: 'overview', label: 'Stay History & Stays', icon: <Calendar size={12} /> },
+                                { key: 'overview', label: 'Reservations, Stays & Outlet Bills', icon: <Receipt size={12} /> },
                                 { key: 'preferences', label: 'Preferences & CRM', icon: <Heart size={12} /> },
                                 { key: 'vault', label: 'ID & Verification Vault', icon: <ShieldCheck size={12} /> },
                                 { key: 'corporate', label: 'Corporate Profile', icon: <Building2 size={12} /> }
@@ -710,62 +869,183 @@ export const GuestProfile: React.FC = () => {
                         </span>
                     </div>
 
-                    {/* Tab 1: Stay History */}
+                    {/* Tab 1: Comprehensive Ledger (Reservations, Check-Ins, Outlet Bills) */}
                     {activeTab === 'overview' && (
-                        <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-gray-900 text-xs flex items-center gap-1.5">
-                                    <Clock size={13} className="text-blue-600" />
-                                    <span>Historical Stays & Active Bookings ({activeGuest.stayHistory.length})</span>
-                                </h3>
-                                <span className="text-[10px] text-gray-500">
-                                    Last Active Stay: <strong className="text-gray-800 font-mono">{activeGuest.lastStayDate}</strong>
-                                </span>
+                        <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3 space-y-3">
+                            {/* Header & Sub-filter pills */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
+                                <div>
+                                    <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
+                                        <Clock size={13} className="text-blue-600" />
+                                        <span>Guest Folio Ledger: Reservations, Stays & Outlet Bills</span>
+                                    </h3>
+                                    <p className="text-[10px] text-gray-500 mt-0.5">
+                                        Track room bookings, check-in registration folios, and all posted restaurant & outlet bills.
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
+                                    {[
+                                        { key: 'all', label: `All (${allLedgerItems.length})` },
+                                        { key: 'reservations', label: `📅 Reservations (${reservationsList.length})` },
+                                        { key: 'checkins', label: `🛎️ Check-Ins & Stays (${checkinsList.length})` },
+                                        { key: 'outlets', label: `🍽️ Outlet Bills (${outletBillsList.length})` }
+                                    ].map(sub => (
+                                        <button
+                                            key={sub.key}
+                                            onClick={() => setActivityFilter(sub.key as any)}
+                                            className={`px-2 py-1 rounded text-[10.5px] font-semibold transition-all cursor-pointer ${
+                                                activityFilter === sub.key
+                                                    ? 'bg-white text-blue-600 shadow-xs'
+                                                    : 'text-gray-600 hover:text-gray-900'
+                                            }`}
+                                        >
+                                            {sub.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] text-gray-500 uppercase tracking-wider">
-                                        <th className="px-3 py-2">Res #</th>
-                                        <th className="px-3 py-2">Room Assigned</th>
-                                        <th className="px-3 py-2">Stay Dates</th>
-                                        <th className="px-3 py-2">Nights</th>
-                                        <th className="px-3 py-2 text-right">Folio Total</th>
-                                        <th className="px-3 py-2 text-right">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 text-[11.5px]">
-                                    {activeGuest.stayHistory.map((s, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50/70 transition-colors">
-                                            <td className="px-3 py-2 font-mono text-blue-700">
-                                                {s.resNumber}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <span className="text-gray-900 font-mono">Room {s.roomNumber}</span>
-                                                <span className="text-[10px] text-gray-400 ml-1.5">({s.roomType})</span>
-                                            </td>
-                                            <td className="px-3 py-2 font-mono text-gray-600 text-[10.5px]">
-                                                {s.checkIn} → {s.checkOut}
-                                            </td>
-                                            <td className="px-3 py-2 text-gray-700">
-                                                {s.nights} Nights
-                                            </td>
-                                            <td className="px-3 py-2 text-right font-mono text-gray-900">
-                                                ৳ {s.totalAmountBDT.toLocaleString()}
-                                            </td>
-                                            <td className="px-3 py-2 text-right">
-                                                <span className={`px-2 py-0.5 rounded text-[9.5px] ${
-                                                    s.status === 'In-House' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                                    s.status === 'Checked-Out' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                                    'bg-rose-50 text-rose-700 border border-rose-200'
-                                                }`}>
-                                                    {s.status}
-                                                </span>
-                                            </td>
+                            {/* Summary Metrics Strip */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-2 flex items-center gap-2">
+                                    <div className="p-1.5 bg-blue-100 text-blue-700 rounded-md">
+                                        <Calendar size={13} />
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Reservations</span>
+                                        <span className="text-xs font-bold text-gray-900">
+                                            {reservationsList.length} Booking{reservationsList.length !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-2 flex items-center gap-2">
+                                    <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-md">
+                                        <BedDouble size={13} />
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Stays & Nights</span>
+                                        <span className="text-xs font-bold text-gray-900">
+                                            {checkinsList.length} Stay{checkinsList.length !== 1 ? 's' : ''} • {activeGuest.totalNights} Nts
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-amber-50/50 border border-amber-100 rounded-lg p-2 flex items-center gap-2">
+                                    <div className="p-1.5 bg-amber-100 text-amber-700 rounded-md">
+                                        <Utensils size={13} />
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Outlet Bills</span>
+                                        <span className="text-xs font-bold text-amber-800 font-mono">
+                                            {outletBillsList.length} Bills • ৳ {outletBillsList.reduce((acc, c) => acc + c.amountBDT, 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-2 flex items-center gap-2">
+                                    <div className="p-1.5 bg-purple-100 text-purple-700 rounded-md">
+                                        <Receipt size={13} />
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-500 block uppercase font-medium">Folio Total Spend</span>
+                                        <span className="text-xs font-bold text-purple-800 font-mono">
+                                            ৳ {activeGuest.lifetimeSpendBDT.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Activity Data Table */}
+                            <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b border-gray-200 text-[10px] text-gray-500 uppercase tracking-wider">
+                                            <th className="px-3 py-2">Category & Type</th>
+                                            <th className="px-3 py-2">Ref / Bill #</th>
+                                            <th className="px-3 py-2">Service Particulars</th>
+                                            <th className="px-3 py-2">Room / Outlet</th>
+                                            <th className="px-3 py-2">Date & Time</th>
+                                            <th className="px-3 py-2 text-right">Folio Total</th>
+                                            <th className="px-3 py-2 text-right">Status</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 text-[11.5px]">
+                                        {(activityFilter === 'all' ? allLedgerItems :
+                                          activityFilter === 'reservations' ? reservationsList :
+                                          activityFilter === 'checkins' ? checkinsList :
+                                          outletBillsList).map((item) => (
+                                            <tr key={item.id} className="hover:bg-gray-50/70 transition-colors">
+                                                <td className="px-3 py-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {item.type === 'reservation' ? (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                                                <Calendar size={10} /> Reservation
+                                                            </span>
+                                                        ) : item.type === 'checkin' ? (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                <BedDouble size={10} /> Check-In Stay
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                                                {item.outletCategory?.includes('Restaurant') ? <Utensils size={10} /> :
+                                                                 item.outletCategory?.includes('Room Service') ? <Coffee size={10} /> :
+                                                                 item.outletCategory?.includes('Spa') ? <Sparkles size={10} /> :
+                                                                 item.outletCategory?.includes('Laundry') ? <Shirt size={10} /> :
+                                                                 <Wine size={10} />}
+                                                                {item.outletCategory || 'Outlet Bill'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-3 py-2 font-mono font-medium text-gray-900 text-[11px]">
+                                                    {item.refNumber}
+                                                </td>
+
+                                                <td className="px-3 py-2">
+                                                    <div className="font-semibold text-gray-900 text-[11px] leading-tight">
+                                                        {item.title}
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-500 leading-tight mt-0.5">
+                                                        {item.particulars}
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-3 py-2 font-mono text-gray-700 text-[11px]">
+                                                    {item.roomOrLocation}
+                                                </td>
+
+                                                <td className="px-3 py-2 font-mono text-gray-500 text-[10.5px] whitespace-nowrap">
+                                                    {item.dateTime}
+                                                </td>
+
+                                                <td className="px-3 py-2 text-right font-mono font-semibold text-gray-900">
+                                                    ৳ {item.amountBDT.toLocaleString()}
+                                                </td>
+
+                                                <td className="px-3 py-2 text-right">
+                                                    <span className={`px-2 py-0.5 rounded text-[9.5px] font-medium border ${item.statusBadgeColor}`}>
+                                                        {item.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+
+                                        {(activityFilter === 'all' ? allLedgerItems :
+                                          activityFilter === 'reservations' ? reservationsList :
+                                          activityFilter === 'checkins' ? checkinsList :
+                                          outletBillsList).length === 0 && (
+                                            <tr>
+                                                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-xs">
+                                                    No ledger entries found for this filter.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
 
