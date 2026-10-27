@@ -94,6 +94,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         };
     });
 
+    // Collapsible Section Headers state - persisted in localStorage
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+        try {
+            const saved = localStorage.getItem('hotel_sidebar_collapsed_sections');
+            if (saved) return JSON.parse(saved);
+        } catch {
+            // fallback
+        }
+        return {};
+    });
+
+    const toggleSection = (title: string) => {
+        setCollapsedSections(prev => {
+            const updated = { ...prev, [title]: !prev[title] };
+            try {
+                localStorage.setItem('hotel_sidebar_collapsed_sections', JSON.stringify(updated));
+            } catch {
+                // ignore
+            }
+            return updated;
+        });
+    };
+
     const toggleDropdown = (label: string) => {
         setOpenDropdowns(prev => {
             const updated = { ...prev, [label]: !prev[label] };
@@ -252,6 +275,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
     ], []);
 
+    // Auto-expand section if activePage belongs to it
+    useEffect(() => {
+        sections.forEach(sec => {
+            if (!sec.title) return;
+            const containsActive = sec.items.some(item => 
+                item.id === activePage || item.children?.some(c => c.id === activePage)
+            );
+            if (containsActive && collapsedSections[sec.title]) {
+                setCollapsedSections(prev => {
+                    const next = { ...prev, [sec.title!]: false };
+                    try {
+                        localStorage.setItem('hotel_sidebar_collapsed_sections', JSON.stringify(next));
+                    } catch {}
+                    return next;
+                });
+            }
+        });
+    }, [activePage, sections, collapsedSections]);
+
     // Filter sections dynamically if user types in search bar
     const filteredSections = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
@@ -375,110 +417,131 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Navigation List */}
             <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-1.5 scrollbar-thin">
-                {filteredSections.map((sec, sIdx) => (
-                    <div key={sIdx} className="space-y-0.5">
-                        {sec.title && (
-                            <div className="px-2 pt-1.5 pb-0.5 text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">
-                                {sec.title}
-                            </div>
-                        )}
+                {filteredSections.map((sec, sIdx) => {
+                    const isSectionCollapsed = searchQuery ? false : Boolean(collapsedSections[sec.title || '']);
 
-                        {sec.items.map((item, iIdx) => {
-                            // Submenu / Accordion parent
-                            if (item.children) {
-                                const isOpen = searchQuery ? true : openDropdowns[item.label];
-                                const hasActiveChild = item.children.some(c => c.id === activePage);
-
-                                return (
-                                    <div key={iIdx} className="space-y-0.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleDropdown(item.label)}
-                                            className={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${hasActiveChild
-                                                    ? 'text-blue-600 font-bold bg-blue-50/70'
-                                                    : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <span className={hasActiveChild ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>
-                                                    {item.icon}
-                                                </span>
-                                                <span className="truncate">{item.label}</span>
-                                            </div>
-                                            <ChevronDown
-                                                size={11}
-                                                className={`text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
-                                            />
-                                        </button>
-
-                                        {isOpen && (
-                                            <div className="relative ml-3 pl-2.5 border-l border-slate-200/80 space-y-0.5 pt-0.5 pb-0.5">
-                                                {item.children.map((sub, subIdx) => {
-                                                    const isSubActive =
-                                                        activePage === sub.id ||
-                                                        (sub.id === 'general-settings' &&
-                                                            ['hotel-info', 'hotel-profile', 'edit-property'].includes(activePage));
-                                                    return (
-                                                        <button
-                                                            key={subIdx}
-                                                            type="button"
-                                                            onClick={() => setActivePage(sub.id)}
-                                                            className={`relative group flex w-full items-center justify-between rounded-md px-2 py-0.5 text-[10.5px] transition cursor-pointer ${isSubActive
-                                                                    ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
-                                                                    : 'text-slate-600 hover:bg-slate-100/60 hover:text-slate-900 font-normal'
-                                                                }`}
-                                                        >
-                                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                                {isSubActive && (
-                                                                    <span className="absolute -left-[11px] top-1 bottom-1 w-[2.5px] rounded-full bg-blue-600" />
-                                                                )}
-                                                                <span className={isSubActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}>
-                                                                    {sub.icon}
-                                                                </span>
-                                                                <span className="truncate">{sub.label}</span>
-                                                            </div>
-                                                            {sub.badge && (
-                                                                <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${sub.badgeColor || 'bg-slate-100 text-slate-600'}`}>
-                                                                    {sub.badge}
-                                                                </span>
-                                                            )}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            }
-
-                            // Single Direct Item
-                            const isActive = activePage === item.id;
-                            return (
+                    return (
+                        <div key={sIdx} className="space-y-0.5">
+                            {sec.title && (
                                 <button
-                                    key={iIdx}
                                     type="button"
-                                    onClick={() => item.id && setActivePage(item.id)}
-                                    className={`relative flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${isActive
-                                            ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
-                                            : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
-                                        }`}
+                                    onClick={() => toggleSection(sec.title!)}
+                                    className="w-full flex items-center justify-between px-2 pt-2 pb-1 text-[8.5px] font-bold text-slate-400 hover:text-slate-700 uppercase tracking-wider cursor-pointer group transition select-none rounded-md hover:bg-slate-100/60"
+                                    title={`Toggle ${sec.title}`}
                                 >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <span className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>
-                                            {item.icon}
-                                        </span>
-                                        <span className="truncate">{item.label}</span>
-                                    </div>
-                                    {item.badge && (
-                                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${item.badgeColor || 'bg-slate-100 text-slate-600'}`}>
-                                            {item.badge}
-                                        </span>
-                                    )}
+                                    <span className="group-hover:text-slate-900 transition-colors font-extrabold tracking-wider">
+                                        {sec.title}
+                                    </span>
+                                    <ChevronDown
+                                        size={10}
+                                        className={`text-slate-400 group-hover:text-slate-600 transition-transform duration-200 shrink-0 ${
+                                            isSectionCollapsed ? '-rotate-90' : ''
+                                        }`}
+                                    />
                                 </button>
-                            );
-                        })}
-                    </div>
-                ))}
+                            )}
+
+                            {!isSectionCollapsed && (
+                                <div className="space-y-0.5">
+                                    {sec.items.map((item, iIdx) => {
+                                        // Submenu / Accordion parent
+                                        if (item.children) {
+                                            const isOpen = searchQuery ? true : openDropdowns[item.label];
+                                            const hasActiveChild = item.children.some(c => c.id === activePage);
+
+                                            return (
+                                                <div key={iIdx} className="space-y-0.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleDropdown(item.label)}
+                                                        className={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${hasActiveChild
+                                                                ? 'text-blue-600 font-bold bg-blue-50/70'
+                                                                : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className={hasActiveChild ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>
+                                                                {item.icon}
+                                                            </span>
+                                                            <span className="truncate">{item.label}</span>
+                                                        </div>
+                                                        <ChevronDown
+                                                            size={11}
+                                                            className={`text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+                                                        />
+                                                    </button>
+
+                                                    {isOpen && (
+                                                        <div className="relative ml-3 pl-2.5 border-l border-slate-200/80 space-y-0.5 pt-0.5 pb-0.5">
+                                                            {item.children.map((sub, subIdx) => {
+                                                                const isSubActive =
+                                                                    activePage === sub.id ||
+                                                                    (sub.id === 'general-settings' &&
+                                                                        ['hotel-info', 'hotel-profile', 'edit-property'].includes(activePage));
+                                                                return (
+                                                                    <button
+                                                                        key={subIdx}
+                                                                        type="button"
+                                                                        onClick={() => setActivePage(sub.id)}
+                                                                        className={`relative group flex w-full items-center justify-between rounded-md px-2 py-0.5 text-[10.5px] transition cursor-pointer ${isSubActive
+                                                                                ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
+                                                                                : 'text-slate-600 hover:bg-slate-100/60 hover:text-slate-900 font-normal'
+                                                                            }`}
+                                                                    >
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                            {isSubActive && (
+                                                                                <span className="absolute -left-[11px] top-1 bottom-1 w-[2.5px] rounded-full bg-blue-600" />
+                                                                            )}
+                                                                            <span className={isSubActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}>
+                                                                                {sub.icon}
+                                                                            </span>
+                                                                            <span className="truncate">{sub.label}</span>
+                                                                        </div>
+                                                                        {sub.badge && (
+                                                                            <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${sub.badgeColor || 'bg-slate-100 text-slate-600'}`}>
+                                                                                {sub.badge}
+                                                                            </span>
+                                                                        )}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        // Single Direct Item
+                                        const isActive = activePage === item.id;
+                                        return (
+                                            <button
+                                                key={iIdx}
+                                                type="button"
+                                                onClick={() => item.id && setActivePage(item.id)}
+                                                className={`relative flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition cursor-pointer group ${isActive
+                                                        ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
+                                                        : 'text-slate-700 hover:bg-slate-100/70 hover:text-slate-900'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'}>
+                                                        {item.icon}
+                                                    </span>
+                                                    <span className="truncate">{item.label}</span>
+                                                </div>
+                                                {item.badge && (
+                                                    <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${item.badgeColor || 'bg-slate-100 text-slate-600'}`}>
+                                                        {item.badge}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </nav>
         </aside>
     );

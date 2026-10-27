@@ -15,7 +15,9 @@ import {
     CalendarDays,
     SlidersHorizontal,
     ExternalLink,
-    Search
+    Search,
+    Shield,
+    ArrowRight
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
 import GlobalOmniSearchModal from './common/GlobalOmniSearchModal';
@@ -270,8 +272,11 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
         .map(w => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
 
-    const userInitial = user?.name ? user.name.trim()[0].toUpperCase() : 'A';
-    const userRoleDisplay = user?.role ? user.role.replace('_', ' ').toUpperCase() : 'STAFF';
+    // Dynamic user profile resolution (0 hardcoded mock names)
+    const activeUserName = user?.name || user?.username || 'Hotel Manager';
+    const activeUserEmail = user?.email || (user?.username ? `${user.username.toLowerCase()}@hotel.com` : 'admin@hotel.com');
+    const userRoleDisplay = user?.role ? user.role.replace(/_/g, ' ').toUpperCase() : 'HOTEL ADMINISTRATOR';
+    const userInitial = (activeUserName.trim()[0] || 'U').toUpperCase();
 
     return (
         <>
@@ -616,7 +621,7 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                     {/* Subtle Divider */}
                     <div className="h-5 w-px bg-slate-200"></div>
 
-                    {/* 5. USER PROFILE PILL & DROPDOWN (OrderlyRMS TopNavbar Avatar Style) */}
+                    {/* 5. USER AVATAR BUTTON & EXECUTIVE ACCOUNT POPOVER */}
                     <div className="relative" ref={dropdownRef}>
                         <button
                             type="button"
@@ -626,49 +631,75 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                 setIsDatePopoverOpen(false);
                                 setIsAlertsPopoverOpen(false);
                             }}
-                            className="flex items-center gap-1.5 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-2xs group"
-                            title="User Account"
+                            className="size-8.5 rounded-full border border-slate-200/90 bg-white hover:border-blue-500 hover:ring-2 hover:ring-blue-100 transition-all cursor-pointer shadow-2xs flex items-center justify-center relative group"
+                            title={`${activeUserName} (${userRoleDisplay})`}
                         >
-                            <div className="size-6 sm:size-6.5 rounded-lg bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10.5px] font-bold shadow-2xs shrink-0">
+                            <div className="size-7 rounded-full bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-inner">
                                 {userInitial}
                             </div>
-                            <div className="hidden md:flex flex-col text-left max-w-[95px] leading-tight">
-                                <span className="text-[11px] font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
-                                    {user?.name || 'Alexander Vance'}
-                                </span>
-                                <span className="text-[9px] font-medium text-slate-400 truncate">
-                                    {userRoleDisplay}
-                                </span>
-                            </div>
-                            <ChevronDown
-                                size={10}
-                                className={`text-slate-400 transition-transform duration-200 shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`}
-                            />
+                            <span className="size-2 rounded-full bg-emerald-500 ring-2 ring-white absolute bottom-0 right-0" />
                         </button>
 
-                        {/* User Dropdown Menu */}
+                        {/* Executive Account Popover */}
                         {isDropdownOpen && (
-                            <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150 z-50">
-                                <div className="px-3.5 py-2 border-b border-slate-100">
-                                    <p className="text-xs text-slate-900 truncate">{user?.name || 'Alexander Vance'}</p>
-                                    <p className="text-[10px] text-slate-400 truncate">{user?.email || 'superadmin@hotelmanagement.os'}</p>
-                                    <div className="flex items-center gap-1.5 mt-1.5 text-[9.5px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/50">
-                                        <span className="size-1.5 rounded-full bg-emerald-500"></span>
-                                        <span className="truncate">{activeProperty?.name || 'Grand Palace Dhaka'}</span>
+                            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in zoom-in-95 duration-150 z-50">
+                                {/* Top Banner: Executive Dark Navy */}
+                                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white p-3.5 relative overflow-hidden">
+                                    <div className="absolute -right-4 -bottom-4 size-20 rounded-full bg-blue-500/15 blur-lg pointer-events-none" />
+
+                                    <div className="flex items-center gap-3 relative z-10">
+                                        <div className="size-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center text-sm font-black shadow-md border-2 border-white/20 shrink-0">
+                                            {userInitial}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-bold text-white truncate">
+                                                {activeUserName}
+                                            </p>
+                                            <p className="text-[10px] text-slate-300 font-mono truncate mt-0.5">
+                                                {activeUserEmail}
+                                            </p>
+                                            <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[9px] font-extrabold tracking-wide uppercase">
+                                                <Shield size={9} />
+                                                <span>{userRoleDisplay}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="py-1">
+                                {/* Active Hotel Property Context */}
+                                <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <Building2 size={13} className="text-blue-600 shrink-0" />
+                                        <span className="text-[11px] font-bold text-slate-700 truncate">
+                                            {activeProperty?.name || 'Grand Palace Hotel & Resort'}
+                                        </span>
+                                    </div>
+                                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/80 shrink-0 flex items-center gap-1">
+                                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span>Active</span>
+                                    </span>
+                                </div>
+
+                                {/* Account Navigation Actions */}
+                                <div className="p-1.5 space-y-0.5">
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setIsDropdownOpen(false);
                                             setActivePage('user-management');
                                         }}
-                                        className="w-full text-left px-3.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer font-medium"
+                                        className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50/70 rounded-xl flex items-center justify-between transition cursor-pointer group"
                                     >
-                                        <User size={13} className="text-slate-400" />
-                                        <span>My Profile & Staff</span>
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="size-7 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center transition">
+                                                <User size={13} />
+                                            </div>
+                                            <div>
+                                                <p className="leading-tight font-bold">My Profile & Staff</p>
+                                                <p className="text-[10px] text-slate-400 group-hover:text-blue-500 font-normal">Account security & PIN</p>
+                                            </div>
+                                        </div>
+                                        <ArrowRight size={12} className="text-slate-300 group-hover:text-blue-600 transition" />
                                     </button>
 
                                     <button
@@ -677,10 +708,20 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                             setIsDropdownOpen(false);
                                             setActivePage('multi-property');
                                         }}
-                                        className="w-full text-left px-3.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer font-medium"
+                                        className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50/70 rounded-xl flex items-center justify-between transition cursor-pointer group"
                                     >
-                                        <Building2 size={13} className="text-blue-600" />
-                                        <span>Multi-Hotel Chain Console</span>
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="size-7 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center transition">
+                                                <Building2 size={13} />
+                                            </div>
+                                            <div>
+                                                <p className="leading-tight font-bold">Hotel Chain Console</p>
+                                                <p className="text-[10px] text-slate-400 group-hover:text-blue-500 font-normal">Multi-property portfolio</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            HQ
+                                        </span>
                                     </button>
 
                                     <button
@@ -689,26 +730,33 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                                             setIsDropdownOpen(false);
                                             setActivePage('hotel-info');
                                         }}
-                                        className="w-full text-left px-3.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition cursor-pointer font-medium"
+                                        className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50/70 rounded-xl flex items-center justify-between transition cursor-pointer group"
                                     >
-                                        <SlidersHorizontal size={13} className="text-slate-400" />
-                                        <span>Property & General Settings</span>
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="size-7 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center transition">
+                                                <SlidersHorizontal size={13} />
+                                            </div>
+                                            <div>
+                                                <p className="leading-tight font-bold">Property Configuration</p>
+                                                <p className="text-[10px] text-slate-400 group-hover:text-blue-500 font-normal">Policies, outlets & folio</p>
+                                            </div>
+                                        </div>
+                                        <ArrowRight size={12} className="text-slate-300 group-hover:text-blue-600 transition" />
                                     </button>
                                 </div>
 
-                                <div className="border-t border-slate-100 my-1"></div>
-
-                                <div className="px-2 pb-0.5">
+                                {/* Footer with Sign Out */}
+                                <div className="p-2 border-t border-slate-100 bg-slate-50/50">
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setIsDropdownOpen(false);
                                             onLogout();
                                         }}
-                                        className="w-full text-left px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition flex items-center gap-2 cursor-pointer"
+                                        className="w-full px-3 py-2 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer border border-rose-200/50"
                                     >
                                         <LogOut size={13} />
-                                        <span>Sign Out</span>
+                                        <span>Sign Out of Session</span>
                                     </button>
                                 </div>
                             </div>

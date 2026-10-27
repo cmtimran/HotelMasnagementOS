@@ -90,12 +90,16 @@ const Login = ({ onLogin }: LoginProps) => {
                             ? "Grand Ocean Resort (Cox's Bazar)" 
                             : 'Grand Palace Dhaka';
 
+                    const cleanEmailName = email.split('@')[0]
+                        .split(/[._-]/)
+                        .filter(Boolean)
+                        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                        .join(' ');
+
+                    const userName = cleanEmailName || (isSuper ? 'System Administrator' : 'Staff User');
+
                     const mockUser: User = {
-                        name: isSuper 
-                            ? 'Alexander Vance (Group MD)' 
-                            : isCox 
-                                ? 'Rahim Chowdhury (Resort GM)' 
-                                : 'Sarah Jenkins (Front Desk Officer)',
+                        name: userName,
                         role: role,
                         property: propertyName,
                         property_id: propertyIdNum,
