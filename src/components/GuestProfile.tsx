@@ -997,10 +997,6 @@ export const GuestProfile: React.FC = () => {
                                 </button>
                             ))}
                         </div>
-
-                        <span className="text-[10px] text-gray-400 font-mono">
-                            Guest ID: #GP-{activeGuest.id}
-                        </span>
                     </div>
 
                     {/* Tab 1: Comprehensive Ledger (Reservations, Check-Ins, Outlet Bills) */}
@@ -1018,23 +1014,30 @@ export const GuestProfile: React.FC = () => {
                                     </p>
                                 </div>
 
-                                <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
+                                <div className="inline-flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md border border-gray-200/60 self-start sm:self-auto flex-nowrap">
                                     {[
-                                        { key: 'all', label: `All (${allLedgerItems.length})` },
-                                        { key: 'reservations', label: `📅 Reservations (${reservationsList.length})` },
-                                        { key: 'checkins', label: `🛎️ Check-Ins & Stays (${checkinsList.length})` },
-                                        { key: 'outlets', label: `🍽️ Outlet Bills (${outletBillsList.length})` }
+                                        { key: 'all', label: 'All', count: allLedgerItems.length },
+                                        { key: 'reservations', label: 'Reservations', count: reservationsList.length },
+                                        { key: 'checkins', label: 'Stays', count: checkinsList.length },
+                                        { key: 'outlets', label: 'Outlet Bills', count: outletBillsList.length }
                                     ].map(sub => (
                                         <button
                                             key={sub.key}
                                             onClick={() => setActivityFilter(sub.key as any)}
-                                            className={`px-2 py-1 rounded text-[10.5px] font-semibold transition-all cursor-pointer ${
+                                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                                                 activityFilter === sub.key
-                                                    ? 'bg-white text-blue-600 shadow-xs'
-                                                    : 'text-gray-600 hover:text-gray-900'
+                                                    ? 'bg-white text-blue-600 shadow-2xs'
+                                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
                                             }`}
                                         >
-                                            {sub.label}
+                                            <span>{sub.label}</span>
+                                            <span className={`text-[9px] px-1 py-0 rounded font-mono ${
+                                                activityFilter === sub.key
+                                                    ? 'bg-blue-50 text-blue-700'
+                                                    : 'bg-gray-200/70 text-gray-600'
+                                            }`}>
+                                                {sub.count}
+                                            </span>
                                         </button>
                                     ))}
                                 </div>
