@@ -14,9 +14,11 @@ import {
     Plus,
     CalendarDays,
     SlidersHorizontal,
-    ExternalLink
+    ExternalLink,
+    Search
 } from 'lucide-react';
 import AddReservationModal from './modals/AddReservationModal';
+import GlobalOmniSearchModal from './common/GlobalOmniSearchModal';
 import { useProperty } from '../context/PropertyContext';
 import { formatToDisplayDate, formatToISODate, setOperatingSystemDate, getOperatingSystemDate } from '../utils/roomInventoryEngine';
 
@@ -33,6 +35,19 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
     const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
     const [isPropertyPopoverOpen, setIsPropertyPopoverOpen] = useState(false);
     const [isAlertsPopoverOpen, setIsAlertsPopoverOpen] = useState(false);
+    const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+
+    // Global Command Palette Shortcut (Ctrl+K or Cmd+K)
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                setIsSearchModalOpen(prev => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const datePopoverRef = useRef<HTMLDivElement>(null);
@@ -390,6 +405,20 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
 
                     {/* 3. QUICK ACTION SHORTCUT ICONS */}
                     <div className="hidden sm:flex items-center gap-1 bg-slate-50 p-0.5 rounded-xl border border-slate-200/80">
+                        {/* Global Omni-Search Shortcut (Ctrl + K) */}
+                        <button
+                            type="button"
+                            onClick={() => setIsSearchModalOpen(true)}
+                            title="Global Omni-Search (Ctrl + K)"
+                            className={`w-7 h-7 rounded-lg transition flex items-center justify-center cursor-pointer ${
+                                isSearchModalOpen
+                                    ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                            }`}
+                        >
+                            <Search size={13} />
+                        </button>
+
                         {/* New Reservation Shortcut */}
                         <button
                             type="button"
@@ -633,6 +662,13 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                     setIsAddReservationOpen(false);
                     setActivePage('reservations');
                 }}
+            />
+
+            {/* Global Omni-Search / Command Palette Modal */}
+            <GlobalOmniSearchModal
+                isOpen={isSearchModalOpen}
+                onClose={() => setIsSearchModalOpen(false)}
+                setActivePage={setActivePage}
             />
         </>
     );
