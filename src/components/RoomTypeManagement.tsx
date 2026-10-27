@@ -498,8 +498,6 @@ const RoomTypeManagement = () => {
                 </div>
             </div>
         );
-            </div>
-        );
     }
 
     return (
