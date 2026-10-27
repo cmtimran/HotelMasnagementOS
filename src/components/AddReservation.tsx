@@ -1788,20 +1788,23 @@ export const AddReservation: React.FC = () => {
                                                         const rowAddons = getRoomBundleTotal(bundle, rowN);
                                                         const rowBase = getRowBaseTotal(row);
                                                         const rowTotal = rowBase + rowAddons;
+                                                        const totalRN = getRowTotalRoomNights(row);
+                                                        const isCustomRN = totalRN !== nights * (Number(row.roomsCount) || 1);
 
                                                         return (
-                                                            <td className="p-1.5 text-gray-900 text-right">
-                                                                <div>৳{(rowTotal).toLocaleString()}</div>
-                                                                {rowAddons > 0 && (
-                                                                    <div className="text-[9px] text-slate-400 font-normal">
-                                                                        Base: ৳{rowBase.toLocaleString()} + Svc: ৳{rowAddons.toLocaleString()}
+                                                            <td className="p-1.5 text-gray-900 text-right whitespace-nowrap">
+                                                                <div className="font-bold text-slate-900 font-mono text-xs">
+                                                                    ৳{rowTotal.toLocaleString()}
+                                                                </div>
+                                                                {rowAddons > 0 ? (
+                                                                    <div className="text-[9px] text-slate-500 font-mono" title={`Base Tariff: ৳${rowBase.toLocaleString()} + Services: ৳${rowAddons.toLocaleString()}`}>
+                                                                        +৳{rowAddons.toLocaleString()} svc
                                                                     </div>
-                                                                )}
-                                                                {getRowTotalRoomNights(row) !== nights * (Number(row.roomsCount) || 1) && (
-                                                                    <div className="text-[8.5px] font-mono text-blue-700 font-semibold">
-                                                                        {getRowTotalRoomNights(row)} room-nights
+                                                                ) : isCustomRN ? (
+                                                                    <div className="text-[8.5px] font-mono text-blue-700 font-semibold" title={`${totalRN} total room-nights across this row`}>
+                                                                        {totalRN}N
                                                                     </div>
-                                                                )}
+                                                                ) : null}
                                                             </td>
                                                         );
                                                     })()}
