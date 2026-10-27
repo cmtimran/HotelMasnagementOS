@@ -5,7 +5,7 @@ import {
     Heart, CheckCircle2,
     Building2, Printer, Clock,
     AlertTriangle, ChevronRight, ChevronLeft,
-    Home
+    Home, Edit3
 } from 'lucide-react';
 import { getAllStoredReservations, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 
@@ -195,8 +195,10 @@ export const GuestProfile: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'overview' | 'preferences' | 'vault' | 'corporate'>('overview');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-    // Modal state for adding a guest
+    // Modal state for adding or editing a guest
     const [showAddGuestModal, setShowAddGuestModal] = useState(false);
+    const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+    const [editingGuestId, setEditingGuestId] = useState<number | null>(null);
     const [modalTab, setModalTab] = useState<'kyc' | 'contact' | 'preferences' | 'corporate'>('kyc');
 
     const initialGuestForm = {
@@ -240,6 +242,60 @@ export const GuestProfile: React.FC = () => {
 
     const [newGuestForm, setNewGuestForm] = useState(initialGuestForm);
 
+    const handleOpenCreateModal = () => {
+        setModalMode('create');
+        setEditingGuestId(null);
+        setNewGuestForm(initialGuestForm);
+        setModalTab('kyc');
+        setShowAddGuestModal(true);
+    };
+
+    const handleOpenEditModal = (guest: GuestRecord = activeGuest, targetTab: 'kyc' | 'contact' | 'preferences' | 'corporate' = 'kyc') => {
+        if (!guest) return;
+        setModalMode('edit');
+        setEditingGuestId(guest.id);
+        setModalTab(targetTab);
+        setNewGuestForm({
+            title: guest.title,
+            name: guest.name,
+            gender: guest.gender || 'Male',
+            dob: guest.dob || '1990-01-01',
+            nationality: guest.nationality || 'Bangladesh',
+            idType: guest.idType || 'National ID (NID)',
+            idNumber: guest.idNumber || '',
+            idExpiry: guest.idExpiry || '2030-12-31',
+            issuingCountry: guest.issuingCountry || guest.nationality || 'Bangladesh',
+
+            phone: guest.phone || '',
+            altPhone: guest.altPhone || '',
+            email: guest.email || '',
+            address: guest.address || '',
+            homeCity: guest.homeCity || 'Dhaka',
+            homeCountry: guest.homeCountry || 'Bangladesh',
+            postalCode: guest.postalCode || '',
+            emergencyName: guest.emergencyContact?.name || '',
+            emergencyRelation: guest.emergencyContact?.relationship || 'Spouse',
+            emergencyPhone: guest.emergencyContact?.phone || '',
+
+            roomType: guest.preferences?.roomType || 'Deluxe King',
+            floorPreference: guest.preferences?.floorPreference || 'High Floor',
+            bedType: guest.preferences?.bedType || 'King Bed',
+            pillowType: guest.preferences?.pillowType || 'Feather / Down',
+            smoking: guest.preferences?.smoking || 'Non-Smoking',
+            dietary: guest.preferences?.dietary || 'Standard Halal',
+            allergies: guest.preferences?.allergies || 'None',
+            newspaper: guest.preferences?.newspaper || 'The Daily Star',
+
+            vipTier: guest.vipTier || 'Regular',
+            company: guest.company || '',
+            designation: guest.designation || '',
+            corporateTaxId: guest.corporateTaxId || '',
+            billingRoute: guest.billingRoute || 'Self-Pay (Guest Folio)',
+            specialNotes: guest.preferences?.specialNotes || ''
+        });
+        setShowAddGuestModal(true);
+    };
+
     useEffect(() => {
         localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(guests));
     }, [guests]);
@@ -264,10 +320,60 @@ export const GuestProfile: React.FC = () => {
         return matchesQuery && matchesTier;
     });
 
-    const handleCreateGuest = (e: React.FormEvent) => {
+    const handleSaveGuestProfile = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newGuestForm.name.trim() || !newGuestForm.phone.trim()) {
             alert('Please enter guest full legal name and primary phone number.');
+            return;
+        }
+
+        if (modalMode === 'edit' && editingGuestId) {
+            setGuests(prev => prev.map(g => {
+                if (g.id !== editingGuestId) return g;
+                return {
+                    ...g,
+                    title: newGuestForm.title,
+                    name: newGuestForm.name.trim(),
+                    phone: newGuestForm.phone.trim(),
+                    altPhone: newGuestForm.altPhone.trim() || undefined,
+                    email: newGuestForm.email.trim() || `${newGuestForm.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                    vipTier: newGuestForm.vipTier,
+                    nationality: newGuestForm.nationality.trim() || 'Bangladesh',
+                    idType: newGuestForm.idType,
+                    idNumber: newGuestForm.idNumber.trim() || g.idNumber,
+                    idExpiry: newGuestForm.idExpiry,
+                    issuingCountry: newGuestForm.issuingCountry || newGuestForm.nationality || 'Bangladesh',
+                    dob: newGuestForm.dob || g.dob,
+                    gender: newGuestForm.gender,
+                    homeCity: newGuestForm.homeCity.trim() || 'Dhaka',
+                    homeCountry: newGuestForm.homeCountry.trim() || newGuestForm.nationality || 'Bangladesh',
+                    address: newGuestForm.address.trim() || undefined,
+                    postalCode: newGuestForm.postalCode.trim() || undefined,
+                    emergencyContact: newGuestForm.emergencyName.trim() ? {
+                        name: newGuestForm.emergencyName.trim(),
+                        relationship: newGuestForm.emergencyRelation || 'Family',
+                        phone: newGuestForm.emergencyPhone.trim() || newGuestForm.phone.trim()
+                    } : undefined,
+                    company: newGuestForm.company.trim() || undefined,
+                    designation: newGuestForm.designation.trim() || undefined,
+                    corporateTaxId: newGuestForm.corporateTaxId.trim() || undefined,
+                    billingRoute: newGuestForm.billingRoute,
+                    preferences: {
+                        ...g.preferences,
+                        roomType: newGuestForm.roomType,
+                        floorPreference: newGuestForm.floorPreference,
+                        bedType: newGuestForm.bedType,
+                        pillowType: newGuestForm.pillowType,
+                        smoking: newGuestForm.smoking,
+                        dietary: newGuestForm.dietary,
+                        allergies: newGuestForm.allergies.trim() || 'None',
+                        newspaper: newGuestForm.newspaper,
+                        specialNotes: newGuestForm.specialNotes.trim() || g.preferences.specialNotes
+                    }
+                };
+            }));
+            setShowAddGuestModal(false);
+            showToast(`Guest profile updated successfully for ${newGuestForm.title} ${newGuestForm.name}`);
             return;
         }
 
@@ -369,12 +475,21 @@ export const GuestProfile: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={() => setShowAddGuestModal(true)}
+                        onClick={handleOpenCreateModal}
                         className="btn-primary"
                     >
                         <Plus size={14} />
                         <span>Register Guest</span>
                     </button>
+                    {activeGuest && (
+                        <button
+                            onClick={() => handleOpenEditModal(activeGuest)}
+                            className="btn-secondary"
+                        >
+                            <Edit3 size={13} />
+                            <span>Edit Profile</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => window.print()}
                         className="btn-secondary"
@@ -423,10 +538,10 @@ export const GuestProfile: React.FC = () => {
                         {filteredGuests.map(g => {
                             const isSelected = g.id === activeGuest.id;
                             return (
-                                <button
+                                <div
                                     key={g.id}
                                     onClick={() => setSelectedGuestId(g.id)}
-                                    className={`w-full p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                                    className={`w-full p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col gap-1 relative group ${
                                         isSelected
                                             ? 'bg-blue-50/60 border-blue-500 shadow-2xs ring-1 ring-blue-500'
                                             : 'bg-white border-gray-200 hover:bg-gray-50'
@@ -434,18 +549,31 @@ export const GuestProfile: React.FC = () => {
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                            <span className="text-gray-900 truncate text-[11.5px]">
+                                            <span className="text-gray-900 truncate text-[11.5px] font-medium">
                                                 {g.title} {g.name}
                                             </span>
                                         </div>
-                                        <span className={`px-1.5 py-0.2 rounded text-[9px] ${
-                                            g.vipTier.includes('Platinum') ? 'bg-purple-100 text-purple-800 border border-purple-200' :
-                                            g.vipTier.includes('Corporate') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                            g.vipTier.includes('Gold') ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                                            'bg-gray-100 text-gray-700 border border-gray-200'
-                                        }`}>
-                                            {g.vipTier}
-                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <span className={`px-1.5 py-0.2 rounded text-[9px] ${
+                                                g.vipTier.includes('Platinum') ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                                                g.vipTier.includes('Corporate') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                                g.vipTier.includes('Gold') ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                                'bg-gray-100 text-gray-700 border border-gray-200'
+                                            }`}>
+                                                {g.vipTier}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenEditModal(g);
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-blue-600 rounded transition-opacity"
+                                                title="Edit Guest Profile"
+                                            >
+                                                <Edit3 size={11} />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center justify-between text-[10px] text-gray-500">
@@ -458,7 +586,7 @@ export const GuestProfile: React.FC = () => {
                                             {g.company}
                                         </div>
                                     )}
-                                </button>
+                                </div>
                             );
                         })}
                     </div>
@@ -474,7 +602,7 @@ export const GuestProfile: React.FC = () => {
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-base text-gray-900 leading-tight">
+                                    <h2 className="text-base text-gray-900 leading-tight font-bold">
                                         {activeGuest.title} {activeGuest.name}
                                     </h2>
                                     <span className={`px-2 py-0.5 rounded text-[10px] ${
@@ -485,9 +613,17 @@ export const GuestProfile: React.FC = () => {
                                         <Star size={10} className="inline mr-1 -mt-0.5" />
                                         {activeGuest.vipTier}
                                     </span>
-                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                    <span className="px-1.5 py-0.2 rounded text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 font-medium">
                                         <ShieldCheck size={11} /> KYC Verified
                                     </span>
+                                    <button
+                                        onClick={() => handleOpenEditModal(activeGuest)}
+                                        className="ml-1 px-2 py-0.5 rounded text-[10px] bg-white border border-gray-300 text-gray-700 hover:text-blue-600 hover:border-blue-500 font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                        title="Edit this guest profile"
+                                    >
+                                        <Edit3 size={10} />
+                                        <span>Edit Profile</span>
+                                    </button>
                                 </div>
 
                                 <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-1 flex-wrap">
@@ -636,10 +772,19 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 2: Preferences & CRM */}
                     {activeTab === 'preferences' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
-                                <Heart size={13} className="text-rose-500" />
-                                <span>Hospitality Preferences & Personalization</span>
-                            </h3>
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
+                                    <Heart size={13} className="text-rose-500" />
+                                    <span>Hospitality Preferences & Personalization</span>
+                                </h3>
+                                <button
+                                    onClick={() => handleOpenEditModal(activeGuest, 'preferences')}
+                                    className="px-2.5 py-1 rounded text-[10.5px] bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-blue-700 font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                    <Edit3 size={11} />
+                                    <span>Edit Preferences</span>
+                                </button>
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
@@ -706,10 +851,19 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 3: ID & Verification Vault */}
                     {activeTab === 'vault' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
-                                <ShieldCheck size={13} className="text-emerald-600" />
-                                <span>KYC & Document Verification Records</span>
-                            </h3>
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
+                                    <ShieldCheck size={13} className="text-emerald-600" />
+                                    <span>KYC & Document Verification Records</span>
+                                </h3>
+                                <button
+                                    onClick={() => handleOpenEditModal(activeGuest, 'kyc')}
+                                    className="px-2.5 py-1 rounded text-[10.5px] bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-blue-700 font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                    <Edit3 size={11} />
+                                    <span>Update KYC Records</span>
+                                </button>
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
@@ -767,10 +921,19 @@ export const GuestProfile: React.FC = () => {
                     {/* Tab 4: Corporate Profile */}
                     {activeTab === 'corporate' && (
                         <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
-                            <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
-                                <Building2 size={13} className="text-blue-600" />
-                                <span>Corporate Affiliation & City Ledger Agreement</span>
-                            </h3>
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
+                                    <Building2 size={13} className="text-blue-600" />
+                                    <span>Corporate Affiliation & City Ledger Agreement</span>
+                                </h3>
+                                <button
+                                    onClick={() => handleOpenEditModal(activeGuest, 'corporate')}
+                                    className="px-2.5 py-1 rounded text-[10.5px] bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-blue-700 font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                    <Edit3 size={11} />
+                                    <span>Edit Corporate Billing</span>
+                                </button>
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
@@ -807,7 +970,7 @@ export const GuestProfile: React.FC = () => {
                 </div>
             </div>
 
-            {/* Add Guest Modal */}
+            {/* Add / Edit Guest Modal */}
             {showAddGuestModal && (
                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full flex flex-col max-h-[92vh] overflow-hidden">
@@ -815,17 +978,21 @@ export const GuestProfile: React.FC = () => {
                         <div className="px-4 py-3 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300">
-                                    <User size={16} />
+                                    {modalMode === 'edit' ? <Edit3 size={16} /> : <User size={16} />}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-bold text-white tracking-tight">Register New Guest Profile</h3>
+                                        <h3 className="text-sm font-bold text-white tracking-tight">
+                                            {modalMode === 'edit' ? `Edit Guest Profile #${editingGuestId}` : 'Register New Guest Profile'}
+                                        </h3>
                                         <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 border border-blue-400/40 text-blue-200 uppercase font-semibold">
-                                            Enterprise 360° CRM
+                                            {modalMode === 'edit' ? 'Modify Mode' : 'Enterprise 360° CRM'}
                                         </span>
                                     </div>
                                     <p className="text-[10px] text-slate-300">
-                                        5-Star Hotel KYC, Special Branch compliance, stay personalization & corporate ledger
+                                        {modalMode === 'edit'
+                                            ? `Updating profile and hospitality preferences for ${newGuestForm.title} ${newGuestForm.name || activeGuest?.name}`
+                                            : '5-Star Hotel KYC, Special Branch compliance, stay personalization & corporate ledger'}
                                     </p>
                                 </div>
                             </div>
@@ -862,7 +1029,7 @@ export const GuestProfile: React.FC = () => {
                         </div>
 
                         {/* Form Body */}
-                        <form onSubmit={handleCreateGuest} className="flex flex-col flex-1 overflow-hidden">
+                        <form onSubmit={handleSaveGuestProfile} className="flex flex-col flex-1 overflow-hidden">
                             <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
                                 {/* TAB 1: IDENTITY & LEGAL KYC */}
                                 {modalTab === 'kyc' && (
@@ -1415,7 +1582,7 @@ export const GuestProfile: React.FC = () => {
                                         className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center gap-1.5 shadow-xs transition-colors"
                                     >
                                         <CheckCircle2 size={13} />
-                                        <span>Save Guest 360 Profile</span>
+                                        <span>{modalMode === 'edit' ? 'Update Guest Profile' : 'Save Guest 360 Profile'}</span>
                                     </button>
                                 </div>
                             </div>
