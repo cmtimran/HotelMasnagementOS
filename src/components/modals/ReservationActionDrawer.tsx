@@ -27,7 +27,8 @@ import {
     Plus,
     Lock,
     ShieldCheck,
-    Link as LinkIcon
+    Link as LinkIcon,
+    FileText
 } from 'lucide-react';
 import type { AmendBookingData } from './AmendStayModal';
 import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
@@ -121,11 +122,17 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const [mode, setMode] = useState<DrawerMode>(initialMode);
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
 
+    // Status-Driven Document Printing States
+    const [isPrintMenuOpen, setIsPrintMenuOpen] = useState(false);
+    const [activePrintDoc, setActivePrintDoc] = useState<'reg_card' | 'voucher' | 'folio' | 'cancellation' | null>(null);
+
     // Synchronize mode when initialMode or booking changes
     useEffect(() => {
         if (isOpen) {
             setMode(initialMode);
             setIsOptionsOpen(false);
+            setIsPrintMenuOpen(false);
+            setActivePrintDoc(null);
         }
     }, [isOpen, initialMode, booking?.id]);
 
@@ -371,8 +378,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const activeStatus = (activeRoom.status || booking.status || 'CONFIRMED').toUpperCase();
     const isCurrentActiveInHouse = activeStatus === 'IN-HOUSE' || activeStatus === 'ARRIVED' || activeStatus === 'STAYOVER';
     const isCurrentActiveConfirmed = activeStatus === 'CONFIRMED' || activeStatus === 'ARRIVING';
+    const isCurrentActiveCheckedOut = activeStatus === 'CHECKED-OUT' || activeStatus === 'COMPLETED' || activeStatus === 'DEPARTED';
+    const isCurrentActiveCancelled = activeStatus === 'CANCELLED' || activeStatus === 'VOID';
     const activeRegNo = activeRoom.registrationNumber || (isCurrentActiveInHouse ? (booking.registrationNumber || generateRegistrationNumber(activeSubBookingNo)) : booking.registrationNumber);
     const activeGuestName = activeRoom.guestName || booking.guestName;
+    const bookingAny = booking as any;
 
     const isTaxApplicable = booking.taxApplicable !== false;
     const taxConfigId = booking.taxConfigId;
@@ -1185,16 +1195,107 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     </div>
 
                                     {/* Overview Footer */}
-                                    <div className="flex-shrink-0 px-3.5 py-2.5 bg-[#0c2e7a]/80 border-t border-blue-400/20 flex items-center justify-between gap-1.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => window.print()}
-                                            className="h-8 px-3.5 bg-white/10 hover:bg-white/20 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                                            title="Print Folio for active room"
-                                        >
-                                            <Printer size={12} />
-                                            <span>Print Folio</span>
-                                        </button>
+                                    <div className="flex-shrink-0 px-3.5 py-2.5 bg-[#0c2e7a]/80 border-t border-blue-400/20 flex items-center justify-between gap-1.5 relative">
+                                        {/* Status-Aware Dynamic Print Action Button */}
+                                        <div className="relative">
+                                            <div className="inline-flex rounded-md shadow-xs">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (isCurrentActiveInHouse || isCurrentActiveCheckedOut) {
+                                                            setActivePrintDoc('folio');
+                                                        } else if (isCurrentActiveCancelled) {
+                                                            setActivePrintDoc('cancellation');
+                                                        } else {
+                                                            setActivePrintDoc('reg_card');
+                                                        }
+                                                    }}
+                                                    className="h-8 px-3 bg-white/10 hover:bg-white/20 text-white rounded-l-md text-[9.5px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border-r border-white/10"
+                                                    title={
+                                                        isCurrentActiveInHouse
+                                                            ? 'Print Running Folio & Bill'
+                                                            : isCurrentActiveCheckedOut
+                                                            ? 'Print Tax Invoice & Final Folio'
+                                                            : isCurrentActiveCancelled
+                                                            ? 'Print Cancellation Receipt'
+                                                            : 'Print Guest Registration Card (GRC) for Check-in signature'
+                                                    }
+                                                >
+                                                    <Printer size={12} />
+                                                    <span>
+                                                        {isCurrentActiveInHouse
+                                                            ? 'Print Folio'
+                                                            : isCurrentActiveCheckedOut
+                                                            ? 'Print Tax Invoice'
+                                                            : isCurrentActiveCancelled
+                                                            ? 'Print Cancellation'
+                                                            : 'Print Reg Card'}
+                                                    </span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsPrintMenuOpen(prev => !prev)}
+                                                    className="h-8 px-1.5 bg-white/10 hover:bg-white/20 text-white rounded-r-md text-[9.5px] flex items-center justify-center transition-colors cursor-pointer"
+                                                    title="More print document options"
+                                                >
+                                                    <ChevronDown size={11} className={`transition-transform duration-150 ${isPrintMenuOpen ? 'rotate-180' : ''}`} />
+                                                </button>
+                                            </div>
+
+                                            {/* Status-Driven Dropdown Menu */}
+                                            {isPrintMenuOpen && (
+                                                <div className="absolute left-0 bottom-full mb-1.5 w-60 bg-[#0a235c] border border-blue-400/30 rounded-xl shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100 text-[10px]">
+                                                    <div className="px-3 py-1.5 text-[8.5px] uppercase tracking-wider font-bold text-blue-200/80 border-b border-blue-400/20 flex items-center justify-between">
+                                                        <span>Printable Documents</span>
+                                                        <span className="px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-200 font-mono text-[8px]">{activeStatus}</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActivePrintDoc('reg_card');
+                                                            setIsPrintMenuOpen(false);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
+                                                    >
+                                                        <FileText size={13} className="text-emerald-300 shrink-0" />
+                                                        <div>
+                                                            <div className="font-semibold text-white">Registration Card (GRC)</div>
+                                                            <div className="text-[8.5px] text-blue-200/70 leading-tight">Arrival registration form for guest signature</div>
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActivePrintDoc('voucher');
+                                                            setIsPrintMenuOpen(false);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors border-b border-blue-500/10"
+                                                    >
+                                                        <FileText size={13} className="text-amber-300 shrink-0" />
+                                                        <div>
+                                                            <div className="font-semibold text-white">Confirmation Voucher</div>
+                                                            <div className="text-[8.5px] text-blue-200/70 leading-tight">Official booking confirmation & tariff slip</div>
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActivePrintDoc('folio');
+                                                            setIsPrintMenuOpen(false);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-left text-white hover:bg-blue-600/50 flex items-center gap-2 cursor-pointer transition-colors"
+                                                    >
+                                                        <Printer size={13} className="text-blue-300 shrink-0" />
+                                                        <div>
+                                                            <div className="font-semibold text-white">
+                                                                {isCurrentActiveCheckedOut ? 'Tax Invoice / Settled Bill' : 'Guest Folio Statement'}
+                                                            </div>
+                                                            <div className="text-[8.5px] text-blue-200/70 leading-tight">Room tariff, postings & payment ledger</div>
+                                                        </div>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
 
                                         <div className="flex items-center gap-1.5">
                                             {isCurrentActiveConfirmed && !booking?.isPast && onCheckIn && (
@@ -2012,6 +2113,321 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     )}
                 </div>
             </div>
+
+            {/* Status-Driven Printable Document Modal (GRC, Voucher, Folio Statement) */}
+            {activePrintDoc && (
+                <div className="fixed inset-0 z-[120] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150">
+                    <style>{`
+                        @media print {
+                            body * {
+                                visibility: hidden !important;
+                            }
+                            #hotel-printable-document, #hotel-printable-document * {
+                                visibility: visible !important;
+                            }
+                            #hotel-printable-document {
+                                position: fixed !important;
+                                left: 0 !important;
+                                top: 0 !important;
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 24px !important;
+                                background: white !important;
+                                color: black !important;
+                                border: none !important;
+                                box-shadow: none !important;
+                            }
+                            .no-print {
+                                display: none !important;
+                            }
+                        }
+                    `}</style>
+
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full overflow-hidden flex flex-col my-auto max-h-[92vh] animate-in zoom-in-95 duration-150">
+                        {/* Modal Header Bar (no-print) */}
+                        <div className="px-5 py-3 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 no-print border-b border-slate-800 flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <Printer size={15} className="text-blue-400" />
+                                <span className="text-xs font-bold uppercase tracking-wider">Document Preview</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 font-semibold font-mono">
+                                    {activePrintDoc === 'reg_card'
+                                        ? 'Guest Registration Card (GRC)'
+                                        : activePrintDoc === 'voucher'
+                                        ? 'Booking Confirmation Voucher'
+                                        : activePrintDoc === 'cancellation'
+                                        ? 'Cancellation Slip'
+                                        : isCurrentActiveCheckedOut
+                                        ? 'Tax Invoice'
+                                        : 'Guest Folio Statement'}
+                                </span>
+                            </div>
+
+                            {/* Document Switcher Tabs */}
+                            <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg text-[10px]">
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePrintDoc('reg_card')}
+                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                                        activePrintDoc === 'reg_card' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Reg Card
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePrintDoc('voucher')}
+                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                                        activePrintDoc === 'voucher' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Voucher
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePrintDoc('folio')}
+                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                                        activePrintDoc === 'folio' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                                    }`}
+                                >
+                                    Folio Bill
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => window.print()}
+                                    className="h-7.5 px-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                                >
+                                    <Printer size={13} />
+                                    <span>Print Document</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePrintDoc(null)}
+                                    className="w-7.5 h-7.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+                                    title="Close Preview"
+                                >
+                                    <X size={15} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Printable Paper Area */}
+                        <div className="p-6 overflow-y-auto bg-slate-100 flex-1">
+                            <div id="hotel-printable-document" className="bg-white p-8 rounded-xl border border-slate-300 shadow-xs max-w-2xl mx-auto text-slate-800 font-sans text-xs space-y-4">
+                                {/* Letterhead */}
+                                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                                    <div>
+                                        <h1 className="text-base font-black text-slate-900 tracking-tight font-serif uppercase">GRAND PALACE HOTEL & RESORT</h1>
+                                        <p className="text-[10.5px] text-slate-600 mt-0.5">Plot 12, Road 45, Gulshan-2, Dhaka-1212, Bangladesh</p>
+                                        <p className="text-[10px] text-slate-500">Tel: +880 2 9882200 • Email: frontdesk@grandpalace.com</p>
+                                        <p className="text-[10px] text-slate-500 font-mono">BIN / VAT Registration: 1234567890123</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] uppercase tracking-wider">
+                                            {activePrintDoc === 'reg_card'
+                                                ? 'GUEST REGISTRATION CARD (GRC)'
+                                                : activePrintDoc === 'voucher'
+                                                ? 'BOOKING CONFIRMATION VOUCHER'
+                                                : activePrintDoc === 'cancellation'
+                                                ? 'CANCELLATION SLIP'
+                                                : isCurrentActiveCheckedOut
+                                                ? 'TAX INVOICE & FINAL FOLIO'
+                                                : 'GUEST FOLIO STATEMENT'}
+                                        </span>
+                                        <div className="font-mono text-xs font-bold text-slate-900 mt-1">Ref: {activeSubBookingNo}</div>
+                                        {activeRegNo && <div className="font-mono text-[10.5px] text-emerald-700 font-semibold">Reg: {activeRegNo}</div>}
+                                        <div className="text-[10px] text-slate-500 mt-0.5">Date: {operatingSystemDate}</div>
+                                    </div>
+                                </div>
+
+                                {/* REGISTRATION CARD CONTENT */}
+                                {activePrintDoc === 'reg_card' && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-500 block">Guest Personal Details</span>
+                                                <p className="text-sm font-bold text-slate-900">{activeGuestName}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                                <p className="text-xs text-slate-700">Pax: {activeRoom.adults ?? booking.adults ?? 2} Adults, {activeRoom.children ?? booking.children ?? 0} Children</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-500 block">Stay Allocation</span>
+                                                <p className="text-sm font-bold text-blue-700 font-mono">Room {activeRoomNum} — {activeRoomType}</p>
+                                                <p className="text-xs text-slate-700">Rate Plan: {activeRatePlan}</p>
+                                                <p className="text-xs text-slate-700 font-medium">Check-In: <span className="font-bold">{booking.arrivalDate || bookingAny.checkIn}</span> (14:00)</p>
+                                                <p className="text-xs text-slate-700 font-medium">Check-Out: <span className="font-bold">{booking.departureDate || bookingAny.checkOut}</span> (12:00)</p>
+                                                <p className="text-xs text-slate-700">Nights: {booking.nights || 1} Night(s)</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-200 text-[10px] text-slate-600 space-y-1 leading-relaxed">
+                                            <p className="font-bold text-slate-700 uppercase">Terms, Conditions & Hotel Regulations:</p>
+                                            <p>1. Check-out time is 12:00 PM. Late check-out is subject to room availability and standard tariff.</p>
+                                            <p>2. The hotel reserves the right to charge registered payment methods for unsettled food, beverage, minibar, or damages.</p>
+                                            <p>3. Safe deposit lockers are provided in all rooms. The hotel does not accept liability for money or valuables left in rooms.</p>
+                                            <p>4. I certify that all personal and identification details stated above are accurate and valid.</p>
+                                        </div>
+
+                                        <div className="pt-10 flex justify-between items-end border-t border-slate-300">
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-semibold">
+                                                Front Desk Receptionist
+                                            </div>
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-bold">
+                                                Guest Signature
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* BOOKING CONFIRMATION VOUCHER CONTENT */}
+                                {activePrintDoc === 'voucher' && (
+                                    <div className="space-y-4">
+                                        <div className="bg-blue-50/60 p-4 rounded-lg border border-blue-200 grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-800 block">Lead Guest</span>
+                                                <p className="text-sm font-bold text-slate-900">{activeGuestName}</p>
+                                                <p className="text-xs text-slate-700">Phone: {booking.phone || bookingAny.mobile || '—'}</p>
+                                                <p className="text-xs text-slate-700">Email: {booking.email || '—'}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-blue-800 block">Booking Reference</span>
+                                                <p className="text-sm font-bold font-mono text-blue-900">{activeSubBookingNo}</p>
+                                                <p className="text-xs text-slate-700">Booking Status: <span className="font-bold text-emerald-700">{activeStatus}</span></p>
+                                                <p className="text-xs text-slate-700">Booked On: {bookingAny.bookedOn || operatingSystemDate}</p>
+                                            </div>
+                                        </div>
+
+                                        <table className="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
+                                            <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                                <tr>
+                                                    <th className="p-2.5 text-left">Room #</th>
+                                                    <th className="p-2.5 text-left">Category & Rate Plan</th>
+                                                    <th className="p-2.5 text-center">Stay Period</th>
+                                                    <th className="p-2.5 text-right">Tariff / Night</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr className="border-b border-slate-100">
+                                                    <td className="p-2.5 font-mono font-bold text-blue-800">{activeRoomNum}</td>
+                                                    <td className="p-2.5">
+                                                        <div className="font-bold">{activeRoomType}</div>
+                                                        <div className="text-[10px] text-slate-500">{activeRatePlan}</div>
+                                                    </td>
+                                                    <td className="p-2.5 text-center font-mono text-[11px]">
+                                                        {booking.arrivalDate || bookingAny.checkIn} → {booking.departureDate || bookingAny.checkOut} ({booking.nights || 1}N)
+                                                    </td>
+                                                    <td className="p-2.5 text-right font-mono font-bold">
+                                                        ৳ {Number(booking.avgDailyRate || getStandardDailyRateForRoom(activeRoomNum, activeRoomType)).toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+
+                                        <div className="flex justify-end">
+                                            <div className="w-64 space-y-1.5 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-600">Total Billed:</span>
+                                                    <span className="font-mono font-bold">৳ {Number(booking.totalAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-emerald-700 font-semibold">
+                                                    <span>Advance Deposited:</span>
+                                                    <span className="font-mono">৳ {Number(booking.paidAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-rose-700 font-bold border-t border-slate-200 pt-1">
+                                                    <span>Payable at Check-In:</span>
+                                                    <span className="font-mono">৳ {Number(booking.dueAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* FOLIO STATEMENT / TAX INVOICE CONTENT */}
+                                {(activePrintDoc === 'folio' || activePrintDoc === 'cancellation') && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-500 block">Guest Details</span>
+                                                <p className="text-sm font-bold text-slate-900">{activeGuestName}</p>
+                                                <p className="text-xs text-slate-700">Room: <span className="font-mono font-bold text-blue-800">{activeRoomNum}</span> ({activeRoomType})</p>
+                                                <p className="text-xs text-slate-700">Stay: {booking.arrivalDate || bookingAny.checkIn} to {booking.departureDate || bookingAny.checkOut}</p>
+                                            </div>
+                                            <div className="text-right space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-500 block">Folio & Account</span>
+                                                <p className="text-sm font-bold font-mono text-slate-900">{booking.folioNumber || `FOL-${activeSubBookingNo}-1`}</p>
+                                                <p className="text-xs text-slate-700">Billing Status: <span className="font-bold text-blue-700">{activeStatus}</span></p>
+                                                <p className="text-xs text-slate-700">Currency: BDT (৳)</p>
+                                            </div>
+                                        </div>
+
+                                        <table className="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
+                                            <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                                <tr>
+                                                    <th className="p-2.5 text-left">Description</th>
+                                                    <th className="p-2.5 text-center">Ref Date</th>
+                                                    <th className="p-2.5 text-right">Debit (Charge)</th>
+                                                    <th className="p-2.5 text-right">Credit (Payment)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                <tr>
+                                                    <td className="p-2.5">
+                                                        <div className="font-semibold">Room Accommodation Tariff ({booking.nights || 1} Nights)</div>
+                                                        <div className="text-[10px] text-slate-500">Room {activeRoomNum} — {activeRatePlan}</div>
+                                                    </td>
+                                                    <td className="p-2.5 text-center font-mono text-[11px]">{booking.arrivalDate || bookingAny.checkIn}</td>
+                                                    <td className="p-2.5 text-right font-mono font-bold">৳ {Number(booking.totalAmount || 0).toLocaleString()}</td>
+                                                    <td className="p-2.5 text-right font-mono text-slate-400">—</td>
+                                                </tr>
+                                                {Number(booking.paidAmount || 0) > 0 && (
+                                                    <tr>
+                                                        <td className="p-2.5">
+                                                            <div className="font-semibold text-emerald-800">Payment Received ({bookingAny.paymentMethod || 'Cash'})</div>
+                                                            <div className="text-[10px] text-emerald-600">Settled at Front Desk</div>
+                                                        </td>
+                                                        <td className="p-2.5 text-center font-mono text-[11px]">{operatingSystemDate}</td>
+                                                        <td className="p-2.5 text-right font-mono text-slate-400">—</td>
+                                                        <td className="p-2.5 text-right font-mono font-bold text-emerald-700">৳ {Number(booking.paidAmount || 0).toLocaleString()}</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+
+                                        <div className="flex justify-end">
+                                            <div className="w-64 space-y-1.5 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-600">Total Charges:</span>
+                                                    <span className="font-mono font-bold">৳ {Number(booking.totalAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-emerald-700 font-semibold">
+                                                    <span>Total Credits (Paid):</span>
+                                                    <span className="font-mono font-bold">৳ {Number(booking.paidAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-slate-900 font-black border-t border-slate-300 pt-1.5 text-sm">
+                                                    <span>Balance Outstanding:</span>
+                                                    <span className="font-mono text-rose-700">৳ {Number(booking.dueAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-10 flex justify-between items-end border-t border-slate-300">
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-semibold">
+                                                Authorized Cashier Signature
+                                            </div>
+                                            <div className="text-center w-48 border-t border-slate-500 pt-1.5 text-[10px] text-slate-600 font-bold">
+                                                Guest Signature
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     </div>,
     document.body
