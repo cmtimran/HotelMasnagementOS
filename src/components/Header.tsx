@@ -283,7 +283,12 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
 
     return (
         <>
-            <header className="h-14 sm:h-14 bg-white border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 flex-shrink-0 z-30 sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.02)] select-none">
+            {/* Header creates its own stacking context: lift it above page-level sticky layers
+                (e.g. StayView date header z-30/z-40) whenever one of its popovers is open,
+                otherwise the dropdowns render underneath the page content. */}
+            <header className={`h-14 sm:h-14 bg-white border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 flex-shrink-0 sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.02)] select-none ${
+                isPropertyPopoverOpen || isDatePopoverOpen || isAlertsPopoverOpen || isDropdownOpen ? 'z-[70]' : 'z-30'
+            }`}>
                 {/* Left Side - Clean Page Title */}
                 <div className="flex items-center min-w-0">
                     <h1 className="text-slate-900 text-sm sm:text-base font-bold tracking-tight truncate max-w-[260px] sm:max-w-md">
