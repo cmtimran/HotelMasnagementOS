@@ -4,7 +4,7 @@ import {
     Briefcase, MapPin, Shield, Settings, Zap, CheckCircle2,
     LogIn, ShieldCheck, ShieldAlert, DollarSign, Calendar,
     AlertCircle, FileText, Image, Trash2, Plus,
-    Globe, Receipt, Mail, Lock, Eye, RotateCcw, Send, Database,
+    Globe, Receipt, Mail, Lock, Eye, Send, Database,
     Layers, Sparkles, BedDouble, FolderKanban, Percent, Printer, Utensils, Building
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';

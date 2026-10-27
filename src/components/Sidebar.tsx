@@ -7,7 +7,6 @@ import {
     Grid3X3,
     ChefHat,
     Building2,
-    BedDouble,
     FileText,
     Briefcase,
     Utensils,

@@ -63,6 +63,7 @@ export interface AmendBookingData {
     taxDetails?: any;
     phone?: string;
     email?: string;
+    companyName?: string;
     vip?: string;
     source?: string;
     adults?: number;
