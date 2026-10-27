@@ -18,10 +18,12 @@ import {
     ChevronUp,
     ChevronDown,
     ArrowUpDown,
-    ExternalLink
+    ExternalLink,
+    Edit3
 } from 'lucide-react';
 import AddReservationModal from '../modals/AddReservationModal';
 import ReservationActionDrawer, { type DrawerMode } from '../modals/ReservationActionDrawer';
+import { EditReservationModal } from '../modals/EditReservationModal';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import { useNavigation } from '../../context/NavigationContext';
 import {
@@ -32,7 +34,8 @@ import {
     getAllStoredReservations,
     getCanonicalRooms,
     getOperatingSystemDate,
-    subscribeToPMSEvents
+    subscribeToPMSEvents,
+    type StoredReservation
 } from '../../utils/roomInventoryEngine';
 
 export interface ReservationItem {
@@ -102,6 +105,42 @@ export const ReservationsView: React.FC = () => {
     const [isActionDrawerOpen, setIsActionDrawerOpen] = useState(false);
     const [actionDrawerBooking, setActionDrawerBooking] = useState<AmendBookingData | null>(null);
     const [actionDrawerMode, setActionDrawerMode] = useState<DrawerMode>('overview');
+
+    // Edit Reservation Full Modal State
+    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
+
+    const handleOpenEditReservation = (r: ReservationItem | AmendBookingData | any) => {
+        const all = getAllStoredReservations();
+        const found = all.find(x =>
+            (r.reservationNumber && x.reservationNumber === r.reservationNumber) ||
+            (r.id && String(x.id) === String(r.id))
+        );
+        if (found) {
+            setEditingReservation(found);
+        } else {
+            // Synthesize reservation from row
+            setEditingReservation({
+                id: r.id || Date.now(),
+                reservationNumber: r.reservationNumber || `RES-${Date.now().toString().slice(-6)}`,
+                guestName: r.guestName || '',
+                phone: r.phone || '',
+                email: r.email || '',
+                roomNumber: r.roomNumber || '',
+                roomType: r.roomType || 'Standard Room',
+                checkIn: r.checkIn || r.arrivalDate || new Date().toISOString().slice(0, 10),
+                checkOut: r.checkOut || r.departureDate || new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+                nights: Number(r.nights) || 1,
+                adults: Number(r.adults) || 1,
+                children: Number(r.children) || 0,
+                status: (r.status || 'CONFIRMED').toUpperCase(),
+                totalAmount: Number(r.totalAmount) || 0,
+                paidAmount: Number(r.paidAmount) || 0,
+                dueAmount: Number(r.dueAmount) || 0,
+                source: r.source || 'Direct',
+                allocatedRooms: [r.roomNumber]
+            } as any);
+        }
+    };
 
     const allRooms = useMemo(() => {
         return getCanonicalRooms().map(r => ({
@@ -1134,6 +1173,15 @@ export const ReservationsView: React.FC = () => {
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     <button
                                                         type="button"
+                                                        onClick={() => handleOpenEditReservation(r)}
+                                                        className="h-6 px-2 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                        title="Edit Complete Reservation"
+                                                    >
+                                                        <Edit3 size={10} />
+                                                        <span>Edit</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
                                                         onClick={() => openDrawerForReservation(r)}
                                                         className="h-6 px-2 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                                         title="Open Action Drawer & Guest Folio"
@@ -1296,6 +1344,15 @@ export const ReservationsView: React.FC = () => {
                                         <div className="flex items-center gap-1.5">
                                             <button
                                                 type="button"
+                                                onClick={() => handleOpenEditReservation(r)}
+                                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                title="Edit Complete Reservation"
+                                            >
+                                                <Edit3 size={10} />
+                                                <span>Edit</span>
+                                            </button>
+                                            <button
+                                                type="button"
                                                 onClick={() => openDrawerForReservation(r)}
                                                 className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                                 title="Open Action Drawer & Guest Folio"
@@ -1442,6 +1499,10 @@ export const ReservationsView: React.FC = () => {
                 initialMode={actionDrawerMode}
                 allRooms={allRooms}
                 systemDate={getOperatingSystemDate()}
+                onEdit={(b) => {
+                    setIsActionDrawerOpen(false);
+                    handleOpenEditReservation(b);
+                }}
                 onCheckIn={async (resNo) => {
                     const target = reservations.find(r => r.reservationNumber === resNo);
                     if (target) {
@@ -1454,6 +1515,17 @@ export const ReservationsView: React.FC = () => {
                     if (target) {
                         handleStatusChange(target.id, 'checked-out');
                     }
+                    await loadReservationsFromDB();
+                }}
+            />
+
+            {/* Complete 360-Degree Reservation Edit Modal */}
+            <EditReservationModal
+                isOpen={Boolean(editingReservation)}
+                onClose={() => setEditingReservation(null)}
+                reservation={editingReservation}
+                onSaved={async () => {
+                    setEditingReservation(null);
                     await loadReservationsFromDB();
                 }}
             />

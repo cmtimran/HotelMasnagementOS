@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, Users, MapPin, Phone, Mail, Download, CheckCircle, ArrowUpDown } from 'lucide-react';
+import { Calendar, Users, MapPin, Phone, Mail, Download, CheckCircle, ArrowUpDown, Edit3 } from 'lucide-react';
 import GuestProfile360 from './GuestProfile360';
+import { EditReservationModal } from './modals/EditReservationModal';
 import {
     getAllStoredReservations,
     syncReservationsFromDB,
@@ -38,6 +39,39 @@ const ReservationList = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedReservations, setSelectedReservations] = useState<(number | string)[]>([]);
     const [showGuestProfile, setShowGuestProfile] = useState(false);
+    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
+
+    const handleOpenEdit = (res: Reservation) => {
+        const all = getAllStoredReservations();
+        const found = all.find(x =>
+            (res.reservationNumber && x.reservationNumber === res.reservationNumber) ||
+            (res.id && String(x.id) === String(res.id))
+        );
+        if (found) {
+            setEditingReservation(found);
+        } else {
+            setEditingReservation({
+                id: res.id,
+                reservationNumber: res.reservationNumber,
+                guestName: res.guestName,
+                phone: res.phone,
+                email: res.email,
+                roomNumber: res.roomNumber,
+                roomType: res.roomType,
+                checkIn: res.checkIn,
+                checkOut: res.checkOut,
+                nights: res.nights,
+                adults: res.adults,
+                children: res.children,
+                status: (res.status || 'CONFIRMED').toUpperCase(),
+                totalAmount: res.totalAmount,
+                paidAmount: 0,
+                dueAmount: res.totalAmount,
+                source: res.source,
+                allocatedRooms: [res.roomNumber]
+            } as any);
+        }
+    };
 
     const mapStoredToUi = useCallback((stored: StoredReservation[]): Reservation[] => {
         const operatingDate = getOperatingSystemDate();
@@ -411,16 +445,28 @@ const ReservationList = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleActionClick(res)}
-                                            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg text-xs font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-md opacity-90 group-hover:opacity-100 cursor-pointer"
-                                        >
-                                            {(res.status === 'arriving' || res.status === 'confirmed')
-                                                ? 'Check-in'
-                                                : (res.status === 'departing' || res.status === 'in-house' || res.status === 'arrived')
-                                                    ? 'Check-out'
-                                                    : 'View'}
-                                        </button>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenEdit(res)}
+                                                className="px-3 py-1.5 bg-white border border-gray-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                                title="Edit Reservation Details"
+                                            >
+                                                <Edit3 size={13} />
+                                                <span>Edit</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleActionClick(res)}
+                                                className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg text-xs font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-md opacity-90 group-hover:opacity-100 cursor-pointer"
+                                            >
+                                                {(res.status === 'arriving' || res.status === 'confirmed')
+                                                    ? 'Check-in'
+                                                    : (res.status === 'departing' || res.status === 'in-house' || res.status === 'arrived')
+                                                        ? 'Check-out'
+                                                        : 'View'}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -442,6 +488,19 @@ const ReservationList = () => {
 
             {/* Guest Profile Modal */}
             {showGuestProfile && <GuestProfile360 onClose={() => setShowGuestProfile(false)} />}
+
+            {/* Complete 360-Degree Reservation Edit Modal */}
+            <EditReservationModal
+                isOpen={Boolean(editingReservation)}
+                onClose={() => setEditingReservation(null)}
+                reservation={editingReservation}
+                onSaved={async () => {
+                    setEditingReservation(null);
+                    await syncReservationsFromDB();
+                    const all = getAllStoredReservations();
+                    setReservations(mapStoredToUi(all));
+                }}
+            />
         </div>
     );
 };

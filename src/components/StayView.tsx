@@ -20,6 +20,7 @@ import {
 import { useProperty } from '../context/PropertyContext';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
+import { EditReservationModal } from './modals/EditReservationModal';
 import type { AmendBookingData } from './modals/AmendStayModal';
 import ReservationActionDrawer, { type DrawerMode } from './modals/ReservationActionDrawer';
 import { toast } from '../context/ToastContext';
@@ -238,6 +239,7 @@ export const StayView: React.FC = () => {
     const [isAddReservationOpen, setIsAddReservationOpen] = useState(false);
     const [isQuickReservationOpen, setIsQuickReservationOpen] = useState(false);
     const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
+    const [fullEditReservation, setFullEditReservation] = useState<StoredReservation | null>(null);
     const [selectedRange, setSelectedRange] = useState<{
         room: string;
         startIndex: number;
@@ -3225,8 +3227,45 @@ export const StayView: React.FC = () => {
                 onCheckIn={handleDrawerCheckIn}
                 onCheckOut={handleDrawerCheckOut}
                 systemDate={operatingDateStr}
-                onEdit={() => {
-                    setActionDrawerMode('amend');
+                onEdit={(b) => {
+                    setIsActionDrawerOpen(false);
+                    const all = getAllStoredReservations();
+                    const found = all.find(x =>
+                        (b?.reservationNumber && x.reservationNumber === b.reservationNumber) ||
+                        (b?.id && String(x.id) === String(b.id))
+                    );
+                    if (found) {
+                        setFullEditReservation(found);
+                    } else if (b) {
+                        setFullEditReservation({
+                            id: b.id,
+                            reservationNumber: b.reservationNumber,
+                            guestName: b.guestName,
+                            roomNumber: b.roomNumber,
+                            roomType: b.roomType,
+                            checkIn: b.arrivalDate,
+                            checkOut: b.departureDate,
+                            nights: b.nights,
+                            adults: b.adults,
+                            children: b.children,
+                            status: b.status,
+                            totalAmount: b.totalAmount,
+                            paidAmount: b.paidAmount,
+                            dueAmount: b.dueAmount,
+                            allocatedRooms: [b.roomNumber]
+                        } as any);
+                    }
+                }}
+            />
+
+            {/* Complete 360-Degree Reservation Edit Modal */}
+            <EditReservationModal
+                isOpen={Boolean(fullEditReservation)}
+                onClose={() => setFullEditReservation(null)}
+                reservation={fullEditReservation}
+                onSaved={() => {
+                    setFullEditReservation(null);
+                    syncStoredReservations();
                 }}
             />
 

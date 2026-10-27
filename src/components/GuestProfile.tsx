@@ -8,6 +8,7 @@ import {
     Home, Edit3, Receipt
 } from 'lucide-react';
 import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
+import { EditReservationModal } from './modals/EditReservationModal';
 
 export interface GuestRecord {
     id: number;
@@ -323,6 +324,7 @@ export const GuestProfile: React.FC = () => {
     };
 
     const [newGuestForm, setNewGuestForm] = useState(initialGuestForm);
+    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
 
     const handleOpenCreateModal = () => {
         setModalMode('create');
@@ -423,7 +425,8 @@ export const GuestProfile: React.FC = () => {
                 dateTime: `${r.checkIn}`,
                 amountBDT: amount,
                 status: status.replace('_', ' '),
-                statusBadgeColor: badgeColor
+                statusBadgeColor: badgeColor,
+                rawReservation: r
             };
         });
 
@@ -448,7 +451,8 @@ export const GuestProfile: React.FC = () => {
                     dateTime: `${r.checkIn}`,
                     amountBDT: Number(r.totalAmount) || Number(r.totalRate) || 0,
                     status: isInHouse ? 'In-House' : 'Checked-Out',
-                    statusBadgeColor: isInHouse ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                    statusBadgeColor: isInHouse ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200',
+                    rawReservation: r
                 });
             }
         });
@@ -1063,6 +1067,20 @@ export const GuestProfile: React.FC = () => {
                                                                     <span className="font-mono text-gray-800 text-[10.5px] font-medium truncate">
                                                                         {item.refNumber}
                                                                     </span>
+                                                                    {item.rawReservation && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setEditingReservation(item.rawReservation);
+                                                                            }}
+                                                                            className="px-1.5 py-0.5 text-[9px] bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded font-semibold inline-flex items-center gap-0.5 cursor-pointer shadow-2xs transition-colors"
+                                                                            title="Edit Reservation Details"
+                                                                        >
+                                                                            <Edit3 size={9} />
+                                                                            <span>Edit</span>
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             </td>
 
@@ -1927,6 +1945,16 @@ export const GuestProfile: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* Complete 360-Degree Reservation Edit Modal */}
+            <EditReservationModal
+                isOpen={Boolean(editingReservation)}
+                onClose={() => setEditingReservation(null)}
+                reservation={editingReservation}
+                onSaved={() => {
+                    setEditingReservation(null);
+                    setGuests(prev => [...prev]);
+                }}
+            />
         </div>
     );
 };
