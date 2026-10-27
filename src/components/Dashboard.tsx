@@ -4,7 +4,7 @@ import {
     TrendingUp, Wrench,
     ChevronRight, User,
     Ban, CreditCard, Banknote,
-    ArrowUpRight
+    ArrowUpRight, CheckCircle2, Clock, Sparkles, X, AlertTriangle, FileText, ArrowRight
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { useNavigation } from '../context/NavigationContext';
@@ -14,8 +14,10 @@ import {
     syncRoomTypesAndRoomsFromDB,
     syncReservationsFromDB,
     subscribeToPMSEvents,
-    getOperatingSystemDate
+    getOperatingSystemDate,
+    updateRoomHousekeepingInDB
 } from '../utils/roomInventoryEngine';
+import { toast } from '../context/ToastContext';
 
 const Dashboard: React.FC = () => {
     const { setActivePage } = useNavigation();
@@ -23,6 +25,22 @@ const Dashboard: React.FC = () => {
     // Live Database State
     const [rooms, setRooms] = useState(() => getCanonicalRooms());
     const [reservations, setReservations] = useState(() => getAllStoredReservations());
+    const [statusFilter, setStatusFilter] = useState<'all' | 'clean' | 'occupied' | 'reserved' | 'dirty' | 'maintenance'>('all');
+    const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
+
+    const handleUpdateHousekeeping = async (roomNo: string, newStatus: 'Clean' | 'Dirty' | 'Inspected') => {
+        await updateRoomHousekeepingInDB(roomNo, newStatus);
+        toast.success(`Room ${roomNo} status updated to ${newStatus}`);
+        const freshRooms = getCanonicalRooms();
+        setRooms(freshRooms);
+        if (selectedRoom && String(selectedRoom.number) === String(roomNo)) {
+            setSelectedRoom((prev: any) => prev ? {
+                ...prev,
+                housekeepingStatus: newStatus,
+                status: prev.activeRes ? prev.status : (newStatus === 'Dirty' ? 'dirty' : 'clean')
+            } : null);
+        }
+    };
 
     useEffect(() => {
         // Initial sync from central relational database
@@ -62,8 +80,76 @@ const Dashboard: React.FC = () => {
         const departsToday = activeReservations.filter(r => r.checkOut === todayStr && (r.status === 'in-house' || r.status === 'arrived'));
         const inHouseGuests = activeReservations.filter(r => r.status === 'in-house' || r.status === 'arrived');
 
-        const occupiedRoomNumbers = new Set(inHouseGuests.flatMap(r => r.allocatedRooms && r.allocatedRooms.length > 0 ? r.allocatedRooms : [r.roomNumber]));
-        const occupiedCount = occupiedRoomNumbers.size;
+        // Build active reservation map for today
+        const activeResMap = new Map<string, any>();
+        activeReservations.forEach(res => {
+            const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+            if (rawStatus === 'cancelled' || rawStatus === 'voided' || rawStatus === 'checked-out' || rawStatus === 'completed') {
+                return;
+            }
+            const checkIn = String(res.checkIn || res.arrivalDate || '');
+            const checkOut = String(res.checkOut || res.departureDate || '');
+            const isCoveringToday = (checkIn <= todayStr && checkOut > todayStr) || (checkIn === todayStr);
+            if (!isCoveringToday) return;
+
+            const roomNumbers = [
+                ...(Array.isArray(res.allocatedRooms) ? res.allocatedRooms : []),
+                ...(Array.isArray(res.roomsList) ? res.roomsList.map((rm: any) => rm.roomNumber) : []),
+                ...(Array.isArray(res.groupRoomsList) ? res.groupRoomsList.map((rm: any) => rm.roomNumber) : []),
+                res.roomNumber,
+                res.roomNo
+            ].filter(Boolean).map(String);
+
+            roomNumbers.forEach(rm => {
+                if (!activeResMap.has(rm)) {
+                    activeResMap.set(rm, res);
+                }
+            });
+        });
+
+        // Dynamic Room Status Matrix
+        const roomStatusList = rooms.map(room => {
+            const res = activeResMap.get(String(room.number));
+            let status: 'clean' | 'dirty' | 'occupied' | 'reserved' | 'maintenance' = 'clean';
+            if (room.status === 'Out of Order' || room.status === 'Maintenance') {
+                status = 'maintenance';
+            } else if (res) {
+                const rawStatus = String(res.status || '').toLowerCase().replace(/_/g, '-');
+                const isInHouse = rawStatus === 'in-house' || rawStatus === 'arrived' || rawStatus === 'checked-in';
+                status = isInHouse ? 'occupied' : 'reserved';
+            } else if (room.housekeepingStatus === 'Dirty') {
+                status = 'dirty';
+            } else {
+                status = 'clean';
+            }
+            return {
+                number: room.number,
+                name: room.name,
+                roomType: room.roomTypeName || 'Deluxe Double',
+                floorId: room.floorId || (room.number.length >= 3 ? room.number[0] : '1'),
+                housekeepingStatus: room.housekeepingStatus || 'Clean',
+                status,
+                activeRes: res ? {
+                    id: res.id,
+                    reservationNumber: res.reservationNumber,
+                    guestName: res.guestName,
+                    phone: res.phone || res.mobile || '—',
+                    checkIn: res.checkIn || res.arrivalDate,
+                    checkOut: res.checkOut || res.departureDate,
+                    status: res.status,
+                    vip: res.vip,
+                    totalAmount: res.totalAmount || 0,
+                    paidAmount: res.paidAmount || 0,
+                    dueAmount: res.dueAmount || 0
+                } : null
+            };
+        });
+
+        const occupiedCount = roomStatusList.filter(r => r.status === 'occupied').length;
+        const reservedCount = roomStatusList.filter(r => r.status === 'reserved').length;
+        const cleanCount = roomStatusList.filter(r => r.status === 'clean').length;
+        const dirtyCount = roomStatusList.filter(r => r.status === 'dirty').length;
+        const oooCount = roomStatusList.filter(r => r.status === 'maintenance').length;
         const occupancyRate = totalRooms > 0 ? Math.round((occupiedCount / totalRooms) * 100) : 0;
 
         const totalRevenue = activeReservations.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0);
@@ -78,33 +164,10 @@ const Dashboard: React.FC = () => {
 
         const cancellationsToday = reservations.filter(r => r.status === 'cancelled').length;
 
-        // Dynamic Room Status Matrix
-        const roomStatusList = rooms.map(room => {
-            let status: 'clean' | 'dirty' | 'occupied' | 'maintenance' = 'clean';
-            if (room.status === 'Out of Order' || room.status === 'Maintenance') {
-                status = 'maintenance';
-            } else if (occupiedRoomNumbers.has(room.number)) {
-                status = 'occupied';
-            } else if (room.housekeepingStatus === 'Dirty') {
-                status = 'dirty';
-            } else {
-                status = 'clean';
-            }
-            return {
-                number: room.number,
-                status
-            };
-        });
-
-        // Housekeeping Breakdown
-        const cleanCount = rooms.filter(r => r.housekeepingStatus === 'Clean' && !occupiedRoomNumbers.has(r.number)).length;
-        const dirtyCount = rooms.filter(r => r.housekeepingStatus === 'Dirty').length;
-        const inspectedCount = rooms.filter(r => r.housekeepingStatus === 'Inspected').length;
-        const oooCount = rooms.filter(r => r.status === 'Out of Order' || r.status === 'Maintenance').length;
-
         return {
             totalRooms,
             occupiedCount,
+            reservedCount,
             occupancyRate,
             arrivalsCount: arrivalsToday.length,
             departsCount: departsToday.length,
@@ -117,10 +180,17 @@ const Dashboard: React.FC = () => {
             avgNights,
             cancellationsToday,
             roomStatusList,
+            counts: {
+                clean: cleanCount,
+                occupied: occupiedCount,
+                reserved: reservedCount,
+                dirty: dirtyCount,
+                maintenance: oooCount
+            },
             housekeeping: {
                 clean: cleanCount,
                 dirty: dirtyCount,
-                inspected: inspectedCount,
+                inspected: rooms.filter(r => r.housekeepingStatus === 'Inspected').length,
                 ooo: oooCount
             },
             arrivalsToday
@@ -129,10 +199,11 @@ const Dashboard: React.FC = () => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'clean': return 'bg-emerald-600 text-white';
-            case 'dirty': return 'bg-amber-500 text-white';
-            case 'occupied': return 'bg-slate-700 text-white';
-            case 'maintenance': return 'bg-rose-500 text-white';
+            case 'clean': return 'bg-emerald-600 hover:bg-emerald-700 text-white';
+            case 'dirty': return 'bg-amber-500 hover:bg-amber-600 text-white';
+            case 'occupied': return 'bg-slate-800 hover:bg-slate-900 text-white';
+            case 'reserved': return 'bg-blue-600 hover:bg-blue-700 text-white';
+            case 'maintenance': return 'bg-rose-600 hover:bg-rose-700 text-white';
             default: return 'bg-slate-200 text-slate-700';
         }
     };
@@ -335,39 +406,106 @@ const Dashboard: React.FC = () => {
             {/* Row 3: Room Status Grid & Upcoming Arrivals */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Room Status Grid */}
-                <div className="lg:col-span-2 card-container p-4">
-                    <div className="flex justify-between items-center mb-3">
-                        <div>
-                            <h3 className="text-slate-900 text-xs tracking-tight">Real-Time Room Status Matrix ({metrics.totalRooms} Rooms)</h3>
-                            <p className="text-[11px] text-slate-500">Live operational state per physical room asset</p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setActivePage('room-rack')}
-                            className="text-xs text-primary hover:text-primary-hover font-semibold inline-flex items-center gap-1 cursor-pointer"
-                        >
-                            <span>Open Room Rack</span>
-                            <ArrowUpRight size={13} />
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                        {metrics.roomStatusList.map((room) => (
-                            <div key={room.number}
-                                className={`${getStatusColor(room.status)} h-8 rounded-lg flex items-center justify-center text-[11px] cursor-pointer hover:opacity-90 transition-opacity relative shadow-2xs`}
-                                title={`Room ${room.number}: ${room.status}`}
-                                onClick={() => setActivePage('room-rack')}
-                            >
-                                {room.number}
-                                {room.status === 'maintenance' && <Wrench size={9} className="absolute top-1 right-1" />}
-                                {room.status === 'dirty' && <span className="absolute top-1 right-1 size-1.5 bg-white rounded-full"></span>}
+                <div className="lg:col-span-2 card-container p-4 flex flex-col justify-between">
+                    <div>
+                        <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+                            <div>
+                                <h3 className="text-slate-900 text-xs font-bold tracking-tight">Real-Time Room Status Matrix ({metrics.totalRooms} Rooms)</h3>
+                                <p className="text-[10.5px] text-slate-500 mt-0.5">Click any room for instant guest profile, folio balance &amp; housekeeping control</p>
                             </div>
-                        ))}
+                            <button
+                                type="button"
+                                onClick={() => setActivePage('room-rack')}
+                                className="text-xs text-primary hover:text-primary-hover font-semibold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                                <span>Open Room Rack</span>
+                                <ArrowUpRight size={13} />
+                            </button>
+                        </div>
+
+                        {/* Interactive Status Filter Tabs */}
+                        <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1 text-[10.5px]">
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter('all')}
+                                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${statusFilter === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                All ({metrics.roomStatusList.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter('clean')}
+                                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1 ${statusFilter === 'clean' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'}`}
+                            >
+                                <span className="size-1.5 rounded-full bg-emerald-500"></span>
+                                Clean ({metrics.counts.clean})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter('occupied')}
+                                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1 ${statusFilter === 'occupied' ? 'bg-slate-800 text-white shadow-2xs' : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'}`}
+                            >
+                                <span className="size-1.5 rounded-full bg-slate-700"></span>
+                                Occupied ({metrics.counts.occupied})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter('reserved')}
+                                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1 ${statusFilter === 'reserved' ? 'bg-blue-600 text-white shadow-2xs' : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'}`}
+                            >
+                                <span className="size-1.5 rounded-full bg-blue-500"></span>
+                                Reserved ({metrics.counts.reserved})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter('dirty')}
+                                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1 ${statusFilter === 'dirty' ? 'bg-amber-500 text-white shadow-2xs' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'}`}
+                            >
+                                <span className="size-1.5 rounded-full bg-amber-500"></span>
+                                Dirty ({metrics.counts.dirty})
+                            </button>
+                            {metrics.counts.maintenance > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setStatusFilter('maintenance')}
+                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1 ${statusFilter === 'maintenance' ? 'bg-rose-600 text-white shadow-2xs' : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'}`}
+                                >
+                                    <span className="size-1.5 rounded-full bg-rose-500"></span>
+                                    OOO ({metrics.counts.maintenance})
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Room Grid */}
+                        <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
+                            {metrics.roomStatusList
+                                .filter(r => statusFilter === 'all' || r.status === statusFilter)
+                                .map((room) => (
+                                    <div
+                                        key={room.number}
+                                        onClick={() => setSelectedRoom(room)}
+                                        className={`${getStatusColor(room.status)} h-8.5 rounded-lg flex flex-col items-center justify-center text-xs font-mono font-bold cursor-pointer hover:scale-105 active:scale-95 transition-all relative shadow-2xs group`}
+                                        title={`Room ${room.number}: ${room.roomType} (${room.status.toUpperCase()})${room.activeRes ? ` • Guest: ${room.activeRes.guestName}` : ''}`}
+                                    >
+                                        <span>{room.number}</span>
+                                        {room.status === 'maintenance' && <Wrench size={8} className="absolute top-1 right-1 text-white" />}
+                                        {room.status === 'dirty' && <span className="absolute top-1 right-1 size-1.5 bg-amber-200 rounded-full"></span>}
+                                        {room.status === 'occupied' && <span className="absolute top-1 right-1 size-1.5 bg-blue-300 rounded-full"></span>}
+                                        {room.status === 'reserved' && <Clock size={8} className="absolute top-1 right-1 text-white" />}
+                                    </div>
+                                ))}
+                        </div>
                     </div>
-                    <div className="flex gap-4 mt-3 text-[11px] text-slate-500 justify-end font-medium">
-                        <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-600"></span> Clean</span>
-                        <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-700"></span> Occupied</span>
-                        <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500"></span> Dirty</span>
-                        <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-rose-500"></span> Maintenance</span>
+
+                    <div className="flex flex-wrap gap-3 mt-3 pt-2.5 border-t border-slate-100 text-[10.5px] text-slate-500 justify-between items-center font-medium">
+                        <span className="text-slate-400">Click any room pill above for full details &amp; quick operations</span>
+                        <div className="flex gap-3">
+                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-600"></span> Clean</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-800"></span> Occupied</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600"></span> Reserved</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500"></span> Dirty</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-rose-600"></span> Maintenance</span>
+                        </div>
                     </div>
                 </div>
 
@@ -407,6 +545,194 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Interactive Room Quick Action Modal */}
+            {selectedRoom && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 select-none"
+                    onClick={() => setSelectedRoom(null)}
+                >
+                    <div 
+                        className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold font-mono text-sm shadow-xs">
+                                    {selectedRoom.number}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xs font-bold leading-none">{selectedRoom.name || `Room ${selectedRoom.number}`}</h3>
+                                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-white/20 text-white font-mono">
+                                            Floor {selectedRoom.floorId || 1}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-300 mt-0.5">{selectedRoom.roomType}</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoom(null)}
+                                className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-4 space-y-3.5">
+                            {/* Status Strip */}
+                            <div className="flex items-center justify-between p-2.5 rounded-xl border bg-slate-50 border-slate-200/80">
+                                <div className="flex items-center gap-2">
+                                    <span className={`size-2.5 rounded-full ${
+                                        selectedRoom.status === 'occupied' ? 'bg-slate-800' :
+                                        selectedRoom.status === 'reserved' ? 'bg-blue-600' :
+                                        selectedRoom.status === 'clean' ? 'bg-emerald-600' :
+                                        selectedRoom.status === 'dirty' ? 'bg-amber-500' : 'bg-rose-600'
+                                    }`} />
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-900 capitalize block leading-none">
+                                            {selectedRoom.status === 'occupied' ? 'In-House Guest (Occupied)' :
+                                             selectedRoom.status === 'reserved' ? 'Confirmed Arrival / Reserved' :
+                                             selectedRoom.status === 'clean' ? 'Vacant Ready (Clean)' :
+                                             selectedRoom.status === 'dirty' ? 'Needs Cleaning (Dirty)' : 'Out of Order / Maintenance'}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500 mt-0.5 block">
+                                            Housekeeping: <strong className="text-slate-700">{selectedRoom.housekeepingStatus}</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* Quick Housekeeping Toggle */}
+                                <button
+                                    type="button"
+                                    onClick={() => handleUpdateHousekeeping(selectedRoom.number, selectedRoom.housekeepingStatus === 'Clean' ? 'Dirty' : 'Clean')}
+                                    className="h-7 px-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[10.5px] font-semibold shadow-2xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                    title="Toggle Clean / Dirty"
+                                >
+                                    <Sparkles size={11} className="text-amber-500" />
+                                    <span>Mark {selectedRoom.housekeepingStatus === 'Clean' ? 'Dirty' : 'Clean'}</span>
+                                </button>
+                            </div>
+
+                            {/* If Occupied or Reserved: Guest Details */}
+                            {selectedRoom.activeRes ? (
+                                <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <User size={13} className="text-blue-700 shrink-0" />
+                                            <span className="text-xs font-bold text-slate-900 truncate">
+                                                {selectedRoom.activeRes.guestName}
+                                            </span>
+                                        </div>
+                                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold shrink-0">
+                                            {selectedRoom.activeRes.reservationNumber || 'RES-LIVE'}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 text-[10.5px] text-slate-600 pt-1.5 border-t border-blue-100/70">
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Check-In</span>
+                                            <span className="font-semibold text-slate-800">{selectedRoom.activeRes.checkIn}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Check-Out</span>
+                                            <span className="font-semibold text-slate-800">{selectedRoom.activeRes.checkOut}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Contact</span>
+                                            <span className="font-medium text-slate-700">{selectedRoom.activeRes.phone || '—'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[9px] text-slate-400 block uppercase font-semibold">Folio Balance</span>
+                                            <span className={`font-bold ${Number(selectedRoom.activeRes.dueAmount) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                ৳{Number(selectedRoom.activeRes.dueAmount || 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* If Vacant */
+                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+                                    {selectedRoom.status === 'clean' ? (
+                                        <p className="flex items-center gap-1.5 text-emerald-800 font-medium">
+                                            <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                                            <span>Room is vacant and ready for immediate guest check-in.</span>
+                                        </p>
+                                    ) : selectedRoom.status === 'dirty' ? (
+                                        <p className="flex items-center gap-1.5 text-amber-800 font-medium">
+                                            <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                                            <span>Room requires housekeeping service before next arrival.</span>
+                                        </p>
+                                    ) : (
+                                        <p className="flex items-center gap-1.5 text-rose-800 font-medium">
+                                            <Wrench size={14} className="text-rose-600 shrink-0" />
+                                            <span>Room is currently scheduled for maintenance/repairs.</span>
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Actions Footer */}
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                                {selectedRoom.activeRes ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedRoom(null);
+                                                setActivePage('folio');
+                                            }}
+                                            className="btn-secondary text-xs h-8 px-3"
+                                        >
+                                            <FileText size={13} />
+                                            <span>View Folio</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedRoom(null);
+                                                setActivePage('room-rack');
+                                            }}
+                                            className="btn-primary text-xs h-8 px-3"
+                                        >
+                                            <span>Open in Room Rack</span>
+                                            <ArrowRight size={13} />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedRoom(null);
+                                                setActivePage('room-rack');
+                                            }}
+                                            className="btn-secondary text-xs h-8 px-3"
+                                        >
+                                            <span>View Room Rack</span>
+                                        </button>
+                                        {selectedRoom.status === 'clean' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedRoom(null);
+                                                    setActivePage('add-reservation');
+                                                }}
+                                                className="btn-primary text-xs h-8 px-3"
+                                            >
+                                                <BedDouble size={13} />
+                                                <span>Walk-In Booking</span>
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

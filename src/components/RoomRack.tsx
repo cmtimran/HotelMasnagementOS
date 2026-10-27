@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, BedDouble, Sparkles, User, Calendar, 
     MapPin, Plus, RefreshCw, LayoutGrid, List, CheckCircle2, 
-    Wrench, ArrowRight, X, ExternalLink, Phone
+    Wrench, ArrowRight, X, ExternalLink, Phone, Building2
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
@@ -35,7 +35,22 @@ export interface RoomRackItem {
     maintenanceReason?: string;
     reservationId?: number | string;
     reservationNumber?: string;
+    buildingId?: string;
+    buildingName?: string;
 }
+
+const getBuildingNameById = (bId: string): string => {
+    try {
+        const raw = localStorage.getItem('hotel_buildings_v2');
+        if (raw) {
+            const list = JSON.parse(raw);
+            const found = list.find((b: any) => String(b.id) === String(bId));
+            if (found && (found.title || found.name)) return found.title || found.name;
+        }
+    } catch {}
+    if (bId === '2') return 'Suites & Annex Wing';
+    return 'Main Tower';
+};
 
 const deriveRoomsFromInventory = (): RoomRackItem[] => {
     const canonical = getCanonicalRooms();
@@ -44,6 +59,8 @@ const deriveRoomsFromInventory = (): RoomRackItem[] => {
 
     return canonical.map(r => {
         const floorNum = parseInt(r.floorId, 10) || parseInt(r.number[0], 10) || 1;
+        const buildingId = String(r.buildingId || (parseInt(String(r.number)[0], 10) >= 4 ? '2' : '1'));
+        const buildingName = (r as any).buildingName || getBuildingNameById(buildingId);
         
         // Match active reservations covering today or arriving today
         const activeRes = storedRes.find(res => {
@@ -86,6 +103,8 @@ const deriveRoomsFromInventory = (): RoomRackItem[] => {
             id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || 1,
             roomNumber: r.number,
             floor: floorNum,
+            buildingId,
+            buildingName,
             roomType: (r.roomTypeName as any) || 'Deluxe Double',
             status,
             guestName: activeRes ? activeRes.guestName : undefined,
@@ -132,6 +151,7 @@ export const RoomRack: React.FC = () => {
     // View Options & Filters
     const [viewMode, setViewMode] = useState<'grid' | 'dense'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterBuilding, setFilterBuilding] = useState<string>('all');
     const [filterFloor, setFilterFloor] = useState<string>('all');
     const [filterType, setFilterType] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -156,11 +176,50 @@ export const RoomRack: React.FC = () => {
         return { total, occupied, reserved, clean, dirty, inspected, ooo, available, occupancyRate };
     }, [rooms]);
 
-    // Dynamic Floors and Room Types (derived dynamically from database & rooms)
-    const availableFloors = useMemo(() => {
-        const list = Array.from(new Set(rooms.map(r => r.floor))).sort((a, b) => a - b);
-        return list.length > 0 ? list : [1, 2, 3, 4, 5];
+    // Dynamic Buildings (derived from database, localStorage, and room mapping)
+    const availableBuildings = useMemo(() => {
+        const bMap = new Map<string, string>();
+        bMap.set('1', 'Main Tower');
+        bMap.set('2', 'Suites & Annex Wing');
+
+        try {
+            const raw = localStorage.getItem('hotel_buildings_v2');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach((b: any) => {
+                        const id = String(b.id);
+                        const name = b.title || b.name || `Building ${id}`;
+                        bMap.set(id, name);
+                    });
+                }
+            }
+        } catch {}
+
+        rooms.forEach(r => {
+            if (r.buildingId) {
+                bMap.set(r.buildingId, r.buildingName || getBuildingNameById(r.buildingId));
+            }
+        });
+
+        return Array.from(bMap.entries()).map(([id, name]) => ({ id, name }));
     }, [rooms]);
+
+    // Dynamic Floors and Room Types (derived dynamically from database & rooms, scoped to building if filtered)
+    const availableFloors = useMemo(() => {
+        const relevantRooms = filterBuilding === 'all'
+            ? rooms
+            : rooms.filter(r => r.buildingId === filterBuilding || r.buildingName === filterBuilding);
+        const list = Array.from(new Set(relevantRooms.map(r => r.floor))).sort((a, b) => a - b);
+        return list.length > 0 ? list : [1, 2, 3, 4, 5];
+    }, [rooms, filterBuilding]);
+
+    // Auto reset floor if selected floor does not exist in selected building
+    useEffect(() => {
+        if (filterFloor !== 'all' && !availableFloors.includes(parseInt(filterFloor, 10))) {
+            setFilterFloor('all');
+        }
+    }, [filterBuilding, availableFloors, filterFloor]);
 
     const availableRoomTypes = useMemo(() => {
         const fromRooms = Array.from(new Set(rooms.map(r => r.roomType).filter(Boolean)));
@@ -174,15 +233,17 @@ export const RoomRack: React.FC = () => {
             const matchesSearch = 
                 room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (room.guestName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-                room.roomType.toLowerCase().includes(searchTerm.toLowerCase());
+                room.roomType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (room.buildingName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
             
+            const matchesBuilding = filterBuilding === 'all' || room.buildingId === filterBuilding || room.buildingName === filterBuilding;
             const matchesFloor = filterFloor === 'all' || room.floor.toString() === filterFloor;
             const matchesType = filterType === 'all' || room.roomType === filterType;
             const matchesStatus = filterStatus === 'all' || room.status === filterStatus;
 
-            return matchesSearch && matchesFloor && matchesType && matchesStatus;
+            return matchesSearch && matchesBuilding && matchesFloor && matchesType && matchesStatus;
         });
-    }, [rooms, searchTerm, filterFloor, filterType, filterStatus]);
+    }, [rooms, searchTerm, filterBuilding, filterFloor, filterType, filterStatus]);
 
     // Group Rooms by Floor
     const floorsMap = useMemo(() => {
@@ -462,11 +523,11 @@ export const RoomRack: React.FC = () => {
 
             {/* Filter Toolbar */}
             <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-2.5">
-                <div className="relative w-full md:w-80">
+                <div className="relative w-full md:w-72">
                     <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search Room #, Guest, or Type..."
+                        placeholder="Search Room #, Guest, Type, Building..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="w-full h-8 pl-8 pr-3 bg-slate-50/60 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all font-medium"
@@ -474,8 +535,23 @@ export const RoomRack: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
+                    {/* Building Filter */}
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-400 uppercase">Floor:</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Building:</span>
+                        <select
+                            value={filterBuilding}
+                            onChange={e => setFilterBuilding(e.target.value)}
+                            className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:border-blue-500"
+                        >
+                            <option value="all">All Buildings</option>
+                            {availableBuildings.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Floor:</span>
                         <select
                             value={filterFloor}
                             onChange={e => setFilterFloor(e.target.value)}
@@ -489,7 +565,7 @@ export const RoomRack: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-400 uppercase">Type:</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Type:</span>
                         <select
                             value={filterType}
                             onChange={e => setFilterType(e.target.value)}
@@ -503,7 +579,7 @@ export const RoomRack: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-400 uppercase">Status:</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Status:</span>
                         <select
                             value={filterStatus}
                             onChange={e => setFilterStatus(e.target.value)}
@@ -522,6 +598,7 @@ export const RoomRack: React.FC = () => {
                         type="button"
                         onClick={() => {
                             setSearchTerm('');
+                            setFilterBuilding('all');
                             setFilterFloor('all');
                             setFilterType('all');
                             setFilterStatus('all');
@@ -536,26 +613,34 @@ export const RoomRack: React.FC = () => {
 
             {/* Display: Floor-by-Floor Matrix */}
             {floorsMap.length > 0 ? (
-                floorsMap.map(([floorNum, floorRooms]) => (
-                    <div key={floorNum} className="space-y-2">
-                        {/* Floor Header Badge */}
-                        <div className="flex items-center justify-between px-1">
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-md bg-[#1e3a8a] text-white flex items-center justify-center font-black text-[10px]">
-                                    {floorNum}
+                floorsMap.map(([floorNum, floorRooms]) => {
+                    const bName = floorRooms[0]?.buildingName;
+                    return (
+                        <div key={floorNum} className="space-y-2">
+                            {/* Floor Header Badge */}
+                            <div className="flex items-center justify-between px-1">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-md bg-[#1e3a8a] text-white flex items-center justify-center font-black text-[10px]">
+                                        {floorNum}
+                                    </div>
+                                    <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                        {floorNum === 1 ? 'Floor 1 — Lobby & Executive Wing' : 
+                                         floorNum === 5 ? 'Floor 5 — Penthouse & Presidential Suites' : 
+                                         `Floor ${floorNum} Guest Rooms`}
+                                    </h2>
+                                    {bName && (
+                                        <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                            <Building2 size={10} className="text-blue-600" />
+                                            {bName}
+                                        </span>
+                                    )}
+                                    <span className="text-[10.5px] text-slate-400 font-medium">({floorRooms.length} Rooms)</span>
                                 </div>
-                                <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                    {floorNum === 1 ? 'Floor 1 — Lobby & Executive Wing' : 
-                                     floorNum === 5 ? 'Floor 5 — Penthouse & Presidential Suites' : 
-                                     `Floor ${floorNum} Guest Rooms`}
-                                </h2>
-                                <span className="text-[10.5px] text-slate-400 font-medium">({floorRooms.length} Rooms)</span>
-                            </div>
 
-                            <span className="text-[10px] text-slate-500 font-semibold">
-                                {floorRooms.filter(r => r.status === 'clean' || r.status === 'inspected').length} Available • {floorRooms.filter(r => r.status === 'occupied').length} Occupied
-                            </span>
-                        </div>
+                                <span className="text-[10px] text-slate-500 font-semibold">
+                                    {floorRooms.filter(r => r.status === 'clean' || r.status === 'inspected').length} Available • {floorRooms.filter(r => r.status === 'occupied').length} Occupied
+                                </span>
+                            </div>
 
                         {/* Rooms Grid */}
                         {viewMode === 'grid' ? (
@@ -580,6 +665,9 @@ export const RoomRack: React.FC = () => {
                                                         <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
                                                             <MapPin size={9} />
                                                             <span>Floor {room.floor}</span>
+                                                            {room.buildingName && (
+                                                                <span className="text-[9px] text-slate-400">• {room.buildingName}</span>
+                                                            )}
                                                         </div>
                                                         <h3 className="text-base font-black text-slate-900 leading-tight font-mono tracking-tight">
                                                             {room.roomNumber}
@@ -710,12 +798,13 @@ export const RoomRack: React.FC = () => {
                             </div>
                         )}
                     </div>
-                ))
+                    );
+                })
             ) : (
                 <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
                     <BedDouble size={28} className="text-slate-300 mx-auto mb-2" />
                     <p className="text-xs text-slate-700">No rooms match filter criteria</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Try clearing the search query or selecting All Floors</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Try clearing the search query or selecting All Buildings / Floors</p>
                 </div>
             )}
 
@@ -737,7 +826,7 @@ export const RoomRack: React.FC = () => {
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                        Floor {selectedRoom.floor} • {selectedRoom.roomType} ({selectedRoom.bedType} Bed)
+                                        {selectedRoom.buildingName ? `${selectedRoom.buildingName} • ` : ''}Floor {selectedRoom.floor} • {selectedRoom.roomType} ({selectedRoom.bedType} Bed)
                                     </p>
                                 </div>
                             </div>
