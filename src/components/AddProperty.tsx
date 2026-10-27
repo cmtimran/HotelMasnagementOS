@@ -2953,11 +2953,11 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                             <label className="text-[11px] text-gray-600 ml-0.5">
                                                 {box.label}
                                             </label>
-                                            <div className="border border-dashed border-gray-200 rounded-xl p-3.5 flex flex-col items-center justify-center gap-1.5 hover:border-blue-400 hover:bg-blue-50/20 transition-all cursor-pointer group">
-                                                <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors">
-                                                    <Image size={16} />
+                                            <div className="border border-dashed border-gray-200 rounded-xl py-2 px-2 flex flex-col items-center justify-center gap-1 hover:border-blue-400 hover:bg-blue-50/20 transition-all cursor-pointer group min-h-[76px]">
+                                                <div className="size-6 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors">
+                                                    <Image size={13} />
                                                 </div>
-                                                <p className="text-[9.5px] text-gray-400 uppercase tracking-wider text-center">
+                                                <p className="text-[9px] text-gray-400 uppercase tracking-wider text-center leading-tight">
                                                     {box.desc}
                                                 </p>
                                             </div>
@@ -3345,19 +3345,8 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                     )}
 
                     {/* Clean Footer Bar */}
-                    <div className="mt-auto px-5 py-3 bg-gray-50/70 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSettings(getDefaultUnifiedSettings(targetProperty));
-                                showToast('Restored default property settings.', { type: 'info' });
-                            }}
-                            className="text-xs font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-1 cursor-pointer"
-                        >
-                            <RotateCcw size={12} />
-                            <span>Reset to Defaults</span>
-                        </button>
-                        <div className="flex items-center gap-2">
+                    {!isSelfManagedTab && (
+                        <div className="mt-auto px-5 py-3 bg-gray-50/70 border-t border-gray-100 flex items-center justify-end gap-2">
                             <button
                                 type="button"
                                 onClick={() => handleSave('draft')}
@@ -3376,7 +3365,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                 <span>{isSaving ? 'Saving...' : 'Save & Publish'}</span>
                             </button>
                         </div>
-                    </div>
+                    )}
                 </div>
             </main>
         </div>
