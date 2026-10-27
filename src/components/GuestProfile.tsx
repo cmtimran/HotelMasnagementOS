@@ -7,7 +7,7 @@ import {
     AlertTriangle, ChevronRight, ChevronLeft,
     Home, Edit3, Utensils, Coffee, Sparkles, Shirt, Wine, Receipt, BedDouble
 } from 'lucide-react';
-import { getAllStoredReservations, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
+import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 
 export interface GuestRecord {
     id: number;
@@ -78,10 +78,47 @@ const calculateAge = (dobString: string): number => {
     return Math.max(0, age);
 };
 
+export const parseTitleAndName = (fullName: string): { title: GuestRecord['title']; cleanName: string } => {
+    if (!fullName) return { title: 'Mr.', cleanName: 'Guest' };
+    const raw = fullName.trim();
+    const titleMatch = raw.match(/^(Mr|Mrs|Ms|Miss|Dr|Prof|Engr)\.?\s+/i);
+    if (!titleMatch) {
+        return { title: 'Mr.', cleanName: raw };
+    }
+    const rawTitle = titleMatch[1].toLowerCase();
+    let title: GuestRecord['title'] = 'Mr.';
+    if (rawTitle === 'dr') title = 'Dr.';
+    else if (rawTitle === 'ms' || rawTitle === 'miss') title = 'Ms.';
+    else if (rawTitle === 'mrs') title = 'Mrs.';
+    else if (rawTitle === 'prof') title = 'Prof.';
+    else if (rawTitle === 'engr') title = 'Engr.';
+
+    const afterFirstTitle = raw.substring(titleMatch[0].length).trim();
+    // Clean any accidental duplicate title prefixes (e.g. "Mr. Mr Imran" or "Mr Imran")
+    const cleanName = afterFirstTitle.replace(/^(Mr|Mrs|Ms|Miss|Dr|Prof|Engr)\.?\s+/i, '').trim();
+    return { title, cleanName: cleanName || raw };
+};
+
+const getSavedGuestProfiles = (): GuestRecord[] => {
+    try {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('hotel_guest_profiles_v2');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) return parsed;
+            }
+        }
+    } catch {}
+    return [];
+};
+
 const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestRecord[] => {
+    const savedProfiles = getSavedGuestProfiles();
     const map = new Map<string, GuestRecord>();
+
     reservations.forEach((r, idx) => {
-        const key = (r.guestName || `Guest ${idx + 1}`).trim().toLowerCase();
+        const { title: detectedTitle, cleanName } = parseTitleAndName(r.guestName || `Guest ${idx + 1}`);
+        const key = cleanName.toLowerCase();
         const nights = Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
         const spend = Number(r.totalAmount) || Number(r.totalRate) || 0;
         const stayItem: GuestRecord['stayHistory'][0] = {
@@ -104,56 +141,100 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
             if (r.checkIn > existing.lastStayDate) existing.lastStayDate = r.checkIn;
             existing.stayHistory.push(stayItem);
             if (existing.lifetimeSpendBDT > 100000) existing.vipTier = 'Platinum VIP';
-            else if (existing.lifetimeSpendBDT > 50000) existing.vipTier = 'Gold';
+            else if (existing.lifetimeSpendBDT > 50000 && existing.vipTier !== 'Platinum VIP') existing.vipTier = 'Gold';
         } else {
+            // Check if user already customized/edited this profile in hotel_guest_profiles_v2
+            const savedMatch = savedProfiles.find(p => {
+                const pClean = parseTitleAndName(p.name).cleanName.toLowerCase();
+                const phoneMatch = Boolean(p.phone && (p.phone === r.phone || p.phone === r.guestPhone));
+                return pClean === key || phoneMatch;
+            });
+
+            if (savedMatch) {
+                const mergedStayHistory = [...(savedMatch.stayHistory || [])];
+                if (!mergedStayHistory.some(s => s.resNumber === stayItem.resNumber)) {
+                    mergedStayHistory.push(stayItem);
+                }
+                const savedParsed = parseTitleAndName(savedMatch.name);
+                map.set(key, {
+                    ...savedMatch,
+                    id: savedMatch.id || idx + 1,
+                    title: savedMatch.title || detectedTitle,
+                    name: savedParsed.cleanName || cleanName,
+                    phone: savedMatch.phone || r.phone || r.guestPhone || '+880 1711-000000',
+                    email: savedMatch.email || r.email || r.guestEmail || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                    totalStays: Math.max(savedMatch.totalStays || 1, 1),
+                    totalNights: (savedMatch.totalNights || 0) + nights,
+                    lifetimeSpendBDT: (savedMatch.lifetimeSpendBDT || 0) + spend,
+                    lastStayDate: r.checkIn > (savedMatch.lastStayDate || '') ? r.checkIn : (savedMatch.lastStayDate || r.checkIn),
+                    loyaltyPoints: Math.round(((savedMatch.lifetimeSpendBDT || 0) + spend) / 20),
+                    stayHistory: mergedStayHistory
+                });
+            } else {
+                map.set(key, {
+                    id: idx + 1,
+                    title: detectedTitle,
+                    name: cleanName,
+                    phone: r.phone || r.guestPhone || '+880 1711-000000',
+                    altPhone: '+880 1819-000000',
+                    email: r.email || r.guestEmail || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                    vipTier: spend > 50000 ? 'Gold' : r.bookingSource === 'Corporate' ? 'Corporate VIP' : 'Regular',
+                    nationality: r.nationality || 'Bangladesh',
+                    idType: r.passportNo ? 'Passport' : 'National ID (NID)',
+                    idNumber: r.passportNo || r.nidNumber || `KYC-${10000 + idx}`,
+                    idExpiry: '2030-12-31',
+                    issuingCountry: r.nationality || 'Bangladesh',
+                    dob: '1988-05-15',
+                    gender: 'Male',
+                    homeCity: 'Dhaka',
+                    homeCountry: r.nationality || 'Bangladesh',
+                    address: 'House 42, Road 11, Banani',
+                    postalCode: '1213',
+                    emergencyContact: {
+                        name: 'Family Contact',
+                        relationship: 'Spouse',
+                        phone: '+880 1712-345678'
+                    },
+                    company: r.bookingSource === 'Corporate' ? 'Corporate Partner' : undefined,
+                    designation: r.bookingSource === 'Corporate' ? 'Executive' : undefined,
+                    corporateTaxId: r.bookingSource === 'Corporate' ? 'BIN-00294819-2024' : undefined,
+                    billingRoute: r.bookingSource === 'Corporate' ? 'Bill to Company (BTC / City Ledger)' : 'Self-Pay (Guest Folio)',
+                    totalStays: 1,
+                    totalNights: nights,
+                    lifetimeSpendBDT: spend,
+                    lastStayDate: r.checkIn,
+                    loyaltyPoints: Math.round(spend / 20),
+                    preferences: {
+                        roomType: r.roomType || 'Deluxe Double',
+                        floorPreference: 'High Floor',
+                        bedType: 'King Bed',
+                        pillowType: 'Feather / Down',
+                        smoking: 'Non-Smoking',
+                        dietary: 'Standard Halal',
+                        allergies: 'None',
+                        newspaper: 'The Daily Star',
+                        specialNotes: r.notes || 'Registered via Reservation PMS.'
+                    },
+                    stayHistory: [stayItem]
+                });
+            }
+        }
+    });
+
+    // Also include any standalone saved profiles that don't have reservations yet
+    savedProfiles.forEach((sp, spIdx) => {
+        const { title, cleanName } = parseTitleAndName(sp.name);
+        const key = cleanName.toLowerCase();
+        if (!map.has(key)) {
             map.set(key, {
-                id: idx + 1,
-                title: r.guestName.startsWith('Dr.') ? 'Dr.' : r.guestName.startsWith('Ms.') ? 'Ms.' : 'Mr.',
-                name: r.guestName.replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Engr\.)\s*/i, ''),
-                phone: r.phone || r.guestPhone || '+880 1711-000000',
-                altPhone: '+880 1819-000000',
-                email: r.email || r.guestEmail || `${r.guestName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
-                vipTier: spend > 50000 ? 'Gold' : r.bookingSource === 'Corporate' ? 'Corporate VIP' : 'Regular',
-                nationality: r.nationality || 'Bangladesh',
-                idType: r.passportNo ? 'Passport' : 'National ID (NID)',
-                idNumber: r.passportNo || r.nidNumber || `KYC-${10000 + idx}`,
-                idExpiry: '2030-12-31',
-                issuingCountry: r.nationality || 'Bangladesh',
-                dob: '1988-05-15',
-                gender: 'Male',
-                homeCity: 'Dhaka',
-                homeCountry: r.nationality || 'Bangladesh',
-                address: 'House 42, Road 11, Banani',
-                postalCode: '1213',
-                emergencyContact: {
-                    name: 'Family Contact',
-                    relationship: 'Spouse',
-                    phone: '+880 1712-345678'
-                },
-                company: r.bookingSource === 'Corporate' ? 'Corporate Partner' : undefined,
-                designation: r.bookingSource === 'Corporate' ? 'Executive' : undefined,
-                corporateTaxId: r.bookingSource === 'Corporate' ? 'BIN-00294819-2024' : undefined,
-                billingRoute: r.bookingSource === 'Corporate' ? 'Bill to Company (BTC / City Ledger)' : 'Self-Pay (Guest Folio)',
-                totalStays: 1,
-                totalNights: nights,
-                lifetimeSpendBDT: spend,
-                lastStayDate: r.checkIn,
-                loyaltyPoints: Math.round(spend / 20),
-                preferences: {
-                    roomType: r.roomType || 'Deluxe Double',
-                    floorPreference: 'High Floor',
-                    bedType: 'King Bed',
-                    pillowType: 'Feather / Down',
-                    smoking: 'Non-Smoking',
-                    dietary: 'Standard Halal',
-                    allergies: 'None',
-                    newspaper: 'The Daily Star',
-                    specialNotes: r.notes || 'Registered via Reservation PMS.'
-                },
-                stayHistory: [stayItem]
+                ...sp,
+                id: sp.id || (1000 + spIdx),
+                title: sp.title || title,
+                name: cleanName
             });
         }
     });
+
     return Array.from(map.values());
 };
 
@@ -256,9 +337,10 @@ export const GuestProfile: React.FC = () => {
         setModalMode('edit');
         setEditingGuestId(guest.id);
         setModalTab(targetTab);
+        const { title: parsedTitle, cleanName } = parseTitleAndName(guest.name);
         setNewGuestForm({
-            title: guest.title,
-            name: guest.name,
+            title: guest.title || parsedTitle,
+            name: cleanName,
             gender: guest.gender || 'Male',
             dob: guest.dob || '1990-01-01',
             nationality: guest.nationality || 'Bangladesh',
@@ -314,12 +396,12 @@ export const GuestProfile: React.FC = () => {
         }
 
         const canonicalReservations = getAllStoredReservations();
-        const guestNameLower = activeGuest.name.toLowerCase().trim();
+        const guestNameLower = parseTitleAndName(activeGuest.name).cleanName.toLowerCase().trim();
 
         // 1. Reservations
         const matchedRes = canonicalReservations.filter(r => {
-            const rName = (r.guestName || '').toLowerCase().trim();
-            return rName.includes(guestNameLower) || guestNameLower.includes(rName) || (r.phone && r.phone === activeGuest.phone);
+            const rClean = parseTitleAndName(r.guestName || '').cleanName.toLowerCase().trim();
+            return (rClean && (rClean.includes(guestNameLower) || guestNameLower.includes(rClean))) || Boolean(r.phone && (r.phone === activeGuest.phone || (r as any).guestPhone === activeGuest.phone));
         });
 
         const resItems = matchedRes.length > 0
@@ -508,16 +590,21 @@ export const GuestProfile: React.FC = () => {
             return;
         }
 
+        const { title: parsedTitle, cleanName: parsedName } = parseTitleAndName(newGuestForm.name);
+        const finalTitle = newGuestForm.title || parsedTitle;
+        const finalName = parsedName;
+        const fullNameWithTitle = `${finalTitle} ${finalName}`;
+
         if (modalMode === 'edit' && editingGuestId) {
-            setGuests(prev => prev.map(g => {
+            const updatedGuests = guests.map(g => {
                 if (g.id !== editingGuestId) return g;
                 return {
                     ...g,
-                    title: newGuestForm.title,
-                    name: newGuestForm.name.trim(),
+                    title: finalTitle,
+                    name: finalName,
                     phone: newGuestForm.phone.trim(),
                     altPhone: newGuestForm.altPhone.trim() || undefined,
-                    email: newGuestForm.email.trim() || `${newGuestForm.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                    email: newGuestForm.email.trim() || `${finalName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
                     vipTier: newGuestForm.vipTier,
                     nationality: newGuestForm.nationality.trim() || 'Bangladesh',
                     idType: newGuestForm.idType,
@@ -552,19 +639,62 @@ export const GuestProfile: React.FC = () => {
                         specialNotes: newGuestForm.specialNotes.trim() || g.preferences.specialNotes
                     }
                 };
-            }));
+            });
+
+            setGuests(updatedGuests);
+            try {
+                localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(updatedGuests));
+            } catch {}
+
+            // Synchronize canonical reservations so FrontDesk, StayView, and ReservationList reflect the updated guest name!
+            try {
+                const storedRes = getAllStoredReservations();
+                const oldGuest = guests.find(g => g.id === editingGuestId);
+                const oldCleanName = oldGuest ? parseTitleAndName(oldGuest.name).cleanName.toLowerCase() : '';
+                let hasChanges = false;
+                const updatedRes = storedRes.map(r => {
+                    const rCleanName = parseTitleAndName(r.guestName || '').cleanName.toLowerCase();
+                    const matchesName = Boolean(oldCleanName && (rCleanName === oldCleanName || rCleanName.includes(oldCleanName)));
+                    const matchesPhone = Boolean(oldGuest?.phone && (r.phone === oldGuest.phone || r.guestPhone === oldGuest.phone));
+                    if (matchesName || matchesPhone) {
+                        hasChanges = true;
+                        return {
+                            ...r,
+                            guestName: fullNameWithTitle,
+                            phone: newGuestForm.phone.trim(),
+                            guestPhone: newGuestForm.phone.trim(),
+                            email: newGuestForm.email.trim() || r.email
+                        };
+                    }
+                    return r;
+                });
+
+                if (hasChanges) {
+                    saveStoredReservations(updatedRes);
+                    broadcastPMSEvent({
+                        type: 'RESERVATION_UPDATED',
+                        reservationId: editingGuestId
+                    });
+                    broadcastPMSEvent({
+                        type: 'INVENTORY_REFRESH'
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to sync updated guest name to reservations', err);
+            }
+
             setShowAddGuestModal(false);
-            showToast(`Guest profile updated successfully for ${newGuestForm.title} ${newGuestForm.name}`);
+            showToast(`Guest profile updated successfully for ${finalTitle} ${finalName}`);
             return;
         }
 
         const newRecord: GuestRecord = {
             id: Date.now(),
-            title: newGuestForm.title,
-            name: newGuestForm.name.trim(),
+            title: finalTitle,
+            name: finalName,
             phone: newGuestForm.phone.trim(),
             altPhone: newGuestForm.altPhone.trim() || undefined,
-            email: newGuestForm.email.trim() || `${newGuestForm.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+            email: newGuestForm.email.trim() || `${finalName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
             vipTier: newGuestForm.vipTier,
             nationality: newGuestForm.nationality.trim() || 'Bangladesh',
             idType: newGuestForm.idType,
@@ -616,7 +746,11 @@ export const GuestProfile: React.FC = () => {
             ]
         };
 
-        setGuests(prev => [newRecord, ...prev]);
+        const updatedList = [newRecord, ...guests];
+        setGuests(updatedList);
+        try {
+            localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(updatedList));
+        } catch {}
         setSelectedGuestId(newRecord.id);
         setShowAddGuestModal(false);
         setNewGuestForm(initialGuestForm);
@@ -724,7 +858,7 @@ export const GuestProfile: React.FC = () => {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1.5 min-w-0">
                                             <span className="text-gray-900 truncate text-[11.5px] font-medium">
-                                                {g.title} {g.name}
+                                                {g.title} {parseTitleAndName(g.name).cleanName}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-1">
@@ -772,12 +906,12 @@ export const GuestProfile: React.FC = () => {
                     <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-8 h-8 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-white ring-1 ring-blue-500/20">
-                                {activeGuest.name.slice(0, 2).toUpperCase()}
+                                {parseTitleAndName(activeGuest.name).cleanName.slice(0, 2).toUpperCase()}
                             </div>
                             <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     <h2 className="text-[13px] text-gray-900 leading-tight font-bold truncate">
-                                        {activeGuest.title} {activeGuest.name}
+                                        {activeGuest.title} {parseTitleAndName(activeGuest.name).cleanName}
                                     </h2>
                                     <span className={`px-1.5 py-0.2 rounded text-[9px] font-medium ${
                                         activeGuest.vipTier.includes('Platinum') ? 'bg-purple-50 text-purple-700 border border-purple-200' :

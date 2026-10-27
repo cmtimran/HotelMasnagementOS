@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    ChevronDown,
-    ChevronUp,
     Copy,
     Trash2,
     User as UserIcon,
@@ -24,7 +22,11 @@ import {
     Sparkles,
     Split,
     CalendarRange,
-    Users
+    Users,
+    Search,
+    ShieldCheck,
+    Heart,
+    X
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from './common/StayPeriodPicker';
@@ -53,7 +55,8 @@ import {
     getStandardDailyRateForRoom,
     getDynamicRoomTypes,
     calculateTariffForRatePlan,
-    getRoomTypeCapacity
+    getRoomTypeCapacity,
+    getAllStoredReservations
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
 import { useProperty } from '../context/PropertyContext';
@@ -239,10 +242,6 @@ export const AddReservation: React.FC = () => {
     // ==========================================
     // STEP 2 STATE
     // ==========================================
-    const [openGuestProfile, setOpenGuestProfile] = useState(true);
-    const [openAddress, setOpenAddress] = useState(false);
-    const [openWork, setOpenWork] = useState(false);
-
     // Guest Profile
     const [salutation, setSalutation] = useState('Mr');
     const [guestName, setGuestName] = useState('');
@@ -254,7 +253,6 @@ export const AddReservation: React.FC = () => {
     const [nationality, setNationality] = useState('Bangladeshi');
     const [guestType, setGuestType] = useState('Adult');
     const [dob, setDob] = useState('');
-    const [birthCountry, setBirthCountry] = useState('Bangladesh');
     const [birthCity, setBirthCity] = useState('Dhaka');
     const [occupation, setOccupation] = useState('');
     const [purposeOfVisit, setPurposeOfVisit] = useState('Business');
@@ -284,6 +282,165 @@ export const AddReservation: React.FC = () => {
     const [officePhone, setOfficePhone] = useState('');
     const [corporateEmail, setCorporateEmail] = useState('');
     const [taxVatId, setTaxVatId] = useState('');
+
+    // Enhanced Step 2 State & CRM Integration
+    const [step2Tab, setStep2Tab] = useState<'profile' | 'address' | 'corporate' | 'preferences'>('profile');
+    const [guestSearchQuery, setGuestSearchQuery] = useState('');
+    const [isGuestSearchOpen, setIsGuestSearchOpen] = useState(false);
+    const [selectedExistingGuest, setSelectedExistingGuest] = useState<any | null>(null);
+    const [emergencyName, setEmergencyName] = useState('');
+    const [emergencyPhone, setEmergencyPhone] = useState('');
+    const [emergencyRelation, setEmergencyRelation] = useState('Family / Spouse');
+    const [bedPreference, setBedPreference] = useState('King Bed');
+    const [floorPreference, setFloorPreference] = useState('High Floor');
+    const [smokingPreference, setSmokingPreference] = useState<'Non-Smoking' | 'Smoking'>('Non-Smoking');
+    const [dietaryPreference, setDietaryPreference] = useState('Halal');
+
+    // Stored & Canonical Guests for instant auto-complete
+    const allKnownGuests = useMemo(() => {
+        const guestMap = new Map<string, any>();
+        
+        try {
+            const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
+            if (rawProfiles) {
+                const profiles = JSON.parse(rawProfiles);
+                if (Array.isArray(profiles)) {
+                    profiles.forEach(p => {
+                        const key = (p.name || '').trim().toLowerCase();
+                        if (key) {
+                            guestMap.set(key, {
+                                id: p.id,
+                                title: p.title || 'Mr.',
+                                name: p.name,
+                                phone: p.phone || '',
+                                altPhone: p.altPhone || '',
+                                email: p.email || '',
+                                vipTier: p.vipTier || 'Regular',
+                                nationality: p.nationality || 'Bangladeshi',
+                                idType: p.idType || 'National ID (NID)',
+                                idNumber: p.idNumber || '',
+                                dob: p.dob || '',
+                                gender: p.gender || 'Male',
+                                homeCity: p.homeCity || '',
+                                homeCountry: p.homeCountry || 'Bangladesh',
+                                address: p.address || '',
+                                postalCode: p.postalCode || '',
+                                company: p.company || '',
+                                designation: p.designation || '',
+                                totalStays: p.totalStays || 1,
+                                lifetimeSpendBDT: p.lifetimeSpendBDT || 0,
+                                preferences: p.preferences || {},
+                                emergencyContact: p.emergencyContact
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (e) {}
+
+        const reservations = getAllStoredReservations();
+        reservations.forEach(r => {
+            const cleanName = (r.guestName || '').replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Engr\.)\s*/i, '').trim();
+            const key = cleanName.toLowerCase();
+            if (key && !guestMap.has(key)) {
+                guestMap.set(key, {
+                    id: r.id || key,
+                    title: r.guestName?.startsWith('Dr') ? 'Dr.' : r.guestName?.startsWith('Ms') ? 'Ms.' : 'Mr.',
+                    name: cleanName,
+                    phone: r.phone || r.guestPhone || '',
+                    altPhone: '',
+                    email: r.email || r.guestEmail || '',
+                    vipTier: r.bookingSource === 'Corporate' ? 'Corporate VIP' : 'Regular',
+                    nationality: r.nationality || 'Bangladeshi',
+                    idType: r.passportNo ? 'Passport' : 'National ID (NID)',
+                    idNumber: r.passportNo || r.nidNumber || '',
+                    dob: '',
+                    gender: 'Male',
+                    homeCity: 'Dhaka',
+                    homeCountry: 'Bangladesh',
+                    address: '',
+                    postalCode: '',
+                    company: r.company || (r.bookingSource === 'Corporate' ? r.source : ''),
+                    designation: '',
+                    totalStays: 1,
+                    lifetimeSpendBDT: Number(r.totalAmount) || 0,
+                    preferences: {},
+                    emergencyContact: undefined
+                });
+            }
+        });
+
+        return Array.from(guestMap.values());
+    }, []);
+
+    const filteredKnownGuests = useMemo(() => {
+        if (!guestSearchQuery.trim()) return [];
+        const q = guestSearchQuery.toLowerCase().trim();
+        return allKnownGuests.filter(g =>
+            g.name.toLowerCase().includes(q) ||
+            g.phone.includes(q) ||
+            (g.altPhone && g.altPhone.includes(q)) ||
+            (g.email && g.email.toLowerCase().includes(q)) ||
+            (g.idNumber && g.idNumber.toLowerCase().includes(q)) ||
+            (g.company && g.company.toLowerCase().includes(q))
+        ).slice(0, 6);
+    }, [allKnownGuests, guestSearchQuery]);
+
+    const handleSelectExistingGuest = (g: any) => {
+        setSelectedExistingGuest(g);
+        setSalutation(g.title ? g.title.replace('.', '') : 'Mr');
+        setGuestName(g.name);
+        setMobile(g.phone || g.altPhone || '');
+        setPhone(g.altPhone || '');
+        setEmail(g.email || '');
+        setVipStatus(
+            g.vipTier?.includes('Platinum') ? 'VVIP' :
+            g.vipTier?.includes('Gold') ? 'VIP-2' :
+            g.vipTier?.includes('Silver') ? 'VIP-1' :
+            g.vipTier?.includes('Corporate') ? 'VIP-1' : ''
+        );
+        if (g.gender) setGender(g.gender);
+        if (g.nationality) setNationality(g.nationality);
+        if (g.idType) setIdType(g.idType);
+        if (g.idNumber) setIdNumber(g.idNumber);
+        if (g.dob) setDob(g.dob);
+        if (g.address) setStreetAddress(g.address);
+        if (g.homeCity) setHomeCity(g.homeCity);
+        if (g.homeCountry) setHomeCountry(g.homeCountry);
+        if (g.postalCode) setPostalCode(g.postalCode);
+        if (g.company) setCompanyName(g.company);
+        if (g.designation) setDesignation(g.designation);
+        if (g.emergencyContact) {
+            setEmergencyName(g.emergencyContact.name || '');
+            setEmergencyPhone(g.emergencyContact.phone || '');
+            if (g.emergencyContact.relationship) setEmergencyRelation(g.emergencyContact.relationship);
+        }
+        if (g.preferences?.floorPreference) setFloorPreference(g.preferences.floorPreference);
+        if (g.preferences?.bedType) setBedPreference(g.preferences.bedType);
+        if (g.preferences?.smoking) setSmokingPreference(g.preferences.smoking);
+        if (g.preferences?.dietary) setDietaryPreference(g.preferences.dietary);
+
+        setGuestSearchQuery('');
+        setIsGuestSearchOpen(false);
+        toast.success(`Loaded verified profile for ${g.title || ''} ${g.name}`);
+    };
+
+    const handleClearSelectedGuest = () => {
+        setSelectedExistingGuest(null);
+        setGuestName('');
+        setMobile('');
+        setPhone('');
+        setEmail('');
+        setVipStatus('');
+        setIdNumber('');
+        setStreetAddress('');
+        setCompanyName('');
+        setDesignation('');
+        setEmergencyName('');
+        setEmergencyPhone('');
+    };
+
+    const isGuestProfileComplete = Boolean(guestName.trim() && (mobile.trim() || phone.trim()));
 
     // ==========================================
     // STEP 3 STATE
@@ -958,6 +1115,18 @@ export const AddReservation: React.FC = () => {
             return;
         }
 
+        if (!guestName.trim()) {
+            toast.error('Guest full name is required. Please complete Step 2 (Guest Profile).');
+            setStep(2);
+            return;
+        }
+
+        if (!mobile.trim() && !phone.trim()) {
+            toast.error('Guest mobile or contact phone is required in Step 2.');
+            setStep(2);
+            return;
+        }
+
         const reservationNumber = `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
 
         // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
@@ -1127,6 +1296,84 @@ export const AddReservation: React.FC = () => {
             }
         }
 
+        // Synchronize and persist guest profile in hotel_guest_profiles_v2
+        try {
+            const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
+            const profiles: any[] = rawProfiles ? JSON.parse(rawProfiles) : [];
+            const cleanName = guestName.trim();
+            const existingIdx = profiles.findIndex(p =>
+                (p.name && p.name.toLowerCase() === cleanName.toLowerCase()) ||
+                (p.phone && (p.phone === mobile || p.phone === phone))
+            );
+
+            const stayRecord = {
+                resNumber: reservationNumber,
+                roomNumber: primaryRoomNumber,
+                roomType: mainRoom.roomType,
+                checkIn: newReservation.checkIn,
+                checkOut: newReservation.checkOut,
+                nights: newReservation.nights,
+                totalAmountBDT: finalPayable,
+                status: actionType === 'checkin' ? ('In-House' as const) : ('Confirmed' as const)
+            };
+
+            if (existingIdx >= 0) {
+                profiles[existingIdx].totalStays = (profiles[existingIdx].totalStays || 0) + 1;
+                profiles[existingIdx].totalNights = (profiles[existingIdx].totalNights || 0) + newReservation.nights;
+                profiles[existingIdx].lifetimeSpendBDT = (profiles[existingIdx].lifetimeSpendBDT || 0) + finalPayable;
+                profiles[existingIdx].lastStayDate = newReservation.checkIn;
+                if (!profiles[existingIdx].stayHistory) profiles[existingIdx].stayHistory = [];
+                profiles[existingIdx].stayHistory.unshift(stayRecord);
+                if (email) profiles[existingIdx].email = email;
+                if (companyName) profiles[existingIdx].company = companyName;
+            } else {
+                profiles.unshift({
+                    id: Date.now(),
+                    title: salutation ? `${salutation}.` : 'Mr.',
+                    name: cleanName,
+                    phone: mobile || phone,
+                    altPhone: phone !== mobile ? phone : undefined,
+                    email: email || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                    vipTier: vipStatus === 'VVIP' ? 'Platinum VIP' : vipStatus === 'VIP-2' ? 'Gold' : vipStatus === 'VIP-1' ? 'Silver' : 'Regular',
+                    nationality: nationality || 'Bangladeshi',
+                    idType: idType || 'National ID (NID)',
+                    idNumber: idNumber || `KYC-${Math.floor(10000 + Math.random() * 90000)}`,
+                    dob: dob || '1990-01-01',
+                    gender: gender || 'Male',
+                    homeCity: homeCity || 'Dhaka',
+                    homeCountry: homeCountry || 'Bangladesh',
+                    address: streetAddress || '',
+                    postalCode: postalCode || '',
+                    company: companyName || '',
+                    designation: designation || '',
+                    totalStays: 1,
+                    totalNights: newReservation.nights,
+                    lifetimeSpendBDT: finalPayable,
+                    lastStayDate: newReservation.checkIn,
+                    loyaltyPoints: Math.round(finalPayable / 20),
+                    preferences: {
+                        roomType: mainRoom.roomType,
+                        floorPreference: floorPreference,
+                        bedType: bedPreference,
+                        pillowType: 'Feather / Down',
+                        smoking: smokingPreference,
+                        dietary: dietaryPreference,
+                        newspaper: 'The Daily Star',
+                        specialNotes: remarksMap['Guest'] || ''
+                    },
+                    stayHistory: [stayRecord],
+                    emergencyContact: emergencyName ? {
+                        name: emergencyName,
+                        relationship: emergencyRelation,
+                        phone: emergencyPhone
+                    } : undefined
+                });
+            }
+            localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(profiles));
+        } catch (e) {
+            console.error('Error synchronizing guest profile:', e);
+        }
+
         toast.success(`Reservation ${reservationNumber} confirmed successfully!`);
         setCreatedReservation(newReservation);
     };
@@ -1141,6 +1388,9 @@ export const AddReservation: React.FC = () => {
         setGuestName('');
         setMobile('');
         setEmail('');
+        setSelectedExistingGuest(null);
+        setGuestSearchQuery('');
+        setStep2Tab('profile');
         setCreatedReservation(null);
     };
 
@@ -1217,29 +1467,53 @@ export const AddReservation: React.FC = () => {
                         {/* Step 2 */}
                         <button
                             type="button"
-                            onClick={() => setStep(2)}
+                            onClick={() => {
+                                if (step === 1 && hasOverbookingError) {
+                                    toast.error('Cannot proceed: Requested rooms exceed available inventory!');
+                                    return;
+                                }
+                                setStep(2);
+                            }}
                             className={`flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg border text-xs transition-all cursor-pointer ${step === 2
                                 ? 'bg-white border-blue-500 text-blue-900 shadow-xs ring-1 ring-blue-500/20'
-                                : step > 2
-                                    ? 'bg-blue-50/60 border-blue-200 text-blue-800 font-medium hover:bg-blue-100/50'
+                                : isGuestProfileComplete
+                                    ? 'bg-emerald-50/70 border-emerald-300 text-emerald-800 font-medium hover:bg-emerald-100/60'
                                     : 'bg-white/60 border-gray-200 text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] flex-shrink-0 transition-colors ${step === 2
                                 ? 'bg-[#1e3a8a] text-white shadow-xs'
-                                : step > 2
-                                    ? 'bg-blue-600 text-white'
+                                : isGuestProfileComplete
+                                    ? 'bg-emerald-600 text-white'
                                     : 'bg-gray-200 text-gray-600'
                                 }`}>
-                                {step > 2 ? <Check size={11} className="stroke-[3]" /> : '2'}
+                                {isGuestProfileComplete ? <Check size={11} className="stroke-[3]" /> : '2'}
                             </div>
-                            <span className="truncate tracking-tight font-medium">Guest Profile</span>
+                            <div className="flex items-center gap-1 min-w-0">
+                                <span className="truncate tracking-tight font-medium">Guest Profile</span>
+                                {guestName.trim() && (
+                                    <span className="hidden sm:inline text-[9.5px] px-1 py-0.2 rounded bg-blue-100 text-blue-800 font-medium max-w-[80px] truncate">
+                                        {guestName.trim().split(' ')[0]}
+                                    </span>
+                                )}
+                            </div>
                         </button>
 
                         {/* Step 3 */}
                         <button
                             type="button"
-                            onClick={() => setStep(3)}
+                            onClick={() => {
+                                if (step === 1 && hasOverbookingError) {
+                                    toast.error('Cannot proceed: Requested rooms exceed available inventory!');
+                                    return;
+                                }
+                                if (!isGuestProfileComplete) {
+                                    toast.warning('Please enter guest full name and contact number in Step 2.');
+                                    setStep(2);
+                                    return;
+                                }
+                                setStep(3);
+                            }}
                             className={`flex items-center justify-center gap-2 py-1.5 px-2 rounded-lg border text-xs transition-all cursor-pointer ${step === 3
                                 ? 'bg-white border-blue-500 text-blue-900 shadow-xs ring-1 ring-blue-500/20'
                                 : 'bg-white/60 border-gray-200 text-gray-500 hover:text-gray-700'
@@ -2056,412 +2330,671 @@ export const AddReservation: React.FC = () => {
                         ======================================================== */}
                     {step === 2 && (
                         <div className="space-y-2.5 animate-in fade-in duration-150">
-                            {/* 1. Guest Profile Accordion */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-                                <div
-                                    onClick={() => setOpenGuestProfile(!openGuestProfile)}
-                                    className="flex items-center justify-between px-3 py-2 bg-gray-50/80 cursor-pointer border-b border-gray-100 select-none hover:bg-gray-100/70 transition-colors"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded bg-blue-100 text-blue-700 flex items-center justify-center">
-                                            <UserIcon size={13} />
+                            {/* A. Returning Guest Instant Lookup Card */}
+                            <div className="bg-white border border-gray-200 rounded-lg p-2.5 shadow-2xs space-y-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-5 h-5 rounded bg-blue-100 text-blue-700 flex items-center justify-center">
+                                            <Search size={12} />
                                         </div>
                                         <div>
-                                            <h3 className="text-gray-900 text-[11.5px] leading-tight">Guest Profile</h3>
-                                            <p className="text-[9.5px] text-gray-500 leading-tight">Identity, contact, passport and travel information</p>
+                                            <span className="text-[11px] font-bold text-gray-900">Returning Guest Quick-Lookup</span>
+                                            <span className="text-[9.5px] text-gray-500 ml-1.5 hidden sm:inline">Search CRM directory by Name, Mobile, Email, or NID to auto-fill</span>
                                         </div>
                                     </div>
-                                    {openGuestProfile ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                    {selectedExistingGuest && (
+                                        <button
+                                            type="button"
+                                            onClick={handleClearSelectedGuest}
+                                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 hover:bg-red-50 hover:text-red-700 border border-gray-200 transition-colors cursor-pointer"
+                                        >
+                                            ✕ Unlink / New Guest
+                                        </button>
+                                    )}
                                 </div>
 
-                                {openGuestProfile && (
-                                    <div className="p-3 space-y-2.5">
-                                        {/* Row 1 */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">
-                                                    FULL NAME <span className="text-red-500">*</span>
-                                                </label>
-                                                <div className="flex gap-1">
-                                                    <select
-                                                        value={salutation}
-                                                        onChange={e => setSalutation(e.target.value)}
-                                                        className="w-14 h-7 px-1 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                {!selectedExistingGuest ? (
+                                    <div className="relative">
+                                        <div className="relative">
+                                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Type to search returning guest (e.g. Imran, 01711, NID)..."
+                                                value={guestSearchQuery}
+                                                onChange={e => {
+                                                    setGuestSearchQuery(e.target.value);
+                                                    setIsGuestSearchOpen(true);
+                                                }}
+                                                onFocus={() => setIsGuestSearchOpen(true)}
+                                                className="w-full h-7 pl-7 pr-2 text-[11px] bg-slate-50 border border-gray-200 rounded-md outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                                            />
+                                            {guestSearchQuery && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setGuestSearchQuery('')}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Dropdown Results */}
+                                        {isGuestSearchOpen && filteredKnownGuests.length > 0 && (
+                                            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-30 max-h-56 overflow-y-auto divide-y divide-gray-100">
+                                                {filteredKnownGuests.map(g => (
+                                                    <div
+                                                        key={g.id}
+                                                        onClick={() => handleSelectExistingGuest(g)}
+                                                        className="p-2 hover:bg-blue-50/70 transition-colors cursor-pointer flex items-center justify-between gap-2"
                                                     >
-                                                        <option value="Mr">Mr</option>
-                                                        <option value="Ms">Ms</option>
-                                                        <option value="Mrs">Mrs</option>
-                                                        <option value="Dr">Dr</option>
-                                                    </select>
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="w-6 h-6 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                                                {g.name.slice(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="font-semibold text-gray-900 text-[11.5px] truncate">
+                                                                        {g.title} {g.name}
+                                                                    </span>
+                                                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                                        {g.vipTier}
+                                                                    </span>
+                                                                    {g.company && (
+                                                                        <span className="text-[9.5px] text-gray-400 truncate hidden md:inline">
+                                                                            ({g.company})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-500 font-mono flex items-center gap-2">
+                                                                    <span>📞 {g.phone}</span>
+                                                                    {g.email && <span className="truncate">✉️ {g.email}</span>}
+                                                                    {g.idNumber && <span>🪪 {g.idNumber}</span>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 whitespace-nowrap">
+                                                            Auto-Fill ↵
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-md p-2 flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10.5px] flex-shrink-0">
+                                                {selectedExistingGuest.name.slice(0, 2).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="font-bold text-gray-900 text-[12px]">
+                                                        {selectedExistingGuest.title} {selectedExistingGuest.name}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                        {selectedExistingGuest.vipTier || 'Regular'}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5 font-medium">
+                                                        <ShieldCheck size={9} /> Verified Returning Guest
+                                                    </span>
+                                                </div>
+                                                <div className="text-[10px] text-gray-600 flex items-center gap-2 mt-0.5 flex-wrap font-mono">
+                                                    <span>Phone: {selectedExistingGuest.phone}</span>
+                                                    {selectedExistingGuest.email && <span>Email: {selectedExistingGuest.email}</span>}
+                                                    <span>{selectedExistingGuest.totalStays || 1} Past Stay(s)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* B. Sub-tabs Navigation for Step 2 Form (Identity, Address, Corporate, Preferences) */}
+                            <div className="bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
+                                <div className="bg-gray-50/90 border-b border-gray-200 px-2 py-1 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
+                                    <div className="flex items-center gap-1">
+                                        {[
+                                            { key: 'profile', label: '1. Identity & Contact', icon: <UserIcon size={12} />, required: true },
+                                            { key: 'address', label: '2. Address & Emergency', icon: <MapPin size={12} />, filled: Boolean(streetAddress || homeCity || emergencyName) },
+                                            { key: 'corporate', label: '3. Corporate & Work', icon: <Briefcase size={12} />, filled: Boolean(companyName || designation) },
+                                            { key: 'preferences', label: '4. Hospitality Preferences', icon: <Heart size={12} />, filled: Boolean(remarksMap['Guest'] || bedPreference !== 'King Bed') }
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.key}
+                                                type="button"
+                                                onClick={() => setStep2Tab(tab.key as any)}
+                                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                                                    step2Tab === tab.key
+                                                        ? 'bg-white text-blue-700 border border-gray-200 shadow-2xs'
+                                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'
+                                                }`}
+                                            >
+                                                {tab.icon}
+                                                <span>{tab.label}</span>
+                                                {tab.required && !isGuestProfileComplete && (
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block ml-0.5" />
+                                                )}
+                                                {tab.filled && (
+                                                    <span className="text-[9px] text-emerald-600">✓</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="text-[10px] text-gray-500 font-medium pr-1 hidden md:block">
+                                        {isGuestProfileComplete ? (
+                                            <span className="text-emerald-700 flex items-center gap-1">
+                                                <CheckCircle2 size={11} /> Required Fields Filled
+                                            </span>
+                                        ) : (
+                                            <span className="text-amber-700">
+                                                * Name &amp; Contact are mandatory
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="p-3">
+                                    {/* Tab 1: Identity & Contact */}
+                                    {step2Tab === 'profile' && (
+                                        <div className="space-y-2.5 animate-in fade-in duration-100">
+                                            {/* Row 1: Name, Phone, Mobile, Email */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700 flex items-center justify-between">
+                                                        <span>FULL LEGAL NAME <span className="text-red-500">*</span></span>
+                                                    </label>
+                                                    <div className="flex gap-1">
+                                                        <select
+                                                            value={salutation}
+                                                            onChange={e => setSalutation(e.target.value)}
+                                                            className="w-16 h-7 px-1 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium"
+                                                        >
+                                                            <option value="Mr">Mr.</option>
+                                                            <option value="Ms">Ms.</option>
+                                                            <option value="Mrs">Mrs.</option>
+                                                            <option value="Dr">Dr.</option>
+                                                            <option value="Engr">Engr.</option>
+                                                            <option value="Prof">Prof.</option>
+                                                        </select>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Guest full name..."
+                                                            value={guestName}
+                                                            onChange={e => setGuestName(e.target.value)}
+                                                            className="flex-1 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-medium"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">
+                                                        MOBILE NUMBER <span className="text-red-500">*</span>
+                                                    </label>
                                                     <input
                                                         type="text"
-                                                        placeholder="Type guest name..."
-                                                        value={guestName}
-                                                        onChange={e => setGuestName(e.target.value)}
-                                                        className="flex-1 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500"
+                                                        placeholder="+880 1711-000000"
+                                                        value={mobile}
+                                                        onChange={e => setMobile(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-mono"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">LANDLINE / ALT PHONE</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Alternative contact..."
+                                                        value={phone}
+                                                        onChange={e => setPhone(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">EMAIL ADDRESS</label>
+                                                    <input
+                                                        type="email"
+                                                        placeholder="guest@example.com"
+                                                        value={email}
+                                                        onChange={e => setEmail(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
                                                     />
                                                 </div>
                                             </div>
 
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">PHONE</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Landline / Alt..."
-                                                    value={phone}
-                                                    onChange={e => setPhone(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                />
+                                            {/* Row 2: VIP, Gender, Nationality, Guest Type, DOB */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-1 border-t border-gray-100">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">VIP STATUS</label>
+                                                    <select
+                                                        value={vipStatus}
+                                                        onChange={e => setVipStatus(e.target.value)}
+                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                    >
+                                                        <option value="">None (Standard)</option>
+                                                        <option value="VIP-1">VIP-1 (Silver Tier)</option>
+                                                        <option value="VIP-2">VIP-2 (Gold Tier)</option>
+                                                        <option value="VVIP">VVIP (Platinum VIP)</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">GENDER</label>
+                                                    <select
+                                                        value={gender}
+                                                        onChange={e => setGender(e.target.value)}
+                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                    >
+                                                        <option value="Male">Male</option>
+                                                        <option value="Female">Female</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">NATIONALITY</label>
+                                                    <input
+                                                        type="text"
+                                                        value={nationality}
+                                                        onChange={e => setNationality(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">GUEST CATEGORY</label>
+                                                    <select
+                                                        value={guestType}
+                                                        onChange={e => setGuestType(e.target.value)}
+                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                    >
+                                                        <option value="Adult">Adult Individual</option>
+                                                        <option value="Corporate">Corporate Executive</option>
+                                                        <option value="Diplomat">Diplomat / Government</option>
+                                                        <option value="Family">Family Head</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">DATE OF BIRTH</label>
+                                                    <input
+                                                        type="date"
+                                                        value={dob}
+                                                        onChange={e => setDob(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none"
+                                                    />
+                                                </div>
                                             </div>
 
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">
-                                                    MOBILE <span className="text-red-500">*</span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="+880 1711..."
-                                                    value={mobile}
-                                                    onChange={e => setMobile(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500"
-                                                />
-                                            </div>
+                                            {/* Row 3: ID Verification, Purpose of Visit, Birth Location */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1 border-t border-gray-100">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">PURPOSE OF VISIT</label>
+                                                    <select
+                                                        value={purposeOfVisit}
+                                                        onChange={e => setPurposeOfVisit(e.target.value)}
+                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                    >
+                                                        <option value="Business">Business</option>
+                                                        <option value="Leisure / Holiday">Leisure / Holiday</option>
+                                                        <option value="Medical">Medical</option>
+                                                        <option value="Official / Diplomatic">Official / Diplomatic</option>
+                                                        <option value="Transit">Transit</option>
+                                                    </select>
+                                                </div>
 
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">EMAIL</label>
-                                                <input
-                                                    type="email"
-                                                    placeholder="guest@mail.com"
-                                                    value={email}
-                                                    onChange={e => setEmail(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                />
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">ID TYPE</label>
+                                                    <select
+                                                        value={idType}
+                                                        onChange={e => setIdType(e.target.value)}
+                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                    >
+                                                        <option value="National ID (NID)">National ID (NID)</option>
+                                                        <option value="Passport">Passport</option>
+                                                        <option value="Driving License">Driving License</option>
+                                                        <option value="Diplomatic ID">Diplomatic ID</option>
+                                                        <option value="Birth Certificate">Birth Certificate</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                                                    <label className="text-[10px] font-semibold text-gray-700">ID / PASSPORT #</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Document number..."
+                                                        value={idNumber}
+                                                        onChange={e => setIdNumber(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">BIRTH CITY</label>
+                                                    <input
+                                                        type="text"
+                                                        value={birthCity}
+                                                        onChange={e => setBirthCity(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">OCCUPATION</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Profession..."
+                                                        value={occupation}
+                                                        onChange={e => setOccupation(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
+                                    )}
 
-                                        {/* Row 2 */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">VIP STATUS</label>
-                                                <select
-                                                    value={vipStatus}
-                                                    onChange={e => setVipStatus(e.target.value)}
-                                                    className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                >
-                                                    <option value="">None</option>
-                                                    <option value="VIP-1">VIP-1 (Silver)</option>
-                                                    <option value="VIP-2">VIP-2 (Gold)</option>
-                                                    <option value="VVIP">VVIP (Presidential)</option>
-                                                </select>
+                                    {/* Tab 2: Address & Emergency Contact */}
+                                    {step2Tab === 'address' && (
+                                        <div className="space-y-3 animate-in fade-in duration-100">
+                                            <div>
+                                                <h4 className="text-[11px] font-bold text-gray-900 mb-1.5 flex items-center gap-1.5">
+                                                    <MapPin size={12} className="text-emerald-600" />
+                                                    <span>Primary Residential Address</span>
+                                                </h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                                                    <div className="flex flex-col gap-0.5 lg:col-span-2">
+                                                        <label className="text-[10px] font-semibold text-gray-700">STREET ADDRESS</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="House, Road, Area..."
+                                                            value={streetAddress}
+                                                            onChange={e => setStreetAddress(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">CITY</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Dhaka..."
+                                                            value={homeCity}
+                                                            onChange={e => setHomeCity(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">STATE / PROVINCE</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="State..."
+                                                            value={homeState}
+                                                            onChange={e => setHomeState(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">POSTAL CODE</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="1200..."
+                                                            value={postalCode}
+                                                            onChange={e => setPostalCode(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">GENDER</label>
-                                                <select
-                                                    value={gender}
-                                                    onChange={e => setGender(e.target.value)}
-                                                    className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                >
-                                                    <option value="Male">Male</option>
-                                                    <option value="Female">Female</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">NATIONALITY</label>
-                                                <input
-                                                    type="text"
-                                                    value={nationality}
-                                                    onChange={e => setNationality(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                />
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">GUEST TYPE</label>
-                                                <select
-                                                    value={guestType}
-                                                    onChange={e => setGuestType(e.target.value)}
-                                                    className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                >
-                                                    <option value="Adult">Adult</option>
-                                                    <option value="Child">Child</option>
-                                                    <option value="Corporate">Corporate</option>
-                                                    <option value="Diplomat">Diplomat</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">DATE OF BIRTH</label>
-                                                <input
-                                                    type="date"
-                                                    value={dob}
-                                                    onChange={e => setDob(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Row 3 */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">BIRTH COUNTRY</label>
-                                                <input
-                                                    type="text"
-                                                    value={birthCountry}
-                                                    onChange={e => setBirthCountry(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                />
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">BIRTH CITY</label>
-                                                <input
-                                                    type="text"
-                                                    value={birthCity}
-                                                    onChange={e => setBirthCity(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                />
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">OCCUPATION</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Engineer, Doctor..."
-                                                    value={occupation}
-                                                    onChange={e => setOccupation(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                />
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">PURPOSE OF VISIT</label>
-                                                <select
-                                                    value={purposeOfVisit}
-                                                    onChange={e => setPurposeOfVisit(e.target.value)}
-                                                    className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                >
-                                                    <option value="Business">Business</option>
-                                                    <option value="Leisure / Holiday">Leisure / Holiday</option>
-                                                    <option value="Medical">Medical</option>
-                                                    <option value="Official / Diplomatic">Official / Diplomatic</option>
-                                                    <option value="Transit">Transit</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">ID TYPE</label>
-                                                <select
-                                                    value={idType}
-                                                    onChange={e => setIdType(e.target.value)}
-                                                    className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                >
-                                                    <option value="National ID (NID)">National ID (NID)</option>
-                                                    <option value="Passport">Passport</option>
-                                                    <option value="Driving License">Driving License</option>
-                                                    <option value="Birth Certificate">Birth Certificate</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="flex flex-col gap-0.5">
-                                                <label className="text-[10px] font-semibold text-gray-700">ID / PASSPORT #</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="ID number..."
-                                                    value={idNumber}
-                                                    onChange={e => setIdNumber(e.target.value)}
-                                                    className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                />
+                                            <div className="pt-2 border-t border-gray-100">
+                                                <h4 className="text-[11px] font-bold text-gray-900 mb-1.5 flex items-center gap-1.5">
+                                                    <AlertTriangle size={12} className="text-rose-500" />
+                                                    <span>Emergency Contact (Hotel Safety Compliance)</span>
+                                                </h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">CONTACT PERSON NAME</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. Dr. Rafiqul Islam"
+                                                            value={emergencyName}
+                                                            onChange={e => setEmergencyName(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">RELATIONSHIP</label>
+                                                        <select
+                                                            value={emergencyRelation}
+                                                            onChange={e => setEmergencyRelation(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                        >
+                                                            <option value="Spouse">Spouse / Partner</option>
+                                                            <option value="Family / Parent">Family / Parent</option>
+                                                            <option value="Colleague / Manager">Colleague / Manager</option>
+                                                            <option value="Friend">Friend</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">EMERGENCY PHONE</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="+880 18..."
+                                                            value={emergencyPhone}
+                                                            onChange={e => setEmergencyPhone(e.target.value)}
+                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+
+                                    {/* Tab 3: Corporate & Work */}
+                                    {step2Tab === 'corporate' && (
+                                        <div className="space-y-3 animate-in fade-in duration-100">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">COMPANY / ORGANIZATION</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g. Grameenphone Ltd."
+                                                        value={companyName}
+                                                        onChange={e => setCompanyName(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-medium"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">DESIGNATION</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g. Managing Director"
+                                                        value={designation}
+                                                        onChange={e => setDesignation(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">OFFICE PHONE</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="+880 2..."
+                                                        value={officePhone}
+                                                        onChange={e => setOfficePhone(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">CORPORATE EMAIL</label>
+                                                    <input
+                                                        type="email"
+                                                        placeholder="corporate@company.com"
+                                                        value={corporateEmail}
+                                                        onChange={e => setCorporateEmail(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">TAX / BIN / VAT ID</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="TIN-9812..."
+                                                        value={taxVatId}
+                                                        onChange={e => setTaxVatId(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Tab 4: Hospitality Preferences & Notes */}
+                                    {step2Tab === 'preferences' && (
+                                        <div className="space-y-3 animate-in fade-in duration-100">
+                                            {/* Quick-select Hospitality Chips */}
+                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-2">
+                                                <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider block">
+                                                    HOSPITALITY QUICK-PREFERENCES (SYNCED WITH FRONT DESK &amp; HOUSEKEEPING)
+                                                </span>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                    <div className="space-y-1">
+                                                        <span className="text-[9.5px] text-gray-500 font-semibold block">BED TYPE</span>
+                                                        <div className="flex gap-1">
+                                                            {['King Bed', 'Twin Beds'].map(b => (
+                                                                <button
+                                                                    key={b}
+                                                                    type="button"
+                                                                    onClick={() => setBedPreference(b)}
+                                                                    className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
+                                                                        bedPreference === b
+                                                                            ? 'bg-[#1e3a8a] text-white border-blue-900 shadow-2xs'
+                                                                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                                                                    }`}
+                                                                >
+                                                                    {b}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <span className="text-[9.5px] text-gray-500 font-semibold block">SMOKING PREFERENCE</span>
+                                                        <div className="flex gap-1">
+                                                            {['Non-Smoking', 'Smoking'].map(s => (
+                                                                <button
+                                                                    key={s}
+                                                                    type="button"
+                                                                    onClick={() => setSmokingPreference(s as any)}
+                                                                    className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
+                                                                        smokingPreference === s
+                                                                            ? 'bg-[#1e3a8a] text-white border-blue-900 shadow-2xs'
+                                                                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                                                                    }`}
+                                                                >
+                                                                    {s}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <span className="text-[9.5px] text-gray-500 font-semibold block">FLOOR PREFERENCE</span>
+                                                        <select
+                                                            value={floorPreference}
+                                                            onChange={e => setFloorPreference(e.target.value)}
+                                                            className="w-full h-6 px-1.5 border border-gray-200 rounded text-[10.5px] bg-white outline-none cursor-pointer"
+                                                        >
+                                                            <option value="High Floor">High Floor</option>
+                                                            <option value="Low Floor">Low Floor</option>
+                                                            <option value="Quiet Corner">Quiet Corner</option>
+                                                            <option value="Near Elevator">Near Elevator</option>
+                                                            <option value="Away from Elevator">Away from Elevator</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <span className="text-[9.5px] text-gray-500 font-semibold block">DIETARY / DINING</span>
+                                                        <select
+                                                            value={dietaryPreference}
+                                                            onChange={e => setDietaryPreference(e.target.value)}
+                                                            className="w-full h-6 px-1.5 border border-gray-200 rounded text-[10.5px] bg-white outline-none cursor-pointer"
+                                                        >
+                                                            <option value="Halal">Halal (Strict)</option>
+                                                            <option value="Vegetarian">Vegetarian</option>
+                                                            <option value="Vegan">Vegan</option>
+                                                            <option value="Diabetic">Diabetic Friendly</option>
+                                                            <option value="No Restrictions">Standard / No Restrictions</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Department Remarks Tabs */}
+                                            <div className="space-y-1.5 pt-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">
+                                                        DEPARTMENTAL OPERATIONAL REMARKS
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-400">Routes to Folio &amp; Daily Log</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 border-b border-gray-100 pb-1">
+                                                    {(['Guest', 'Check In', 'Check Out', 'House Keeping', 'Payment Note'] as const).map(tab => (
+                                                        <button
+                                                            key={tab}
+                                                            type="button"
+                                                            onClick={() => setActivePrefTab(tab)}
+                                                            className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition-colors cursor-pointer ${
+                                                                activePrefTab === tab
+                                                                    ? 'bg-[#1e3a8a] text-white shadow-2xs'
+                                                                    : 'text-gray-600 hover:bg-gray-100'
+                                                            }`}
+                                                        >
+                                                            {tab}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                <textarea
+                                                    rows={2}
+                                                    placeholder={`Enter special notes for ${activePrefTab}...`}
+                                                    value={remarksMap[activePrefTab]}
+                                                    onChange={e => setRemarksMap({ ...remarksMap, [activePrefTab]: e.target.value })}
+                                                    className="w-full p-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500"
+                                                ></textarea>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* 2. Remarks & Preferences Card */}
-                            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h4 className="text-gray-900 text-[11px] tracking-wider uppercase">REMARKS &amp; PREFERENCES</h4>
-                                        <p className="text-[9.5px] text-gray-500">Keep guest-facing and internal operational notes organized.</p>
-                                    </div>
-                                    <span className="text-[8.5px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
-                                        OPTIONAL
-                                    </span>
-                                </div>
-
-                                <div className="flex items-center gap-1 border-b border-gray-100 pb-1.5">
-                                    {(['Guest', 'Check In', 'Check Out', 'House Keeping', 'Payment Note'] as const).map(tab => (
-                                        <button
-                                            key={tab}
-                                            type="button"
-                                            onClick={() => setActivePrefTab(tab)}
-                                            className={`px-2.5 py-0.5 rounded text-[10.5px] font-semibold transition-colors cursor-pointer ${activePrefTab === tab
-                                                ? 'bg-[#1e3a8a] text-white shadow-2xs'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                                }`}
-                                        >
-                                            {tab}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <textarea
-                                    rows={2}
-                                    placeholder={`Enter remarks for ${activePrefTab}...`}
-                                    value={remarksMap[activePrefTab]}
-                                    onChange={e => setRemarksMap({ ...remarksMap, [activePrefTab]: e.target.value })}
-                                    className="w-full p-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500"
-                                ></textarea>
-                            </div>
-
-                            {/* 3. Home Address Accordion */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-                                <div
-                                    onClick={() => setOpenAddress(!openAddress)}
-                                    className="flex items-center justify-between px-3 py-2 bg-gray-50/80 cursor-pointer border-b border-gray-100 select-none hover:bg-gray-100/70 transition-colors"
+                            {/* C. Step 2 Bottom Action Bar */}
+                            <div className="flex items-center justify-between pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setStep(1)}
+                                    className="h-7 px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs"
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                                            <MapPin size={13} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-gray-900 text-[11.5px] leading-tight">Home Address</h3>
-                                            <p className="text-[9.5px] text-gray-500 leading-tight">Primary residence and emergency dispatch details</p>
-                                        </div>
-                                    </div>
-                                    {openAddress ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </div>
-
-                                {openAddress && (
-                                    <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-                                        <div className="flex flex-col gap-0.5 lg:col-span-2">
-                                            <label className="text-[10px] font-semibold text-gray-700">STREET ADDRESS</label>
-                                            <input
-                                                type="text"
-                                                placeholder="House, Road, Area..."
-                                                value={streetAddress}
-                                                onChange={e => setStreetAddress(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">CITY</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Dhaka..."
-                                                value={homeCity}
-                                                onChange={e => setHomeCity(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">STATE / PROVINCE</label>
-                                            <input
-                                                type="text"
-                                                placeholder="State..."
-                                                value={homeState}
-                                                onChange={e => setHomeState(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">POSTAL CODE</label>
-                                            <input
-                                                type="text"
-                                                placeholder="1200..."
-                                                value={postalCode}
-                                                onChange={e => setPostalCode(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">COUNTRY</label>
-                                            <input
-                                                type="text"
-                                                value={homeCountry}
-                                                onChange={e => setHomeCountry(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 4. Work Details Accordion */}
-                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-                                <div
-                                    onClick={() => setOpenWork(!openWork)}
-                                    className="flex items-center justify-between px-3 py-2 bg-gray-50/80 cursor-pointer border-b border-gray-100 select-none hover:bg-gray-100/70 transition-colors"
+                                    ← Back to Room Availability
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!isGuestProfileComplete) {
+                                            toast.warning('Please enter guest full legal name and mobile number.');
+                                            setStep2Tab('profile');
+                                            return;
+                                        }
+                                        setStep(3);
+                                    }}
+                                    className={`h-7 px-4 rounded text-[11px] font-semibold transition-colors shadow-2xs cursor-pointer ${
+                                        isGuestProfileComplete
+                                            ? 'bg-[#1e3a8a] hover:bg-blue-900 text-white'
+                                            : 'bg-amber-600 hover:bg-amber-700 text-white'
+                                    }`}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded bg-amber-100 text-amber-700 flex items-center justify-center">
-                                            <Briefcase size={13} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-gray-900 text-[11.5px] leading-tight">Work &amp; Corporate Details</h3>
-                                            <p className="text-[9.5px] text-gray-500 leading-tight">Organization, corporate contract and billing contact</p>
-                                        </div>
-                                    </div>
-                                    {openWork ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </div>
-
-                                {openWork && (
-                                    <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">COMPANY NAME</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Grameenphone, Beximco..."
-                                                value={companyName}
-                                                onChange={e => setCompanyName(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">DESIGNATION</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Director, Manager..."
-                                                value={designation}
-                                                onChange={e => setDesignation(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">OFFICE PHONE</label>
-                                            <input
-                                                type="text"
-                                                placeholder="+880 2..."
-                                                value={officePhone}
-                                                onChange={e => setOfficePhone(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">CORPORATE EMAIL</label>
-                                            <input
-                                                type="email"
-                                                placeholder="guest@company.com"
-                                                value={corporateEmail}
-                                                onChange={e => setCorporateEmail(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <label className="text-[10px] font-semibold text-gray-700">TAX / VAT ID</label>
-                                            <input
-                                                type="text"
-                                                placeholder="TIN / VAT..."
-                                                value={taxVatId}
-                                                onChange={e => setTaxVatId(e.target.value)}
-                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                                    Next: Billing &amp; Pay →
+                                </button>
                             </div>
                         </div>
                     )}
