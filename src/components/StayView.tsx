@@ -15,8 +15,11 @@ import {
     Lock,
     Home,
     Printer,
-    Wallet
+    Wallet,
+    Link2
 } from 'lucide-react';
+import { useProperty } from '../context/PropertyContext';
+import { getConnectingRoomsMap } from '../utils/connectingRoomHelper';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
 import type { AmendBookingData } from './modals/AmendStayModal';
@@ -34,6 +37,7 @@ import {
     syncRoomTypesAndRoomsFromDB,
     getStandardDailyRateForRoom,
     resolveReservationDailyBaseRate,
+    getRoomTypeCapacity,
     calculateTariffForRatePlan,
     amendStayInDB,
     moveRoomInDB,
@@ -111,6 +115,10 @@ export interface RoomNode {
     floor: string;
     building: string;
     status: string;
+    wing?: string;
+    connectingWith?: string;
+    connectingDoorType?: string;
+    connectingMutualBlock?: boolean;
 }
 
 export interface FloorNode {
@@ -189,6 +197,23 @@ const calculateStayViewStartDate = (sysDateISO: string): string => {
 };
 
 export const StayView: React.FC = () => {
+    const { activeProperty } = useProperty();
+    const currencySymbol = useMemo(() => {
+        const code = activeProperty?.currency || 'BDT';
+        switch (code.toUpperCase()) {
+            case 'USD': return '$';
+            case 'EUR': return '€';
+            case 'GBP': return '£';
+            case 'INR': return '₹';
+            case 'AED': return 'AED ';
+            case 'BDT':
+            default: return '৳';
+        }
+    }, [activeProperty?.currency]);
+
+    // Dynamic Connecting Rooms Resolution Map from General Settings
+    const connectingRoomsMap = useMemo(() => getConnectingRoomsMap(), []);
+
     // Current System Operating Date state (realtime synchronized with Header & Night Audit)
     const [operatingDateStr, setOperatingDateStr] = useState<string>(() => getOperatingSystemDate());
 
@@ -478,13 +503,30 @@ export const StayView: React.FC = () => {
             if (!floorMap.has(fId)) {
                 floorMap.set(fId, []);
             }
+            const rawStatus = String(r.status || '').trim();
+            const hkStatus = String(r.housekeepingStatus || '').trim().toLowerCase();
+            const normalizedStatus = rawStatus.toLowerCase().includes('out of order') || rawStatus === 'out-of-order' || rawStatus === 'ooo'
+                ? 'out-of-order'
+                : rawStatus.toLowerCase().includes('out of service') || rawStatus === 'out-of-service' || rawStatus === 'oos'
+                    ? 'out-of-service'
+                    : hkStatus === 'inspected'
+                        ? 'inspected'
+                        : hkStatus === 'dirty'
+                            ? 'dirty'
+                            : 'clean';
+
+            const connInfo = connectingRoomsMap.get(String(r.number));
+
             floorMap.get(fId)!.push({
                 id: `r-${r.number}`,
                 roomNumber: String(r.number),
                 type: r.roomTypeName,
                 floor: fId,
                 building: buildingNames[bId] || `Building ${bId}`,
-                status: r.status === 'Out of Order' ? 'out-of-order' : (r.housekeepingStatus?.toLowerCase() || 'clean')
+                status: normalizedStatus,
+                connectingWith: connInfo?.partnerRoom,
+                connectingDoorType: connInfo?.doorType,
+                connectingMutualBlock: connInfo?.mutualBlock
             });
         });
 
@@ -508,7 +550,7 @@ export const StayView: React.FC = () => {
         });
 
         return tree;
-    }, [roomsVersion]);
+    }, [roomsVersion, connectingRoomsMap]);
 
     // Total rooms count across entire hotel
     const totalRoomsCount = useMemo(() => {
@@ -1417,7 +1459,7 @@ export const StayView: React.FC = () => {
         }
 
         setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, paidAmount: (b.paidAmount || 0) + amount, dueAmount: newDue, isPaymentDue: newDue > 0 } : b));
-        showToast(`Payment of ৳${amount.toLocaleString()} received via ${method} for ${targetB.guestName}!`);
+        showToast(`Payment of ${currencySymbol}${amount.toLocaleString()} received via ${method} for ${targetB.guestName}!`);
     };
 
     const handleSaveRoomSplit = (bookingId: string, targetRoomNumber: string, splitFromDate?: string, splitToDate?: string) => {
@@ -1533,7 +1575,7 @@ export const StayView: React.FC = () => {
         }
 
         setBookings(prev => prev.filter(b => b.reservationNumber !== target.reservationNumber));
-        showToast(`Reservation ${target.reservationNumber} cancelled (Fee: ৳${fee}, Refund: ৳${refund})`);
+        showToast(`Reservation ${target.reservationNumber} cancelled (Fee: ${currencySymbol}${fee}, Refund: ${currencySymbol}${refund})`);
     };
 
     const handleConfirmVoid = (bookingId: string, reason: string) => {
@@ -1910,6 +1952,14 @@ export const StayView: React.FC = () => {
                         return;
                     }
 
+                    // Room Status Check: Guard against moving into Out of Order rooms
+                    const targetCanonical = getCanonicalRooms().find(r => String(r.number) === String(moveDrag.targetRoomNumber));
+                    if (targetCanonical && (targetCanonical.status === 'Out of Order' || String(targetCanonical.status).toLowerCase().includes('out of order'))) {
+                        toast.error(`Cannot move to Room ${moveDrag.targetRoomNumber}: Room is currently Out of Order (Under Maintenance)!`);
+                        setMoveDrag(null);
+                        return;
+                    }
+
                     const bNights = Math.max(1, (moveDrag.targetEndIndex - moveDrag.targetStartIndex + 1) || (b.endIndex - b.startIndex + 1));
                     // For in-house guests, Room Move applies from current System Date onwards
                     const targetFromDate = isGuestInHouse
@@ -1923,6 +1973,31 @@ export const StayView: React.FC = () => {
                     const resolvedAdults = Number(matchingRoomRow?.adults ?? originalRes?.adults ?? b.adults ?? 2);
                     const resolvedChildren = Number(matchingRoomRow?.children ?? originalRes?.children ?? b.children ?? 0);
                     const dailyBase = resolveReservationDailyBaseRate(originalRes, b.roomNumber);
+
+                    // Room Type Capacity Check: Prevent assigning bookings with more guests than allowed by target room
+                    const targetCap = targetCanonical ? getRoomTypeCapacity(targetCanonical.roomTypeId || targetCanonical.roomTypeName) : null;
+                    const totalGuests = resolvedAdults + resolvedChildren;
+                    if (targetCap && targetCap.maxOccupancy > 0 && totalGuests > targetCap.maxOccupancy) {
+                        toast.error(`Cannot move to Room ${moveDrag.targetRoomNumber}: Exceeds capacity! (Room max: ${targetCap.maxOccupancy} guests, Booking has: ${totalGuests} guests)`);
+                        setMoveDrag(null);
+                        return;
+                    }
+
+                    // Connecting Room Awareness & Mutual Block Warning
+                    const conn = connectingRoomsMap.get(String(moveDrag.targetRoomNumber));
+                    if (conn) {
+                        const partnerConflict = findRoomConflict(conn.partnerRoom, moveDrag.targetStartIndex, moveDrag.targetEndIndex, b.id);
+                        if (partnerConflict) {
+                            showToast(`ℹ️ Connected Room Note: Linked Room ${conn.partnerRoom} is occupied by ${partnerConflict.guestName}.`);
+                        }
+                    }
+
+                    // Room Type Upgrade Tariff Difference Alert
+                    const targetBase = targetCanonical?.baseRate || (targetCap ? targetCap.baseRate : dailyBase);
+                    if (targetBase > dailyBase) {
+                        const rateDiff = (targetBase - dailyBase) * bNights;
+                        showToast(`Room Move: Upgrading to ${targetCanonical?.roomTypeName || 'higher category'} (+${currencySymbol}${rateDiff.toLocaleString()} tariff delta).`);
+                    }
 
                     const bData: AmendBookingData = {
                         id: b.id,
@@ -2283,10 +2358,6 @@ export const StayView: React.FC = () => {
                                                 setHoveredDate(null);
                                             }, 100);
                                         }}
-                                        title={d.isHoliday 
-                                            ? `🎉 ${d.holidayTitle || 'Holiday'}\n📅 ${d.fullDateStr}${d.hasSurgeRate ? `\n⚡ Rate Surge: ${d.rateMultiplier}x` : ''}${d.holidayDescription ? `\nℹ️ ${d.holidayDescription}` : ''}`
-                                            : `📅 ${d.fullDateStr}`
-                                        }
                                         className={`px-0.5 py-0.5 border-r text-center flex-shrink-0 transition-colors overflow-hidden cursor-pointer select-none relative group ${d.isToday
                                             ? 'bg-blue-100/95 text-blue-900 font-black border-b-2 border-b-blue-600 border-r-blue-200'
                                             : d.isPast
@@ -2406,20 +2477,37 @@ export const StayView: React.FC = () => {
                                                         className={`px-2 py-1 pl-6 border-r border-gray-200 flex items-center justify-between sticky left-0 z-20 bg-white group-hover:bg-blue-50/30 flex-shrink-0 transition-colors min-h-[36px] ${moveDrag && moveDrag.isDragging && moveDrag.targetRoomNumber === room.roomNumber ? 'bg-blue-100 ring-2 ring-blue-500' : ''
                                                             }`}
                                                     >
-                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                             <BedDouble size={12} className="text-gray-400 flex-shrink-0" />
-                                                            <div className="truncate">
-                                                                <span className="text-[10px] text-gray-900 mr-1.5">
+                                                            <div className="truncate flex items-center gap-1">
+                                                                <span className="text-[10px] text-gray-900 font-semibold">
                                                                     {room.roomNumber}
                                                                 </span>
-                                                                <span className="text-[9.5px] text-gray-500 truncate">
+                                                                {room.connectingWith && (
+                                                                    <span
+                                                                        className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[7.5px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 flex-shrink-0 cursor-help"
+                                                                        title={`Connecting Room: Connected with Room ${room.connectingWith} (${room.connectingDoorType || 'Connecting Door'})${room.connectingMutualBlock ? ' • Mutual Block Active' : ''}`}
+                                                                    >
+                                                                        <Link2 size={7} className="stroke-[2.5]" />
+                                                                        <span>{room.connectingWith}</span>
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-[9.5px] text-gray-500 truncate ml-0.5">
                                                                     {room.type}
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${room.status === 'clean' ? 'bg-emerald-500' :
-                                                            room.status === 'inspected' ? 'bg-blue-500' : 'bg-amber-500'
-                                                            }`} title={`Room is ${room.status}`}></span>
+                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                                            room.status === 'out-of-order'
+                                                                ? 'bg-rose-600 ring-2 ring-rose-200'
+                                                                : room.status === 'out-of-service'
+                                                                    ? 'bg-amber-600 ring-1 ring-amber-300'
+                                                                    : room.status === 'inspected'
+                                                                        ? 'bg-blue-500'
+                                                                        : room.status === 'dirty'
+                                                                            ? 'bg-yellow-500'
+                                                                            : 'bg-emerald-500'
+                                                        }`} title={`Room ${room.roomNumber} is ${room.status.replace(/-/g, ' ')}`}></span>
                                                     </div>
 
                                                     {/* Day Cells & Bookings Overlay */}
@@ -2429,6 +2517,10 @@ export const StayView: React.FC = () => {
                                                                 key={d.index}
                                                                 style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
                                                                 onMouseDown={(e) => {
+                                                                    if (room.status === 'out-of-order') {
+                                                                        showToast(`⚠️ Room ${room.roomNumber} is Out of Order (Under Maintenance). Cannot allocate reservations.`);
+                                                                        return;
+                                                                    }
                                                                     if (d.isPast) {
                                                                         showToast("🔒 Historical Dates: Past dates are audit locked (Read Only).");
                                                                         return;
@@ -2488,7 +2580,6 @@ export const StayView: React.FC = () => {
                                                                         }) : null);
                                                                     }
                                                                 }}
-                                                                title={d.isHoliday ? `${d.holidayTitle} • ${d.date}` : undefined}
                                                                 className={`border-r flex-shrink-0 transition-colors relative ${d.isToday
                                                                     ? 'bg-blue-50/50 border-r-blue-100/80 cursor-pointer hover:bg-blue-100/40'
                                                                     : d.isPast
@@ -2641,7 +2732,7 @@ export const StayView: React.FC = () => {
                                                                             {booking.isPaymentDue && (
                                                                                 <span
                                                                                     className="w-4 h-4 rounded-full bg-red-600 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
-                                                                                    title={`Payment Due: ৳${(booking.dueAmount || 0).toLocaleString()} (Includes Tax: ৳${(booking.totalTaxAmount || 0).toLocaleString()})`}
+                                                                                    title={`Payment Due: ${currencySymbol}${(booking.dueAmount || 0).toLocaleString()} (Includes Tax: ${currencySymbol}${(booking.totalTaxAmount || 0).toLocaleString()})`}
                                                                                 >
                                                                                     <DollarSign size={9} className="stroke-[3]" />
                                                                                 </span>
@@ -2971,13 +3062,34 @@ export const StayView: React.FC = () => {
                                                                     <select
                                                                         value={selectedRoomNumber || availableRooms[0]?.roomNumber || ''}
                                                                         onChange={(e) => setSelectedRoomNumber(e.target.value)}
-                                                                        className="h-6 px-1.5 border border-blue-500 rounded text-[10.5px] font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[120px]"
+                                                                        className="h-6 px-1.5 border border-blue-500 rounded text-[10.5px] font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[140px]"
                                                                     >
-                                                                        {availableRooms.map(r => (
-                                                                            <option key={r.roomNumber} value={r.roomNumber}>
-                                                                                Room {r.roomNumber} ({r.type.split(' ')[0]})
-                                                                            </option>
-                                                                        ))}
+                                                                        {(() => {
+                                                                            const matching = availableRooms.filter(r => r.type.toLowerCase().trim() === item.roomType.toLowerCase().trim());
+                                                                            const other = availableRooms.filter(r => r.type.toLowerCase().trim() !== item.roomType.toLowerCase().trim());
+                                                                            return (
+                                                                                <>
+                                                                                    {matching.length > 0 && (
+                                                                                        <optgroup label={`✓ Exact Match (${item.roomType})`}>
+                                                                                            {matching.map(r => (
+                                                                                                <option key={r.roomNumber} value={r.roomNumber}>
+                                                                                                    Room {r.roomNumber} (Match)
+                                                                                                </option>
+                                                                                            ))}
+                                                                                        </optgroup>
+                                                                                    )}
+                                                                                    {other.length > 0 && (
+                                                                                        <optgroup label="↕ Other Available Rooms">
+                                                                                            {other.map(r => (
+                                                                                                <option key={r.roomNumber} value={r.roomNumber}>
+                                                                                                    Room {r.roomNumber} ({r.type.split(' ')[0]})
+                                                                                                </option>
+                                                                                            ))}
+                                                                                        </optgroup>
+                                                                                    )}
+                                                                                </>
+                                                                            );
+                                                                        })()}
                                                                     </select>
                                                                     <div className="flex items-center gap-1">
                                                                         <button
@@ -3280,7 +3392,7 @@ export const StayView: React.FC = () => {
                                     {hoveredBooking.enriched?.ratePlan || hoveredBooking.booking?.ratePlan || 'Standard Rate'}
                                 </div>
                                 <div className="text-[9px] text-slate-400 font-mono">
-                                    ৳{(hoveredBooking.enriched?.avgDailyRate ?? hoveredBooking.booking?.rate ?? 0).toLocaleString()}/night
+                                    {currencySymbol}{(hoveredBooking.enriched?.avgDailyRate ?? hoveredBooking.booking?.rate ?? 0).toLocaleString()}/night
                                 </div>
                             </div>
 
@@ -3298,12 +3410,12 @@ export const StayView: React.FC = () => {
                                     )}
                                 </div>
                                 <div className="text-white mt-0.5 text-[10.5px] font-mono">
-                                    ৳{(hoveredBooking.enriched?.totalAmount ?? hoveredBooking.booking?.totalAmount ?? 0).toLocaleString()}
+                                    {currencySymbol}{(hoveredBooking.enriched?.totalAmount ?? hoveredBooking.booking?.totalAmount ?? 0).toLocaleString()}
                                 </div>
                                 <div className={`text-[9px] font-mono ${(hoveredBooking.enriched?.dueAmount ?? 0) > 0 ? 'text-rose-400' : 'text-emerald-400'
                                     }`}>
                                     {(hoveredBooking.enriched?.dueAmount ?? 0) > 0
-                                        ? `Due: ৳${(hoveredBooking.enriched?.dueAmount || 0).toLocaleString()}`
+                                        ? `Due: ${currencySymbol}${(hoveredBooking.enriched?.dueAmount || 0).toLocaleString()}`
                                         : '✓ Settled'}
                                 </div>
                             </div>
