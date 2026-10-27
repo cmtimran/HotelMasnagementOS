@@ -44,7 +44,21 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+
+// Body parser with 50mb limit for room data / logs / bulk sync
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Error handler for malformed JSON or oversized request bodies
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ success: false, error: 'Malformed JSON payload' });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ success: false, error: 'Payload too large (exceeds 50MB)' });
+  }
+  next(err);
+});
 
 // Enterprise Auth Middleware
 app.use(authMiddleware);

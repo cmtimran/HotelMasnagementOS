@@ -164,6 +164,10 @@ export class TenantConnectionManager {
             ssl: t.db_ssl ? { rejectUnauthorized: false } : undefined
         });
 
+        tenantPool.on('error', (err: any) => {
+            console.warn(`⚠️ [Tenant Pool ${cleanSlug}] Idle client error:`, err?.message || err);
+        });
+
         // Test connection
         const client = await tenantPool.connect();
         try {

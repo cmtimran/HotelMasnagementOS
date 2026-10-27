@@ -33,6 +33,11 @@ export const pgPool = new Pool({
     ssl: isRemoteOrSsl ? { rejectUnauthorized: false } : undefined
 });
 
+// Handle idle connection errors without crashing Node.js process
+pgPool.on('error', (err: any) => {
+    console.warn('⚠️ [PostgreSQL Pool] Idle client connection closed or error:', err.message);
+});
+
 let postgresConnected = false;
 
 export const isPostgresConnected = () => postgresConnected;
