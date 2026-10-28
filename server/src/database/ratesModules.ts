@@ -51,6 +51,53 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             CREATE INDEX IF NOT EXISTS idx_room_maint_dates ON room_maintenance_blocks(property_id, room_number, start_date, end_date, status);
         `);
 
+        // 1c. Lost & Found Management Table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS lost_and_found_items (
+                id BIGSERIAL PRIMARY KEY,
+                property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                reference_no VARCHAR(64) NOT NULL UNIQUE,
+                item_name VARCHAR(255) NOT NULL,
+                category VARCHAR(64) NOT NULL,
+                description TEXT,
+                found_date DATE NOT NULL,
+                found_time VARCHAR(16),
+                location_type VARCHAR(32) NOT NULL DEFAULT 'Guest Room',
+                room_number VARCHAR(32),
+                area_details VARCHAR(255),
+                found_by VARCHAR(128) NOT NULL,
+                finder_role VARCHAR(64) DEFAULT 'Housekeeping Attendant',
+                storage_location VARCHAR(128) NOT NULL,
+                storage_bin VARCHAR(64),
+                is_valuable BOOLEAN NOT NULL DEFAULT FALSE,
+                holding_period_days INT NOT NULL DEFAULT 90,
+                guest_name VARCHAR(128),
+                guest_phone VARCHAR(64),
+                guest_email VARCHAR(128),
+                reservation_id VARCHAR(64),
+                notified_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                notified_at TIMESTAMPTZ,
+                notified_notes TEXT,
+                status VARCHAR(32) NOT NULL DEFAULT 'in_custody',
+                claimed_by VARCHAR(128),
+                claimant_phone VARCHAR(64),
+                claimant_id_type VARCHAR(64),
+                claimant_id_number VARCHAR(128),
+                released_by VARCHAR(128),
+                released_at TIMESTAMPTZ,
+                release_notes TEXT,
+                shipping_tracking_number VARCHAR(128),
+                shipping_carrier VARCHAR(64),
+                disposal_reason TEXT,
+                disposed_at TIMESTAMPTZ,
+                disposed_by VARCHAR(128),
+                created_by VARCHAR(128) NOT NULL DEFAULT 'Housekeeping',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_lost_found_status ON lost_and_found_items(property_id, status, found_date);
+        `);
+
         // 2. Rate Plans Table
         await client.query(`
             CREATE TABLE IF NOT EXISTS rate_plans (

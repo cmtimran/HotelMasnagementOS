@@ -24,6 +24,7 @@ import ReservationHold from './components/reservations/ReservationHold';
 import ReservationUnassigned from './components/reservations/ReservationUnassigned';
 import ReservationCancel from './components/reservations/ReservationCancel';
 import HousekeepingGrid from './components/HousekeepingGrid';
+import LostAndFoundManagement from './components/LostAndFoundManagement';
 import RateCalendar from './components/RateCalendar';
 import OccupancyHeatmap from './components/OccupancyHeatmap';
 import RevenueDashboard from './components/RevenueDashboard';
@@ -504,6 +505,8 @@ function App() {
         return <ReservationCancel />;
       case 'housekeeping':
         return <HousekeepingGrid />;
+      case 'lost-and-found':
+        return <LostAndFoundManagement />;
       case 'stay-view':
       case 'stayview':
         return <StayView />;

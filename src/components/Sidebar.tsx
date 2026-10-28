@@ -38,7 +38,8 @@ import {
     MapPin,
     BarChart3,
     PanelLeftClose,
-    PanelLeft
+    PanelLeft,
+    PackageSearch
 } from 'lucide-react';
 
 export interface SubMenuItem {
@@ -189,6 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             items: [
                 { id: 'housekeeping', label: 'Housekeeping', icon: <Sparkles size={14} /> },
                 { id: 'maintenance', label: 'Maintenance', icon: <Wrench size={14} /> },
+                { id: 'lost-and-found', label: 'Lost & Found', icon: <PackageSearch size={14} /> },
                 { id: 'service-master', label: 'Laundry & Services', icon: <FileText size={14} /> },
             ]
         },

@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Search, Sparkles, BedDouble, AlertCircle, Users, CheckCircle2, XCircle,
     Clock, RefreshCw, X, Edit3, Zap, Coffee, ShieldAlert, Star,
-    CheckSquare, Square, Layers, UserCheck, Filter, Wrench
+    CheckSquare, Square, Layers, UserCheck, Filter, Wrench, PackageSearch, Plus
 } from 'lucide-react';
+import { useNavigation } from '../context/NavigationContext';
+import { createLostAndFoundItem } from '../utils/lostAndFoundEngine';
 import {
     getCanonicalRooms, getAllStoredReservations, getOperatingSystemDate,
     broadcastPMSEvent, subscribeToPMSEvents, updateRoomHousekeepingInDB
@@ -55,6 +57,7 @@ const nightsSince = (checkInDate: string): number => {
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 const HousekeepingGrid = () => {
+    const { setActivePage } = useNavigation();
     const settings = useMemo(() => getHousekeepingSettings(), []);
     const housekeepers = useMemo(() => getHousekeepersList(), []);
 
@@ -81,6 +84,12 @@ const HousekeepingGrid = () => {
     // Maintenance / Out of Order Modal
     const [isOooModalOpen, setIsOooModalOpen] = useState(false);
     const [oooInitialRoom, setOooInitialRoom] = useState<string | undefined>(undefined);
+
+    // Quick Lost & Found Logging
+    const [isQuickLostModalOpen, setIsQuickLostModalOpen] = useState(false);
+    const [quickLostItemName, setQuickLostItemName] = useState('');
+    const [quickLostDescription, setQuickLostDescription] = useState('');
+    const [quickLostIsValuable, setQuickLostIsValuable] = useState(false);
 
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -590,6 +599,15 @@ const HousekeepingGrid = () => {
                         </button>
                         <button
                             type="button"
+                            onClick={() => setActivePage('lost-and-found')}
+                            className="btn-secondary flex items-center gap-1.5 cursor-pointer text-slate-700 hover:text-blue-700"
+                            title="Open Lost & Found Registry (AHLA/Opera Cloud Standard)"
+                        >
+                            <PackageSearch size={13} className="text-amber-600" />
+                            <span>Lost & Found</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => setShowBulkBar(v => !v)}
                             className={`btn-secondary flex items-center gap-1.5 cursor-pointer ${showBulkBar ? 'ring-1 ring-primary' : ''}`}
                         >
@@ -1050,6 +1068,30 @@ const HousekeepingGrid = () => {
                                     </button>
                                 </div>
                             )}
+
+                            {/* Quick Lost & Found Logging Action */}
+                            <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl flex items-center justify-between">
+                                <div className="text-xs text-amber-950">
+                                    <span className="font-bold flex items-center gap-1.5">
+                                        <PackageSearch size={14} className="text-amber-700" />
+                                        Guest Property Left Behind?
+                                    </span>
+                                    <span className="text-[11px] text-amber-700">Auto-link room {selectedRoomForModal.roomNumber} guest profile & log item</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setQuickLostItemName('');
+                                        setQuickLostDescription('');
+                                        setQuickLostIsValuable(false);
+                                        setIsQuickLostModalOpen(true);
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <Plus size={12} />
+                                    Report Item
+                                </button>
+                            </div>
                         </div>
 
                         {/* Modal Footer */}
@@ -1086,6 +1128,110 @@ const HousekeepingGrid = () => {
                     fetchRooms();
                 }}
             />
+
+            {/* ── Quick Lost & Found Modal (from Room Inspection) ────────────── */}
+            {isQuickLostModalOpen && selectedRoomForModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in-50 zoom-in-95">
+                        <div className="px-4 py-3 bg-amber-600 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <PackageSearch size={16} />
+                                <div>
+                                    <h3 className="text-sm font-bold">Report Found Item — Room {selectedRoomForModal.roomNumber}</h3>
+                                    <p className="text-[11px] text-amber-100">
+                                        {selectedRoomForModal.guestName ? `Guest: ${selectedRoomForModal.guestName}` : 'Auto-links to room guest profile'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsQuickLostModalOpen(false)} className="text-amber-100 hover:text-white">
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                            <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                    Item Name <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Apple iPhone 15, Black Wallet, Gold Earrings"
+                                    value={quickLostItemName}
+                                    onChange={(e) => setQuickLostItemName(e.target.value)}
+                                    className="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Description (Color, Brand, Marks)</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="e.g. Black leather case, initials R.K. engraved..."
+                                    value={quickLostDescription}
+                                    onChange={(e) => setQuickLostDescription(e.target.value)}
+                                    className="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md focus:bg-white"
+                                />
+                            </div>
+
+                            <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-amber-50 border border-amber-200">
+                                <input
+                                    type="checkbox"
+                                    checked={quickLostIsValuable}
+                                    onChange={(e) => setQuickLostIsValuable(e.target.checked)}
+                                    className="rounded text-amber-600"
+                                />
+                                <span className="text-xs font-semibold text-amber-900">High-Value Item (Jewellery, Currency, Passport, Device)</span>
+                            </label>
+
+                            {selectedRoomForModal.guestName && (
+                                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px]">
+                                    <p className="font-bold text-emerald-800">✓ Guest Auto-Linked</p>
+                                    <p className="text-emerald-700">{selectedRoomForModal.guestName}</p>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickLostModalOpen(false)}
+                                    className="px-3 py-1.5 text-xs font-medium text-slate-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (!quickLostItemName.trim()) return;
+                                        await createLostAndFoundItem({
+                                            itemName: quickLostItemName.trim(),
+                                            description: quickLostDescription.trim(),
+                                            locationType: 'Guest Room',
+                                            roomNumber: selectedRoomForModal.roomNumber,
+                                            isValuable: quickLostIsValuable,
+                                            guestName: selectedRoomForModal.guestName || '',
+                                            foundBy: 'Housekeeper',
+                                            finderRole: 'Housekeeper',
+                                            storageLocation: quickLostIsValuable
+                                                ? 'Duty Manager High-Security Vault #01'
+                                                : 'Housekeeping Department Locker',
+                                            notifiedStatus: selectedRoomForModal.guestName ? 'pending' : 'pending'
+                                        });
+                                        setIsQuickLostModalOpen(false);
+                                        setSelectedRoomForModal(null);
+                                        // Navigate to full L&F for full context
+                                        setActivePage('lost-and-found');
+                                    }}
+                                    disabled={!quickLostItemName.trim()}
+                                    className="px-4 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-md shadow-xs transition disabled:opacity-50"
+                                >
+                                    Log & Open Registry
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
