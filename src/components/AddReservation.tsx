@@ -1193,7 +1193,7 @@ export const AddReservation: React.FC = () => {
                         return {
                             ...r,
                             roomType: suite.name,
-                            roomsCount: suiteRooms.length,
+                            roomsCount: 1,
                             assignedRooms: suiteRooms,
                             roomNumber: suiteRooms[0] || '101',
                             adults: clampedAdults,
@@ -1256,6 +1256,15 @@ export const AddReservation: React.FC = () => {
                     };
                 }
                 if (field === 'roomsCount') {
+                    const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
+                    if (suite) {
+                        toast.info(`${suite.name} is a 1-unit interconnecting suite.`);
+                        return {
+                            ...r,
+                            roomsCount: 1,
+                            assignedRooms: suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String)
+                        };
+                    }
                     const rawVal = Number(value);
                     const maxAllowed = getMaxRoomsAllowedForRow(r.roomType, id);
                     if (maxAllowed <= 0) {
@@ -1381,6 +1390,22 @@ export const AddReservation: React.FC = () => {
         const rowAllocatedMap = new Map<number, string[]>();
 
         for (const r of roomsList) {
+            const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
+            if (suite) {
+                const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
+                const conflict = suiteRooms.find(rm => usedRoomsAcrossBooking.has(rm));
+                if (conflict) {
+                    toast.error(`Overbooking Prevented: Room ${conflict} in ${suite.name} is already allocated!`);
+                    return;
+                }
+                rowAllocatedMap.set(r.id, suiteRooms);
+                suiteRooms.forEach(rm => {
+                    allocatedRoomNumbers.push(rm);
+                    usedRoomsAcrossBooking.add(rm);
+                });
+                continue;
+            }
+
             const countNeeded = Number(r.roomsCount) || 1;
             let roomsForThisRow: string[] = [];
 
@@ -1465,9 +1490,10 @@ export const AddReservation: React.FC = () => {
             idNumber,
             specialRequests: remarksMap['Guest'] || '',
             roomsList: roomsList.flatMap((r) => {
+                const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
                 const countNeeded = Number(r.roomsCount) || 1;
                 const assigned = rowAllocatedMap.get(r.id) || (
-                    (r.assignedRooms && r.assignedRooms.length === countNeeded)
+                    (r.assignedRooms && (suite || r.assignedRooms.length === countNeeded))
                         ? r.assignedRooms
                         : [r.roomNumber]
                 );
@@ -2162,6 +2188,23 @@ export const AddReservation: React.FC = () => {
                                                     </td>
                                                     <td className="p-1.5 text-center">
                                                         {(() => {
+                                                            const isConnectingSuite = activeConnectingSuites.some(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase());
+                                                            if (isConnectingSuite) {
+                                                                return (
+                                                                    <div className="flex items-center justify-center">
+                                                                        <input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            max={1}
+                                                                            disabled={true}
+                                                                            value={1}
+                                                                            title="Interconnecting Suite is a 1-unit combined suite consisting of connected rooms."
+                                                                            className="w-10 h-7 px-0.5 border border-blue-200 bg-blue-50/80 text-blue-900 rounded text-[11px] text-center font-bold outline-none cursor-not-allowed"
+                                                                        />
+                                                                    </div>
+                                                                );
+                                                            }
+
                                                             const maxAllowed = getMaxRoomsAllowedForRow(row.roomType, row.id);
                                                             const freeLeft = getRemainingFreeCountForType(row.roomType);
                                                             const isExceeded = (Number(row.roomsCount) || 1) > maxAllowed;
@@ -2281,6 +2324,29 @@ export const AddReservation: React.FC = () => {
                                                                                 : 'Pick'}
                                                                         </span>
                                                                     </button>
+                                                                );
+                                                            }
+
+                                                            // Connecting suite display mode
+                                                            const isConnectingSuite = activeConnectingSuites.some(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase());
+                                                            if (isConnectingSuite) {
+                                                                const suiteRoomsStr = (row.assignedRooms && row.assignedRooms.length > 0)
+                                                                    ? row.assignedRooms.join(' + ')
+                                                                    : (assignedList.length > 0 ? assignedList.join(' + ') : '101 + 102');
+                                                                return (
+                                                                    <div className="flex flex-col items-center justify-center">
+                                                                        <div
+                                                                            className="w-28 h-7 px-1.5 border border-blue-400 bg-blue-50/90 text-blue-900 rounded-md text-[10.5px] flex items-center justify-between select-none shadow-2xs mx-auto"
+                                                                            title={`Interconnecting Suite: Rooms ${row.assignedRooms?.join(' & ')} (Adjoining Internal Door)`}
+                                                                        >
+                                                                            <div className="flex items-center gap-1 truncate">
+                                                                                <span className="text-blue-700 font-extrabold text-[10px]">🔗 Suite</span>
+                                                                            </div>
+                                                                            <span className="text-[9.5px] font-mono font-bold text-slate-800 bg-white px-1 py-0.5 rounded border border-blue-200/80 truncate">
+                                                                                {suiteRoomsStr}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
                                                                 );
                                                             }
 
