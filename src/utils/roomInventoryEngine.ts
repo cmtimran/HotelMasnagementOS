@@ -10,6 +10,7 @@
  */
 
 import { getApiBaseUrl } from './apiUrl';
+import { isRoomOOOForDates, isRoomOOSForDates } from './outOfOrderEngine';
 
 export interface CanonicalRoom {
     id: number;
@@ -1080,6 +1081,9 @@ export interface RoomAvailabilityStatus {
         checkOut: string;
     };
     conflictingLock?: RoomLock;
+    maintenanceBlock?: any;
+    isOOSWarning?: boolean;
+    oosWarningReason?: string;
 }
 
 /**
@@ -1106,7 +1110,21 @@ export const getAvailableRoomsForStay = (
     const normalizedFilterType = filterRoomType?.trim().toLowerCase();
 
     const resultStatus: RoomAvailabilityStatus[] = allRooms.map(room => {
-        // 1. Check Physical Status (OOO / Maintenance)
+        // 1a. Check Date-Range Out Of Order (OOO) Blocks (Strict Inventory Deduction)
+        const oooCheck = isRoomOOOForDates(room.number, checkIn, checkOut);
+        if (oooCheck.isBlocked) {
+            return {
+                room,
+                isAvailable: false,
+                reason: 'Out of Order',
+                maintenanceBlock: oooCheck.block
+            };
+        }
+
+        // 1b. Check Date-Range Out Of Service (OOS) Warning
+        const oosCheck = isRoomOOSForDates(room.number, checkIn, checkOut);
+
+        // 1c. Check Legacy Physical Status (OOO / Maintenance)
         if (room.status === 'Out of Order') {
             return {
                 room,
@@ -1218,7 +1236,10 @@ export const getAvailableRoomsForStay = (
 
         return {
             room,
-            isAvailable: true
+            isAvailable: true,
+            isOOSWarning: oosCheck.isWarning,
+            oosWarningReason: oosCheck.reason,
+            maintenanceBlock: oosCheck.block
         };
     });
 

@@ -591,14 +591,24 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                                 <Check size={14} strokeWidth={3} />
                                             </span>
                                         ) : (
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-md ${
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
                                                 isSelectable 
                                                     ? 'bg-emerald-100 text-emerald-800' 
                                                     : isTakenInOther 
                                                         ? 'bg-amber-100 text-amber-800' 
-                                                        : 'bg-red-100 text-red-800'
+                                                        : st.reason === 'Out of Order'
+                                                            ? 'bg-rose-100 text-rose-800'
+                                                            : 'bg-red-100 text-red-800'
                                             }`}>
-                                                {isSelectable ? 'Free' : isTakenInOther ? 'In Form' : 'Booked'}
+                                                {isSelectable
+                                                    ? ((st as any).isOOSWarning ? 'OOS (Warn)' : 'Free')
+                                                    : isTakenInOther
+                                                        ? 'In Form'
+                                                        : st.reason === 'Out of Order'
+                                                            ? 'Out of Order'
+                                                            : st.reason === 'Maintenance'
+                                                                ? 'Maintenance'
+                                                                : 'Booked'}
                                             </span>
                                         )}
                                     </div>
@@ -614,8 +624,17 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                             </div>
                                         )}
                                         {!isSelectable && (
-                                            <div className="text-red-500 text-[10px] truncate mt-1">
-                                                {isTakenInOther ? 'Used in another row' : (st.reason || 'Occupied')}
+                                            <div className="text-rose-600 font-medium text-[10px] truncate mt-1">
+                                                {isTakenInOther
+                                                    ? 'Used in another row'
+                                                    : st.reason === 'Out of Order'
+                                                        ? `🔧 Out of Order (${(st as any).maintenanceBlock?.reasonCategory || 'Maintenance'})`
+                                                        : (st.reason || 'Occupied')}
+                                            </div>
+                                        )}
+                                        {isSelectable && (st as any).isOOSWarning && (
+                                            <div className="text-amber-700 font-medium text-[10px] truncate mt-1">
+                                                ⚠️ Out of Service ({(st as any).maintenanceBlock?.reasonCategory || 'Minor Service'})
                                             </div>
                                         )}
                                     </div>

@@ -28,6 +28,29 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             );
         `);
 
+        // 1b. Room Maintenance Blocks (Out of Order & Out of Service)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS room_maintenance_blocks (
+                id BIGSERIAL PRIMARY KEY,
+                property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                room_number VARCHAR(32) NOT NULL,
+                room_type VARCHAR(128) NOT NULL,
+                block_type VARCHAR(10) NOT NULL DEFAULT 'OOO', -- 'OOO' (Out of Order) or 'OOS' (Out of Service)
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                reason_category VARCHAR(64) NOT NULL,
+                description TEXT,
+                assigned_to VARCHAR(128),
+                status VARCHAR(32) NOT NULL DEFAULT 'active', -- 'active', 'extended', 'completed', 'cancelled'
+                return_to_status VARCHAR(32) NOT NULL DEFAULT 'Dirty', -- 'Dirty', 'Inspected', 'Clean'
+                extension_notes TEXT,
+                created_by VARCHAR(128) NOT NULL DEFAULT 'Manager',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_room_maint_dates ON room_maintenance_blocks(property_id, room_number, start_date, end_date, status);
+        `);
+
         // 2. Rate Plans Table
         await client.query(`
             CREATE TABLE IF NOT EXISTS rate_plans (

@@ -137,4 +137,259 @@ router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Req
     }
 });
 
+// ============================================================================
+// OUT OF ORDER (OOO) & OUT OF SERVICE (OOS) MAINTENANCE BLOCKS
+// ============================================================================
+
+// GET /api/rooms/ooo-blocks - List all OOO/OOS blocks
+router.get('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+    try {
+        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const status = String(req.query.status || 'all');
+        const roomNo = req.query.roomNo ? String(req.query.roomNo) : null;
+
+        let query = `
+            SELECT id, property_id as "propertyId", room_number as "roomNumber", room_type as "roomType",
+                   block_type as "blockType", start_date as "startDate", end_date as "endDate",
+                   reason_category as "reasonCategory", description, assigned_to as "assignedTo",
+                   status, return_to_status as "returnToStatus", extension_notes as "extensionNotes",
+                   created_by as "createdBy", created_at as "createdAt", updated_at as "updatedAt"
+            FROM room_maintenance_blocks
+            WHERE property_id = ?
+        `;
+        const params: any[] = [propertyId];
+
+        if (status !== 'all') {
+            query += ` AND status = ?`;
+            params.push(status);
+        }
+        if (roomNo) {
+            query += ` AND room_number = ?`;
+            params.push(roomNo);
+        }
+
+        query += ` ORDER BY start_date DESC, id DESC`;
+
+        const rows = await db.prepare(query).all(params);
+        res.json({ success: true, data: rows });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to fetch OOO blocks' });
+    }
+});
+
+// POST /api/rooms/ooo-blocks - Create a new OOO/OOS block
+router.post('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+    try {
+        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const body = req.body || {};
+        const roomNumber = String(body.roomNumber || body.room_number || '').trim();
+        const roomType = String(body.roomType || body.room_type || 'Room').trim();
+        const blockType = (body.blockType || body.type || 'OOO').toUpperCase() === 'OOS' ? 'OOS' : 'OOO';
+        const startDate = String(body.startDate || body.start_date || '').trim();
+        const endDate = String(body.endDate || body.end_date || '').trim();
+        const reasonCategory = String(body.reasonCategory || body.reason_category || 'Maintenance').trim();
+        const description = String(body.description || '').trim();
+        const assignedTo = body.assignedTo ? String(body.assignedTo).trim() : null;
+        const returnToStatus = body.returnToStatus === 'Clean' || body.returnToStatus === 'Inspected' ? body.returnToStatus : 'Dirty';
+        const createdBy = body.createdBy ? String(body.createdBy).trim() : 'Manager';
+        const force = Boolean(body.force);
+
+        if (!roomNumber || !startDate || !endDate) {
+            return res.status(400).json({ success: false, error: 'roomNumber, startDate, and endDate are required' });
+        }
+        if (startDate > endDate) {
+            return res.status(400).json({ success: false, error: 'startDate cannot be after endDate' });
+        }
+
+        // 1. Conflict Check: Search for overlapping active reservations in this room
+        const conflictSql = `
+            SELECT r.id, r.reservation_number as "reservationNumber",
+                   rr.check_in_date as "checkIn", rr.check_out_date as "checkOut", r.status,
+                   COALESCE(g.first_name || ' ' || g.last_name, 'Guest') as "guestName"
+            FROM reservations r
+            LEFT JOIN guests g ON r.booker_guest_id = g.id
+            JOIN reservation_rooms rr ON rr.reservation_id = r.id
+            JOIN rooms rm ON rr.room_id = rm.id
+            WHERE r.property_id = ?
+              AND rm.room_number = ?
+              AND r.status NOT IN ('CANCELLED', 'VOIDED', 'CHECKED_OUT', 'COMPLETED')
+              AND rr.check_in_date < ?
+              AND rr.check_out_date > ?
+        `;
+        const conflicts = await db.prepare(conflictSql).all(propertyId, roomNumber, endDate, startDate);
+
+        if (conflicts.length > 0 && !force) {
+            return res.status(409).json({
+                success: false,
+                conflict: true,
+                message: `Room ${roomNumber} has ${conflicts.length} overlapping reservation(s). Reassign them first or confirm with force=true.`,
+                conflictingReservations: conflicts
+            });
+        }
+
+        // 2. Insert maintenance block
+        const insertResult = await db.prepare(`
+            INSERT INTO room_maintenance_blocks (
+                property_id, room_number, room_type, block_type, start_date, end_date,
+                reason_category, description, assigned_to, status, return_to_status, created_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+        `).run(
+            propertyId,
+            roomNumber,
+            roomType,
+            blockType,
+            startDate,
+            endDate,
+            reasonCategory,
+            description,
+            assignedTo,
+            returnToStatus,
+            createdBy
+        );
+
+        // 3. If today falls in [startDate, endDate], sync room status in rooms table
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (todayStr >= startDate && todayStr <= endDate) {
+            const targetStatus = blockType === 'OOO' ? 'OUT_OF_ORDER' : 'MAINTENANCE';
+            await db.prepare(`
+                UPDATE rooms
+                SET status = ?, housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
+                WHERE property_id = ? AND room_number = ?
+            `).run(targetStatus, propertyId, roomNumber);
+        }
+
+        res.status(201).json({
+            success: true,
+            data: {
+                id: insertResult.lastInsertRowid,
+                roomNumber,
+                roomType,
+                blockType,
+                startDate,
+                endDate,
+                reasonCategory,
+                description,
+                assignedTo,
+                status: 'active',
+                returnToStatus,
+                createdBy
+            },
+            message: `Room ${roomNumber} successfully placed ${blockType === 'OOO' ? 'Out of Order' : 'Out of Service'}`
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to create OOO block' });
+    }
+});
+
+// PUT /api/rooms/ooo-blocks/:id/extend - Extend OOO/OOS duration
+router.put('/ooo-blocks/:id/extend', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const body = req.body || {};
+        const newEndDate = String(body.newEndDate || body.endDate || '').trim();
+        const reason = String(body.reason || '').trim();
+        const extendedBy = String(body.extendedBy || 'Manager').trim();
+
+        if (!newEndDate) {
+            return res.status(400).json({ success: false, error: 'newEndDate is required' });
+        }
+
+        const block = await db.prepare('SELECT * FROM room_maintenance_blocks WHERE id = ? AND property_id = ?').get(id, propertyId);
+        if (!block) {
+            return res.status(404).json({ success: false, error: 'Maintenance block not found' });
+        }
+
+        const noteEntry = `[${new Date().toISOString().slice(0, 16).replace('T', ' ')}] Extended from ${block.end_date} to ${newEndDate} by ${extendedBy}. Reason: ${reason || 'N/A'}`;
+        const updatedNotes = block.extension_notes ? `${block.extension_notes}\n${noteEntry}` : noteEntry;
+
+        await db.prepare(`
+            UPDATE room_maintenance_blocks
+            SET end_date = ?, status = 'extended', extension_notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND property_id = ?
+        `).run(newEndDate, updatedNotes, id, propertyId);
+
+        res.json({
+            success: true,
+            message: `Maintenance period extended to ${newEndDate}`,
+            data: { id, newEndDate, status: 'extended' }
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to extend OOO block' });
+    }
+});
+
+// PUT /api/rooms/ooo-blocks/:id/release - Mark maintenance completed and return room to housekeeping
+router.put('/ooo-blocks/:id/release', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const body = req.body || {};
+        const returnStatus = body.returnStatus === 'Clean' || body.returnStatus === 'Inspected' ? body.returnStatus : 'Dirty';
+        const releasedBy = String(body.releasedBy || 'Manager').trim();
+        const notes = String(body.notes || '').trim();
+
+        const block = await db.prepare('SELECT * FROM room_maintenance_blocks WHERE id = ? AND property_id = ?').get(id, propertyId);
+        if (!block) {
+            return res.status(404).json({ success: false, error: 'Maintenance block not found' });
+        }
+
+        const releaseEntry = `[${new Date().toISOString().slice(0, 16).replace('T', ' ')}] Released by ${releasedBy} with status ${returnStatus}. Note: ${notes || 'Work completed'}`;
+        const updatedNotes = block.extension_notes ? `${block.extension_notes}\n${releaseEntry}` : releaseEntry;
+
+        await db.prepare(`
+            UPDATE room_maintenance_blocks
+            SET status = 'completed', return_to_status = ?, extension_notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND property_id = ?
+        `).run(returnStatus, updatedNotes, id, propertyId);
+
+        // Transition room back to ACTIVE with returned Housekeeping status
+        const hkEnum = returnStatus.toUpperCase() === 'INSPECTED' ? 'INSPECTED' : returnStatus.toUpperCase() === 'CLEAN' ? 'CLEAN' : 'DIRTY';
+        await db.prepare(`
+            UPDATE rooms
+            SET status = 'ACTIVE', housekeeping_status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE property_id = ? AND room_number = ?
+        `).run(hkEnum, propertyId, block.room_number);
+
+        res.json({
+            success: true,
+            message: `Room ${block.room_number} successfully released to Housekeeping as ${returnStatus}`,
+            data: { id, roomNumber: block.room_number, returnStatus, status: 'completed' }
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to release OOO block' });
+    }
+});
+
+// DELETE /api/rooms/ooo-blocks/:id - Cancel maintenance block
+router.delete('/ooo-blocks/:id', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+
+        const block = await db.prepare('SELECT * FROM room_maintenance_blocks WHERE id = ? AND property_id = ?').get(id, propertyId);
+        if (!block) {
+            return res.status(404).json({ success: false, error: 'Maintenance block not found' });
+        }
+
+        await db.prepare(`
+            UPDATE room_maintenance_blocks
+            SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND property_id = ?
+        `).run(id, propertyId);
+
+        // If room is currently OUT_OF_ORDER or MAINTENANCE, revert to ACTIVE
+        await db.prepare(`
+            UPDATE rooms
+            SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+            WHERE property_id = ? AND room_number = ? AND status IN ('OUT_OF_ORDER', 'MAINTENANCE')
+        `).run(propertyId, block.room_number);
+
+        res.json({ success: true, message: `Maintenance block cancelled for Room ${block.room_number}` });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to cancel OOO block' });
+    }
+});
+
 export default router;

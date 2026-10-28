@@ -16,12 +16,21 @@ import {
     Home,
     Printer,
     Wallet,
-    Link as LinkIcon
+    Link as LinkIcon,
+    Wrench
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useNavigation } from '../context/NavigationContext';
 import QuickReservationModal from './modals/QuickReservationModal';
 import AddReservationModal from './modals/AddReservationModal';
+import OutOfOrderModal from './modals/OutOfOrderModal';
+import {
+    getStoredOOOBlocks,
+    isBlockOverdue,
+    syncOOOBlocksFromBackend,
+    isDateRangeOverlapping,
+    type OutOfOrderBlock
+} from '../utils/outOfOrderEngine';
 import type { AmendBookingData } from './modals/AmendStayModal';
 import ReservationActionDrawer, { type DrawerMode } from './modals/ReservationActionDrawer';
 import { toast } from '../context/ToastContext';
@@ -272,6 +281,51 @@ export const StayView: React.FC = () => {
     const [actionDrawerTargetDep, setActionDrawerTargetDep] = useState<string | undefined>();
     const [actionDrawerTargetNights, setActionDrawerTargetNights] = useState<number | undefined>();
     const [actionDrawerTargetRoom, setActionDrawerTargetRoom] = useState<string | undefined>();
+
+    // =========================================================================
+    // ROOM MAINTENANCE & OUT OF ORDER (OOO / OOS) STATE
+    // =========================================================================
+    const [isOOOModalOpen, setIsOOOModalOpen] = useState(false);
+    const [selectedOOORoom, setSelectedOOORoom] = useState<string | undefined>(undefined);
+    const [selectedOOOStart, setSelectedOOOStart] = useState<string | undefined>(undefined);
+    const [selectedOOOEnd, setSelectedOOOEnd] = useState<string | undefined>(undefined);
+    const [oooVersion, setOooVersion] = useState(0);
+
+    const oooBlocks = useMemo(() => {
+        return getStoredOOOBlocks(activePropertyId);
+    }, [oooVersion, activePropertyId]);
+
+    const activeOOOBlocksByRoom = useMemo(() => {
+        const map = new Map<string, OutOfOrderBlock[]>();
+        oooBlocks.filter(b => b.status === 'active' || b.status === 'extended').forEach(b => {
+            const list = map.get(b.roomNumber) || [];
+            list.push(b);
+            map.set(b.roomNumber, list);
+        });
+        return map;
+    }, [oooBlocks]);
+
+    const activeOOOCount = useMemo(() => {
+        return oooBlocks.filter(b => b.status === 'active' || b.status === 'extended').length;
+    }, [oooBlocks]);
+
+    const overdueOOOCount = useMemo(() => {
+        return oooBlocks.filter(b => isBlockOverdue(b, operatingDateStr)).length;
+    }, [oooBlocks, operatingDateStr]);
+
+    useEffect(() => {
+        const handleOOOUpdate = () => {
+            setOooVersion(v => v + 1);
+            setRoomsVersion(v => v + 1);
+        };
+        window.addEventListener('hotel_ooo_blocks_updated', handleOOOUpdate);
+        syncOOOBlocksFromBackend(activePropertyId).then(() => {
+            setOooVersion(v => v + 1);
+        });
+        return () => {
+            window.removeEventListener('hotel_ooo_blocks_updated', handleOOOUpdate);
+        };
+    }, [activePropertyId]);
 
     // Extend / Shorten Drag State
     const [extendDrag, setExtendDrag] = useState<{
@@ -866,7 +920,7 @@ export const StayView: React.FC = () => {
         return map;
     }, [bookings]);
 
-    // Check if a target room and inclusive column range [startCol, endCol] conflicts with any existing booking
+    // Check if a target room and inclusive column range [startCol, endCol] conflicts with any existing booking OR Out of Order block
     const findRoomConflict = React.useCallback((
         roomNum: string,
         startCol: number,
@@ -874,13 +928,37 @@ export const StayView: React.FC = () => {
         excludeBookingId?: string
     ): TimelineBooking | undefined => {
         const roomBookings = bookingsByRoom.get(String(roomNum)) || [];
-        return roomBookings.find(other => {
+        const bookingConflict = roomBookings.find(other => {
             if (excludeBookingId && (other.id === excludeBookingId || other.reservationNumber === excludeBookingId)) {
                 return false;
             }
             return other.startIndex <= endCol && other.endIndex >= startCol;
         });
-    }, [bookingsByRoom]);
+        if (bookingConflict) return bookingConflict;
+
+        // Check if room has an active Out Of Order block for this date window
+        const blocks = activeOOOBlocksByRoom.get(String(roomNum)) || [];
+        const startDateStr = days[startCol]?.date;
+        const endDateStr = days[endCol]?.date;
+        if (startDateStr && endDateStr) {
+            const oooMatch = blocks.find(b => b.blockType === 'OOO' && isDateRangeOverlapping(b.startDate, b.endDate, startDateStr, endDateStr));
+            if (oooMatch) {
+                return {
+                    id: oooMatch.id,
+                    reservationNumber: `OOO-${oooMatch.roomNumber}`,
+                    guestName: `[Out of Order: ${oooMatch.reasonCategory}]`,
+                    roomNumber: oooMatch.roomNumber,
+                    roomType: oooMatch.roomType,
+                    startIndex: startCol,
+                    endIndex: endCol,
+                    status: 'out-of-order',
+                    nights: endCol - startCol + 1,
+                    rate: 0
+                };
+            }
+        }
+        return undefined;
+    }, [bookingsByRoom, activeOOOBlocksByRoom, days]);
 
     // O(1) Pre-calculated Soft Locks Lookup Map by Room Number
     const locksByRoom = useMemo(() => {
@@ -2414,6 +2492,33 @@ export const StayView: React.FC = () => {
                             </span>
                         )}
                     </button>
+
+                    {/* ROOM MAINTENANCE (OOO / OOS) BUTTON */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSelectedOOORoom(undefined);
+                            setIsOOOModalOpen(true);
+                        }}
+                        className={`h-7 px-2.5 rounded text-[10px] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ml-1 active:scale-[0.98] ${
+                            overdueOOOCount > 0
+                                ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
+                                : 'bg-slate-700 hover:bg-slate-800 text-white'
+                        }`}
+                        title="Open Room Out of Order & Out of Service Manager"
+                    >
+                        <Wrench size={12} />
+                        <span>Maintenance</span>
+                        {overdueOOOCount > 0 ? (
+                            <span className="px-1.5 py-0.2 bg-white text-rose-700 font-extrabold text-[9px] rounded-full shadow-2xs">
+                                {overdueOOOCount} Overdue
+                            </span>
+                        ) : activeOOOCount > 0 ? (
+                            <span className="px-1.5 py-0.2 bg-amber-400 text-slate-900 font-extrabold text-[9px] rounded-full shadow-2xs">
+                                {activeOOOCount}
+                            </span>
+                        ) : null}
+                    </button>
                 </div>
             </div>
 
@@ -2593,17 +2698,31 @@ export const StayView: React.FC = () => {
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                                            room.status === 'out-of-order'
-                                                                ? 'bg-rose-600 ring-2 ring-rose-200'
-                                                                : room.status === 'out-of-service'
-                                                                    ? 'bg-amber-600 ring-1 ring-amber-300'
-                                                                    : room.status === 'inspected'
-                                                                        ? 'bg-blue-500'
-                                                                        : room.status === 'dirty'
-                                                                            ? 'bg-yellow-500'
-                                                                            : 'bg-emerald-500'
-                                                        }`} title={`Room ${room.roomNumber} is ${room.status.replace(/-/g, ' ')}`}></span>
+                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedOOORoom(room.roomNumber);
+                                                                    setIsOOOModalOpen(true);
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-rose-600 transition-opacity rounded hover:bg-slate-100"
+                                                                title={`Place Room ${room.roomNumber} Out of Order / Out of Service`}
+                                                            >
+                                                                <Wrench size={10} />
+                                                            </button>
+                                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                                                room.status === 'out-of-order'
+                                                                    ? 'bg-rose-600 ring-2 ring-rose-200'
+                                                                    : room.status === 'out-of-service'
+                                                                        ? 'bg-amber-600 ring-1 ring-amber-300'
+                                                                        : room.status === 'inspected'
+                                                                            ? 'bg-blue-500'
+                                                                            : room.status === 'dirty'
+                                                                                ? 'bg-yellow-500'
+                                                                                : 'bg-emerald-500'
+                                                            }`} title={`Room ${room.roomNumber} is ${room.status.replace(/-/g, ' ')}`}></span>
+                                                        </div>
                                                     </div>
 
                                                     {/* Day Cells & Bookings Overlay */}
@@ -2613,6 +2732,13 @@ export const StayView: React.FC = () => {
                                                                 key={d.index}
                                                                 style={{ width: `${colWidth}px`, flex: `0 0 ${colWidth}px` }}
                                                                 onMouseDown={(e) => {
+                                                                    const dateOOO = (activeOOOBlocksByRoom.get(room.roomNumber) || []).find(b =>
+                                                                        b.blockType === 'OOO' && isDateRangeOverlapping(b.startDate, b.endDate, d.date, d.date)
+                                                                    );
+                                                                    if (dateOOO) {
+                                                                        showToast(`⚠️ Room ${room.roomNumber} is Out of Order on ${d.date} (${dateOOO.reasonCategory}). Cannot allocate reservations.`);
+                                                                        return;
+                                                                    }
                                                                     if (room.status === 'out-of-order') {
                                                                         showToast(`⚠️ Room ${room.roomNumber} is Out of Order (Under Maintenance). Cannot allocate reservations.`);
                                                                         return;
@@ -2712,6 +2838,66 @@ export const StayView: React.FC = () => {
                                                                 </div>
                                                             );
                                                         })()}
+
+                                                        {/* Render Active Maintenance (OOO / OOS) Blocks */}
+                                                        {(activeOOOBlocksByRoom.get(room.roomNumber) || []).map(block => {
+                                                            const isOverdue = isBlockOverdue(block, operatingDateStr);
+
+                                                            let startCol = days.findIndex(d => d.date === block.startDate);
+                                                            let endCol = days.findIndex(d => d.date === block.endDate);
+
+                                                            if (startCol === -1) {
+                                                                if (block.startDate < days[0]?.date && block.endDate >= days[0]?.date) {
+                                                                    startCol = 0;
+                                                                } else {
+                                                                    return null;
+                                                                }
+                                                            }
+                                                            if (endCol === -1) {
+                                                                if (block.endDate > days[days.length - 1]?.date) {
+                                                                    endCol = daysWindow - 1;
+                                                                } else {
+                                                                    return null;
+                                                                }
+                                                            }
+                                                            if (startCol > daysWindow - 1 || endCol < 0 || startCol > endCol) return null;
+
+                                                            const left = startCol * colWidth + 1;
+                                                            const width = Math.max(20, (endCol - startCol + 1) * colWidth - 2);
+                                                            const isOOO = block.blockType === 'OOO';
+
+                                                            return (
+                                                                <div
+                                                                    key={block.id}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedOOORoom(block.roomNumber);
+                                                                        setIsOOOModalOpen(true);
+                                                                    }}
+                                                                    style={{
+                                                                        left: `${left}px`,
+                                                                        width: `${width}px`,
+                                                                        background: isOOO
+                                                                            ? 'repeating-linear-gradient(45deg, #e11d48, #e11d48 8px, #be123c 8px, #be123c 16px)'
+                                                                            : 'repeating-linear-gradient(45deg, #d97706, #d97706 8px, #b45309 8px, #b45309 16px)'
+                                                                    }}
+                                                                    className={`absolute top-[4px] bottom-[4px] rounded px-1.5 py-0.5 text-[9.5px] text-white flex items-center justify-between shadow-xs z-15 cursor-pointer hover:brightness-110 transition-all ${
+                                                                        isOverdue ? 'ring-2 ring-rose-400 animate-pulse' : ''
+                                                                    }`}
+                                                                    title={`Room ${block.roomNumber} ${block.blockType} (${block.reasonCategory}): ${block.description}\nPeriod: ${block.startDate} to ${block.endDate}${isOverdue ? ' [OVERDUE]' : ''}\nClick to Manage / Extend / Release`}
+                                                                >
+                                                                    <div className="flex items-center gap-1 truncate">
+                                                                        <Wrench size={10} className="flex-shrink-0" />
+                                                                        <span className="font-bold tracking-tight truncate">
+                                                                            {block.blockType}: {block.reasonCategory} {isOverdue ? '⚠️ OVERDUE' : ''}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-[8.5px] font-mono opacity-80 hidden md:inline ml-1 flex-shrink-0">
+                                                                        {block.endDate.slice(5)}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
 
                                                         {/* Render Booking Bars with O(1) Precomputed Room Lookup */}
                                                         {(bookingsByRoom.get(room.roomNumber) || [])
@@ -3627,6 +3813,24 @@ export const StayView: React.FC = () => {
                 </div>,
                 document.body
             )}
+
+            {/* Out Of Order & Out Of Service Management Modal */}
+            <OutOfOrderModal
+                isOpen={isOOOModalOpen}
+                onClose={() => {
+                    setIsOOOModalOpen(false);
+                    setSelectedOOORoom(undefined);
+                    setSelectedOOOStart(undefined);
+                    setSelectedOOOEnd(undefined);
+                }}
+                initialRoomNumber={selectedOOORoom}
+                initialStartDate={selectedOOOStart}
+                initialEndDate={selectedOOOEnd}
+                onBlockUpdated={() => {
+                    setOooVersion(v => v + 1);
+                    setRoomsVersion(v => v + 1);
+                }}
+            />
         </div>
     );
 };

@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
     Search, Plus, Edit2, Trash2, Save, ChevronLeft,
-    MapPin, Key, Layers, CheckCircle2, Building2, AlertTriangle, Sparkles
+    MapPin, Key, Layers, CheckCircle2, Building2, AlertTriangle, Sparkles, Wrench
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { getApiBaseUrl } from '../utils/apiUrl';
+import OutOfOrderModal from './modals/OutOfOrderModal';
+import { getStoredOOOBlocks } from '../utils/outOfOrderEngine';
 import {
     getCanonicalRooms,
     getDynamicRoomTypes,
@@ -92,6 +94,21 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
     const [selectedFloor, setSelectedFloor] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     const [activeTab, setActiveTab] = useState('location');
+
+    // Out of Order Manager
+    const [isOOOModalOpen, setIsOOOModalOpen] = useState(false);
+    const [selectedOOORoom, setSelectedOOORoom] = useState<string | undefined>(undefined);
+    const [oooVersion, setOooVersion] = useState(0);
+
+    const oooBlocks = useMemo(() => {
+        return getStoredOOOBlocks(1);
+    }, [oooVersion]);
+
+    useEffect(() => {
+        const handleUpdate = () => setOooVersion(v => v + 1);
+        window.addEventListener('hotel_ooo_blocks_updated', handleUpdate);
+        return () => window.removeEventListener('hotel_ooo_blocks_updated', handleUpdate);
+    }, []);
 
     const [formData, setFormData] = useState<Room>({
         id: 0,
@@ -368,6 +385,19 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                 Back
                             </button>
                         )}
+                        {view === 'list' && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedOOORoom(undefined);
+                                    setIsOOOModalOpen(true);
+                                }}
+                                className="btn-secondary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer text-rose-700 hover:bg-rose-50 border-rose-200"
+                            >
+                                <Wrench className="size-3.5 text-rose-600" />
+                                <span>Manage OOO / OOS</span>
+                            </button>
+                        )}
                         {view === 'list' ? (
                             <button
                                 onClick={handleAddNew}
@@ -526,6 +556,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                             {filteredRooms.map(room => {
                                 const roomType = availableRoomTypes.find(t => String(t.id) === room.roomTypeId);
                                 const floor = availableFloors.find(f => String(f.id) === room.floorId);
+                                const activeBlock = oooBlocks.find(b => b.roomNumber === room.number && (b.status === 'active' || b.status === 'extended'));
 
                                 return (
                                     <div key={room.id} className="card-container p-3 hover:shadow-xs transition relative flex flex-col justify-between group">
@@ -539,9 +570,34 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                                         </span>
                                                     </div>
                                                     <p className="text-[11px] text-primary font-semibold mt-0.5">{roomType?.name || 'Standard'}</p>
+                                                    {activeBlock && (
+                                                        <div className="mt-1">
+                                                            <span
+                                                                onClick={() => {
+                                                                    setSelectedOOORoom(room.number);
+                                                                    setIsOOOModalOpen(true);
+                                                                }}
+                                                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                                                title={`Active ${activeBlock.blockType}: ${activeBlock.startDate} to ${activeBlock.endDate} (${activeBlock.reasonCategory})`}
+                                                            >
+                                                                <Wrench className="size-2.5 text-rose-600" />
+                                                                {activeBlock.blockType}: {activeBlock.reasonCategory} ({activeBlock.endDate.slice(5)})
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="flex gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedOOORoom(room.number);
+                                                            setIsOOOModalOpen(true);
+                                                        }}
+                                                        className="btn-icon size-6 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                                        title="Set Out of Order / Out of Service"
+                                                    >
+                                                        <Wrench className="size-3 text-slate-600" />
+                                                    </button>
                                                     <button onClick={() => handleEdit(room)} className="btn-icon size-6" title="Edit Room">
                                                         <Edit2 className="size-3 text-slate-600" />
                                                     </button>
@@ -850,6 +906,19 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                     </div>
                 </div>
             )}
+
+            {/* Out of Order & Out of Service Modal */}
+            <OutOfOrderModal
+                isOpen={isOOOModalOpen}
+                onClose={() => {
+                    setIsOOOModalOpen(false);
+                    setSelectedOOORoom(undefined);
+                }}
+                initialRoomNumber={selectedOOORoom}
+                onBlockUpdated={() => {
+                    setOooVersion(v => v + 1);
+                }}
+            />
         </div>
     );
 }
