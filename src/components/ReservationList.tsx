@@ -51,13 +51,18 @@ const ReservationList = () => {
         const operatingDate = getOperatingSystemDate();
         if (!Array.isArray(stored)) return [];
         return stored.flatMap((r, idx) => {
+            const isConnectingSuite = Boolean(
+                r.isConnectingSuite ||
+                (r.roomType && (r.roomType.toLowerCase().includes('connecting') || r.roomType.toLowerCase().includes('interconnecting')))
+            );
+
             const rooms = (r.roomsList && r.roomsList.length > 0)
                 ? r.roomsList
                 : (r.groupRoomsList && r.groupRoomsList.length > 0)
                     ? r.groupRoomsList
                     : null;
 
-            if (rooms && rooms.length > 1) {
+            if (!isConnectingSuite && rooms && rooms.length > 1) {
                 return rooms.map((rm: any, subIdx: number) => {
                     const rawSt = (rm.status && rm.status !== 'ASSIGNED' && rm.status !== 'UNASSIGNED') ? rm.status : (r.status || 'confirmed');
                     let st = String(rawSt || 'confirmed').toLowerCase() as any;
@@ -103,7 +108,15 @@ const ReservationList = () => {
             } else if (st === 'confirmed' || st === 'arriving' || st === 'assigned') {
                 st = r.checkIn === operatingDate ? 'arriving' : 'confirmed';
             }
-            const subNum = r.subBookingNumber || (r.reservationNumber ? `${r.reservationNumber}-01` : undefined);
+
+            const roomNumbers = (r.allocatedRooms && r.allocatedRooms.length > 0)
+                ? r.allocatedRooms
+                : (rooms && rooms.length > 0 ? rooms.map((x: any) => x.roomNumber).filter(Boolean) : [r.roomNumber]);
+            const roomDisplay = isConnectingSuite && roomNumbers.length > 1
+                ? roomNumbers.join(' + ')
+                : String(r.roomNumber || (r.allocatedRooms && r.allocatedRooms[0]) || (rooms && rooms[0]?.roomNumber) || 'Unassigned');
+
+            const subNum = isConnectingSuite ? undefined : (r.subBookingNumber || (r.reservationNumber ? `${r.reservationNumber}-01` : undefined));
             const regNo = r.registrationNumber || (st === 'in-house' || st === 'departing' ? `REG-${(subNum || r.reservationNumber || '').replace(/^RES-/, '')}` : undefined);
             const folioNo = r.folioNumber || `FOL-${(subNum || r.reservationNumber || '').replace(/^RES-/, '')}`;
 
@@ -111,11 +124,11 @@ const ReservationList = () => {
                 id: String(r.id || idx + 1),
                 reservationNumber: r.reservationNumber,
                 subBookingNumber: subNum,
-                groupCode: r.groupCode,
+                groupCode: isConnectingSuite ? undefined : r.groupCode,
                 registrationNumber: regNo,
                 folioNumber: folioNo,
-                guestName: r.guestName || 'Valued Guest',
-                roomNumber: String(r.roomNumber || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned'),
+                guestName: r.guestName || (rooms && rooms[0]?.guestName) || 'Valued Guest',
+                roomNumber: roomDisplay,
                 roomType: r.roomType || 'Standard Room',
                 checkIn: r.checkIn,
                 checkOut: r.checkOut,

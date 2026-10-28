@@ -598,7 +598,15 @@ export const StayView: React.FC = () => {
                 continue;
             }
 
-            const isGroup = (res.roomsList && res.roomsList.length > 1) || (res.allocatedRooms && res.allocatedRooms.length > 1);
+            const isConnSuite = Boolean(
+                res.isConnectingSuite ||
+                (res.roomType && (res.roomType.toLowerCase().includes('connecting') || res.roomType.toLowerCase().includes('interconnecting')))
+            );
+            const isGroup = !isConnSuite && Boolean(
+                res.isGroup ||
+                res.groupCode ||
+                ((res.roomsList && res.roomsList.length > 1) || (res.allocatedRooms && res.allocatedRooms.length > 1))
+            );
             const totalAmt = Number(res.totalAmount) || 0;
             const paidAmt = Number(res.paidAmount) || 0;
             const dueAmt = Number(res.dueAmount !== undefined ? res.dueAmount : Math.max(0, totalAmt - paidAmt));
@@ -612,6 +620,61 @@ export const StayView: React.FC = () => {
             const timelineStatus: TimelineBooking['status'] = isPastBooking ? 'checked-out' : isInHouse ? 'arrived' : isHold ? 'hold' : 'confirmed';
             const regNo = res.registrationNumber || (isInHouse ? `REG-${res.reservationNumber.replace(/^RES-/, '')}` : undefined);
             const folioNo = res.folioNumber || `FOL-${res.reservationNumber.replace(/^RES-/, '')}-1`;
+
+            if (isConnSuite) {
+                const connRooms = (res.allocatedRooms && res.allocatedRooms.length > 0)
+                    ? res.allocatedRooms.map(String)
+                    : (res.roomsList && res.roomsList.length > 0
+                        ? res.roomsList.flatMap((rm: any) => String(rm.roomNumber).split('+').map(s => s.trim()))
+                        : [String(res.roomNumber || '101')]);
+
+                connRooms.forEach((rNum: string) => {
+                    const rIn = res.checkIn;
+                    const rOut = res.checkOut;
+                    const rNights = Number(res.nights || 1);
+                    const sIdx = days.findIndex(d => d.date === rIn);
+                    const curInDate = new Date(rIn);
+                    const diffFromStart = Math.round((curInDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const start = sIdx !== -1 ? sIdx : diffFromStart;
+                    const end = start + Math.max(1, rNights) - 1;
+
+                    syncedList.push({
+                        id: `res-${res.id}-suite-${rNum}`,
+                        reservationNumber: res.reservationNumber,
+                        subBookingNumber: res.reservationNumber,
+                        groupCode: undefined,
+                        registrationNumber: regNo,
+                        registeredAt: res.registeredAt,
+                        folioNumber: folioNo,
+                        guestName: res.guestName,
+                        roomNumber: rNum,
+                        roomType: res.roomType || 'Interconnecting Suite',
+                        ratePlan: res.ratePlan || 'Standard Rate',
+                        rate: Number(res.rateAmount || res.totalAmount || 0),
+                        startIndex: start,
+                        endIndex: end,
+                        checkInDate: rIn,
+                        checkOutDate: rOut,
+                        nights: rNights,
+                        status: timelineStatus,
+                        isPast: isPastBooking,
+                        isGroupOwner: false,
+                        isGroupBooking: false,
+                        isPaymentDue: dueAmt > 0,
+                        isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none'),
+                        totalAmount: totalAmt,
+                        paidAmount: paidAmt,
+                        dueAmount: dueAmt,
+                        baseAmount: baseAmt,
+                        totalTaxAmount: totalTax,
+                        taxConfigCode: taxCode,
+                        taxApplicable: isTaxApp,
+                        adults: Number(res.adults !== undefined ? res.adults : 2),
+                        children: Number(res.children !== undefined ? res.children : 0)
+                    });
+                });
+                continue;
+            }
 
             if (res.roomsList && Array.isArray(res.roomsList) && res.roomsList.length > 0) {
                 res.roomsList.forEach((r: any, idx: number) => {

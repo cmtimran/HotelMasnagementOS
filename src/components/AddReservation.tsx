@@ -520,7 +520,35 @@ export const AddReservation: React.FC = () => {
             if ((found as any).taxConfigId) setSelectedTaxConfigId((found as any).taxConfigId);
 
             // Step 1: Rooms List
-            if (Array.isArray(found.roomsList) && found.roomsList.length > 0) {
+            const isConnRes = Boolean(
+                found.isConnectingSuite ||
+                (found.roomType && (found.roomType.toLowerCase().includes('connecting') || found.roomType.toLowerCase().includes('interconnecting')))
+            );
+
+            if (isConnRes) {
+                const connRooms = (found.allocatedRooms && found.allocatedRooms.length > 0)
+                    ? found.allocatedRooms
+                    : (found.roomsList && found.roomsList.length > 0
+                        ? found.roomsList.flatMap((rm: any) => String(rm.roomNumber).split('+').map(s => s.trim()))
+                        : [found.roomNumber || '101']);
+                setRoomsList([{
+                    id: 1,
+                    roomType: found.roomType || 'Interconnecting Suite',
+                    roomsCount: 1,
+                    ratePlan: found.ratePlan || '',
+                    roomNumber: connRooms.join(' + '),
+                    assignedRooms: connRooms,
+                    adults: Number(found.adults) || 2,
+                    children: Number(found.children) || 0,
+                    childrenAges: [],
+                    rate: Number((found as any).roomRate) || (Number(found.totalAmount) ? Math.round(Number(found.totalAmount) / Math.max(1, Number(found.nights) || 1)) : 6000),
+                    isAssign: true,
+                    checkInDate: found.checkIn,
+                    checkOutDate: found.checkOut,
+                    nights: Number(found.nights) || 1,
+                    servicesBundle: (found as any).servicesBundle
+                }]);
+            } else if (Array.isArray(found.roomsList) && found.roomsList.length > 0) {
                 setRoomsList(found.roomsList.map((rm: any, idx: number) => ({
                     id: idx + 1,
                     roomType: rm.roomType || found.roomType || 'Deluxe Double',
@@ -1444,26 +1472,34 @@ export const AddReservation: React.FC = () => {
             });
         }
 
+        const hasConnectingSuite = roomsList.some(r =>
+            activeConnectingSuites.some(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase())
+        );
+        const isConnectingSuite = hasConnectingSuite && roomsList.length === 1 && totalRoomsCount === 1;
+
         const mainRoom = roomsList[0] || { roomNumber: '101', roomType: 'Deluxe Double' };
-        const primaryRoomNumber = allocatedRoomNumbers[0] || mainRoom.roomNumber;
+        const primaryRoomNumber = isConnectingSuite && allocatedRoomNumbers.length > 1
+            ? allocatedRoomNumbers.join(' + ')
+            : (allocatedRoomNumbers[0] || mainRoom.roomNumber);
 
         const newReservation = {
             id: reservationId,
             reservationNumber,
             registrationNumber: statusVal === 'in-house' ? (editingReservation?.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : editingReservation?.registrationNumber,
             folioNumber: editingReservation?.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`,
-            groupCode: editingReservation?.groupCode || (totalRoomsCount > 1 ? `GRP-${reservationNumber.replace(/^RES-/, '')}` : undefined),
+            groupCode: isConnectingSuite ? undefined : (editingReservation?.groupCode || (totalRoomsCount > 1 ? `GRP-${reservationNumber.replace(/^RES-/, '')}` : undefined)),
             guestName: `${salutation} ${guestName.trim()}`,
             phone: mobile || phone,
             email: email,
             roomNumber: primaryRoomNumber,
             roomType: mainRoom.roomType,
             allocatedRooms: allocatedRoomNumbers,
-            roomsCount: totalRoomsCount,
+            roomsCount: isConnectingSuite ? 1 : totalRoomsCount,
             checkIn: groupHorizon.hasCustomDates ? groupHorizon.minIn : checkIn,
             checkOut: groupHorizon.hasCustomDates ? groupHorizon.maxOut : checkOut,
             nights: groupHorizon.hasCustomDates ? groupHorizon.spanNights : nights,
-            isGroup: totalRoomsCount > 1,
+            isGroup: isConnectingSuite ? false : (totalRoomsCount > 1),
+            isConnectingSuite,
             staggeredDates: groupHorizon.hasCustomDates,
             dayUse,
             adults: mainRoom.adults,
@@ -1491,9 +1527,21 @@ export const AddReservation: React.FC = () => {
             specialRequests: remarksMap['Guest'] || '',
             roomsList: roomsList.flatMap((r) => {
                 const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
+                if (suite) {
+                    const assigned = rowAllocatedMap.get(r.id) || r.assignedRooms || suite.componentRooms.flatMap(c => c.roomNumbers || []);
+                    return [{
+                        ...r,
+                        roomsCount: 1,
+                        roomNumber: assigned.join(' + '),
+                        assignedRooms: assigned,
+                        checkInDate: r.checkInDate || checkIn,
+                        checkOutDate: r.checkOutDate || checkOut,
+                        nights: r.nights || Math.max(1, nights)
+                    }];
+                }
                 const countNeeded = Number(r.roomsCount) || 1;
                 const assigned = rowAllocatedMap.get(r.id) || (
-                    (r.assignedRooms && (suite || r.assignedRooms.length === countNeeded))
+                    (r.assignedRooms && r.assignedRooms.length === countNeeded)
                         ? r.assignedRooms
                         : [r.roomNumber]
                 );

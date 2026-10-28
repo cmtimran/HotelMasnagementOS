@@ -184,13 +184,18 @@ export const ReservationsView: React.FC = () => {
         if (!Array.isArray(rawList)) return [];
         const opDate = getOperatingSystemDate();
         return rawList.flatMap((r: any, idx: number) => {
+            const isConnectingSuite = Boolean(
+                r.isConnectingSuite ||
+                (r.roomType && (r.roomType.toLowerCase().includes('connecting') || r.roomType.toLowerCase().includes('interconnecting')))
+            );
+
             const rooms = (r.roomsList && r.roomsList.length > 0)
                 ? r.roomsList
                 : (r.groupRoomsList && r.groupRoomsList.length > 0)
                     ? r.groupRoomsList
                     : null;
 
-            if (rooms && rooms.length > 1) {
+            if (!isConnectingSuite && rooms && rooms.length > 1) {
                 return rooms.map((rm: any, subIdx: number) => {
                     const subNum = rm.subBookingNumber || `${r.reservationNumber}-${String(subIdx + 1).padStart(2, '0')}`;
                     const regNo = rm.registrationNumber || r.registrationNumber;
@@ -238,17 +243,24 @@ export const ReservationsView: React.FC = () => {
             const rawVip = String(r.vip || '').trim();
             const normalizedVip = (rawVip && rawVip.toUpperCase() !== 'NONE' && rawVip.toUpperCase() !== 'REGULAR' && rawVip.toLowerCase() !== 'null') ? rawVip : 'None';
 
+            const roomNumbers = (r.allocatedRooms && r.allocatedRooms.length > 0)
+                ? r.allocatedRooms
+                : (rooms && rooms.length > 0 ? rooms.map((x: any) => x.roomNumber).filter(Boolean) : [r.roomNumber]);
+            const roomDisplay = isConnectingSuite && roomNumbers.length > 1
+                ? roomNumbers.join(' + ')
+                : String(r.roomNumber || (rooms && rooms[0]?.roomNumber) || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned');
+
             return [{
                 id: r.id || idx + 1,
                 reservationNumber: r.reservationNumber,
-                subBookingNumber: r.subBookingNumber || `${r.reservationNumber}-01`,
-                groupCode: r.groupCode,
+                subBookingNumber: isConnectingSuite ? undefined : (r.subBookingNumber || (r.reservationNumber ? `${r.reservationNumber}-01` : 'RES-01')),
+                groupCode: isConnectingSuite ? undefined : r.groupCode,
                 registrationNumber: r.registrationNumber,
                 folioNumber: r.folioNumber || `FOL-${(r.reservationNumber || '').replace(/^RES-/, '')}`,
-                guestName: r.guestName || 'Valued Guest',
+                guestName: r.guestName || (rooms && rooms[0]?.guestName) || 'Valued Guest',
                 phone: r.phone || '',
                 email: r.email || '',
-                roomNumber: String(r.roomNumber || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned'),
+                roomNumber: roomDisplay,
                 roomType: r.roomType || 'Standard Room',
                 checkIn: r.checkIn,
                 checkOut: r.checkOut,
@@ -261,9 +273,9 @@ export const ReservationsView: React.FC = () => {
                 dueAmount: Number(r.dueAmount) || 0,
                 source: r.source || 'Direct',
                 vip: normalizedVip,
-                isGroup: Boolean(r.isGroup || r.groupCode),
-                groupId: r.groupCode || r.groupId,
-                groupName: r.groupCode ? `Group: ${r.groupCode}` : undefined,
+                isGroup: isConnectingSuite ? false : Boolean(r.isGroup || r.groupCode),
+                groupId: isConnectingSuite ? undefined : (r.groupCode || r.groupId),
+                groupName: isConnectingSuite ? undefined : (r.groupCode ? `Group: ${r.groupCode}` : undefined),
                 isMasterGuest: true
             }];
         });
