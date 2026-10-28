@@ -520,20 +520,20 @@ export const bookingService = {
       const vipStatus = payload.vip || payload.vipStatus || 'NONE';
 
       let guestId: number;
-      const normPhone = normalizePhone(phone);
-      const altNorm = normPhone.startsWith('0') ? '880' + normPhone.slice(1) : (normPhone.startsWith('880') ? '0' + normPhone.slice(3) : normPhone);
+      const pureDigits = phone.replace(/\D/g, '');
+      const subscriberSuffix = pureDigits.length >= 8 ? pureDigits.slice(-8) : pureDigits;
       const cleanEmail = email ? email.trim().toLowerCase() : '';
 
       const guestLookup = await client.query(`
         SELECT id FROM guests 
         WHERE (
           regexp_replace(phone, '\\D', '', 'g') = $1
-          OR regexp_replace(phone, '\\D', '', 'g') = $2
+          OR ($2 != '' AND length($2) >= 8 AND regexp_replace(phone, '\\D', '', 'g') LIKE '%' || $2)
           OR ($3 != '' AND $3 != 'guest@hospitality.com' AND LOWER(email) = $3)
         )
         ORDER BY id ASC
         LIMIT 1
-      `, [normPhone, altNorm, cleanEmail]);
+      `, [pureDigits, subscriberSuffix, cleanEmail]);
 
       if (guestLookup.rows.length > 0) {
         guestId = guestLookup.rows[0].id;

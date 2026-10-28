@@ -12,15 +12,8 @@ import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, sy
 import { useNavigation } from '../context/NavigationContext';
 import { getApiBaseUrl } from '../utils/apiUrl';
 import MergeGuestModal from './modals/MergeGuestModal';
-
-export const normalizePhone = (raw: string | null | undefined): string => {
-    if (!raw) return '';
-    let digits = raw.replace(/\D/g, '');
-    if (digits.startsWith('880') && digits.length >= 13) {
-        digits = '0' + digits.slice(3);
-    }
-    return digits;
-};
+import { isSamePhoneNumber } from '../utils/phoneUtils';
+export { normalizePhone, isSamePhoneNumber } from '../utils/phoneUtils';
 
 export interface GuestRecord {
     id: number;
@@ -146,13 +139,12 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
         };
 
         const rawPhone = r.phone || r.guestPhone || '';
-        const normP = normalizePhone(rawPhone);
         const cleanE = (r.email || r.guestEmail || '').trim().toLowerCase();
 
         // Check if an existing guest in map matches by normalized phone, email, or clean name
         let matchedKey: string | undefined;
         for (const [k, g] of map.entries()) {
-            if (normP && normalizePhone(g.phone) === normP) {
+            if (rawPhone && isSamePhoneNumber(rawPhone, g.phone)) {
                 matchedKey = k;
                 break;
             }
@@ -180,8 +172,7 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
             // Check if user already customized/edited this profile in hotel_guest_profiles_v2
             const savedMatch = savedProfiles.find(p => {
                 const pClean = parseTitleAndName(p.name).cleanName.toLowerCase();
-                const pNorm = normalizePhone(p.phone);
-                const phoneMatch = Boolean(normP && pNorm && normP === pNorm);
+                const phoneMatch = Boolean(rawPhone && isSamePhoneNumber(rawPhone, p.phone));
                 const emailMatch = Boolean(cleanE && p.email && cleanE === p.email.trim().toLowerCase() && !cleanE.includes('guest.com') && !cleanE.includes('hospitality.com'));
                 return phoneMatch || emailMatch || pClean === key;
             });
@@ -261,9 +252,8 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
     savedProfiles.forEach((sp, spIdx) => {
         const { title, cleanName } = parseTitleAndName(sp.name);
         const key = cleanName.toLowerCase();
-        const spNorm = normalizePhone(sp.phone);
         const alreadyExists = Array.from(map.values()).some(g =>
-            (spNorm && normalizePhone(g.phone) === spNorm) ||
+            (sp.phone && isSamePhoneNumber(sp.phone, g.phone)) ||
             (sp.email && g.email && sp.email.trim().toLowerCase() === g.email.trim().toLowerCase() && !sp.email.includes('guest.com')) ||
             parseTitleAndName(g.name).cleanName.toLowerCase() === key
         );
@@ -314,7 +304,7 @@ export const GuestProfile: React.FC = () => {
                 dbRes.data.forEach((dg: any) => {
                     const existing = Array.from(mergedMap.values()).find(m =>
                         m.id === dg.id ||
-                        (dg.normalizedPhone && normalizePhone(m.phone) === dg.normalizedPhone) ||
+                        (dg.phone && isSamePhoneNumber(dg.phone, m.phone)) ||
                         (dg.email && m.email && m.email.toLowerCase() === dg.email.toLowerCase() && !dg.email.includes('hospitality.com'))
                     );
                     if (existing) {
@@ -664,21 +654,20 @@ export const GuestProfile: React.FC = () => {
             return;
         }
 
-        const normP = normalizePhone(newGuestForm.phone);
         const cleanE = newGuestForm.email.trim().toLowerCase();
         const cleanId = newGuestForm.idNumber.trim().toLowerCase();
 
-        // 1. Strict Duplicate Prevention Verification
+        // 1. Strict Duplicate Prevention Verification (Domestic & International)
         const conflict = guests.find(g => {
             if (modalMode === 'edit' && g.id === editingGuestId) return false;
-            const pMatch = Boolean(normP && normalizePhone(g.phone) === normP);
+            const pMatch = Boolean(newGuestForm.phone && isSamePhoneNumber(newGuestForm.phone, g.phone));
             const eMatch = Boolean(cleanE && !cleanE.includes('guest.com') && !cleanE.includes('hospitality.com') && g.email && g.email.trim().toLowerCase() === cleanE);
             const idMatch = Boolean(cleanId && g.idNumber && g.idNumber.trim().toLowerCase() === cleanId);
             return pMatch || eMatch || idMatch;
         });
 
         if (conflict) {
-            const conflictField = (normP && normalizePhone(conflict.phone) === normP)
+            const conflictField = (newGuestForm.phone && isSamePhoneNumber(conflict.phone, newGuestForm.phone))
                 ? `Phone Number (${conflict.phone})`
                 : (cleanE && conflict.email && conflict.email.trim().toLowerCase() === cleanE)
                 ? `Email Address (${conflict.email})`
@@ -2265,7 +2254,7 @@ export const GuestProfile: React.FC = () => {
                     candidateGuests={
                         activeMergeCluster?.guests
                             ? activeMergeCluster.guests.map((g: any) => {
-                                const richLocal = guests.find(lg => lg.id === Number(g.id) || (g.phone && normalizePhone(lg.phone) === normalizePhone(g.phone)));
+                                const richLocal = guests.find(lg => lg.id === Number(g.id) || (g.phone && isSamePhoneNumber(lg.phone, g.phone)));
                                 return {
                                     id: Number(g.id || richLocal?.id || 1),
                                     title: g.salutation ? `${g.salutation}.` : (richLocal?.title || 'Mr.'),

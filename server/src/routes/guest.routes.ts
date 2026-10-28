@@ -5,16 +5,54 @@ import { broadcastServerEvent } from './realtime.routes.js';
 const router = Router();
 
 /**
- * Normalizes phone numbers to standard national/international digit comparison format.
- * e.g. "+880 1711-234567", "01711234567", "8801711234567" -> "01711234567"
+ * Normalizes any phone number (domestic or international) into clean digits.
+ * Strips formatting, spaces, brackets, hyphens, and international trunk prefix (00).
  */
 export function normalizePhone(raw: string | null | undefined): string {
     if (!raw) return '';
     let digits = raw.replace(/\D/g, '');
-    if (digits.startsWith('880') && digits.length >= 13) {
-        digits = '0' + digits.slice(3);
+    if (digits.startsWith('00')) {
+        digits = digits.slice(2);
     }
     return digits;
+}
+
+/**
+ * Universal phone matcher across all domestic and international formats.
+ * Accurately matches:
+ * - Direct digit matches: "12125551234" === "12125551234"
+ * - Domestic zero vs international country code:
+ *   e.g. Bangladesh (+880): "01775167948" vs "+8801775167948"
+ *   e.g. UK (+44): "07911123456" vs "+447911123456"
+ *   e.g. USA/Canada (+1): "2125551234" vs "+12125551234"
+ *   e.g. India (+91): "09876543210" vs "+919876543210"
+ *   e.g. UAE (+971): "0501234567" vs "+971501234567"
+ *   e.g. Australia (+61): "0412345678" vs "+61412345678"
+ */
+export function isSamePhoneNumber(rawA: string | null | undefined, rawB: string | null | undefined): boolean {
+    if (!rawA || !rawB) return false;
+    const a = normalizePhone(rawA);
+    const b = normalizePhone(rawB);
+    if (a.length < 6 || b.length < 6) return false;
+    if (a === b) return true;
+
+    // Compare without leading domestic zeros
+    const trimA = a.replace(/^0+/, '');
+    const trimB = b.replace(/^0+/, '');
+    if (trimA === trimB) return true;
+
+    // Check if one is a suffix of the other with significant length (at least 8 digits)
+    const minLen = Math.min(trimA.length, trimB.length);
+    if (minLen >= 8) {
+        if (trimA.endsWith(trimB) || trimB.endsWith(trimA)) return true;
+    }
+
+    // Match last 9 significant subscriber digits
+    if (trimA.length >= 9 && trimB.length >= 9) {
+        if (trimA.slice(-9) === trimB.slice(-9)) return true;
+    }
+
+    return false;
 }
 
 // GET /api/guests - List all guest profiles with aggregated stay stats
@@ -69,18 +107,10 @@ router.get('/duplicates', async (req: Request, res: Response) => {
             ORDER BY id ASC
         `).all() as any[];
 
-        const phoneMap = new Map<string, any[]>();
         const emailMap = new Map<string, any[]>();
         const idMap = new Map<string, any[]>();
 
         for (const g of rows) {
-            const normP = normalizePhone(g.phone);
-            if (normP && normP.length >= 7) {
-                const list = phoneMap.get(normP) || [];
-                list.push(g);
-                phoneMap.set(normP, list);
-            }
-
             const cleanEmail = (g.email || '').trim().toLowerCase();
             if (cleanEmail && !cleanEmail.includes('hospitality.com') && !cleanEmail.includes('guest.com')) {
                 const list = emailMap.get(cleanEmail) || [];
@@ -99,15 +129,31 @@ router.get('/duplicates', async (req: Request, res: Response) => {
         const duplicateClusters: any[] = [];
         const seenPairKeys = new Set<string>();
 
-        // 1. Phone duplicates
-        for (const [phone, group] of phoneMap.entries()) {
+        // 1. Phone duplicates (Universal International and Domestic comparison)
+        const phoneGroups: any[][] = [];
+        for (const g of rows) {
+            if (!g.phone) continue;
+            let added = false;
+            for (const grp of phoneGroups) {
+                if (grp.some(existing => isSamePhoneNumber(existing.phone, g.phone))) {
+                    grp.push(g);
+                    added = true;
+                    break;
+                }
+            }
+            if (!added) {
+                phoneGroups.push([g]);
+            }
+        }
+
+        for (const group of phoneGroups) {
             if (group.length > 1) {
                 const key = group.map(x => x.id).sort().join('-');
                 if (!seenPairKeys.has(key)) {
                     seenPairKeys.add(key);
                     duplicateClusters.push({
                         reason: 'Matching Phone Number',
-                        matchValue: phone,
+                        matchValue: group[0].phone,
                         guests: group
                     });
                 }
@@ -201,7 +247,7 @@ router.post('/', async (req: Request, res: Response) => {
         // Check for duplicates
         const allGuests = await db.prepare('SELECT id, first_name, last_name, phone, email, id_number FROM guests').all() as any[];
         const conflict = allGuests.find(g => {
-            const pMatch = normPhone && normalizePhone(g.phone) === normPhone;
+            const pMatch = isSamePhoneNumber(phone, g.phone);
             const eMatch = cleanEmail && g.email && g.email.trim().toLowerCase() === cleanEmail;
             const idMatch = idNumber && g.id_number && g.id_number.trim().toLowerCase() === idNumber.toLowerCase();
             return pMatch || eMatch || idMatch;
@@ -272,10 +318,10 @@ router.put('/:id', async (req: Request, res: Response) => {
         const cleanEmail = email.toLowerCase();
 
         // Conflict check against other guests
-        if (normPhone || cleanEmail || idNumber) {
+        if (phone || cleanEmail || idNumber) {
             const others = await db.prepare('SELECT id, first_name, last_name, phone, email, id_number FROM guests WHERE id != ?').all(id) as any[];
             const conflict = others.find(g => {
-                const pMatch = normPhone && normalizePhone(g.phone) === normPhone;
+                const pMatch = phone && isSamePhoneNumber(phone, g.phone);
                 const eMatch = cleanEmail && g.email && g.email.trim().toLowerCase() === cleanEmail;
                 const idMatch = idNumber && g.id_number && g.id_number.trim().toLowerCase() === idNumber.toLowerCase();
                 return pMatch || eMatch || idMatch;

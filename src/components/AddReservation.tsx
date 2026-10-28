@@ -74,6 +74,7 @@ import {
     getTaxConfigurations,
     type TaxCalculationResult
 } from '../utils/taxCalculationEngine';
+import { isSamePhoneNumber } from '../utils/phoneUtils';
 
 interface RoomRow {
     id: number;
@@ -1654,19 +1655,11 @@ export const AddReservation: React.FC = () => {
             const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
             const profiles: any[] = rawProfiles ? JSON.parse(rawProfiles) : [];
             const cleanName = guestName.trim();
-            const normDigits = (raw: string | null | undefined) => {
-                if (!raw) return '';
-                let d = raw.replace(/\D/g, '');
-                if (d.startsWith('880') && d.length >= 13) d = '0' + d.slice(3);
-                return d;
-            };
-            const inputNormPhone = normDigits(mobile || phone);
             const inputCleanEmail = (email || '').trim().toLowerCase();
             const inputCleanId = (idNumber || '').trim().toLowerCase();
 
             const existingIdx = profiles.findIndex(p => {
-                const pNorm = normDigits(p.phone);
-                const phoneMatch = Boolean(inputNormPhone && pNorm && inputNormPhone === pNorm);
+                const phoneMatch = Boolean((mobile || phone) && isSamePhoneNumber(mobile || phone, p.phone));
                 const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
                 const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
                 const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
@@ -3766,7 +3759,14 @@ export const AddReservation: React.FC = () => {
                                     <span className="text-gray-300">•</span>
                                     <span>Check-in: <strong className="text-gray-800 font-semibold">{checkIn}</strong></span>
                                     <span className="text-gray-300">•</span>
-                                    <span>Total Estimated: <strong className="text-blue-900 font-mono text-xs font-bold">{grossTotal.toFixed(2)}</strong> {currencyCode}</span>
+                                    <span className="flex items-center">
+                                        Total Estimated: <strong className="text-blue-900 font-mono text-xs font-bold ml-1">{finalPayable.toFixed(2)}</strong> <span className="ml-0.5">{currencyCode}</span>
+                                        {taxCalculation.totalTaxAmount > 0 && (
+                                            <span className="ml-1 text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 font-normal">
+                                                (incl. VAT & Tax ৳{taxCalculation.totalTaxAmount.toFixed(2)})
+                                            </span>
+                                        )}
+                                    </span>
                                 </span>
                             )}
                             {step === 2 && `Guest: ${guestName || 'Not entered'} | Phone: ${mobile || 'N/A'}`}
