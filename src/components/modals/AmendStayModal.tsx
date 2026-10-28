@@ -47,6 +47,8 @@ export interface AmendBookingData {
     avgDailyRate?: number;
     status: string;
     isPast?: boolean;
+    isConnectingSuite?: boolean;
+    connectedTo?: string;
     // Statutory Tax & VAT and Financial Details
     totalAmount?: number;
     paidAmount?: number;

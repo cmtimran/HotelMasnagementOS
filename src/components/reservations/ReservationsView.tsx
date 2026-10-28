@@ -63,6 +63,8 @@ export interface ReservationItem {
     groupId?: string;
     groupName?: string;
     isMasterGuest?: boolean;
+    isConnectingSuite?: boolean;
+    allocatedRooms?: string[];
 }
 
 
@@ -134,9 +136,11 @@ export const ReservationsView: React.FC = () => {
         ) || {};
 
         const bookingData: AmendBookingData = {
+            ...rawStored,
             id: String(r.id),
             reservationNumber: r.reservationNumber,
-            groupCode: r.groupCode,
+            groupCode: r.isConnectingSuite ? undefined : (r.groupCode || rawStored.groupCode),
+            isConnectingSuite: Boolean(r.isConnectingSuite || rawStored.isConnectingSuite),
             subBookingNumber: r.subBookingNumber,
             registrationNumber: r.registrationNumber,
             folioNumber: r.folioNumber,
@@ -153,10 +157,9 @@ export const ReservationsView: React.FC = () => {
             paidAmount: r.paidAmount,
             dueAmount: r.dueAmount,
             ratePlan: rawStored.ratePlan || 'Standard Tariff',
-            allocatedRooms: rawStored.allocatedRooms || [r.roomNumber],
+            allocatedRooms: r.allocatedRooms || rawStored.allocatedRooms || [r.roomNumber],
             roomsList: rawStored.roomsList,
-            groupRoomsList: rawStored.groupRoomsList,
-            ...rawStored
+            groupRoomsList: rawStored.groupRoomsList
         };
 
         setActionDrawerBooking(bookingData);
@@ -186,7 +189,9 @@ export const ReservationsView: React.FC = () => {
         return rawList.flatMap((r: any, idx: number) => {
             const isConnectingSuite = Boolean(
                 r.isConnectingSuite ||
-                (r.roomType && (r.roomType.toLowerCase().includes('connecting') || r.roomType.toLowerCase().includes('interconnecting')))
+                (r.roomType && (r.roomType.toLowerCase().includes('connecting') || r.roomType.toLowerCase().includes('interconnecting'))) ||
+                (typeof r.roomNumber === 'string' && r.roomNumber.includes('+')) ||
+                (Array.isArray(r.allocatedRooms) && r.allocatedRooms.length > 1 && (r.allocatedRooms.includes('101') || r.allocatedRooms.includes('102')))
             );
 
             const rooms = (r.roomsList && r.roomsList.length > 0)
@@ -245,10 +250,12 @@ export const ReservationsView: React.FC = () => {
 
             const roomNumbers = (r.allocatedRooms && r.allocatedRooms.length > 0)
                 ? r.allocatedRooms
-                : (rooms && rooms.length > 0 ? rooms.map((x: any) => x.roomNumber).filter(Boolean) : [r.roomNumber]);
+                : (rooms && rooms.length > 0 ? rooms.map((x: any) => x.roomNumber).filter(Boolean) : (typeof r.roomNumber === 'string' && r.roomNumber.includes('+') ? r.roomNumber.split('+').map((s: string) => s.trim()) : [r.roomNumber]));
             const roomDisplay = isConnectingSuite && roomNumbers.length > 1
                 ? roomNumbers.join(' + ')
-                : String(r.roomNumber || (rooms && rooms[0]?.roomNumber) || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned');
+                : (typeof r.roomNumber === 'string' && r.roomNumber.includes('+')
+                    ? r.roomNumber
+                    : (isConnectingSuite ? '101 + 102' : String(r.roomNumber || (rooms && rooms[0]?.roomNumber) || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned')));
 
             return [{
                 id: r.id || idx + 1,
@@ -261,7 +268,7 @@ export const ReservationsView: React.FC = () => {
                 phone: r.phone || '',
                 email: r.email || '',
                 roomNumber: roomDisplay,
-                roomType: r.roomType || 'Standard Room',
+                roomType: isConnectingSuite ? (r.roomType || 'Connecting Suite') : (r.roomType || 'Standard Room'),
                 checkIn: r.checkIn,
                 checkOut: r.checkOut,
                 nights: Number(r.nights) || 1,
@@ -276,7 +283,9 @@ export const ReservationsView: React.FC = () => {
                 isGroup: isConnectingSuite ? false : Boolean(r.isGroup || r.groupCode),
                 groupId: isConnectingSuite ? undefined : (r.groupCode || r.groupId),
                 groupName: isConnectingSuite ? undefined : (r.groupCode ? `Group: ${r.groupCode}` : undefined),
-                isMasterGuest: true
+                isMasterGuest: true,
+                isConnectingSuite,
+                allocatedRooms: roomNumbers
             }];
         });
     };
@@ -1080,7 +1089,11 @@ export const ReservationsView: React.FC = () => {
                                                             {r.vip}
                                                         </span>
                                                     )}
-                                                    {(r.isGroup || r.groupCode) && (
+                                                    {r.isConnectingSuite ? (
+                                                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-0.5 font-bold" title="Interconnecting Suite">
+                                                            🔗 <span>Connecting Suite</span>
+                                                        </span>
+                                                    ) : (r.isGroup || r.groupCode) && (
                                                         <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-0.5 font-bold" title="Group Booking Code">
                                                             <Users size={10} />
                                                             <span>{r.groupCode || r.groupName || 'Group'}</span>
@@ -1092,10 +1105,17 @@ export const ReservationsView: React.FC = () => {
 
                                             {/* Room Details */}
                                             <td className="px-3 py-2">
-                                                <span className="px-1.5 py-0.2 bg-blue-50 text-blue-800 rounded font-mono">
-                                                    {r.roomNumber}
-                                                </span>
-                                                <div className="text-[10px] text-gray-500">{r.roomType}</div>
+                                                <div className="flex items-center gap-1 flex-wrap">
+                                                    <span className="px-1.5 py-0.2 bg-blue-50 text-blue-800 rounded font-mono font-bold">
+                                                        {r.roomNumber}
+                                                    </span>
+                                                    {r.isConnectingSuite && (
+                                                        <span className="text-[8.5px] px-1 py-0.2 bg-indigo-100 text-indigo-800 rounded font-semibold border border-indigo-200" title="Interconnecting Suite">
+                                                            🔗 Interconnected
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] text-gray-500 font-medium">{r.roomType}</div>
                                             </td>
 
                                             {/* Stay Dates */}
@@ -1271,8 +1291,12 @@ export const ReservationsView: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Group Tag if attached */}
-                                    {(r.isGroup || r.groupCode) && (
+                                    {/* Interconnecting or Group Tag */}
+                                    {r.isConnectingSuite ? (
+                                        <div className="bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-2 py-1 text-[10px] font-semibold flex items-center gap-1.5">
+                                            <span>🔗 Interconnecting Suite ({r.roomNumber})</span>
+                                        </div>
+                                    ) : (r.isGroup || r.groupCode) && (
                                         <div className="bg-purple-50 text-purple-700 border border-purple-200 rounded px-2 py-1 text-[10px] font-semibold flex items-center gap-1.5">
                                             <Users size={12} className="text-purple-600" />
                                             <span className="truncate">Group: <strong>{r.groupCode || r.groupName || 'Group'}</strong></span>

@@ -11,6 +11,8 @@ export interface RoomRecord {
   foStatus: 'vacant' | 'occupied' | 'reserved' | 'due_out';
   baseRate: number;
   propertyId: string | number;
+  isConnecting?: boolean;
+  connectedTo?: string;
 }
 
 const resolvePropertyId = (propertyId: string | number | undefined): number => {
@@ -33,6 +35,8 @@ export const roomService = {
         r.room_number as "roomNo",
         r.status as room_status,
         r.housekeeping_status as db_hk,
+        r.is_connecting as "isConnecting",
+        r.connected_to as "connectedTo",
         b.name as building,
         f.floor_number as floor,
         rt.name as "roomType",
@@ -100,7 +104,9 @@ export const roomService = {
         hkStatus,
         foStatus,
         baseRate: Number(row.baseRate || row.baserate) || 3000,
-        propertyId: propId
+        propertyId: propId,
+        isConnecting: Boolean(row.isConnecting || row.is_connecting),
+        connectedTo: row.connectedTo || row.connected_to || undefined
       };
     });
 

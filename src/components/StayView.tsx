@@ -15,7 +15,8 @@ import {
     Lock,
     Home,
     Printer,
-    Wallet
+    Wallet,
+    Link as LinkIcon
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -91,6 +92,8 @@ interface TimelineBooking {
     // 4 Key Indicators requested by User:
     isGroupOwner?: boolean;      // 1. Group Owner (👑)
     isGroupBooking?: boolean;    // 2. Group Booking (👥)
+    isConnectingSuite?: boolean; // Interconnecting Suite (🔗)
+    connectedTo?: string;
     isPaymentDue?: boolean;      // 3. Payment Due ($)
     isVipOrSingleLady?: boolean; // 4. VIP or Single Lady (⭐)
     indicator?: string;
@@ -115,6 +118,8 @@ export interface RoomNode {
     building: string;
     status: string;
     wing?: string;
+    isConnecting?: boolean;
+    connectedTo?: string;
 }
 
 export interface FloorNode {
@@ -511,13 +516,23 @@ export const StayView: React.FC = () => {
                             ? 'dirty'
                             : 'clean';
 
+            const isConn = Boolean(
+                r.isConnecting ||
+                (r.number === '101' && (r.connectedTo === '102' || !r.connectedTo)) ||
+                (r.number === '102' && (r.connectedTo === '101' || !r.connectedTo)) ||
+                r.connectedTo
+            );
+            const connTo = r.connectedTo || (r.number === '101' ? '102' : r.number === '102' ? '101' : undefined);
+
             floorMap.get(fId)!.push({
                 id: `r-${r.number}`,
                 roomNumber: String(r.number),
                 type: r.roomTypeName,
                 floor: fId,
                 building: buildingNames[bId] || `Building ${bId}`,
-                status: normalizedStatus
+                status: normalizedStatus,
+                isConnecting: isConn,
+                connectedTo: connTo
             });
         });
 
@@ -600,7 +615,9 @@ export const StayView: React.FC = () => {
 
             const isConnSuite = Boolean(
                 res.isConnectingSuite ||
-                (res.roomType && (res.roomType.toLowerCase().includes('connecting') || res.roomType.toLowerCase().includes('interconnecting')))
+                (res.roomType && (res.roomType.toLowerCase().includes('connecting') || res.roomType.toLowerCase().includes('interconnecting'))) ||
+                (typeof res.roomNumber === 'string' && res.roomNumber.includes('+')) ||
+                (Array.isArray(res.allocatedRooms) && res.allocatedRooms.length > 1 && (res.allocatedRooms.includes('101') || res.allocatedRooms.includes('102')))
             );
             const isGroup = !isConnSuite && Boolean(
                 res.isGroup ||
@@ -624,9 +641,11 @@ export const StayView: React.FC = () => {
             if (isConnSuite) {
                 const connRooms = (res.allocatedRooms && res.allocatedRooms.length > 0)
                     ? res.allocatedRooms.map(String)
-                    : (res.roomsList && res.roomsList.length > 0
-                        ? res.roomsList.flatMap((rm: any) => String(rm.roomNumber).split('+').map(s => s.trim()))
-                        : [String(res.roomNumber || '101')]);
+                    : (typeof res.roomNumber === 'string' && res.roomNumber.includes('+')
+                        ? res.roomNumber.split('+').map((s: string) => s.trim())
+                        : (res.roomsList && res.roomsList.length > 0
+                            ? res.roomsList.flatMap((rm: any) => String(rm.roomNumber).split('+').map((s: string) => s.trim()))
+                            : ['101', '102']));
 
                 connRooms.forEach((rNum: string) => {
                     const rIn = res.checkIn;
@@ -660,6 +679,8 @@ export const StayView: React.FC = () => {
                         isPast: isPastBooking,
                         isGroupOwner: false,
                         isGroupBooking: false,
+                        isConnectingSuite: true,
+                        connectedTo: connRooms.filter((r: string) => r !== rNum).join(', '),
                         isPaymentDue: dueAmt > 0,
                         isVipOrSingleLady: Boolean(res.vip && res.vip !== 'None' && res.vip !== 'none'),
                         totalAmount: totalAmt,
@@ -1057,13 +1078,27 @@ export const StayView: React.FC = () => {
         const resolvedChildren = Number(matchingRoomRow?.children ?? originalRes?.children ?? booking.children ?? 0);
         const resolvedChildrenAges = matchingRoomRow?.childrenAges || originalRes?.childrenAges || [];
 
-        const subBookingNo = matchingRoomRow?.subBookingNumber || originalRes?.subBookingNumber || (originalRes?.roomsList && originalRes.roomsList.length > 1 ? `${booking.reservationNumber}-01` : booking.reservationNumber);
-        const regNo = matchingRoomRow?.registrationNumber || booking.registrationNumber || originalRes?.registrationNumber || (booking.status === 'arrived' ? `REG-${subBookingNo.replace(/^RES-/, '')}` : undefined);
-        const folioNo = matchingRoomRow?.folioNumber || booking.folioNumber || originalRes?.folioNumber || `FOL-${subBookingNo.replace(/^RES-/, '')}`;
+        const isConn = Boolean(
+            booking.isConnectingSuite ||
+            originalRes?.isConnectingSuite ||
+            (originalRes?.roomType && (originalRes.roomType.toLowerCase().includes('connecting') || originalRes.roomType.toLowerCase().includes('interconnecting'))) ||
+            (typeof originalRes?.roomNumber === 'string' && originalRes.roomNumber.includes('+')) ||
+            (Array.isArray(originalRes?.allocatedRooms) && originalRes.allocatedRooms.length > 1 && (originalRes.allocatedRooms.includes('101') || originalRes.allocatedRooms.includes('102')))
+        );
+
+        const subBookingNo = isConn
+            ? booking.reservationNumber
+            : (matchingRoomRow?.subBookingNumber || originalRes?.subBookingNumber || (originalRes?.roomsList && originalRes.roomsList.length > 1 ? `${booking.reservationNumber}-01` : booking.reservationNumber));
+        const regNo = isConn
+            ? (originalRes?.registrationNumber || booking.registrationNumber)
+            : (matchingRoomRow?.registrationNumber || booking.registrationNumber || originalRes?.registrationNumber || (booking.status === 'arrived' ? `REG-${subBookingNo.replace(/^RES-/, '')}` : undefined));
+        const folioNo = isConn
+            ? (originalRes?.folioNumber || booking.folioNumber || `FOL-${booking.reservationNumber.replace(/^RES-/, '')}`)
+            : (matchingRoomRow?.folioNumber || booking.folioNumber || originalRes?.folioNumber || `FOL-${subBookingNo.replace(/^RES-/, '')}`);
 
         // Build dynamic groupRoomsList if present on originalRes or by cross-referencing stored reservations
-        let groupRoomsList = originalRes?.groupRoomsList;
-        if (!groupRoomsList || groupRoomsList.length === 0) {
+        let groupRoomsList = isConn ? undefined : originalRes?.groupRoomsList;
+        if (!isConn && (!groupRoomsList || groupRoomsList.length === 0)) {
             if (originalRes?.groupCode) {
                 const linkedRes = stored.filter(r => r.groupCode === originalRes.groupCode);
                 groupRoomsList = linkedRes.flatMap((lr, lIdx) => {
@@ -1099,20 +1134,27 @@ export const StayView: React.FC = () => {
             }
         }
 
+        const connRoomsDisplay = isConn && originalRes?.allocatedRooms && originalRes.allocatedRooms.length > 1
+            ? originalRes.allocatedRooms.join(' + ')
+            : (isConn && typeof originalRes?.roomNumber === 'string' && originalRes.roomNumber.includes('+')
+                ? originalRes.roomNumber
+                : (isConn ? '101 + 102' : booking.roomNumber));
+
         return {
             id: booking.id,
             reservationNumber: booking.reservationNumber,
-            groupCode: originalRes?.groupCode,
-            subBookingNumber: subBookingNo,
+            groupCode: isConn ? undefined : originalRes?.groupCode,
+            isConnectingSuite: isConn,
+            subBookingNumber: isConn ? booking.reservationNumber : subBookingNo,
             registrationNumber: regNo,
             registeredAt: booking.registeredAt || originalRes?.registeredAt,
             folioNumber: folioNo,
             groupRoomsList,
-            roomsList: originalRes?.roomsList,
+            roomsList: isConn ? undefined : originalRes?.roomsList,
             allocatedRooms: originalRes?.allocatedRooms,
             guestName: booking.guestName,
-            roomNumber: booking.roomNumber,
-            roomType: originalRes?.roomType || 'Deluxe Double',
+            roomNumber: connRoomsDisplay,
+            roomType: isConn ? (originalRes?.roomType || 'Interconnecting Suite') : (originalRes?.roomType || 'Deluxe Double'),
             ratePlan: originalRes?.ratePlan || 'Standard Rate',
             arrivalDate: arrivalDateStr,
             departureDate: currentDepDateStr,
@@ -2525,9 +2567,17 @@ export const StayView: React.FC = () => {
                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                             <BedDouble size={12} className="text-gray-400 flex-shrink-0" />
                                                             <div className="truncate flex items-center gap-1">
-                                                                <span className="text-[10px] text-gray-900 font-semibold">
+                                                                <span className="text-[10px] text-gray-900 font-semibold font-mono">
                                                                     {room.roomNumber}
                                                                 </span>
+                                                                {room.isConnecting && (
+                                                                    <span
+                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition-colors cursor-help flex-shrink-0"
+                                                                        title={`Connecting Room: Connected with Room ${room.connectedTo || 'Adjoining Room'} (Soundproof Interconnecting Door)`}
+                                                                    >
+                                                                        <LinkIcon size={10} className="stroke-[2.5]" />
+                                                                    </span>
+                                                                )}
                                                                 <span className="text-[9.5px] text-gray-500 truncate ml-0.5">
                                                                     {room.type}
                                                                 </span>
@@ -2749,21 +2799,32 @@ export const StayView: React.FC = () => {
                                                                                     <Lock size={8} />
                                                                                 </span>
                                                                             )}
-                                                                            {booking.isGroupOwner && (
+                                                                            {booking.isConnectingSuite ? (
                                                                                 <span
-                                                                                    className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
-                                                                                    title="Group Owner / Leader"
+                                                                                    className="w-4 h-4 rounded-full bg-indigo-600 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0 text-[8px] font-bold"
+                                                                                    title={`Interconnecting Suite • Adjoining Room ${booking.connectedTo || ''}`}
                                                                                 >
-                                                                                    <Crown size={9} className="stroke-[2.5]" />
+                                                                                    🔗
                                                                                 </span>
-                                                                            )}
-                                                                            {booking.isGroupBooking && (
-                                                                                <span
-                                                                                    className="w-4 h-4 rounded-full bg-rose-500 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
-                                                                                    title="Group Booking"
-                                                                                >
-                                                                                    <Users size={9} className="stroke-[2.5]" />
-                                                                                </span>
+                                                                            ) : (
+                                                                                <>
+                                                                                    {booking.isGroupOwner && (
+                                                                                        <span
+                                                                                            className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
+                                                                                            title="Group Owner / Leader"
+                                                                                        >
+                                                                                            <Crown size={9} className="stroke-[2.5]" />
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {booking.isGroupBooking && (
+                                                                                        <span
+                                                                                            className="w-4 h-4 rounded-full bg-rose-500 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
+                                                                                            title="Group Booking"
+                                                                                        >
+                                                                                            <Users size={9} className="stroke-[2.5]" />
+                                                                                        </span>
+                                                                                    )}
+                                                                                </>
                                                                             )}
                                                                             {booking.isPaymentDue && (
                                                                                 <span
@@ -3348,7 +3409,12 @@ export const StayView: React.FC = () => {
                                             ⭐ VIP
                                         </span>
                                     )}
-                                    {hoveredBooking.booking?.isGroupOwner && (
+                                    {Boolean(hoveredBooking.booking?.isConnectingSuite || hoveredBooking.enriched?.isConnectingSuite) && (
+                                        <span className="px-1.5 py-0.2 bg-indigo-500/30 border border-indigo-400/50 text-indigo-200 rounded text-[8.5px] font-bold">
+                                            🔗 Connecting Suite
+                                        </span>
+                                    )}
+                                    {!hoveredBooking.booking?.isConnectingSuite && hoveredBooking.booking?.isGroupOwner && (
                                         <span className="px-1 py-0.2 bg-purple-500/20 border border-purple-400/40 text-purple-300 rounded text-[8.5px] font-bold">
                                             👑 Leader
                                         </span>
@@ -3356,7 +3422,11 @@ export const StayView: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400 font-mono flex-wrap">
                                     <span className="font-bold text-white">#{hoveredBooking.enriched?.subBookingNumber || hoveredBooking.booking?.subBookingNumber || hoveredBooking.enriched?.reservationNumber || hoveredBooking.booking?.reservationNumber}</span>
-                                    {(hoveredBooking.enriched?.groupCode || hoveredBooking.booking?.groupCode) && (
+                                    {Boolean(hoveredBooking.booking?.isConnectingSuite || hoveredBooking.enriched?.isConnectingSuite) ? (
+                                        <span className="text-indigo-300 font-bold bg-indigo-950/80 border border-indigo-500/40 px-1.5 py-0.2 rounded text-[8.5px] flex items-center gap-1">
+                                            🔗 Interconnected
+                                        </span>
+                                    ) : (hoveredBooking.enriched?.groupCode || hoveredBooking.booking?.groupCode) && (
                                         <span className="text-purple-300 font-semibold bg-purple-950/60 border border-purple-500/30 px-1 py-0.2 rounded text-[8.5px]">
                                             {hoveredBooking.enriched?.groupCode || hoveredBooking.booking?.groupCode}
                                         </span>
@@ -3370,7 +3440,14 @@ export const StayView: React.FC = () => {
                                         </>
                                     )}
                                     <span>•</span>
-                                    <span className="text-blue-300 font-bold">Room {hoveredBooking.enriched?.roomNumber || hoveredBooking.booking?.roomNumber}</span>
+                                    <span className="text-blue-300 font-bold">
+                                        Room {hoveredBooking.enriched?.roomNumber || hoveredBooking.booking?.roomNumber}
+                                        {Boolean(hoveredBooking.booking?.isConnectingSuite || hoveredBooking.enriched?.isConnectingSuite) && (
+                                            <span className="text-emerald-300 ml-1 font-semibold text-[9px]">
+                                                (Adjoining Door)
+                                            </span>
+                                        )}
+                                    </span>
                                 </div>
                             </div>
 

@@ -38,6 +38,7 @@ export interface BookingRecord {
   channel: string;
   vip: string;
   isGroup: boolean;
+  isConnectingSuite?: boolean;
   specialRequests?: string;
   roomsList?: any[];
   groupRoomsList?: any[];
@@ -247,6 +248,13 @@ export const bookingService = {
       ORDER BY rr.id ASC
     `);
 
+    // Fetch active connecting suites for automatic linking
+    const connSuitesRes = await getPool().query(
+      `SELECT name, component_rooms FROM connecting_rooms WHERE property_id = $1 AND status = 'Active'`,
+      [propId]
+    ).catch(() => ({ rows: [] }));
+    const activeSuites = connSuitesRes.rows || [];
+
     const roomsMap = new Map<number | string, any[]>();
     for (const rm of roomsRes.rows) {
       const list = roomsMap.get(rm.reservation_id);
@@ -272,6 +280,24 @@ export const bookingService = {
     for (const r of reservationsRes.rows) {
       const rooms = roomsMap.get(r.id) || [];
       const allocatedRoomNumbers = rooms.map(rm => rm.room_number);
+
+      const matchedSuite = activeSuites.find(s => {
+        try {
+          const comps = typeof s.component_rooms === 'string' ? JSON.parse(s.component_rooms) : s.component_rooms;
+          const suiteNums = (comps || []).flatMap((c: any) => c.roomNumbers || []).map(String);
+          return suiteNums.length > 1 && suiteNums.every((sn: string) => allocatedRoomNumbers.includes(sn));
+        } catch { return false; }
+      });
+
+      const isConnSuite = Boolean(
+        matchedSuite ||
+        r.special_requests?.toLowerCase().includes('connecting suite') ||
+        (allocatedRoomNumbers.length > 1 && (
+          rooms[0]?.room_type_name?.toLowerCase().includes('connecting') ||
+          rooms[0]?.room_type_name?.toLowerCase().includes('interconnecting')
+        ))
+      );
+
       const primaryRoom = rooms[0] || {
         room_number: 'Unassigned',
         room_type_name: 'Standard Single',
@@ -282,6 +308,13 @@ export const bookingService = {
         children: 0,
         room_rate: r.total_amount || 0
       };
+
+      const resolvedRoomType = matchedSuite ? matchedSuite.name : (
+        isConnSuite ? `Interconnecting Suite (${allocatedRoomNumbers.join('-')})` : primaryRoom.room_type_name
+      );
+      const resolvedRoomNumber = (isConnSuite && allocatedRoomNumbers.length > 1) 
+        ? allocatedRoomNumbers.join(' + ') 
+        : primaryRoom.room_number;
 
       const primaryIn = formatDate(primaryRoom.check_in_date);
       const primaryOut = formatDate(primaryRoom.check_out_date);
@@ -303,18 +336,19 @@ export const bookingService = {
         id: r.id,
         resNo: r.reservation_number,
         reservationNumber: r.reservation_number,
-        groupCode: r.group_code || undefined,
-        subBookingNumber: primaryRoom.sub_booking_number || (rooms.length > 1 ? `${r.reservation_number}-01` : r.reservation_number),
+        groupCode: isConnSuite ? undefined : (r.group_code || undefined),
+        subBookingNumber: isConnSuite ? r.reservation_number : (primaryRoom.sub_booking_number || (rooms.length > 1 ? `${r.reservation_number}-01` : r.reservation_number)),
         registrationNumber: regNo,
         registeredAt: r.registration_date ? (typeof r.registration_date === 'string' ? r.registration_date : r.registration_date.toISOString()) : undefined,
         folioNumber: folioNo,
         guestName: guestFullName,
         phone: r.phone || '',
         email: r.email || '',
-        roomNo: primaryRoom.room_number,
-        roomNumber: primaryRoom.room_number,
+        roomNo: resolvedRoomNumber,
+        roomNumber: resolvedRoomNumber,
         allocatedRooms: allocatedRoomNumbers.length > 0 ? allocatedRoomNumbers : [primaryRoom.room_number],
-        roomType: primaryRoom.room_type_name,
+        roomType: resolvedRoomType,
+        isConnectingSuite: isConnSuite,
         ratePlan: r.corporate_name || r.source || 'Standard Plan',
         rateAmount: Number(r.total_amount) || 0,
         totalAmount: Number(r.total_amount) || 0,
@@ -332,7 +366,7 @@ export const bookingService = {
         source: r.source || 'Direct',
         channel: r.channel || 'Front Desk',
         vip: r.vip_status || 'None',
-        isGroup: Boolean(r.is_group || r.group_code),
+        isGroup: isConnSuite ? false : Boolean(r.is_group || r.group_code),
         specialRequests: r.special_requests || '',
         roomsList: rooms.map((rm, idx) => {
           const rIn = formatDate(rm.check_in_date);
@@ -401,6 +435,36 @@ export const bookingService = {
           ? payload.allocatedRooms.map((rNum: string) => ({ roomNumber: rNum }))
           : [{ roomNumber: payload.roomNumber || payload.roomNo || '101' }];
 
+    const isConnectingSuite = Boolean(
+      payload.isConnectingSuite ||
+      (payload.roomType && (
+        String(payload.roomType).toLowerCase().includes('connecting') || 
+        String(payload.roomType).toLowerCase().includes('interconnecting')
+      ))
+    );
+
+    // Expand composite room numbers like "101 + 102" or multiple rooms in allocatedRooms
+    const expandedRooms: any[] = [];
+    if (rawRooms && rawRooms.length > 0) {
+      for (const rm of rawRooms) {
+        const rawNum = String(rm.roomNumber || rm.number || '').trim();
+        if (rawNum.includes('+')) {
+          const parts = rawNum.split('+').map((s: string) => s.trim()).filter(Boolean);
+          parts.forEach(p => expandedRooms.push({ ...rm, roomNumber: p }));
+        } else {
+          expandedRooms.push(rm);
+        }
+      }
+    }
+    if (expandedRooms.length <= 1 && Array.isArray(payload.allocatedRooms) && payload.allocatedRooms.length > 1) {
+      expandedRooms.length = 0;
+      payload.allocatedRooms.forEach((p: string) => expandedRooms.push({ roomNumber: String(p).trim() }));
+    }
+    if (expandedRooms.length === 0) {
+      expandedRooms.push({ roomNumber: payload.roomNumber || payload.roomNo || '101' });
+    }
+    const finalRooms = expandedRooms;
+
     // Acquire connection from active tenant's pool to execute ACID transaction
     const pool = getPool();
     const client = await pool.connect();
@@ -412,7 +476,7 @@ export const bookingService = {
       // 0. Strict Database-Level Pessimistic Row Lock & Overlap Check (Prevents Race Conditions)
       const seenRoomsInPayload = new Set<string>();
 
-      for (const rm of rawRooms) {
+      for (const rm of finalRooms) {
         const roomNum = String(rm.roomNumber || rm.number || '').trim();
         if (!roomNum) continue;
         if (seenRoomsInPayload.has(roomNum)) {
@@ -477,8 +541,8 @@ export const bookingService = {
       const dueAmount = totalAmount - paidAmount;
       const totalTaxAmount = Number(payload.totalTaxAmount || payload.vatAmount || 0);
       const baseAmount = Number(payload.baseAmount) || Math.max(0, totalAmount - totalTaxAmount);
-      const isGroup = Boolean(payload.isGroup || rawRooms.length > 1 || (payload.roomsCount && Number(payload.roomsCount) > 1) || (payload.allocatedRooms && payload.allocatedRooms.length > 1));
-      const groupCode = isGroup ? (payload.groupCode || await generateGroupCode()) : (payload.groupCode || null);
+      const isGroup = !isConnectingSuite && Boolean(payload.isGroup || finalRooms.length > 1 || (payload.roomsCount && Number(payload.roomsCount) > 1));
+      const groupCode = isGroup ? (payload.groupCode || await generateGroupCode()) : null;
       const regNo = statusDb === 'IN_HOUSE' ? (payload.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : (payload.registrationNumber || null);
       const folioNo = payload.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`;
 
@@ -510,10 +574,10 @@ export const bookingService = {
       const reservationId = resInsert.rows[0].id;
 
       // 3. Allocate Rooms in `reservation_rooms`
-      const roomRatePerRoom = rawRooms.length > 0 ? totalAmount / rawRooms.length : totalAmount;
+      const roomRatePerRoom = finalRooms.length > 0 ? totalAmount / finalRooms.length : totalAmount;
 
-      for (let i = 0; i < rawRooms.length; i++) {
-        const rm = rawRooms[i];
+      for (let i = 0; i < finalRooms.length; i++) {
+        const rm = finalRooms[i];
         const roomNum = String(rm.roomNumber || rm.number || '101');
         
         let roomId: number;
@@ -529,9 +593,9 @@ export const bookingService = {
         const roomOut = rm.checkOut || rm.checkOutDate || checkOut;
         const roomNights = rm.nights || nights;
         const roomRate = rm.rate || roomRatePerRoom;
-        const subBookingNum = rawRooms.length > 1 || payload.subBookingNumber
+        const subBookingNum = (!isConnectingSuite && (finalRooms.length > 1 || payload.subBookingNumber))
           ? (rm.subBookingNumber || `${reservationNumber}-${String(i + 1).padStart(2, '0')}`)
-          : (rm.subBookingNumber || `${reservationNumber}-01`);
+          : (rm.subBookingNumber || reservationNumber);
 
         const roomRegNo = statusDb === 'IN_HOUSE'
           ? (rm.registrationNumber || `REG-${subBookingNum.replace(/^RES-/, '')}`)

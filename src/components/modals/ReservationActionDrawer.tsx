@@ -283,6 +283,42 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         if (booking.groupRoomsList && booking.groupRoomsList.length > 0) {
             return booking.groupRoomsList;
         }
+
+        // Special case: Interconnecting Suite with component rooms
+        const isConn = Boolean(
+            booking.isConnectingSuite ||
+            (booking.roomType && (booking.roomType.toLowerCase().includes('connecting') || booking.roomType.toLowerCase().includes('interconnecting'))) ||
+            (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+')) ||
+            (Array.isArray(booking.allocatedRooms) && booking.allocatedRooms.length > 1)
+        );
+
+        if (isConn) {
+            const rooms = Array.isArray(booking.allocatedRooms) && booking.allocatedRooms.length > 1
+                ? booking.allocatedRooms
+                : (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+')
+                    ? booking.roomNumber.split('+').map((s: string) => s.trim())
+                    : ['101', '102']);
+            const roomDisplay = rooms.join(' + ');
+
+            return [{
+                roomNumber: roomDisplay,
+                allocatedRooms: rooms,
+                roomType: booking.roomType || 'Interconnecting Suite',
+                ratePlan: booking.ratePlan || 'Standard Rate',
+                guestName: booking.guestName,
+                adults: booking.adults ?? 2,
+                children: booking.children ?? 0,
+                status: booking.status,
+                reservationNumber: booking.reservationNumber,
+                subBookingNumber: booking.reservationNumber,
+                registrationNumber: booking.registrationNumber,
+                folioNumber: booking.folioNumber,
+                isPrimary: true,
+                isConnecting: true,
+                connectedTo: rooms.join(' & ')
+            }];
+        }
+
         const stored = getAllStoredReservations();
         // 1. Group code matching
         if (booking.groupCode) {
@@ -406,8 +442,21 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const origBase = booking.baseAmount !== undefined ? booking.baseAmount : Math.max(0, origTotal - origTax);
     const dailyBaseRate = Math.max(0, Math.round(origBase / Math.max(1, origNights)));
 
+    // Connecting Suite Detection
+    const isConnectingSuite = Boolean(
+        booking.isConnectingSuite ||
+        (booking.roomType && (booking.roomType.toLowerCase().includes('connecting') || booking.roomType.toLowerCase().includes('interconnecting'))) ||
+        (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+')) ||
+        (Array.isArray(booking.allocatedRooms) && booking.allocatedRooms.length > 1)
+    );
+
     // Capacity & Occupancy Checks
-    const capacity = getRoomTypeCapacity(booking.roomType);
+    const baseCapacity = getRoomTypeCapacity(booking.roomType);
+    const capacity = isConnectingSuite ? {
+        maxOccupancy: Math.max(baseCapacity.maxOccupancy * 2, 6),
+        maxAdults: Math.max(baseCapacity.maxAdults * 2, 4),
+        maxChildren: Math.max(baseCapacity.maxChildren * 2, 2)
+    } : baseCapacity;
     const isAmendingOccupancy = mode === 'amend' && (amendAdults !== (booking.adults ?? 2) || amendChildren !== (booking.children ?? 0));
     const isAmendingNights = mode === 'amend' && nights !== origNights;
     const isAmendingStay = isAmendingNights || isAmendingOccupancy;
@@ -724,9 +773,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         { key: 'hold', label: 'Reservation Hold', icon: CircleSlash },
         { key: 'unassign', label: 'Unassign', icon: DoorClosed },
         { key: 'void', label: 'Void Reservation', icon: CircleSlash },
-        { key: 'link_group', label: 'Link to Group', icon: LinkIcon },
-        { key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw },
-        { key: 'change_owner', label: 'Change Group Owner', icon: Crown }
+        ...(!isConnectingSuite ? [
+            { key: 'link_group', label: 'Link to Group', icon: LinkIcon },
+            { key: 'ungroup', label: 'Ungroup Reservation', icon: RefreshCw },
+            { key: 'change_owner', label: 'Change Group Owner', icon: Crown }
+        ] : [])
     ];
 
     return createPortal(
@@ -776,6 +827,11 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                             }`}>
                             {activeStatus}
                         </span>
+                        {isConnectingSuite && (
+                            <span className="text-[8px] px-1.5 py-0.5 rounded font-bold shadow-2xs ml-1 bg-indigo-50 text-indigo-800 border border-indigo-300 flex items-center gap-1" title="Interconnecting Suite Booking">
+                                🔗 Interconnecting Suite
+                            </span>
+                        )}
                     </div>
 
                     {/* Right: Top Action Buttons (Check In / Check Out + Edit + Dynamic Action Dropdown) */}
@@ -990,11 +1046,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     <Home size={12} />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[8px] uppercase  text-blue-200/80 tracking-wider">
-                                        Room Details
+                                    <div className="text-[8px] uppercase text-blue-200/80 tracking-wider flex items-center gap-1">
+                                        <span>Room Details</span>
+                                        {isConnectingSuite && (
+                                            <span className="text-[7px] px-1 py-0.2 rounded bg-indigo-500/50 text-white font-bold border border-indigo-400/40">
+                                                🔗 Connected
+                                            </span>
+                                        )}
                                     </div>
-                                    <div className="text-[8px]  text-white truncate">
-                                        {activeRoomNum} ({activeRoomType})
+                                    <div className="text-[8px] font-bold text-white truncate">
+                                        {isConnectingSuite
+                                            ? `${resolvedGroupRooms.map((r: any) => r.roomNumber).join(' + ') || activeRoomNum} (${activeRoomType})`
+                                            : `${activeRoomNum} (${activeRoomType})`}
                                     </div>
                                 </div>
                             </div>
@@ -1176,35 +1239,50 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                     {/* Header: ${ratePlan} (${count}) + Action Buttons */}
                                     <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-blue-400/20 flex-shrink-0 bg-[#0c2e7a]/50">
                                         <div className="min-w-0">
-                                            <h2 className="text-[11px] font-bold text-white tracking-wide truncate">
-                                                {activeRatePlan} ({resolvedGroupRooms.length})
+                                            <h2 className="text-[11px] font-bold text-white tracking-wide truncate flex items-center gap-1.5">
+                                                {isConnectingSuite ? (
+                                                    <>
+                                                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/40 border border-indigo-400/40 text-indigo-100 text-[9px] font-extrabold flex items-center gap-1">
+                                                            🔗 Interconnecting Suite
+                                                        </span>
+                                                        <span>(1 Booking • Rooms {resolvedGroupRooms[0]?.roomNumber || activeRoomNum})</span>
+                                                    </>
+                                                ) : (
+                                                    `${activeRatePlan} (${resolvedGroupRooms.length})`
+                                                )}
                                             </h2>
-                                            {booking.groupCode && (
+                                            {isConnectingSuite ? (
+                                                <div className="text-[8.5px] font-medium text-emerald-300 mt-0.5 flex items-center gap-1">
+                                                    <span>🚪 Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : 'Rooms 101 & 102')})</span>
+                                                </div>
+                                            ) : booking.groupCode ? (
                                                 <div className="text-[8.5px] font-mono text-blue-200/90 mt-0.5">
                                                     Group Code: <span className="font-bold text-white">{booking.groupCode}</span>
                                                 </div>
-                                            )}
+                                            ) : null}
                                         </div>
-                                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={() => setMode('link_group')}
-                                                className="h-6 px-2.5 bg-blue-500/25 hover:bg-blue-500/40 text-blue-100 border border-blue-400/30 rounded text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                                                title="Link an existing reservation into this group without modifying its confirmation number"
-                                            >
-                                                <LinkIcon size={10} />
-                                                <span>Link Group</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setMode('add_booking')}
-                                                className="h-6 px-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                                                title="Add a new room booking"
-                                            >
-                                                <Plus size={10} />
-                                                <span>Add Room</span>
-                                            </button>
-                                        </div>
+                                        {!isConnectingSuite && (
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMode('link_group')}
+                                                    className="h-6 px-2.5 bg-blue-500/25 hover:bg-blue-500/40 text-blue-100 border border-blue-400/30 rounded text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                                    title="Link an existing reservation into this group without modifying its confirmation number"
+                                                >
+                                                    <LinkIcon size={10} />
+                                                    <span>Link Group</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMode('add_booking')}
+                                                    className="h-6 px-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                                    title="Add a new room booking"
+                                                >
+                                                    <Plus size={10} />
+                                                    <span>Add Room</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Scrollable Room Cards List (matching media_1792966125811_cc345f83.png) */}
@@ -1254,9 +1332,15 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                     </div>
 
                                                     <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[9px]">
-                                                        <span className="px-2 py-0.5 rounded-md bg-blue-500/25 text-blue-100 border border-blue-400/30 font-medium">
-                                                            Room {rm.roomNumber || 'Unassigned'}
-                                                        </span>
+                                                        {rm.isConnecting ? (
+                                                            <span className="px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-100 border border-indigo-400/40 font-bold flex items-center gap-1">
+                                                                🔗 Rooms {rm.roomNumber}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 rounded-md bg-blue-500/25 text-blue-100 border border-blue-400/30 font-medium">
+                                                                Room {rm.roomNumber || 'Unassigned'}
+                                                            </span>
+                                                        )}
                                                         <span className="px-2 py-0.5 rounded-md bg-white/10 text-blue-100 border border-white/10 font-medium">
                                                             Pax {rm.adults ?? 2}, {rm.children ?? 0}
                                                         </span>

@@ -1960,8 +1960,8 @@ export const syncRoomTypesAndRoomsFromDB = async (
             if (Array.isArray(rooms) && rooms.length > 0) {
                 mappedRooms = rooms.map((r: any) => ({
                     id: r.id,
-                    number: String(r.room_number || r.number),
-                    name: r.name || `Room ${r.room_number || r.number}`,
+                    number: String(r.room_number || r.number || r.roomNo || ''),
+                    name: r.name || `Room ${r.room_number || r.number || r.roomNo || ''}`,
                     buildingId: String(r.building_id || r.buildingId || '1'),
                     floorId: String(r.floor_id || r.floorId || '1'),
                     roomTypeId: String(r.room_type_id || r.roomTypeId || '1'),

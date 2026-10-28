@@ -37,6 +37,8 @@ export interface ArchitecturalRoom {
     y: number;
     width: number;
     height: number;
+    isConnecting?: boolean;
+    connectedTo?: string;
 }
 
 const deriveArchitecturalRooms = (targetDate?: string): ArchitecturalRoom[] => {
@@ -118,11 +120,21 @@ const deriveArchitecturalRooms = (targetDate?: string): ArchitecturalRoom[] => {
             const width = 140;
             const height = 95;
 
+            const isConn = Boolean(
+                r.isConnecting ||
+                (r.number === '101' && (r.connectedTo === '102' || !r.connectedTo)) ||
+                (r.number === '102' && (r.connectedTo === '101' || !r.connectedTo)) ||
+                r.connectedTo
+            );
+            const connTo = r.connectedTo || (r.number === '101' ? '102' : r.number === '102' ? '101' : undefined);
+
             result.push({
                 id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || idx + 1,
                 roomNumber: r.number,
                 floor: floorNum,
                 roomType: r.roomTypeName || 'Deluxe Room',
+                isConnecting: isConn,
+                connectedTo: connTo,
                 status,
                 guestName: activeRes ? activeRes.guestName : undefined,
                 checkIn: activeRes ? (activeRes.checkIn || activeRes.arrivalDate) : undefined,
@@ -395,6 +407,32 @@ export const FloorPlan: React.FC = () => {
                                         Rm {room.roomNumber}
                                     </text>
 
+                                    {/* Interconnecting Badge */}
+                                    {room.isConnecting && (
+                                        <g>
+                                            <rect
+                                                x={room.x + room.width - 52}
+                                                y={room.y + 6}
+                                                width={46}
+                                                height={16}
+                                                fill="#e0e7ff"
+                                                stroke="#6366f1"
+                                                strokeWidth="0.8"
+                                                rx={3}
+                                            />
+                                            <text
+                                                x={room.x + room.width - 29}
+                                                y={room.y + 17}
+                                                textAnchor="middle"
+                                                fill="#4338ca"
+                                                fontSize="8"
+                                                fontWeight="bold"
+                                            >
+                                                🔗 {room.connectedTo || 'Conn'}
+                                            </text>
+                                        </g>
+                                    )}
+
                                     {/* Category Subtitle */}
                                     <text
                                         x={room.x + 10}
@@ -504,6 +542,19 @@ export const FloorPlan: React.FC = () => {
                                 </g>
                             );
                         })}
+
+                        {/* Connecting Door Symbol between Room 101 & 102 on Floor 1 */}
+                        {selectedFloor === 1 && (
+                            <g className="cursor-pointer">
+                                <title>Adjoining Interconnecting Door (Rooms 101 &amp; 102)</title>
+                                <rect x="170" y="65" width="20" height="24" fill="#e0e7ff" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="3,2" rx="3" />
+                                <path d="M 173 77 L 187 77" stroke="#4f46e5" strokeWidth="2" />
+                                <circle cx="180" cy="77" r="2.5" fill="#4f46e5" />
+                                <text x="180" y="60" textAnchor="middle" fill="#4338ca" fontSize="6.5" fontWeight="bold">
+                                    DOOR
+                                </text>
+                            </g>
+                        )}
                     </svg>
                 </div>
 
@@ -527,6 +578,21 @@ export const FloorPlan: React.FC = () => {
                                     ৳ {selectedRoom.ratePerNight.toLocaleString()}/N
                                 </span>
                             </div>
+
+                            {/* Connecting Room Notice Card */}
+                            {selectedRoom.isConnecting && (
+                                <div className="bg-indigo-50/90 border border-indigo-200 rounded-lg p-2.5 space-y-1">
+                                    <span className="text-[9.5px] text-indigo-900 uppercase tracking-wide font-bold flex items-center gap-1.5">
+                                        <span>🔗 Interconnecting Room</span>
+                                    </span>
+                                    <p className="text-xs text-indigo-950 font-medium">
+                                        Adjoining soundproof door connects with <strong className="font-mono text-indigo-800 font-bold">Room {selectedRoom.connectedTo}</strong>.
+                                    </p>
+                                    <p className="text-[10px] text-indigo-700">
+                                        Can be booked individually or unlocked together as an Interconnecting Family Suite.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Guest Details - If Reserved (Incoming Arriving Guest) */}
                             {selectedRoom.status === 'RESERVED' && (

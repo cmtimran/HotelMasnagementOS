@@ -42,6 +42,8 @@ export interface RoomRackItem {
     upcomingCheckOut?: string;
     upcomingReservationId?: number | string;
     upcomingReservationNumber?: string;
+    isConnecting?: boolean;
+    connectedTo?: string;
 }
 
 const getBuildingNameById = (bId: string): string => {
@@ -122,6 +124,14 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
             r.smokingAllowed ? 'Smoking Permitted' : 'Non-Smoking'
         ];
 
+        const isConn = Boolean(
+            r.isConnecting ||
+            (r.number === '101' && (r.connectedTo === '102' || !r.connectedTo)) ||
+            (r.number === '102' && (r.connectedTo === '101' || !r.connectedTo)) ||
+            r.connectedTo
+        );
+        const connTo = r.connectedTo || (r.number === '101' ? '102' : r.number === '102' ? '101' : undefined);
+
         return {
             id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || 1,
             roomNumber: r.number,
@@ -129,6 +139,8 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
             buildingId,
             buildingName,
             roomType: (r.roomTypeName as any) || 'Deluxe Double',
+            isConnecting: isConn,
+            connectedTo: connTo,
             status,
             guestName: activeRes ? activeRes.guestName : undefined,
             phone: activeRes ? activeRes.phone : undefined,
@@ -729,9 +741,19 @@ export const RoomRack: React.FC = () => {
                                                                 <span className="text-[9px] text-slate-400">• {room.buildingName}</span>
                                                             )}
                                                         </div>
-                                                        <h3 className="text-base font-black text-slate-900 leading-tight font-mono tracking-tight">
-                                                            {room.roomNumber}
-                                                        </h3>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <h3 className="text-base font-black text-slate-900 leading-tight font-mono tracking-tight">
+                                                                {room.roomNumber}
+                                                            </h3>
+                                                            {room.isConnecting && (
+                                                                <span
+                                                                    className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-bold flex items-center gap-1 shadow-2xs"
+                                                                    title={`Interconnecting Door to Room ${room.connectedTo}`}
+                                                                >
+                                                                    🔗 Conn {room.connectedTo}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     <span className={`px-2 py-0.5 rounded-full text-[10px] border flex items-center gap-1 ${theme.badge}`}>
@@ -873,7 +895,12 @@ export const RoomRack: React.FC = () => {
                                             className={`p-2 rounded-lg border bg-white shadow-2xs cursor-pointer hover:shadow-xs transition-all flex flex-col justify-between ${theme.border}`}
                                         >
                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs font-black text-slate-900 font-mono">{room.roomNumber}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-xs font-black text-slate-900 font-mono">{room.roomNumber}</span>
+                                                    {room.isConnecting && (
+                                                        <span className="text-[9px] text-indigo-600 font-bold" title={`Interconnecting with Room ${room.connectedTo}`}>🔗</span>
+                                                    )}
+                                                </div>
                                                 <span className={`w-2 h-2 rounded-full ${theme.dot}`}></span>
                                             </div>
                                             <p className="text-[9.5px] font-medium text-slate-500 truncate mt-1">
@@ -912,11 +939,16 @@ export const RoomRack: React.FC = () => {
                                     {selectedRoom.roomNumber}
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="text-sm font-bold text-slate-900">Room {selectedRoom.roomNumber} Operations</h3>
                                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${getStatusTheme(selectedRoom.status).badge}`}>
                                             {getStatusTheme(selectedRoom.status).label}
                                         </span>
+                                        {selectedRoom.isConnecting && (
+                                            <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold flex items-center gap-1">
+                                                🔗 Adjoining Room {selectedRoom.connectedTo}
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-xs text-slate-500 font-medium mt-0.5">
                                         {selectedRoom.buildingName ? `${selectedRoom.buildingName} • ` : ''}Floor {selectedRoom.floor} • {selectedRoom.roomType} ({selectedRoom.bedType} Bed)
