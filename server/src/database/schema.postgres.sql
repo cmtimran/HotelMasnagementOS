@@ -128,6 +128,23 @@ CREATE TABLE IF NOT EXISTS guests (
     id_type VARCHAR(50) DEFAULT 'National ID (NID)',
     id_number VARCHAR(100),
     vip_status VARCHAR(50) DEFAULT 'NONE',
+    is_blacklisted BOOLEAN NOT NULL DEFAULT FALSE,
+    blacklist_reason TEXT,
+    blacklisted_by VARCHAR(150),
+    blacklisted_at TIMESTAMPTZ,
+    dob DATE,
+    gender VARCHAR(20) DEFAULT 'Male',
+    id_issue_date DATE,
+    id_expiry_date DATE,
+    id_issue_country VARCHAR(100),
+    id_issue_place VARCHAR(150),
+    passport_visa_number VARCHAR(100),
+    passport_visa_type VARCHAR(50),
+    passport_visa_expiry DATE,
+    passport_entry_port VARCHAR(150),
+    driving_vehicle_class VARCHAR(50),
+    identity_metadata JSONB DEFAULT '{}'::jsonb,
+    tags TEXT[] DEFAULT '{}',
     address TEXT,
     city VARCHAR(100),
     country VARCHAR(100) DEFAULT 'Bangladesh',
@@ -135,6 +152,17 @@ CREATE TABLE IF NOT EXISTS guests (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Guest Profile Audit Trail & Edit History
+CREATE TABLE IF NOT EXISTS guest_edit_history (
+    id BIGSERIAL PRIMARY KEY,
+    guest_id BIGINT NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
+    changed_by VARCHAR(150) NOT NULL DEFAULT 'Staff Member',
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    change_summary TEXT,
+    changes JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_guest_edit_history_guest_id ON guest_edit_history(guest_id);
 
 CREATE TABLE IF NOT EXISTS corporate_accounts (
     id BIGSERIAL PRIMARY KEY,

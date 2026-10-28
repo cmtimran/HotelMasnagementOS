@@ -6,14 +6,26 @@ import {
     Building2, Clock,
     AlertTriangle, ChevronRight, ChevronLeft,
     Home, Edit3, Receipt,
-    GitMerge, CheckSquare, Square, Loader2
+    GitMerge, CheckSquare, Square, Loader2,
+    Ban, History, FileText
 } from 'lucide-react';
 import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 import { useNavigation } from '../context/NavigationContext';
 import { getApiBaseUrl } from '../utils/apiUrl';
 import MergeGuestModal from './modals/MergeGuestModal';
 import { isSamePhoneNumber } from '../utils/phoneUtils';
+import {
+    formatIdentityDisplay,
+    normalizeIdentityNumber,
+    type BlacklistCategory,
+    type ProfileEditAuditEntry
+} from '../utils/identityUtils';
 export { normalizePhone, isSamePhoneNumber } from '../utils/phoneUtils';
+import {
+    COUNTRIES_DATABASE,
+    getCitiesForCountry,
+    getNationalityForCountry
+} from '../utils/geoData';
 
 export interface GuestRecord {
     id: number;
@@ -24,7 +36,7 @@ export interface GuestRecord {
     email: string;
     vipTier: 'Regular' | 'Silver' | 'Gold' | 'Platinum VIP' | 'Corporate VIP';
     nationality: string;
-    idType: 'National ID (NID)' | 'Passport' | 'Driving License' | 'Diplomatic ID';
+    idType: 'National ID (NID)' | 'Passport' | 'Driving License' | 'Diplomatic ID' | 'Birth Certificate' | 'Other';
     idNumber: string;
     idExpiry?: string;
     issuingCountry?: string;
@@ -34,6 +46,26 @@ export interface GuestRecord {
     homeCountry: string;
     address?: string;
     postalCode?: string;
+
+    // Blacklist / Block Status
+    isBlacklisted?: boolean;
+    blacklistReason?: string;
+    blacklistedBy?: string;
+    blacklistedAt?: string;
+
+    // Polymorphic Identity Attributes
+    idIssueDate?: string;
+    idExpiryDate?: string;
+    idIssueCountry?: string;
+    idIssuePlace?: string;
+    passportVisaNumber?: string;
+    passportVisaType?: string;
+    passportVisaExpiry?: string;
+    passportEntryPort?: string;
+    drivingVehicleClass?: string;
+    fatherOrSpouseName?: string;
+    tags?: string[];
+
     emergencyContact?: {
         name: string;
         relationship: string;
@@ -344,6 +376,22 @@ export const GuestProfile: React.FC = () => {
                             lifetimeSpendBDT: finalSpend,
                             loyaltyPoints: finalPoints,
                             lastStayDate: finalLastStay,
+                            isBlacklisted: Boolean(dg.isBlacklisted),
+                            blacklistReason: dg.blacklistReason || existing.blacklistReason,
+                            blacklistedBy: dg.blacklistedBy || existing.blacklistedBy,
+                            blacklistedAt: dg.blacklistedAt || existing.blacklistedAt,
+                            dob: dg.dob || existing.dob || '1990-01-01',
+                            gender: dg.gender || existing.gender || 'Male',
+                            idIssueDate: dg.idIssueDate || existing.idIssueDate,
+                            idExpiryDate: dg.idExpiryDate || existing.idExpiryDate,
+                            idIssueCountry: dg.idIssueCountry || existing.idIssueCountry,
+                            idIssuePlace: dg.idIssuePlace || existing.idIssuePlace,
+                            passportVisaNumber: dg.passportVisaNumber || existing.passportVisaNumber,
+                            passportVisaType: dg.passportVisaType || existing.passportVisaType,
+                            passportVisaExpiry: dg.passportVisaExpiry || existing.passportVisaExpiry,
+                            passportEntryPort: dg.passportEntryPort || existing.passportEntryPort,
+                            drivingVehicleClass: dg.drivingVehicleClass || existing.drivingVehicleClass,
+                            tags: dg.tags || existing.tags || [],
                             preferences: existing.preferences || {
                                 roomType: 'Deluxe Double',
                                 floorPreference: 'High Floor',
@@ -365,8 +413,8 @@ export const GuestProfile: React.FC = () => {
                             nationality: dg.nationality || 'Bangladesh',
                             idType: dg.idType || 'National ID (NID)',
                             idNumber: dg.idNumber || '',
-                            dob: '1990-01-01',
-                            gender: 'Male',
+                            dob: dg.dob || '1990-01-01',
+                            gender: dg.gender || 'Male',
                             homeCity: dg.city || 'Dhaka',
                             homeCountry: dg.country || 'Bangladesh',
                             address: dg.address || '',
@@ -375,6 +423,20 @@ export const GuestProfile: React.FC = () => {
                             lifetimeSpendBDT: dbSpend,
                             lastStayDate: dg.lastStayDate || '-',
                             loyaltyPoints: dbPoints,
+                            isBlacklisted: Boolean(dg.isBlacklisted),
+                            blacklistReason: dg.blacklistReason,
+                            blacklistedBy: dg.blacklistedBy,
+                            blacklistedAt: dg.blacklistedAt,
+                            idIssueDate: dg.idIssueDate,
+                            idExpiryDate: dg.idExpiryDate,
+                            idIssueCountry: dg.idIssueCountry,
+                            idIssuePlace: dg.idIssuePlace,
+                            passportVisaNumber: dg.passportVisaNumber,
+                            passportVisaType: dg.passportVisaType,
+                            passportVisaExpiry: dg.passportVisaExpiry,
+                            passportEntryPort: dg.passportEntryPort,
+                            drivingVehicleClass: dg.drivingVehicleClass,
+                            tags: dg.tags || [],
                             preferences: {
                                 roomType: 'Deluxe Double',
                                 floorPreference: 'High Floor',
@@ -414,7 +476,7 @@ export const GuestProfile: React.FC = () => {
     const [selectedGuestId, setSelectedGuestId] = useState<number>(() => guests[0]?.id || 1);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTierFilter, setSelectedTierFilter] = useState<string>('ALL');
-    const [activeTab, setActiveTab] = useState<'overview' | 'preferences' | 'vault' | 'corporate'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'preferences' | 'vault' | 'corporate' | 'audit'>('overview');
     const [activityFilter, setActivityFilter] = useState<'all' | 'reservations' | 'checkins' | 'outlets'>('all');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -423,6 +485,17 @@ export const GuestProfile: React.FC = () => {
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
     const [editingGuestId, setEditingGuestId] = useState<number | null>(null);
     const [modalTab, setModalTab] = useState<'kyc' | 'contact' | 'preferences' | 'corporate'>('kyc');
+
+    // Blacklist / Block Modal State
+    const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+    const [blacklistCategory, setBlacklistCategory] = useState<BlacklistCategory>('Payment Default / Unpaid Folio');
+    const [blacklistReasonInput, setBlacklistReasonInput] = useState('');
+    const [blacklistStaffName, setBlacklistStaffName] = useState('Duty Manager');
+    const [blacklistActionType, setBlacklistActionType] = useState<'block' | 'unblock'>('block');
+
+    // Audit Trail State
+    const [editHistory, setEditHistory] = useState<ProfileEditAuditEntry[]>([]);
+    const [loadingEditHistory, setLoadingEditHistory] = useState(false);
 
     const initialGuestForm = {
         title: 'Mr.' as GuestRecord['title'],
@@ -434,6 +507,18 @@ export const GuestProfile: React.FC = () => {
         idNumber: '',
         idExpiry: '2030-12-31',
         issuingCountry: 'Bangladesh',
+
+        idIssueDate: '',
+        idExpiryDate: '2030-12-31',
+        idIssueCountry: 'Bangladesh',
+        idIssuePlace: '',
+        passportVisaNumber: '',
+        passportVisaType: 'Tourist',
+        passportVisaExpiry: '2028-12-31',
+        passportEntryPort: 'Hazrat Shahjalal Int Airport, Dhaka',
+        drivingVehicleClass: 'Light',
+        fatherOrSpouseName: '',
+        tags: [] as string[],
 
         phone: '',
         altPhone: '',
@@ -489,6 +574,18 @@ export const GuestProfile: React.FC = () => {
             idNumber: guest.idNumber || '',
             idExpiry: guest.idExpiry || '2030-12-31',
             issuingCountry: guest.issuingCountry || guest.nationality || 'Bangladesh',
+
+            idIssueDate: guest.idIssueDate || '',
+            idExpiryDate: guest.idExpiryDate || guest.idExpiry || '2030-12-31',
+            idIssueCountry: guest.idIssueCountry || guest.issuingCountry || guest.nationality || 'Bangladesh',
+            idIssuePlace: guest.idIssuePlace || '',
+            passportVisaNumber: guest.passportVisaNumber || '',
+            passportVisaType: guest.passportVisaType || 'Tourist',
+            passportVisaExpiry: guest.passportVisaExpiry || '',
+            passportEntryPort: guest.passportEntryPort || 'Hazrat Shahjalal Int Airport, Dhaka',
+            drivingVehicleClass: guest.drivingVehicleClass || 'Light',
+            fatherOrSpouseName: guest.fatherOrSpouseName || '',
+            tags: guest.tags || [],
 
             phone: guest.phone || '',
             altPhone: guest.altPhone || '',
@@ -558,6 +655,87 @@ export const GuestProfile: React.FC = () => {
                 setIsLoadingHistory(false);
             });
     }, [activeGuest?.id]);
+
+    useEffect(() => {
+        if (activeTab === 'audit' && activeGuest?.id) {
+            setLoadingEditHistory(true);
+            const apiBase = getApiBaseUrl();
+            fetch(`${apiBase}/api/guests/${activeGuest.id}/edit-history`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success && Array.isArray(res.data)) {
+                        setEditHistory(res.data);
+                    } else {
+                        setEditHistory([]);
+                    }
+                })
+                .catch(err => {
+                    console.warn('Failed to load guest edit history:', err);
+                    setEditHistory([]);
+                })
+                .finally(() => {
+                    setLoadingEditHistory(false);
+                });
+        }
+    }, [activeTab, activeGuest?.id]);
+
+    const handleConfirmBlacklist = async () => {
+        if (!activeGuest?.id) return;
+        const apiBase = getApiBaseUrl();
+        const isBlocking = blacklistActionType === 'block';
+
+        const fullReason = isBlocking
+            ? `${blacklistCategory}: ${blacklistReasonInput.trim() || 'Payment Default / Security Violation'}`
+            : null;
+
+        try {
+            const res = await fetch(`${apiBase}/api/guests/${activeGuest.id}/blacklist`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    isBlacklisted: isBlocking,
+                    blacklistReason: fullReason,
+                    blacklistedBy: blacklistStaffName.trim() || 'Duty Manager'
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                const updated = guests.map(g => {
+                    if (g.id !== activeGuest.id) return g;
+                    return {
+                        ...g,
+                        isBlacklisted: isBlocking,
+                        blacklistReason: fullReason || undefined,
+                        blacklistedBy: isBlocking ? (blacklistStaffName.trim() || 'Duty Manager') : undefined,
+                        blacklistedAt: isBlocking ? new Date().toISOString() : undefined
+                    };
+                });
+                setGuests(updated);
+                localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(updated));
+                setShowBlacklistModal(false);
+                showToast(isBlocking ? `Guest ${activeGuest.name} has been placed on Blacklist.` : `Guest ${activeGuest.name} has been removed from Blacklist.`);
+                refreshGuests();
+            } else {
+                alert(json.error || 'Failed to update blacklist status');
+            }
+        } catch (err) {
+            console.error('Blacklist update error:', err);
+            const updated = guests.map(g => {
+                if (g.id !== activeGuest.id) return g;
+                return {
+                    ...g,
+                    isBlacklisted: isBlocking,
+                    blacklistReason: fullReason || undefined,
+                    blacklistedBy: isBlocking ? (blacklistStaffName.trim() || 'Duty Manager') : undefined,
+                    blacklistedAt: isBlocking ? new Date().toISOString() : undefined
+                };
+            });
+            setGuests(updated);
+            localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(updated));
+            setShowBlacklistModal(false);
+            showToast(isBlocking ? `Guest ${activeGuest.name} has been placed on Blacklist.` : `Guest ${activeGuest.name} has been removed from Blacklist.`);
+        }
+    };
 
     const { reservationsList, checkinsList, outletBillsList, allLedgerItems } = useMemo(() => {
         if (!activeGuest) {
@@ -859,13 +1037,29 @@ export const GuestProfile: React.FC = () => {
             lastName,
             email: newGuestForm.email.trim() || undefined,
             phone: newGuestForm.phone.trim(),
+            altPhone: newGuestForm.altPhone.trim() || undefined,
             nationality: newGuestForm.nationality.trim() || 'Bangladeshi',
             idType: newGuestForm.idType,
             idNumber: newGuestForm.idNumber.trim() || undefined,
             vipStatus: newGuestForm.vipTier.includes('Platinum') ? 'VVIP' : newGuestForm.vipTier.includes('Gold') ? 'VIP' : 'NONE',
             address: newGuestForm.address.trim() || undefined,
             city: newGuestForm.homeCity.trim() || 'Dhaka',
-            country: newGuestForm.homeCountry.trim() || 'Bangladesh'
+            country: newGuestForm.homeCountry.trim() || 'Bangladesh',
+            postalCode: newGuestForm.postalCode.trim() || undefined,
+            dob: newGuestForm.dob || undefined,
+            gender: newGuestForm.gender || 'Male',
+            idIssueDate: newGuestForm.idIssueDate || undefined,
+            idExpiryDate: newGuestForm.idExpiryDate || newGuestForm.idExpiry || undefined,
+            idIssueCountry: newGuestForm.idIssueCountry || newGuestForm.nationality || undefined,
+            idIssuePlace: newGuestForm.idIssuePlace || undefined,
+            passportVisaNumber: newGuestForm.passportVisaNumber || undefined,
+            passportVisaType: newGuestForm.passportVisaType || undefined,
+            passportVisaExpiry: newGuestForm.passportVisaExpiry || undefined,
+            passportEntryPort: newGuestForm.passportEntryPort || undefined,
+            drivingVehicleClass: newGuestForm.drivingVehicleClass || undefined,
+            fatherOrSpouseName: newGuestForm.fatherOrSpouseName || undefined,
+            tags: newGuestForm.tags || [],
+            changedBy: 'Front Desk Officer'
         };
 
         if (modalMode === 'edit' && editingGuestId) {
@@ -901,6 +1095,17 @@ export const GuestProfile: React.FC = () => {
                     homeCountry: newGuestForm.homeCountry.trim() || newGuestForm.nationality || 'Bangladesh',
                     address: newGuestForm.address.trim() || undefined,
                     postalCode: newGuestForm.postalCode.trim() || undefined,
+                    idIssueDate: newGuestForm.idIssueDate,
+                    idExpiryDate: newGuestForm.idExpiryDate || newGuestForm.idExpiry,
+                    idIssueCountry: newGuestForm.idIssueCountry || newGuestForm.nationality,
+                    idIssuePlace: newGuestForm.idIssuePlace,
+                    passportVisaNumber: newGuestForm.passportVisaNumber,
+                    passportVisaType: newGuestForm.passportVisaType,
+                    passportVisaExpiry: newGuestForm.passportVisaExpiry,
+                    passportEntryPort: newGuestForm.passportEntryPort,
+                    drivingVehicleClass: newGuestForm.drivingVehicleClass,
+                    fatherOrSpouseName: newGuestForm.fatherOrSpouseName,
+                    tags: newGuestForm.tags,
                     emergencyContact: newGuestForm.emergencyName.trim() ? {
                         name: newGuestForm.emergencyName.trim(),
                         relationship: newGuestForm.emergencyRelation || 'Family',
@@ -1008,6 +1213,17 @@ export const GuestProfile: React.FC = () => {
             homeCountry: newGuestForm.homeCountry.trim() || newGuestForm.nationality || 'Bangladesh',
             address: newGuestForm.address.trim() || undefined,
             postalCode: newGuestForm.postalCode.trim() || undefined,
+            idIssueDate: newGuestForm.idIssueDate,
+            idExpiryDate: newGuestForm.idExpiryDate || newGuestForm.idExpiry,
+            idIssueCountry: newGuestForm.idIssueCountry || newGuestForm.nationality,
+            idIssuePlace: newGuestForm.idIssuePlace,
+            passportVisaNumber: newGuestForm.passportVisaNumber,
+            passportVisaType: newGuestForm.passportVisaType,
+            passportVisaExpiry: newGuestForm.passportVisaExpiry,
+            passportEntryPort: newGuestForm.passportEntryPort,
+            drivingVehicleClass: newGuestForm.drivingVehicleClass,
+            fatherOrSpouseName: newGuestForm.fatherOrSpouseName,
+            tags: newGuestForm.tags,
             emergencyContact: newGuestForm.emergencyName.trim() ? {
                 name: newGuestForm.emergencyName.trim(),
                 relationship: newGuestForm.emergencyRelation || 'Family',
@@ -1267,6 +1483,11 @@ export const GuestProfile: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-1">
+                                            {g.isBlacklisted && (
+                                                <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-rose-100 text-rose-700 border border-rose-300 flex items-center gap-0.5">
+                                                    <Ban size={9} /> Blocked
+                                                </span>
+                                            )}
                                             <span className={`px-1.5 py-0.2 rounded text-[9px] ${
                                                 g.vipTier.includes('Platinum') ? 'bg-purple-100 text-purple-800 border border-purple-200' :
                                                 g.vipTier.includes('Corporate') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
@@ -1376,8 +1597,94 @@ export const GuestProfile: React.FC = () => {
                                 <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Reward Pts</span>
                                 <span className="text-xs font-bold text-emerald-700 font-mono block">{activeGuest.loyaltyPoints ?? Math.round(Number(activeGuest.lifetimeSpendBDT || 0) / 20)}</span>
                             </div>
+
+                            {/* Action Buttons: Block/Unblock & Edit */}
+                            <div className="flex items-center gap-1.5 border-l border-gray-100 pl-3">
+                                {activeGuest.isBlacklisted ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setBlacklistActionType('unblock');
+                                            setBlacklistStaffName('Duty Manager');
+                                            setShowBlacklistModal(true);
+                                        }}
+                                        className="h-7 px-2.5 rounded text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 cursor-pointer shadow-2xs"
+                                        title="Lift blacklist restriction for this guest"
+                                    >
+                                        <CheckCircle2 size={12} />
+                                        <span>Unblock</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setBlacklistActionType('block');
+                                            setBlacklistCategory('Payment Default / Unpaid Folio');
+                                            setBlacklistReasonInput('');
+                                            setBlacklistStaffName('Duty Manager');
+                                            setShowBlacklistModal(true);
+                                        }}
+                                        className="h-7 px-2.5 rounded text-xs font-semibold bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 flex items-center gap-1 cursor-pointer shadow-2xs"
+                                        title="Block guest from reservations & check-ins"
+                                    >
+                                        <Ban size={12} className="text-rose-600" />
+                                        <span>Block Guest</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenEditModal(activeGuest, 'kyc')}
+                                    className="h-7 px-2.5 rounded text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 cursor-pointer shadow-2xs"
+                                    title="Edit Profile"
+                                >
+                                    <Edit3 size={12} />
+                                    <span>Edit</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    {/* Prominent Red Blacklist Alert Banner */}
+                    {activeGuest.isBlacklisted && (
+                        <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-lg flex items-start justify-between gap-3 shadow-xs animate-in fade-in duration-150">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs mt-0.5">
+                                    <Ban size={16} />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white uppercase tracking-wider">
+                                            Blacklisted / Blocked Guest
+                                        </span>
+                                        <span className="text-[11px] text-rose-800 font-semibold">
+                                            Unauthorized for Standard Room Reservation &amp; Check-In
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-rose-950 font-medium mt-1">
+                                        <strong>Incident / Reason:</strong> {activeGuest.blacklistReason || 'Payment default or security violation'}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[10px] text-rose-700 mt-1 flex-wrap">
+                                        <span>Authorized by: <strong>{activeGuest.blacklistedBy || 'Duty Manager'}</strong></span>
+                                        {activeGuest.blacklistedAt && (
+                                            <span>Date: <strong>{new Date(activeGuest.blacklistedAt).toLocaleDateString()}</strong></span>
+                                        )}
+                                        <span className="text-rose-600 italic">• System will require Manager Override authorization during booking</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setBlacklistActionType('unblock');
+                                    setBlacklistStaffName('Duty Manager');
+                                    setShowBlacklistModal(true);
+                                }}
+                                className="px-2.5 py-1 rounded text-xs font-semibold bg-white border border-rose-300 text-rose-700 hover:bg-rose-100 cursor-pointer flex-shrink-0 shadow-2xs"
+                            >
+                                Lift Block
+                            </button>
+                        </div>
+                    )}
 
                     {/* Navigation Tabs */}
                     <div className="bg-white rounded-lg border border-gray-200 px-3 flex items-center justify-between">
@@ -1386,7 +1693,8 @@ export const GuestProfile: React.FC = () => {
                                 { key: 'overview', label: 'Reservations, Stays & Outlet Bills', icon: <Receipt size={12} /> },
                                 { key: 'preferences', label: 'Preferences & CRM', icon: <Heart size={12} /> },
                                 { key: 'vault', label: 'ID & Verification Vault', icon: <ShieldCheck size={12} /> },
-                                { key: 'corporate', label: 'Corporate Profile', icon: <Building2 size={12} /> }
+                                { key: 'corporate', label: 'Corporate Profile', icon: <Building2 size={12} /> },
+                                { key: 'audit', label: 'Edit History & Audit Log', icon: <History size={12} /> }
                             ].map(tab => (
                                 <button
                                     key={tab.key}
@@ -1697,7 +2005,9 @@ export const GuestProfile: React.FC = () => {
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                                     <span className="text-[9.5px] text-gray-400 uppercase block">Document Number</span>
-                                    <p className="font-mono text-gray-900 text-xs mt-0.5 font-semibold">{activeGuest.idNumber}</p>
+                                    <p className="font-mono text-gray-900 text-xs mt-0.5 font-semibold">
+                                        {formatIdentityDisplay(activeGuest.idNumber, activeGuest.idType as any)}
+                                    </p>
                                 </div>
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
@@ -1709,12 +2019,79 @@ export const GuestProfile: React.FC = () => {
 
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                                     <span className="text-[9.5px] text-gray-400 uppercase block">Issuing Authority / Country</span>
-                                    <p className="text-gray-900 text-xs mt-0.5 font-semibold">{activeGuest.issuingCountry || activeGuest.nationality}</p>
-                                    {activeGuest.idExpiry && (
-                                        <span className="text-[9.5px] text-emerald-700 block mt-0.5">Expires: {activeGuest.idExpiry} (Active)</span>
+                                    <p className="text-gray-900 text-xs mt-0.5 font-semibold">{activeGuest.idIssueCountry || activeGuest.issuingCountry || activeGuest.nationality}</p>
+                                    {(activeGuest.idExpiryDate || activeGuest.idExpiry) && (
+                                        <span className="text-[9.5px] text-emerald-700 block mt-0.5">Expires: {activeGuest.idExpiryDate || activeGuest.idExpiry} (Active)</span>
                                     )}
                                 </div>
                             </div>
+
+                            {/* Polymorphic Extended Attributes */}
+                            {activeGuest.idType === 'Passport' && (
+                                <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-200 space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+                                        <div className="flex items-center gap-1.5">
+                                            <FileText size={14} className="text-blue-700" />
+                                            <span>International Passport & Visa Clearance Credentials</span>
+                                        </div>
+                                        <span className="text-[10px] text-blue-700 bg-blue-100 px-2 py-0.5 rounded font-mono">
+                                            Port of Entry: {activeGuest.passportEntryPort || 'Dhaka Int (DAC)'}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                                        <div className="bg-white p-2 rounded border border-blue-200/60">
+                                            <span className="text-[9px] text-gray-400 block uppercase">Visa Number</span>
+                                            <span className="font-mono font-bold text-gray-800">{activeGuest.passportVisaNumber || 'N/A'}</span>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-blue-200/60">
+                                            <span className="text-[9px] text-gray-400 block uppercase">Visa Category</span>
+                                            <span className="font-semibold text-gray-800">{activeGuest.passportVisaType || 'Tourist (T)'}</span>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-blue-200/60">
+                                            <span className="text-[9px] text-gray-400 block uppercase">Visa Expiry</span>
+                                            <span className="font-mono text-emerald-700">{activeGuest.passportVisaExpiry || '2028-12-31'}</span>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-blue-200/60">
+                                            <span className="text-[9px] text-gray-400 block uppercase">Place of Issue</span>
+                                            <span className="font-medium text-gray-800">{activeGuest.idIssuePlace || activeGuest.homeCity || 'Dhaka'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeGuest.idType === 'National ID (NID)' && activeGuest.fatherOrSpouseName && (
+                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-400 uppercase block">Father's / Spouse's Legal Name</span>
+                                        <span className="font-semibold text-gray-800">{activeGuest.fatherOrSpouseName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-400 uppercase block">Issuing Circle / District</span>
+                                        <span className="font-medium text-gray-800">{activeGuest.idIssuePlace || activeGuest.homeCity || 'Dhaka'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-400 uppercase block">Issue Date</span>
+                                        <span className="font-mono text-gray-600">{activeGuest.idIssueDate || '-'}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeGuest.idType === 'Driving License' && (
+                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-400 uppercase block">Vehicle Class</span>
+                                        <span className="font-bold text-gray-800">{activeGuest.drivingVehicleClass || 'Light Vehicle'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-400 uppercase block">BRTA Circle / Authority</span>
+                                        <span className="font-medium text-gray-800">{activeGuest.idIssuePlace || 'BRTA Dhaka'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[9.5px] text-gray-400 uppercase block">License Validity</span>
+                                        <span className="font-mono text-emerald-700">{activeGuest.idExpiryDate || activeGuest.idExpiry || 'Active'}</span>
+                                    </div>
+                                </div>
+                            )}
 
                             {activeGuest.address && (
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 flex items-start gap-2">
@@ -1789,6 +2166,107 @@ export const GuestProfile: React.FC = () => {
                                         : 'Standard individual guest folio settlement. All room charges, taxes, and incidentals to be settled by guest upon departure via credit card, cash, or MFS.'}
                                 </p>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Tab 5: Profile Edit History & Audit Log */}
+                    {activeTab === 'audit' && (
+                        <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-3.5 space-y-3">
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                                <div>
+                                    <h3 className="text-gray-900 text-xs flex items-center gap-1.5 font-bold">
+                                        <History size={13} className="text-indigo-600" />
+                                        <span>Profile Edit History & Tamper-Evident Audit Trail</span>
+                                    </h3>
+                                    <p className="text-[10px] text-gray-500 mt-0.5">
+                                        Immutable log tracking all modifications to guest information, identity credentials, phone numbers, and blacklist events.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (activeGuest?.id) {
+                                            setLoadingEditHistory(true);
+                                            const apiBase = getApiBaseUrl();
+                                            fetch(`${apiBase}/api/guests/${activeGuest.id}/edit-history`)
+                                                .then(r => r.json())
+                                                .then(res => {
+                                                    if (res.success && Array.isArray(res.data)) {
+                                                        setEditHistory(res.data);
+                                                    }
+                                                })
+                                                .finally(() => setLoadingEditHistory(false));
+                                        }
+                                    }}
+                                    className="px-2.5 py-1 text-[10.5px] rounded bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-semibold cursor-pointer"
+                                >
+                                    Refresh Log
+                                </button>
+                            </div>
+
+                            {loadingEditHistory ? (
+                                <div className="py-8 flex flex-col items-center justify-center gap-2 text-gray-400">
+                                    <Loader2 size={20} className="animate-spin text-blue-600" />
+                                    <span className="text-xs">Loading audit trail records...</span>
+                                </div>
+                            ) : editHistory.length === 0 ? (
+                                <div className="py-8 text-center bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+                                    <History size={24} className="mx-auto text-gray-300 mb-1" />
+                                    <p className="text-xs text-gray-600 font-semibold">No Edit History Logged Yet</p>
+                                    <p className="text-[10.5px] text-gray-400 mt-0.5">
+                                        Any edits to this guest profile, phone changes, or blacklist actions will be tracked here with field-level diffs.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {editHistory.map((item, idx) => (
+                                        <div key={item.id || idx} className="p-3 bg-gray-50/70 rounded-lg border border-gray-200 space-y-2">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                                    <span className="font-bold text-gray-900">{item.changeSummary || (item as any).change_summary || 'Profile Updated'}</span>
+                                                    <span className="text-[10px] text-gray-400">•</span>
+                                                    <span className="text-[10.5px] text-gray-600 font-medium">By: {item.changedBy || (item as any).changed_by || 'Staff'}</span>
+                                                </div>
+                                                <span className="text-[10px] font-mono text-gray-500">
+                                                    {(item.changedAt || (item as any).changed_at) ? new Date(item.changedAt || (item as any).changed_at).toLocaleString() : 'Recent'}
+                                                </span>
+                                            </div>
+
+                                            {item.changes && Object.keys(item.changes).length > 0 && (
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-[11px] border-collapse bg-white rounded border border-gray-200">
+                                                        <thead>
+                                                            <tr className="bg-gray-100/70 border-b border-gray-200 text-[10px] uppercase text-gray-600 font-semibold">
+                                                                <th className="py-1 px-2.5">Field</th>
+                                                                <th className="py-1 px-2.5">Previous Value</th>
+                                                                <th className="py-1 px-1 text-center"></th>
+                                                                <th className="py-1 px-2.5">New Value</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100">
+                                                            {Object.entries(item.changes).map(([field, diff]: [string, any]) => (
+                                                                <tr key={field} className="hover:bg-gray-50">
+                                                                    <td className="py-1 px-2.5 font-semibold text-gray-700 capitalize">
+                                                                        {field.replace(/([A-Z])/g, ' $1')}
+                                                                    </td>
+                                                                    <td className="py-1 px-2.5 font-mono text-rose-600 bg-rose-50/50">
+                                                                        <span className="line-through">{String(diff?.oldValue ?? '(empty)')}</span>
+                                                                    </td>
+                                                                    <td className="py-1 px-1 text-center text-gray-400 font-bold">➔</td>
+                                                                    <td className="py-1 px-2.5 font-mono text-emerald-700 bg-emerald-50/50 font-semibold">
+                                                                        {String(diff?.newValue ?? '(empty)')}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1933,65 +2411,360 @@ export const GuestProfile: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        <div>
-                                            <div className="flex items-center justify-between mb-1">
-                                                <label className="text-[10.5px] font-semibold text-gray-700">Nationality</label>
-                                                <div className="flex items-center gap-1 text-[9.5px]">
-                                                    <span className="text-gray-400">Quick:</span>
-                                                    {['Bangladesh', 'India', 'USA', 'UK', 'Canada', 'UAE'].map(nat => (
-                                                        <button
-                                                            key={nat}
-                                                            type="button"
-                                                            onClick={() => setNewGuestForm({ ...newGuestForm, nationality: nat === 'USA' ? 'United States' : nat === 'UK' ? 'United Kingdom' : nat })}
-                                                            className="text-blue-600 hover:underline cursor-pointer"
-                                                        >
-                                                            {nat}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. Bangladesh, United States, United Kingdom"
-                                                value={newGuestForm.nationality}
-                                                onChange={e => setNewGuestForm({ ...newGuestForm, nationality: e.target.value })}
-                                                className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
-                                            />
-                                        </div>
-
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                        {/* Polymorphic Dynamic Identity Capture */}
+                                        <div className="space-y-3 pt-1">
                                             <div>
-                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">ID Document Type</label>
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                    Identification Document Type <span className="text-rose-500">*</span>
+                                                </label>
                                                 <select
                                                     value={newGuestForm.idType}
                                                     onChange={e => setNewGuestForm({ ...newGuestForm, idType: e.target.value as any })}
-                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
                                                 >
-                                                    <option value="National ID (NID)">National ID (NID)</option>
-                                                    <option value="Passport">Passport</option>
-                                                    <option value="Driving License">Driving License</option>
-                                                    <option value="Diplomatic ID">Diplomatic ID</option>
+                                                    <option value="National ID (NID)">National ID (NID / Smart Card)</option>
+                                                    <option value="Passport">International Passport</option>
+                                                    <option value="Driving License">Driving License (BRTA / Int)</option>
+                                                    <option value="Diplomatic ID">Diplomatic ID / UN / Embassy</option>
+                                                    <option value="Birth Certificate">Birth Certificate</option>
+                                                    <option value="Other">Other Official Document</option>
                                                 </select>
                                             </div>
-                                            <div>
-                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Document Number</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="NID / Passport No."
-                                                    value={newGuestForm.idNumber}
-                                                    onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
-                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">ID Expiry Date</label>
-                                                <input
-                                                    type="date"
-                                                    value={newGuestForm.idExpiry}
-                                                    onChange={e => setNewGuestForm({ ...newGuestForm, idExpiry: e.target.value })}
-                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
-                                                />
-                                            </div>
+
+                                            {/* 1. National ID (NID) Specific Fields */}
+                                            {newGuestForm.idType === 'National ID (NID)' && (
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                                                    <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
+                                                        <span className="flex items-center gap-1.5">
+                                                            <ShieldCheck size={14} className="text-emerald-600" />
+                                                            National ID Card (NID) Verification
+                                                        </span>
+                                                        <span className="text-[9.5px] text-gray-500 font-normal">
+                                                            Auto-formats Bengali (০-৯) &amp; English digits
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">
+                                                                NID Number (10-digit Smart / 13 or 17-digit Classic) <span className="text-rose-500">*</span>
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. 550 123 4567 or 19901234567890123"
+                                                                value={newGuestForm.idNumber}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
+                                                                onBlur={() => {
+                                                                    if (newGuestForm.idNumber) {
+                                                                        const norm = normalizeIdentityNumber(newGuestForm.idNumber, 'National ID (NID)');
+                                                                        setNewGuestForm(prev => ({ ...prev, idNumber: norm }));
+                                                                    }
+                                                                }}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs font-mono outline-none focus:border-blue-500"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">
+                                                                Father's / Spouse's Legal Name
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="As shown on back of NID card"
+                                                                value={newGuestForm.fatherOrSpouseName || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, fatherOrSpouseName: e.target.value })}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Issue Date</label>
+                                                            <input
+                                                                type="date"
+                                                                value={newGuestForm.idIssueDate || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idIssueDate: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Expiry Date</label>
+                                                            <input
+                                                                type="date"
+                                                                value={newGuestForm.idExpiryDate || newGuestForm.idExpiry || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idExpiryDate: e.target.value, idExpiry: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Issuing District / Circle</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. Dhaka, Chittagong"
+                                                                value={newGuestForm.idIssuePlace || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idIssuePlace: e.target.value })}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 2. Passport & Visa Specific Fields */}
+                                            {newGuestForm.idType === 'Passport' && (
+                                                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-200 space-y-3">
+                                                    <div className="text-[11px] font-bold text-blue-900 flex items-center justify-between">
+                                                        <span className="flex items-center gap-1.5">
+                                                            <ShieldCheck size={14} className="text-blue-600" />
+                                                            Passport Details (Required for Foreign Visitors &amp; SB Police Register)
+                                                        </span>
+                                                        <span className="text-[9.5px] font-normal text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded">
+                                                            Special Branch Compliance
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">
+                                                                Passport Number <span className="text-rose-500">*</span>
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. A01234567"
+                                                                value={newGuestForm.idNumber}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
+                                                                onBlur={() => {
+                                                                    if (newGuestForm.idNumber) {
+                                                                        const norm = normalizeIdentityNumber(newGuestForm.idNumber, 'Passport');
+                                                                        setNewGuestForm(prev => ({ ...prev, idNumber: norm }));
+                                                                    }
+                                                                }}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs font-mono uppercase outline-none focus:border-blue-500"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Passport Issuing Country</label>
+                                                            <select
+                                                                value={newGuestForm.idIssueCountry || newGuestForm.nationality || 'Bangladesh'}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idIssueCountry: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500 cursor-pointer"
+                                                            >
+                                                                {COUNTRIES_DATABASE.map(c => (
+                                                                    <option key={c.code} value={c.name}>{c.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Passport Expiry Date</label>
+                                                            <input
+                                                                type="date"
+                                                                value={newGuestForm.idExpiryDate || newGuestForm.idExpiry || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idExpiryDate: e.target.value, idExpiry: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Visa Sub-Section */}
+                                                    <div className="bg-white p-2.5 rounded border border-blue-200/80 space-y-2">
+                                                        <div className="text-[10px] font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1">
+                                                            <FileText size={12} className="text-indigo-600" />
+                                                            <span>Visa &amp; Immigration Clearance</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                                            <div>
+                                                                <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">Visa Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="e.g. V-9821734"
+                                                                    value={newGuestForm.passportVisaNumber || ''}
+                                                                    onChange={e => setNewGuestForm({ ...newGuestForm, passportVisaNumber: e.target.value })}
+                                                                    className="w-full h-7 px-2 border border-gray-300 rounded text-xs font-mono outline-none focus:border-blue-500"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">Visa Category</label>
+                                                                <select
+                                                                    value={newGuestForm.passportVisaType || 'Tourist'}
+                                                                    onChange={e => setNewGuestForm({ ...newGuestForm, passportVisaType: e.target.value })}
+                                                                    className="w-full h-7 px-1.5 border border-gray-300 rounded text-xs outline-none focus:border-blue-500 cursor-pointer"
+                                                                >
+                                                                    <option value="Tourist">Tourist (T)</option>
+                                                                    <option value="Business">Business (B)</option>
+                                                                    <option value="Diplomatic">Diplomatic (D)</option>
+                                                                    <option value="Employment">Employment / Work (E)</option>
+                                                                    <option value="Student">Student (S)</option>
+                                                                    <option value="Transit">Transit (TR)</option>
+                                                                    <option value="Visa on Arrival">Visa on Arrival (VoA)</option>
+                                                                    <option value="Exempt / Dual">Exempt / No Visa Required</option>
+                                                                </select>
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">Visa Expiry Date</label>
+                                                                <input
+                                                                    type="date"
+                                                                    value={newGuestForm.passportVisaExpiry || ''}
+                                                                    onChange={e => setNewGuestForm({ ...newGuestForm, passportVisaExpiry: e.target.value })}
+                                                                    className="w-full h-7 px-1.5 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">Port of Entry</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="e.g. Dhaka (DAC) / Benapole"
+                                                                    value={newGuestForm.passportEntryPort || ''}
+                                                                    onChange={e => setNewGuestForm({ ...newGuestForm, passportEntryPort: e.target.value })}
+                                                                    className="w-full h-7 px-2 border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 3. Driving License Specific Fields */}
+                                            {newGuestForm.idType === 'Driving License' && (
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                                                    <div className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                                                        <ShieldCheck size={14} className="text-amber-600" />
+                                                        <span>Driving License Details</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">
+                                                                License Number <span className="text-rose-500">*</span>
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. DK0129382DL"
+                                                                value={newGuestForm.idNumber}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
+                                                                onBlur={() => {
+                                                                    if (newGuestForm.idNumber) {
+                                                                        const norm = normalizeIdentityNumber(newGuestForm.idNumber, 'Driving License');
+                                                                        setNewGuestForm(prev => ({ ...prev, idNumber: norm }));
+                                                                    }
+                                                                }}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs font-mono uppercase outline-none focus:border-blue-500"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Vehicle Class</label>
+                                                            <select
+                                                                value={newGuestForm.drivingVehicleClass || 'Light'}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, drivingVehicleClass: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500 cursor-pointer"
+                                                            >
+                                                                <option value="Light">Light Vehicle (Car / Sedan)</option>
+                                                                <option value="Medium">Medium Commercial</option>
+                                                                <option value="Heavy">Heavy Transport</option>
+                                                                <option value="Motorcycle">Motorcycle</option>
+                                                                <option value="Professional">Professional (All Classes)</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">BRTA Circle / Authority</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. BRTA Mirpur, Dhaka"
+                                                                value={newGuestForm.idIssuePlace || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idIssuePlace: e.target.value })}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Issue Date</label>
+                                                            <input
+                                                                type="date"
+                                                                value={newGuestForm.idIssueDate || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idIssueDate: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">License Expiry Date</label>
+                                                            <input
+                                                                type="date"
+                                                                value={newGuestForm.idExpiryDate || newGuestForm.idExpiry || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idExpiryDate: e.target.value, idExpiry: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 4. Diplomatic ID Specific Fields */}
+                                            {newGuestForm.idType === 'Diplomatic ID' && (
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                                                    <div className="text-[11px] font-bold text-purple-900 flex items-center gap-1.5">
+                                                        <ShieldCheck size={14} className="text-purple-600" />
+                                                        <span>Diplomatic / Consular ID Details</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Diplomatic ID #</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. DIP-902341"
+                                                                value={newGuestForm.idNumber}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs font-mono outline-none focus:border-blue-500"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Embassy / Mission Name</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. Embassy of Canada / UN"
+                                                                value={newGuestForm.idIssuePlace || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idIssuePlace: e.target.value })}
+                                                                className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Expiry Date</label>
+                                                            <input
+                                                                type="date"
+                                                                value={newGuestForm.idExpiryDate || newGuestForm.idExpiry || ''}
+                                                                onChange={e => setNewGuestForm({ ...newGuestForm, idExpiryDate: e.target.value, idExpiry: e.target.value })}
+                                                                className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 5. Birth Certificate / Other */}
+                                            {(newGuestForm.idType === 'Birth Certificate' || newGuestForm.idType === 'Other') && (
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                    <div>
+                                                        <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Document Registration #</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Registration Number"
+                                                            value={newGuestForm.idNumber}
+                                                            onChange={e => setNewGuestForm({ ...newGuestForm, idNumber: e.target.value })}
+                                                            className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs font-mono outline-none focus:border-blue-500"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Issuing Authority / Country</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. City Corporation / Ministry"
+                                                            value={newGuestForm.idIssueCountry || newGuestForm.nationality || ''}
+                                                            onChange={e => setNewGuestForm({ ...newGuestForm, idIssueCountry: e.target.value })}
+                                                            className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -2055,14 +2828,62 @@ export const GuestProfile: React.FC = () => {
 
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                             <div>
-                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">City / Town</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. Dhaka"
-                                                    value={newGuestForm.homeCity}
-                                                    onChange={e => setNewGuestForm({ ...newGuestForm, homeCity: e.target.value })}
-                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
-                                                />
+                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">
+                                                    Country of Residence <span className="text-rose-500">*</span>
+                                                </label>
+                                                <select
+                                                    value={newGuestForm.homeCountry}
+                                                    onChange={e => {
+                                                        const selectedCountry = e.target.value;
+                                                        const cities = getCitiesForCountry(selectedCountry);
+                                                        const nat = getNationalityForCountry(selectedCountry);
+                                                        setNewGuestForm({
+                                                            ...newGuestForm,
+                                                            homeCountry: selectedCountry,
+                                                            nationality: nat,
+                                                            homeCity: cities[0] || 'Dhaka'
+                                                        });
+                                                    }}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
+                                                >
+                                                    {COUNTRIES_DATABASE.map(c => (
+                                                        <option key={c.code} value={c.name}>
+                                                            {c.name} ({c.dialCode})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-[10.5px] font-semibold text-gray-700">City / District</label>
+                                                    <span className="text-[9px] text-gray-400 font-normal">Dynamic by Country</span>
+                                                </div>
+                                                <select
+                                                    value={getCitiesForCountry(newGuestForm.homeCountry).includes(newGuestForm.homeCity) ? newGuestForm.homeCity : '__custom__'}
+                                                    onChange={e => {
+                                                        if (e.target.value === '__custom__') {
+                                                            setNewGuestForm({ ...newGuestForm, homeCity: '' });
+                                                        } else {
+                                                            setNewGuestForm({ ...newGuestForm, homeCity: e.target.value });
+                                                        }
+                                                    }}
+                                                    className="w-full h-8 px-2 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
+                                                >
+                                                    {getCitiesForCountry(newGuestForm.homeCountry).map(cty => (
+                                                        <option key={cty} value={cty}>{cty}</option>
+                                                    ))}
+                                                    <option value="__custom__">Other / Enter Manually...</option>
+                                                </select>
+                                                {!getCitiesForCountry(newGuestForm.homeCountry).includes(newGuestForm.homeCity) && (
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Type city name..."
+                                                        value={newGuestForm.homeCity}
+                                                        onChange={e => setNewGuestForm({ ...newGuestForm, homeCity: e.target.value })}
+                                                        className="w-full h-7 px-2 bg-white border border-blue-400 rounded text-xs outline-none focus:border-blue-600 mt-1"
+                                                        autoFocus
+                                                    />
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Postal / Zip Code</label>
@@ -2072,16 +2893,6 @@ export const GuestProfile: React.FC = () => {
                                                     value={newGuestForm.postalCode}
                                                     onChange={e => setNewGuestForm({ ...newGuestForm, postalCode: e.target.value })}
                                                     className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs font-mono outline-none focus:bg-white focus:border-blue-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10.5px] font-semibold text-gray-700 mb-1">Country of Residence</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. Bangladesh"
-                                                    value={newGuestForm.homeCountry}
-                                                    onChange={e => setNewGuestForm({ ...newGuestForm, homeCountry: e.target.value })}
-                                                    className="w-full h-8 px-2.5 bg-gray-50 border border-gray-300 rounded text-xs outline-none focus:bg-white focus:border-blue-500"
                                                 />
                                             </div>
                                         </div>
@@ -2457,6 +3268,134 @@ export const GuestProfile: React.FC = () => {
                         showToast(`Successfully merged duplicate profiles into: ${mergedData?.first_name || ''} ${mergedData?.last_name || ''}`);
                     }}
                 />
+            )}
+
+            {/* Blacklist / Block Modal */}
+            {showBlacklistModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full overflow-hidden">
+                        <div className={`p-4 text-white flex items-center justify-between ${blacklistActionType === 'block' ? 'bg-rose-600' : 'bg-emerald-600'}`}>
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                                    {blacklistActionType === 'block' ? <Ban size={18} /> : <CheckCircle2 size={18} />}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-sm leading-tight">
+                                        {blacklistActionType === 'block' ? 'Block / Blacklist Guest' : 'Lift Blacklist Block'}
+                                    </h3>
+                                    <p className="text-[10.5px] opacity-90 font-mono mt-0.5">
+                                        {activeGuest.title} {activeGuest.name} ({activeGuest.phone})
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowBlacklistModal(false)}
+                                className="w-7 h-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer text-white"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-3.5">
+                            {blacklistActionType === 'block' ? (
+                                <>
+                                    <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-800 leading-relaxed">
+                                        <strong>Hospitality Warning:</strong> Blacklisting this guest will prevent new reservations across <strong>Add Reservation</strong>, <strong>Quick Reservation</strong>, and express check-in. Attempting to book will trigger a Red Warning alert and require Manager Override authorization.
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                            Violation Category <span className="text-rose-500">*</span>
+                                        </label>
+                                        <select
+                                            value={blacklistCategory}
+                                            onChange={e => setBlacklistCategory(e.target.value as BlacklistCategory)}
+                                            className="w-full h-8 px-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-rose-500 cursor-pointer"
+                                        >
+                                            <option value="Payment Default / Unpaid Folio">Payment Default / Unpaid Folio</option>
+                                            <option value="Property Damage / Vandalism">Property Damage / Vandalism</option>
+                                            <option value="Disorderly Conduct / Harassment">Disorderly Conduct / Harassment</option>
+                                            <option value="Security Threat / Suspicious Activity">Security Threat / Suspicious Activity</option>
+                                            <option value="Fraudulent Identity / Fake Documents">Fraudulent Identity / Fake Documents</option>
+                                            <option value="Rule Violation / Unauthorized Guests">Rule Violation / Unauthorized Guests</option>
+                                            <option value="Other Violation">Other Violation</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                            Detailed Incident Description &amp; Reason <span className="text-rose-500">*</span>
+                                        </label>
+                                        <textarea
+                                            rows={3}
+                                            placeholder="Explain why this guest is being blocked (e.g. Left unpaid restaurant bill of ৳12,500; verbal harassment of night auditor)..."
+                                            value={blacklistReasonInput}
+                                            onChange={e => setBlacklistReasonInput(e.target.value)}
+                                            className="w-full p-2 bg-white border border-gray-300 rounded text-xs outline-none focus:border-rose-500"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                            Authorizing Staff / Manager Name <span className="text-rose-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Duty Manager / GM"
+                                            value={blacklistStaffName}
+                                            onChange={e => setBlacklistStaffName(e.target.value)}
+                                            className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs outline-none focus:border-rose-500"
+                                            required
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 leading-relaxed">
+                                        Are you sure you want to lift the blacklist restriction for <strong>{activeGuest.title} {activeGuest.name}</strong>?
+                                        <div className="mt-1.5 p-2 bg-white/80 rounded border border-amber-300 text-[10.5px] text-amber-800 font-mono">
+                                            Recorded Incident: {activeGuest.blacklistReason || 'None specified'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                            Authorizing Staff / Manager Name <span className="text-rose-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Duty Manager"
+                                            value={blacklistStaffName}
+                                            onChange={e => setBlacklistStaffName(e.target.value)}
+                                            className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded text-xs outline-none focus:border-blue-500"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowBlacklistModal(false)}
+                                className="px-3 py-1.5 rounded text-xs font-semibold text-gray-600 hover:bg-gray-200 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmBlacklist}
+                                className={`px-4 py-1.5 rounded text-xs font-semibold text-white shadow-xs cursor-pointer ${
+                                    blacklistActionType === 'block' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                                }`}
+                            >
+                                {blacklistActionType === 'block' ? 'Confirm Blacklist Block' : 'Confirm Unblock'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

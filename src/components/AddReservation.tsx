@@ -27,8 +27,12 @@ import {
     ShieldCheck,
     Heart,
     X,
-    Edit3
+    Edit3,
+    Ban,
+    FileText
 } from 'lucide-react';
+import { formatIdentityDisplay } from '../utils/identityUtils';
+import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../utils/geoData';
 import { useNavigation } from '../context/NavigationContext';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from './common/StayPeriodPicker';
 import { ChildAgeSelector } from './common/ChildAgeSelector';
@@ -267,6 +271,21 @@ export const AddReservation: React.FC = () => {
     const [idType, setIdType] = useState('National ID (NID)');
     const [idNumber, setIdNumber] = useState('');
 
+    // Polymorphic Step 2 Identity State
+    const [passportVisaNumber, setPassportVisaNumber] = useState('');
+    const [passportVisaType, setPassportVisaType] = useState('Tourist');
+    const [passportVisaExpiry, setPassportVisaExpiry] = useState('');
+    const [passportEntryPort, setPassportEntryPort] = useState('Hazrat Shahjalal Int Airport, Dhaka');
+    const [drivingVehicleClass, setDrivingVehicleClass] = useState('Light');
+    const [fatherOrSpouseName, setFatherOrSpouseName] = useState('');
+    const [idIssueDate, setIdIssueDate] = useState('');
+    const [idExpiryDate, setIdExpiryDate] = useState('');
+    const [idIssueCountry, setIdIssueCountry] = useState('Bangladesh');
+    const [idIssuePlace, setIdIssuePlace] = useState('');
+
+    // Blacklist Interception State
+    const [managerOverrideApproved, setManagerOverrideApproved] = useState(false);
+
     // Remarks & Preferences Tabs
     const [activePrefTab, setActivePrefTab] = useState<'Guest' | 'Check In' | 'Check Out' | 'House Keeping' | 'Payment Note'>('Guest');
     const [remarksMap, setRemarksMap] = useState<Record<string, string>>({
@@ -280,7 +299,6 @@ export const AddReservation: React.FC = () => {
     // Home Address
     const [streetAddress, setStreetAddress] = useState('');
     const [homeCity, setHomeCity] = useState('');
-    const [homeState, setHomeState] = useState('');
     const [homeCountry, setHomeCountry] = useState('Bangladesh');
     const [postalCode, setPostalCode] = useState('');
 
@@ -338,7 +356,21 @@ export const AddReservation: React.FC = () => {
                                 totalStays: p.totalStays || 1,
                                 lifetimeSpendBDT: p.lifetimeSpendBDT || 0,
                                 preferences: p.preferences || {},
-                                emergencyContact: p.emergencyContact
+                                emergencyContact: p.emergencyContact,
+                                isBlacklisted: Boolean(p.isBlacklisted),
+                                blacklistReason: p.blacklistReason,
+                                blacklistedBy: p.blacklistedBy,
+                                blacklistedAt: p.blacklistedAt,
+                                passportVisaNumber: p.passportVisaNumber,
+                                passportVisaType: p.passportVisaType,
+                                passportVisaExpiry: p.passportVisaExpiry,
+                                passportEntryPort: p.passportEntryPort,
+                                drivingVehicleClass: p.drivingVehicleClass,
+                                fatherOrSpouseName: p.fatherOrSpouseName,
+                                idIssueDate: p.idIssueDate,
+                                idExpiryDate: p.idExpiryDate || p.idExpiry,
+                                idIssueCountry: p.idIssueCountry,
+                                idIssuePlace: p.idIssuePlace
                             });
                         }
                     });
@@ -373,13 +405,47 @@ export const AddReservation: React.FC = () => {
                     totalStays: 1,
                     lifetimeSpendBDT: Number(r.totalAmount) || 0,
                     preferences: {},
-                    emergencyContact: undefined
+                    emergencyContact: undefined,
+                    isBlacklisted: false
                 });
             }
         });
 
         return Array.from(guestMap.values());
     }, []);
+
+    const activeBlacklistAlert = useMemo(() => {
+        if (selectedExistingGuest?.isBlacklisted) {
+            return {
+                isBlocked: true,
+                name: selectedExistingGuest.name,
+                reason: selectedExistingGuest.blacklistReason || 'Hospitality policy / payment default',
+                by: selectedExistingGuest.blacklistedBy || 'Duty Manager',
+                at: selectedExistingGuest.blacklistedAt
+            };
+        }
+        const cleanP = (mobile || phone || '').replace(/[^0-9]/g, '');
+        const cleanId = idNumber.trim().toLowerCase();
+        if (cleanP.length >= 8 || (cleanId && cleanId.length >= 4)) {
+            const match = allKnownGuests.find(g => {
+                if (!g.isBlacklisted) return false;
+                const gPhoneClean = (g.phone || '').replace(/[^0-9]/g, '');
+                const phoneMatch = Boolean(cleanP && gPhoneClean && (cleanP.endsWith(gPhoneClean.slice(-8)) || gPhoneClean.endsWith(cleanP.slice(-8))));
+                const idMatch = Boolean(cleanId && g.idNumber && g.idNumber.toLowerCase() === cleanId);
+                return phoneMatch || idMatch;
+            });
+            if (match) {
+                return {
+                    isBlocked: true,
+                    name: match.name,
+                    reason: match.blacklistReason || 'Hospitality policy / payment default',
+                    by: match.blacklistedBy || 'Duty Manager',
+                    at: match.blacklistedAt
+                };
+            }
+        }
+        return null;
+    }, [selectedExistingGuest, mobile, phone, idNumber, allKnownGuests]);
 
     const filteredKnownGuests = useMemo(() => {
         if (!guestSearchQuery.trim()) return [];
@@ -418,6 +484,16 @@ export const AddReservation: React.FC = () => {
         if (g.postalCode) setPostalCode(g.postalCode);
         if (g.company) setCompanyName(g.company);
         if (g.designation) setDesignation(g.designation);
+        if (g.passportVisaNumber) setPassportVisaNumber(g.passportVisaNumber);
+        if (g.passportVisaType) setPassportVisaType(g.passportVisaType);
+        if (g.passportVisaExpiry) setPassportVisaExpiry(g.passportVisaExpiry);
+        if (g.passportEntryPort) setPassportEntryPort(g.passportEntryPort);
+        if (g.drivingVehicleClass) setDrivingVehicleClass(g.drivingVehicleClass);
+        if (g.fatherOrSpouseName) setFatherOrSpouseName(g.fatherOrSpouseName);
+        if (g.idIssueDate) setIdIssueDate(g.idIssueDate);
+        if (g.idExpiryDate || g.idExpiry) setIdExpiryDate(g.idExpiryDate || g.idExpiry);
+        if (g.idIssueCountry) setIdIssueCountry(g.idIssueCountry);
+        if (g.idIssuePlace) setIdIssuePlace(g.idIssuePlace);
         if (g.emergencyContact) {
             setEmergencyName(g.emergencyContact.name || '');
             setEmergencyPhone(g.emergencyContact.phone || '');
@@ -430,7 +506,11 @@ export const AddReservation: React.FC = () => {
 
         setGuestSearchQuery('');
         setIsGuestSearchOpen(false);
-        toast.success(`Loaded verified profile for ${g.title || ''} ${g.name}`);
+        if (g.isBlacklisted) {
+            toast.warning(`⚠️ ATTENTION: Guest ${g.name} is on the Blacklist (${g.blacklistReason || 'Blocked'}). Manager Override required.`);
+        } else {
+            toast.success(`Loaded verified profile for ${g.title || ''} ${g.name}`);
+        }
     };
 
     const handleClearSelectedGuest = () => {
@@ -1409,6 +1489,12 @@ export const AddReservation: React.FC = () => {
             return;
         }
 
+        if (activeBlacklistAlert && !managerOverrideApproved) {
+            toast.error('❌ Booking Blocked: Guest is on the Blacklist. Duty Manager Override is required.');
+            setStep(2);
+            return;
+        }
+
         const reservationNumber = editingReservation?.reservationNumber || `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
         const reservationId = editingReservation?.id || Date.now();
         const statusVal = actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : (editingReservation?.status || 'confirmed');
@@ -1525,6 +1611,23 @@ export const AddReservation: React.FC = () => {
             purpose: purposeOfVisit,
             idType,
             idNumber,
+            nationality,
+            homeCountry,
+            homeCity,
+            address: streetAddress,
+            postalCode,
+            dob,
+            gender,
+            passportVisaNumber: idType === 'Passport' ? passportVisaNumber : undefined,
+            passportVisaType: idType === 'Passport' ? passportVisaType : undefined,
+            passportVisaExpiry: idType === 'Passport' ? passportVisaExpiry : undefined,
+            passportEntryPort: idType === 'Passport' ? passportEntryPort : undefined,
+            drivingVehicleClass: idType === 'Driving License' ? drivingVehicleClass : undefined,
+            fatherOrSpouseName: idType === 'National ID (NID)' ? fatherOrSpouseName : undefined,
+            idIssueDate,
+            idExpiryDate,
+            idIssueCountry,
+            idIssuePlace,
             specialRequests: remarksMap['Guest'] || '',
             roomsList: roomsList.flatMap((r) => {
                 const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === r.roomType.trim().toLowerCase());
@@ -1686,6 +1789,25 @@ export const AddReservation: React.FC = () => {
                 profiles[existingIdx].stayHistory.unshift(stayRecord);
                 if (email) profiles[existingIdx].email = email;
                 if (companyName) profiles[existingIdx].company = companyName;
+                if (idType) profiles[existingIdx].idType = idType;
+                if (idNumber) profiles[existingIdx].idNumber = idNumber;
+                if (nationality) profiles[existingIdx].nationality = nationality;
+                if (homeCountry) profiles[existingIdx].homeCountry = homeCountry;
+                if (homeCity) profiles[existingIdx].homeCity = homeCity;
+                if (streetAddress) profiles[existingIdx].address = streetAddress;
+                if (postalCode) profiles[existingIdx].postalCode = postalCode;
+                if (dob) profiles[existingIdx].dob = dob;
+                if (gender) profiles[existingIdx].gender = gender;
+                if (passportVisaNumber) profiles[existingIdx].passportVisaNumber = passportVisaNumber;
+                if (passportVisaType) profiles[existingIdx].passportVisaType = passportVisaType;
+                if (passportVisaExpiry) profiles[existingIdx].passportVisaExpiry = passportVisaExpiry;
+                if (passportEntryPort) profiles[existingIdx].passportEntryPort = passportEntryPort;
+                if (drivingVehicleClass) profiles[existingIdx].drivingVehicleClass = drivingVehicleClass;
+                if (fatherOrSpouseName) profiles[existingIdx].fatherOrSpouseName = fatherOrSpouseName;
+                if (idIssueDate) profiles[existingIdx].idIssueDate = idIssueDate;
+                if (idExpiryDate) profiles[existingIdx].idExpiryDate = idExpiryDate;
+                if (idIssueCountry) profiles[existingIdx].idIssueCountry = idIssueCountry;
+                if (idIssuePlace) profiles[existingIdx].idIssuePlace = idIssuePlace;
             } else {
                 profiles.unshift({
                     id: Date.now(),
@@ -1706,6 +1828,16 @@ export const AddReservation: React.FC = () => {
                     postalCode: postalCode || '',
                     company: companyName || '',
                     designation: designation || '',
+                    passportVisaNumber: idType === 'Passport' ? passportVisaNumber : undefined,
+                    passportVisaType: idType === 'Passport' ? passportVisaType : undefined,
+                    passportVisaExpiry: idType === 'Passport' ? passportVisaExpiry : undefined,
+                    passportEntryPort: idType === 'Passport' ? passportEntryPort : undefined,
+                    drivingVehicleClass: idType === 'Driving License' ? drivingVehicleClass : undefined,
+                    fatherOrSpouseName: idType === 'National ID (NID)' ? fatherOrSpouseName : undefined,
+                    idIssueDate,
+                    idExpiryDate,
+                    idIssueCountry,
+                    idIssuePlace,
                     totalStays: 1,
                     totalNights: newReservation.nights,
                     lifetimeSpendBDT: finalPayable,
@@ -1917,6 +2049,11 @@ export const AddReservation: React.FC = () => {
                                 }
                                 if (!isGuestProfileComplete) {
                                     toast.warning('Please enter guest full name and contact number in Step 2.');
+                                    setStep(2);
+                                    return;
+                                }
+                                if (activeBlacklistAlert && !managerOverrideApproved) {
+                                    toast.error('❌ CANNOT PROCEED: Guest is blacklisted. Duty Manager Override is required to continue.');
                                     setStep(2);
                                     return;
                                 }
@@ -2964,6 +3101,41 @@ export const AddReservation: React.FC = () => {
                                 </div>
 
                                 <div className="p-3">
+                                    {/* Blacklist Interception Alert */}
+                                    {activeBlacklistAlert && (
+                                        <div className="mb-3 p-3 bg-red-50 border-2 border-red-500 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in">
+                                            <div className="flex items-start gap-2.5">
+                                                <div className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                                                    <Ban size={18} />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-red-900 text-xs uppercase tracking-wide">⚠️ Blacklisted / Blocked Guest Alert</span>
+                                                        <span className="text-[10px] bg-red-200 text-red-800 px-1.5 py-0.2 rounded font-semibold">{activeBlacklistAlert.name}</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-red-700 font-medium mt-0.5">
+                                                        <strong>Incident Reason:</strong> {activeBlacklistAlert.reason}
+                                                    </p>
+                                                    <p className="text-[10px] text-red-600">
+                                                        Logged by <span className="font-semibold">{activeBlacklistAlert.by}</span> {activeBlacklistAlert.at ? `on ${new Date(activeBlacklistAlert.at).toLocaleDateString()}` : ''}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0 bg-white/90 p-2 rounded border border-red-300 shadow-2xs">
+                                                <input
+                                                    type="checkbox"
+                                                    id="managerOverrideStep2"
+                                                    checked={managerOverrideApproved}
+                                                    onChange={e => setManagerOverrideApproved(e.target.checked)}
+                                                    className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500 cursor-pointer"
+                                                />
+                                                <label htmlFor="managerOverrideStep2" className="text-[11px] font-bold text-red-900 cursor-pointer select-none">
+                                                    Duty Manager Override <span className="text-[9.5px] font-normal text-red-700 block">Allow booking under supervision</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Tab 1: Identity & Contact */}
                                     {step2Tab === 'profile' && (
                                         <div className="space-y-2.5 animate-in fade-in duration-100">
@@ -3063,12 +3235,17 @@ export const AddReservation: React.FC = () => {
 
                                                 <div className="flex flex-col gap-0.5">
                                                     <label className="text-[10px] font-semibold text-gray-700">NATIONALITY</label>
-                                                    <input
-                                                        type="text"
+                                                    <select
                                                         value={nationality}
                                                         onChange={e => setNationality(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                    />
+                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                    >
+                                                        {COUNTRIES_DATABASE.map(c => (
+                                                            <option key={c.code} value={c.nationality}>
+                                                                {c.nationality} ({c.name})
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5">
@@ -3117,8 +3294,14 @@ export const AddReservation: React.FC = () => {
                                                     <label className="text-[10px] font-semibold text-gray-700">ID TYPE</label>
                                                     <select
                                                         value={idType}
-                                                        onChange={e => setIdType(e.target.value)}
-                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                        onChange={e => {
+                                                            const nextType = e.target.value;
+                                                            setIdType(nextType);
+                                                            if (idNumber) {
+                                                                setIdNumber(formatIdentityDisplay(idNumber, nextType));
+                                                            }
+                                                        }}
+                                                        className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium"
                                                     >
                                                         <option value="National ID (NID)">National ID (NID)</option>
                                                         <option value="Passport">Passport</option>
@@ -3129,13 +3312,16 @@ export const AddReservation: React.FC = () => {
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5 sm:col-span-2">
-                                                    <label className="text-[10px] font-semibold text-gray-700">ID / PASSPORT #</label>
+                                                    <label className="text-[10px] font-semibold text-gray-700">
+                                                        {idType === 'Passport' ? 'PASSPORT NUMBER' : idType === 'Driving License' ? 'DRIVING LICENSE #' : idType === 'Diplomatic ID' ? 'DIPLOMATIC ID #' : 'NATIONAL ID (NID) #'} <span className="text-red-500">*</span>
+                                                    </label>
                                                     <input
                                                         type="text"
-                                                        placeholder="Document number..."
+                                                        placeholder={idType === 'Passport' ? 'e.g. A01234567' : idType === 'National ID (NID)' ? 'e.g. 550 123 4567' : 'Document number...'}
                                                         value={idNumber}
                                                         onChange={e => setIdNumber(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                        onBlur={e => setIdNumber(formatIdentityDisplay(e.target.value, idType))}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono focus:border-blue-500"
                                                     />
                                                 </div>
 
@@ -3160,6 +3346,197 @@ export const AddReservation: React.FC = () => {
                                                     />
                                                 </div>
                                             </div>
+
+                                            {/* Dynamic Polymorphic Identity Card */}
+                                            {idType === 'Passport' && (
+                                                <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2 mt-2">
+                                                    <div className="flex items-center gap-1.5 text-blue-900 font-bold text-[11px]">
+                                                        <FileText size={13} className="text-blue-700" />
+                                                        <span>Passport &amp; International Guest Visa Clearance (Special Branch Compliance)</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">PASSPORT ISSUING COUNTRY</label>
+                                                            <select
+                                                                value={idIssueCountry}
+                                                                onChange={e => setIdIssueCountry(e.target.value)}
+                                                                className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                            >
+                                                                {COUNTRIES_DATABASE.map(c => (
+                                                                    <option key={c.code} value={c.name}>{c.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">PASSPORT EXPIRY DATE</label>
+                                                            <input
+                                                                type="date"
+                                                                value={idExpiryDate}
+                                                                onChange={e => setIdExpiryDate(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">VISA NUMBER</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Visa document #..."
+                                                                value={passportVisaNumber}
+                                                                onChange={e => setPassportVisaNumber(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">VISA CATEGORY</label>
+                                                            <select
+                                                                value={passportVisaType}
+                                                                onChange={e => setPassportVisaType(e.target.value)}
+                                                                className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                            >
+                                                                <option value="Tourist">Tourist (T)</option>
+                                                                <option value="Business">Business (B)</option>
+                                                                <option value="Employment">Employment / Work (E)</option>
+                                                                <option value="On-Arrival">Visa on Arrival (VoA)</option>
+                                                                <option value="Diplomatic">Diplomatic / Official (D)</option>
+                                                                <option value="Student">Student (S)</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 sm:col-span-2">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">VISA VALIDITY / EXPIRY</label>
+                                                            <input
+                                                                type="date"
+                                                                value={passportVisaExpiry}
+                                                                onChange={e => setPassportVisaExpiry(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 sm:col-span-2">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">PORT OF ENTRY IN BANGLADESH</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Hazrat Shahjalal Int Airport, Dhaka"
+                                                                value={passportEntryPort}
+                                                                onChange={e => setPassportEntryPort(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {idType === 'National ID (NID)' && (
+                                                <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2 mt-2">
+                                                    <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-[11px]">
+                                                        <ShieldCheck size={13} className="text-emerald-700" />
+                                                        <span>Bangladesh Election Commission National ID (NID) Details</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                        <div className="flex flex-col gap-0.5 sm:col-span-2">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">FATHER'S / SPOUSE'S FULL NAME</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="As printed on NID card..."
+                                                                value={fatherOrSpouseName}
+                                                                onChange={e => setFatherOrSpouseName(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">DATE OF ISSUE</label>
+                                                            <input
+                                                                type="date"
+                                                                value={idIssueDate}
+                                                                onChange={e => setIdIssueDate(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">ISSUE DISTRICT / CIRCLE</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. Dhaka, Chittagong..."
+                                                                value={idIssuePlace}
+                                                                onChange={e => setIdIssuePlace(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {idType === 'Driving License' && (
+                                                <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-lg space-y-2 mt-2">
+                                                    <div className="flex items-center gap-1.5 text-purple-900 font-bold text-[11px]">
+                                                        <Car size={13} className="text-purple-700" />
+                                                        <span>BRTA Driving License Credentials</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">VEHICLE CLASS</label>
+                                                            <select
+                                                                value={drivingVehicleClass}
+                                                                onChange={e => setDrivingVehicleClass(e.target.value)}
+                                                                className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                            >
+                                                                <option value="Light">Light (Car / Microbus / Jeep)</option>
+                                                                <option value="Medium">Medium (Minibus / Commercial)</option>
+                                                                <option value="Heavy">Heavy (Bus / Truck)</option>
+                                                                <option value="Motorcycle">Motorcycle</option>
+                                                                <option value="Professional">Professional (All-Category)</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">ISSUING BRTA CIRCLE</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. Dhaka Metro-1 (Mirpur)"
+                                                                value={idIssuePlace}
+                                                                onChange={e => setIdIssuePlace(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">LICENSE EXPIRY DATE</label>
+                                                            <input
+                                                                type="date"
+                                                                value={idExpiryDate}
+                                                                onChange={e => setIdExpiryDate(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {idType === 'Diplomatic ID' && (
+                                                <div className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-2 mt-2">
+                                                    <div className="flex items-center gap-1.5 text-amber-900 font-bold text-[11px]">
+                                                        <ShieldCheck size={13} className="text-amber-700" />
+                                                        <span>Ministry of Foreign Affairs / Diplomatic Mission Protocol</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">EMBASSY / MISSION / HIGH COMMISSION</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="e.g. Embassy of Japan, Dhaka"
+                                                                value={idIssuePlace}
+                                                                onChange={e => setIdIssuePlace(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">DIPLOMATIC CARD EXPIRY</label>
+                                                            <input
+                                                                type="date"
+                                                                value={idExpiryDate}
+                                                                onChange={e => setIdExpiryDate(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] bg-white outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -3169,9 +3546,62 @@ export const AddReservation: React.FC = () => {
                                             <div>
                                                 <h4 className="text-[11px] font-bold text-gray-900 mb-1.5 flex items-center gap-1.5">
                                                     <MapPin size={12} className="text-emerald-600" />
-                                                    <span>Primary Residential Address</span>
+                                                    <span>Primary Residential Address &amp; Region</span>
                                                 </h4>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">COUNTRY OF RESIDENCE</label>
+                                                        <select
+                                                            value={homeCountry}
+                                                            onChange={e => {
+                                                                const newCountry = e.target.value;
+                                                                setHomeCountry(newCountry);
+                                                                const cities = getCitiesForCountry(newCountry);
+                                                                if (cities.length > 0) {
+                                                                    setHomeCity(cities[0]);
+                                                                } else {
+                                                                    setHomeCity('');
+                                                                }
+                                                                const nat = getNationalityForCountry(newCountry);
+                                                                if (nat && (!nationality || nationality === 'Bangladeshi')) {
+                                                                    setNationality(nat);
+                                                                }
+                                                            }}
+                                                            className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                        >
+                                                            {COUNTRIES_DATABASE.map(c => (
+                                                                <option key={c.code} value={c.name}>
+                                                                    {c.name} ({c.dialCode})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <label className="text-[10px] font-semibold text-gray-700">CITY / DISTRICT</label>
+                                                        {getCitiesForCountry(homeCountry).length > 0 ? (
+                                                            <select
+                                                                value={homeCity}
+                                                                onChange={e => setHomeCity(e.target.value)}
+                                                                className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
+                                                            >
+                                                                <option value="">Select City / District...</option>
+                                                                {getCitiesForCountry(homeCountry).map(ct => (
+                                                                    <option key={ct} value={ct}>{ct}</option>
+                                                                ))}
+                                                                <option value="__other__">+ Other / Enter Manually</option>
+                                                            </select>
+                                                        ) : (
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Dhaka..."
+                                                                value={homeCity}
+                                                                onChange={e => setHomeCity(e.target.value)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                            />
+                                                        )}
+                                                    </div>
+
                                                     <div className="flex flex-col gap-0.5 lg:col-span-2">
                                                         <label className="text-[10px] font-semibold text-gray-700">STREET ADDRESS</label>
                                                         <input
@@ -3182,26 +3612,7 @@ export const AddReservation: React.FC = () => {
                                                             className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
                                                         />
                                                     </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[10px] font-semibold text-gray-700">CITY</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Dhaka..."
-                                                            value={homeCity}
-                                                            onChange={e => setHomeCity(e.target.value)}
-                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[10px] font-semibold text-gray-700">STATE / PROVINCE</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="State..."
-                                                            value={homeState}
-                                                            onChange={e => setHomeState(e.target.value)}
-                                                            className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
-                                                        />
-                                                    </div>
+
                                                     <div className="flex flex-col gap-0.5">
                                                         <label className="text-[10px] font-semibold text-gray-700">POSTAL CODE</label>
                                                         <input
@@ -3797,6 +4208,10 @@ export const AddReservation: React.FC = () => {
                                     if (step === 2 && !isGuestProfileComplete) {
                                         toast.warning('Please enter guest full legal name and mobile number.');
                                         setStep2Tab('profile');
+                                        return;
+                                    }
+                                    if (step === 2 && activeBlacklistAlert && !managerOverrideApproved) {
+                                        toast.error('❌ CANNOT PROCEED: Guest is blacklisted. Duty Manager Override is required to continue.');
                                         return;
                                     }
                                     setStep((step + 1) as any);

@@ -154,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ]
         },
         {
-            title: 'HOTEL OPERATIONS',
+            title: 'FRONT OFFICE',
             items: [
                 { id: 'stay-view', label: 'Stay View', icon: <CalendarDays size={14} />, badge: 'Live', badgeColor: 'bg-blue-100 text-blue-700' },
                 { id: 'add-reservation', label: 'New Reservation', icon: <Plus size={14} />, badge: '+ New', badgeColor: 'bg-emerald-100 text-emerald-700' },
@@ -164,6 +164,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 { id: 'floor-plan', label: 'Floor Plan', icon: <Layers size={14} /> },
                 { id: 'occupancy-heatmap', label: 'Occupancy Matrix', icon: <Grid3X3 size={14} /> },
                 { id: 'night-audit', label: 'Night Audit', icon: <Moon size={14} /> },
+            ]
+        },
+        {
+            title: 'RATES & PACKAGES',
+            items: [
+                { id: 'rate-plans', label: 'Rate Plans', icon: <Percent size={14} /> },
+                { id: 'package-builder', label: 'Packages & Offers', icon: <Ticket size={14} /> },
+                { id: 'meal-plans', label: 'Meal Plans', icon: <Coffee size={14} /> },
+                { id: 'rate-calendar', label: 'Rate Calendar', icon: <Calendar size={14} /> },
+            ]
+        },
+        {
+            title: 'GUESTS',
+            items: [
+                { id: 'guest-profile', label: 'Guest Profile', icon: <Users size={14} /> },
+                { id: 'service-vouchers', label: 'Gift Vouchers', icon: <Ticket size={14} /> },
+                { id: 'allowance-checker', label: 'Guest Credits', icon: <Wallet size={14} /> },
+            ]
+        },
+        {
+            title: 'HOUSEKEEPING',
+            items: [
+                { id: 'housekeeping', label: 'Housekeeping', icon: <Sparkles size={14} /> },
+                { id: 'maintenance', label: 'Maintenance', icon: <Wrench size={14} /> },
+                { id: 'service-master', label: 'Laundry & Services', icon: <FileText size={14} /> },
             ]
         },
         {
@@ -192,31 +217,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         { id: 'floor', label: 'Dining Areas', icon: <DoorClosed size={12} /> },
                     ]
                 }
-            ]
-        },
-        {
-            title: 'RATES & PACKAGES',
-            items: [
-                { id: 'rate-plans', label: 'Rate Plans', icon: <Percent size={14} /> },
-                { id: 'package-builder', label: 'Packages & Offers', icon: <Ticket size={14} /> },
-                { id: 'meal-plans', label: 'Meal Plans', icon: <Coffee size={14} /> },
-                { id: 'rate-calendar', label: 'Rate Calendar', icon: <Calendar size={14} /> },
-            ]
-        },
-        {
-            title: 'HOUSEKEEPING',
-            items: [
-                { id: 'housekeeping', label: 'Housekeeping', icon: <Sparkles size={14} /> },
-                { id: 'maintenance', label: 'Maintenance', icon: <Wrench size={14} /> },
-                { id: 'service-master', label: 'Laundry & Services', icon: <FileText size={14} /> },
-            ]
-        },
-        {
-            title: 'GUESTS',
-            items: [
-                { id: 'guest-profile', label: 'Guest Profile', icon: <Users size={14} /> },
-                { id: 'service-vouchers', label: 'Gift Vouchers', icon: <Ticket size={14} /> },
-                { id: 'allowance-checker', label: 'Guest Credits', icon: <Wallet size={14} /> },
             ]
         },
         {

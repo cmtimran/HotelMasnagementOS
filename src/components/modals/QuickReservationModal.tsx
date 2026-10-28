@@ -15,8 +15,13 @@ import {
     Sparkles,
     CheckCircle2,
     AlertTriangle,
-    Split
+    Split,
+    Ban,
+    ShieldCheck,
+    FileText
 } from 'lucide-react';
+import { formatIdentityDisplay } from '../../utils/identityUtils';
+import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../../utils/geoData';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
 import { ChildAgeSelector } from '../common/ChildAgeSelector';
 import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
@@ -198,11 +203,73 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         }
     };
 
-    // Guest Info
+    // Guest Info & Polymorphic KYC
     const [title, setTitle] = useState<string>('Mr.');
     const [name, setName] = useState<string>('');
     const [mobile, setMobile] = useState<string>('');
     const [email, setEmail] = useState<string>('');
+    const [gender, setGender] = useState<string>('Male');
+    const [nationality, setNationality] = useState<string>('Bangladeshi');
+    const [homeCountry, setHomeCountry] = useState<string>('Bangladesh');
+    const [homeCity, setHomeCity] = useState<string>('Dhaka');
+    const [idType, setIdType] = useState<string>('National ID (NID)');
+    const [idNumber, setIdNumber] = useState<string>('');
+    const [dob, setDob] = useState<string>('');
+
+    // Polymorphic Document Details
+    const [passportVisaNumber, setPassportVisaNumber] = useState<string>('');
+    const [passportVisaType, setPassportVisaType] = useState<string>('Tourist');
+    const [passportVisaExpiry, setPassportVisaExpiry] = useState<string>('');
+    const [passportEntryPort, setPassportEntryPort] = useState<string>('Hazrat Shahjalal Int Airport, Dhaka');
+    const [drivingVehicleClass, setDrivingVehicleClass] = useState<string>('Light');
+    const [fatherOrSpouseName, setFatherOrSpouseName] = useState<string>('');
+    const [idIssueDate, setIdIssueDate] = useState<string>('');
+    const [idExpiryDate, setIdExpiryDate] = useState<string>('');
+    const [idIssueCountry, setIdIssueCountry] = useState<string>('Bangladesh');
+    const [idIssuePlace, setIdIssuePlace] = useState<string>('');
+    const [managerOverrideApproved, setManagerOverrideApproved] = useState<boolean>(false);
+
+    // Stored & Canonical Guests for blacklist & auto-fill
+    const knownProfiles = useMemo(() => {
+        try {
+            const raw = localStorage.getItem('hotel_guest_profiles_v2');
+            if (raw) {
+                const list = JSON.parse(raw);
+                if (Array.isArray(list)) return list;
+            }
+        } catch {}
+        return [];
+    }, [isOpen]);
+
+    const quickBlacklistAlert = useMemo(() => {
+        if (!isOpen) return null;
+        const cleanP = (mobile || '').replace(/[^0-9]/g, '');
+        const cleanId = (idNumber || '').trim().toLowerCase();
+        const cleanName = (name || '').trim().toLowerCase();
+        const cleanEmail = (email || '').trim().toLowerCase();
+
+        if (cleanP.length >= 8 || cleanId.length >= 4 || (cleanName.length >= 4 && !cleanName.includes('walk-in')) || (cleanEmail.length >= 5 && !cleanEmail.includes('guest.com'))) {
+            const match = knownProfiles.find(g => {
+                if (!g.isBlacklisted) return false;
+                const gPhoneClean = (g.phone || '').replace(/[^0-9]/g, '');
+                const phoneMatch = Boolean(cleanP && gPhoneClean && (cleanP.endsWith(gPhoneClean.slice(-8)) || gPhoneClean.endsWith(cleanP.slice(-8))));
+                const idMatch = Boolean(cleanId && g.idNumber && g.idNumber.toLowerCase() === cleanId);
+                const nameMatch = Boolean(cleanName && g.name && g.name.toLowerCase() === cleanName);
+                const emailMatch = Boolean(cleanEmail && g.email && g.email.toLowerCase() === cleanEmail);
+                return phoneMatch || idMatch || nameMatch || emailMatch;
+            });
+            if (match) {
+                return {
+                    isBlocked: true,
+                    name: match.name,
+                    reason: match.blacklistReason || 'Hospitality policy / payment default',
+                    by: match.blacklistedBy || 'Duty Manager',
+                    at: match.blacklistedAt
+                };
+            }
+        }
+        return null;
+    }, [isOpen, mobile, idNumber, name, email, knownProfiles]);
 
     // Payment Details
     const [discountType, setDiscountType] = useState<'Percentage' | 'Fixed'>('Fixed');
@@ -219,6 +286,14 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         setName('');
         setMobile('');
         setEmail('');
+        setIdNumber('');
+        setPassportVisaNumber('');
+        setPassportVisaExpiry('');
+        setFatherOrSpouseName('');
+        setIdIssueDate('');
+        setIdExpiryDate('');
+        setIdIssuePlace('');
+        setManagerOverrideApproved(false);
         setActiveTab('reservation');
 
         const targetStart = roomInfo?.startDate || roomInfo?.checkIn || getSystemDateISO();
@@ -799,6 +874,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             return;
         }
 
+        if (quickBlacklistAlert && !managerOverrideApproved) {
+            toast.error('❌ CANNOT PROCEED: Guest is blacklisted. Duty Manager Override is required to continue.');
+            return;
+        }
+
         // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
         const usedRoomsAcrossBooking = new Set<string>();
         const allocatedRoomNumbers: string[] = [];
@@ -897,6 +977,24 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             folioNumber: folioNo,
             guestName: guestDisplayName,
             phone: mobile || 'N/A',
+            email: email || '',
+            idType,
+            idNumber,
+            nationality,
+            homeCountry,
+            homeCity,
+            dob,
+            gender,
+            passportVisaNumber: idType === 'Passport' ? passportVisaNumber : undefined,
+            passportVisaType: idType === 'Passport' ? passportVisaType : undefined,
+            passportVisaExpiry: idType === 'Passport' ? passportVisaExpiry : undefined,
+            passportEntryPort: idType === 'Passport' ? passportEntryPort : undefined,
+            drivingVehicleClass: idType === 'Driving License' ? drivingVehicleClass : undefined,
+            fatherOrSpouseName: idType === 'National ID (NID)' ? fatherOrSpouseName : undefined,
+            idIssueDate,
+            idExpiryDate,
+            idIssueCountry,
+            idIssuePlace,
             roomNumber: primaryRoom,
             roomType: roomsList[0]?.roomType || 'Standard Room',
             allocatedRooms: allocatedRoomNumbers,
@@ -983,6 +1081,100 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 : '';
             toast.error(`${validation.errorTitle || 'Booking Failed'}: ${validation.errorMessage}${altMsg}`);
             return;
+        }
+
+        // Synchronize and persist guest profile in hotel_guest_profiles_v2
+        try {
+            const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
+            const profiles: any[] = rawProfiles ? JSON.parse(rawProfiles) : [];
+            const cleanName = (name || '').trim();
+            const inputCleanEmail = (email || '').trim().toLowerCase();
+            const inputCleanId = (idNumber || '').trim().toLowerCase();
+
+            if (cleanName) {
+                const existingIdx = profiles.findIndex(p => {
+                    const phoneMatch = Boolean(mobile && p.phone && (mobile.replace(/[^0-9]/g, '') === p.phone.replace(/[^0-9]/g, '')));
+                    const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
+                    const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
+                    const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
+                    return phoneMatch || emailMatch || idMatch || nameMatch;
+                });
+
+                const stayRecord = {
+                    resNumber: reservationNumber,
+                    roomNumber: primaryRoom,
+                    roomType: roomsList[0]?.roomType || 'Standard Room',
+                    checkIn: checkInDate,
+                    checkOut: dayUse ? checkInDate : checkOutDate,
+                    nights: dayUse ? 0 : nights,
+                    totalAmountBDT: finalPayable,
+                    status: (status === 'arrived' || (status as string) === 'in-house') ? ('In-House' as const) : ('Confirmed' as const)
+                };
+
+                if (existingIdx >= 0) {
+                    profiles[existingIdx].totalStays = (profiles[existingIdx].totalStays || 0) + 1;
+                    profiles[existingIdx].totalNights = (profiles[existingIdx].totalNights || 0) + (dayUse ? 1 : nights);
+                    profiles[existingIdx].lifetimeSpendBDT = (profiles[existingIdx].lifetimeSpendBDT || 0) + finalPayable;
+                    profiles[existingIdx].lastStayDate = checkInDate;
+                    if (!profiles[existingIdx].stayHistory) profiles[existingIdx].stayHistory = [];
+                    profiles[existingIdx].stayHistory.unshift(stayRecord);
+                    if (email) profiles[existingIdx].email = email;
+                    if (idType) profiles[existingIdx].idType = idType;
+                    if (idNumber) profiles[existingIdx].idNumber = idNumber;
+                    if (nationality) profiles[existingIdx].nationality = nationality;
+                    if (homeCountry) profiles[existingIdx].homeCountry = homeCountry;
+                    if (homeCity) profiles[existingIdx].homeCity = homeCity;
+                    if (passportVisaNumber) profiles[existingIdx].passportVisaNumber = passportVisaNumber;
+                    if (passportVisaType) profiles[existingIdx].passportVisaType = passportVisaType;
+                    if (passportVisaExpiry) profiles[existingIdx].passportVisaExpiry = passportVisaExpiry;
+                    if (passportEntryPort) profiles[existingIdx].passportEntryPort = passportEntryPort;
+                    if (drivingVehicleClass) profiles[existingIdx].drivingVehicleClass = drivingVehicleClass;
+                    if (fatherOrSpouseName) profiles[existingIdx].fatherOrSpouseName = fatherOrSpouseName;
+                    if (idIssueDate) profiles[existingIdx].idIssueDate = idIssueDate;
+                    if (idExpiryDate) profiles[existingIdx].idExpiryDate = idExpiryDate;
+                    if (idIssueCountry) profiles[existingIdx].idIssueCountry = idIssueCountry;
+                    if (idIssuePlace) profiles[existingIdx].idIssuePlace = idIssuePlace;
+                } else {
+                    profiles.unshift({
+                        id: Date.now(),
+                        title: title || 'Mr.',
+                        name: cleanName,
+                        phone: mobile || '',
+                        email: email || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@guest.com`,
+                        vipTier: 'Regular',
+                        nationality: nationality || 'Bangladeshi',
+                        idType: idType || 'National ID (NID)',
+                        idNumber: idNumber || `KYC-${Math.floor(10000 + Math.random() * 90000)}`,
+                        dob: dob || '1990-01-01',
+                        gender: gender || 'Male',
+                        homeCity: homeCity || 'Dhaka',
+                        homeCountry: homeCountry || 'Bangladesh',
+                        address: '',
+                        postalCode: '',
+                        company: '',
+                        designation: '',
+                        passportVisaNumber: idType === 'Passport' ? passportVisaNumber : undefined,
+                        passportVisaType: idType === 'Passport' ? passportVisaType : undefined,
+                        passportVisaExpiry: idType === 'Passport' ? passportVisaExpiry : undefined,
+                        passportEntryPort: idType === 'Passport' ? passportEntryPort : undefined,
+                        drivingVehicleClass: idType === 'Driving License' ? drivingVehicleClass : undefined,
+                        fatherOrSpouseName: idType === 'National ID (NID)' ? fatherOrSpouseName : undefined,
+                        idIssueDate,
+                        idExpiryDate,
+                        idIssueCountry,
+                        idIssuePlace,
+                        totalStays: 1,
+                        totalNights: dayUse ? 1 : nights,
+                        lifetimeSpendBDT: finalPayable,
+                        lastStayDate: checkInDate,
+                        loyaltyPoints: Math.round(finalPayable / 20),
+                        stayHistory: [stayRecord]
+                    });
+                }
+                localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(profiles));
+            }
+        } catch (e) {
+            console.error('Error synchronizing guest profile:', e);
         }
 
         toast.success(
@@ -1553,11 +1745,54 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                 + Add Room
                             </button>
 
-                            {/* Guest Quick Info */}
-                            <div className="bg-slate-50/50 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2">
-                                <h3 className="text-[10px] text-slate-700 uppercase tracking-wider m-0">
-                                    Guest Profile
-                                </h3>
+                            {/* Guest Quick Info & KYC Verification */}
+                            <div className="bg-slate-50/50 border border-slate-200/90 rounded-lg p-3 shadow-2xs space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-[10px] text-slate-700 uppercase tracking-wider m-0 font-bold">
+                                        Guest Profile &amp; KYC Verification
+                                    </h3>
+                                    {quickBlacklistAlert && (
+                                        <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded border border-red-300 flex items-center gap-1">
+                                            <Ban size={11} /> Blacklisted Guest Alert
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Blacklist Alert Banner */}
+                                {quickBlacklistAlert && (
+                                    <div className="p-2.5 bg-red-50 border-2 border-red-500 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 animate-in fade-in">
+                                        <div className="flex items-start gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                                                <Ban size={15} />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-bold text-red-900 text-[11px] uppercase">⚠️ Blocked Guest: {quickBlacklistAlert.name}</span>
+                                                </div>
+                                                <p className="text-[10px] text-red-700 font-medium m-0">
+                                                    <strong>Incident:</strong> {quickBlacklistAlert.reason}
+                                                </p>
+                                                <p className="text-[9.5px] text-red-600 m-0">
+                                                    Authorizer: {quickBlacklistAlert.by} {quickBlacklistAlert.at ? `(${new Date(quickBlacklistAlert.at).toLocaleDateString()})` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 bg-white/90 p-1.5 rounded border border-red-300 shrink-0 shadow-2xs">
+                                            <input
+                                                type="checkbox"
+                                                id="quickManagerOverride"
+                                                checked={managerOverrideApproved}
+                                                onChange={e => setManagerOverrideApproved(e.target.checked)}
+                                                className="w-3.5 h-3.5 text-red-600 rounded border-red-300 focus:ring-red-500 cursor-pointer"
+                                            />
+                                            <label htmlFor="quickManagerOverride" className="text-[10px] font-bold text-red-900 cursor-pointer select-none">
+                                                Duty Manager Override
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Row 1: Title, Name, Mobile, Email */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                                     <div className="flex flex-col gap-1">
                                         <label className="text-[10px] font-semibold text-slate-600">Title</label>
@@ -1596,7 +1831,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             placeholder="e.g. 01712-345678"
                                             value={mobile}
                                             onChange={e => setMobile(e.target.value)}
-                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
+                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono"
                                         />
                                     </div>
 
@@ -1611,6 +1846,287 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         />
                                     </div>
                                 </div>
+
+                                {/* Row 2: Country, City, Nationality, Gender, Date of Birth */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1 border-t border-slate-200/60">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600">Country of Residence</label>
+                                        <select
+                                            value={homeCountry}
+                                            onChange={e => {
+                                                const newCountry = e.target.value;
+                                                setHomeCountry(newCountry);
+                                                const cities = getCitiesForCountry(newCountry);
+                                                if (cities.length > 0) setHomeCity(cities[0]);
+                                                else setHomeCity('');
+                                                const nat = getNationalityForCountry(newCountry);
+                                                if (nat && (!nationality || nationality === 'Bangladeshi')) setNationality(nat);
+                                            }}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
+                                        >
+                                            {COUNTRIES_DATABASE.map(c => (
+                                                <option key={c.code} value={c.name}>{c.name} ({c.dialCode})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600">City / District</label>
+                                        {getCitiesForCountry(homeCountry).length > 0 ? (
+                                            <select
+                                                value={homeCity}
+                                                onChange={e => setHomeCity(e.target.value)}
+                                                className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
+                                            >
+                                                <option value="">Select City / District...</option>
+                                                {getCitiesForCountry(homeCountry).map(ct => (
+                                                    <option key={ct} value={ct}>{ct}</option>
+                                                ))}
+                                                <option value="__other__">+ Other / Enter Manually</option>
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                placeholder="Dhaka..."
+                                                value={homeCity}
+                                                onChange={e => setHomeCity(e.target.value)}
+                                                className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
+                                            />
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600">Nationality</label>
+                                        <select
+                                            value={nationality}
+                                            onChange={e => setNationality(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
+                                        >
+                                            {COUNTRIES_DATABASE.map(c => (
+                                                <option key={c.code} value={c.nationality}>{c.nationality} ({c.name})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600">Gender</label>
+                                        <select
+                                            value={gender}
+                                            onChange={e => setGender(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer"
+                                        >
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600">Date of Birth</label>
+                                        <input
+                                            type="date"
+                                            value={dob}
+                                            onChange={e => setDob(e.target.value)}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Row 3: ID Document Type, ID Number */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-200/60">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600">ID Document Type</label>
+                                        <select
+                                            value={idType}
+                                            onChange={e => {
+                                                const next = e.target.value;
+                                                setIdType(next);
+                                                if (idNumber) setIdNumber(formatIdentityDisplay(idNumber, next));
+                                            }}
+                                            className="w-full h-7.5 px-2 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 cursor-pointer font-medium"
+                                        >
+                                            <option value="National ID (NID)">National ID (NID)</option>
+                                            <option value="Passport">Passport</option>
+                                            <option value="Driving License">Driving License</option>
+                                            <option value="Diplomatic ID">Diplomatic ID</option>
+                                            <option value="Birth Certificate">Birth Certificate</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1 sm:col-span-2">
+                                        <label className="text-[10px] font-semibold text-slate-600">
+                                            {idType === 'Passport' ? 'Passport Number' : idType === 'Driving License' ? 'Driving License #' : idType === 'Diplomatic ID' ? 'Diplomatic ID #' : 'National ID (NID) Number'}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder={idType === 'Passport' ? 'e.g. A01234567' : idType === 'National ID (NID)' ? 'e.g. 550 123 4567' : 'Document number...'}
+                                            value={idNumber}
+                                            onChange={e => setIdNumber(e.target.value)}
+                                            onBlur={e => setIdNumber(formatIdentityDisplay(e.target.value, idType))}
+                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Dynamic Polymorphic Fields for Quick Reservation */}
+                                {idType === 'Passport' && (
+                                    <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2 mt-1">
+                                        <div className="flex items-center gap-1.5 text-blue-900 font-bold text-[10.5px]">
+                                            <FileText size={12} className="text-blue-700" />
+                                            <span>Passport &amp; Visa Verification</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Issuing Country</label>
+                                                <select
+                                                    value={idIssueCountry}
+                                                    onChange={e => setIdIssueCountry(e.target.value)}
+                                                    className="w-full h-7 px-1.5 border border-slate-200 rounded text-[10.5px] bg-white outline-none cursor-pointer"
+                                                >
+                                                    {COUNTRIES_DATABASE.map(c => (
+                                                        <option key={c.code} value={c.name}>{c.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Passport Expiry</label>
+                                                <input
+                                                    type="date"
+                                                    value={idExpiryDate}
+                                                    onChange={e => setIdExpiryDate(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] bg-white outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Visa Number</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Visa #"
+                                                    value={passportVisaNumber}
+                                                    onChange={e => setPassportVisaNumber(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] outline-none font-mono"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Visa Type</label>
+                                                <select
+                                                    value={passportVisaType}
+                                                    onChange={e => setPassportVisaType(e.target.value)}
+                                                    className="w-full h-7 px-1.5 border border-slate-200 rounded text-[10.5px] bg-white outline-none cursor-pointer"
+                                                >
+                                                    <option value="Tourist">Tourist</option>
+                                                    <option value="Business">Business</option>
+                                                    <option value="Employment">Employment</option>
+                                                    <option value="On-Arrival">On-Arrival</option>
+                                                    <option value="Diplomatic">Diplomatic</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex flex-col gap-0.5 sm:col-span-2">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Port of Entry</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Hazrat Shahjalal Int Airport, Dhaka"
+                                                    value={passportEntryPort}
+                                                    onChange={e => setPassportEntryPort(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-0.5 sm:col-span-2">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Visa Expiry Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={passportVisaExpiry}
+                                                    onChange={e => setPassportVisaExpiry(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] bg-white outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {idType === 'National ID (NID)' && (
+                                    <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2 mt-1">
+                                        <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-[10.5px]">
+                                            <ShieldCheck size={12} className="text-emerald-700" />
+                                            <span>NID Identity Verification</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Father's / Spouse's Name</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="As per NID..."
+                                                    value={fatherOrSpouseName}
+                                                    onChange={e => setFatherOrSpouseName(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Date of Issue</label>
+                                                <input
+                                                    type="date"
+                                                    value={idIssueDate}
+                                                    onChange={e => setIdIssueDate(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] bg-white outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Issue District</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Dhaka"
+                                                    value={idIssuePlace}
+                                                    onChange={e => setIdIssuePlace(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {idType === 'Driving License' && (
+                                    <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-lg space-y-2 mt-1">
+                                        <div className="flex items-center gap-1.5 text-purple-900 font-bold text-[10.5px]">
+                                            <Car size={12} className="text-purple-700" />
+                                            <span>Driving License Information</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Vehicle Class</label>
+                                                <select
+                                                    value={drivingVehicleClass}
+                                                    onChange={e => setDrivingVehicleClass(e.target.value)}
+                                                    className="w-full h-7 px-1.5 border border-slate-200 rounded text-[10.5px] bg-white outline-none cursor-pointer"
+                                                >
+                                                    <option value="Light">Light</option>
+                                                    <option value="Medium">Medium</option>
+                                                    <option value="Heavy">Heavy</option>
+                                                    <option value="Motorcycle">Motorcycle</option>
+                                                    <option value="Professional">Professional</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">BRTA Circle</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Mirpur, Dhaka"
+                                                    value={idIssuePlace}
+                                                    onChange={e => setIdIssuePlace(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <label className="text-[9.5px] font-semibold text-slate-700">Expiry Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={idExpiryDate}
+                                                    onChange={e => setIdExpiryDate(e.target.value)}
+                                                    className="w-full h-7 px-2 border border-slate-200 rounded text-[10.5px] bg-white outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

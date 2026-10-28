@@ -96,7 +96,24 @@ router.get('/', async (req: Request, res: Response) => {
                     totalNights: nights,
                     totalSpend: spend,
                     loyaltyPoints: points,
-                    lastStayDate: r.last_stay_date || null
+                    lastStayDate: r.last_stay_date || null,
+                    isBlacklisted: Boolean(r.is_blacklisted),
+                    blacklistReason: r.blacklist_reason || null,
+                    blacklistedBy: r.blacklisted_by || null,
+                    blacklistedAt: r.blacklisted_at || null,
+                    dob: r.dob ? String(r.dob).slice(0, 10) : null,
+                    gender: r.gender || 'Male',
+                    idIssueDate: r.id_issue_date ? String(r.id_issue_date).slice(0, 10) : null,
+                    idExpiryDate: r.id_expiry_date ? String(r.id_expiry_date).slice(0, 10) : null,
+                    idIssueCountry: r.id_issue_country || null,
+                    idIssuePlace: r.id_issue_place || null,
+                    passportVisaNumber: r.passport_visa_number || null,
+                    passportVisaType: r.passport_visa_type || null,
+                    passportVisaExpiry: r.passport_visa_expiry ? String(r.passport_visa_expiry).slice(0, 10) : null,
+                    passportEntryPort: r.passport_entry_port || null,
+                    drivingVehicleClass: r.driving_vehicle_class || null,
+                    identityMetadata: typeof r.identity_metadata === 'object' ? r.identity_metadata : {},
+                    tags: Array.isArray(r.tags) ? r.tags : []
                 };
             })
         });
@@ -329,8 +346,10 @@ router.post('/', async (req: Request, res: Response) => {
         const result = await db.prepare(`
             INSERT INTO guests (
                 organization_id, salutation, first_name, last_name, email, phone, nationality, id_type, id_number,
-                vip_status, address, city, country
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                vip_status, address, city, country, dob, gender, id_issue_date, id_expiry_date, id_issue_country,
+                id_issue_place, passport_visa_number, passport_visa_type, passport_visa_expiry, passport_entry_port,
+                driving_vehicle_class, identity_metadata, tags
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             organizationId,
             salutation,
@@ -344,11 +363,38 @@ router.post('/', async (req: Request, res: Response) => {
             body.vipStatus || body.vip_status || 'NONE',
             body.address || null,
             body.city || null,
-            body.country || 'Bangladesh'
+            body.country || 'Bangladesh',
+            body.dob || null,
+            body.gender || 'Male',
+            body.idIssueDate || body.id_issue_date || null,
+            body.idExpiryDate || body.id_expiry_date || null,
+            body.idIssueCountry || body.id_issue_country || null,
+            body.idIssuePlace || body.id_issue_place || null,
+            body.passportVisaNumber || body.passport_visa_number || null,
+            body.passportVisaType || body.passport_visa_type || null,
+            body.passportVisaExpiry || body.passport_visa_expiry || null,
+            body.passportEntryPort || body.passport_entry_port || null,
+            body.drivingVehicleClass || body.driving_vehicle_class || null,
+            JSON.stringify(body.identityMetadata || body.identity_metadata || {}),
+            body.tags || []
         );
 
         const newId = Number(result.lastInsertRowid);
         const created = await db.prepare('SELECT * FROM guests WHERE id = ?').get(newId);
+
+        // Record initial profile creation in audit trail
+        const actor = body.changedBy || body.staffName || 'System / Front Desk';
+        await db.prepare(`
+            INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
+            VALUES (?, ?, ?, ?)
+        `).run(
+            newId,
+            actor,
+            'Initial Guest Profile Created',
+            JSON.stringify([
+                { field: 'profile', fieldLabel: 'Profile Created', oldValue: null, newValue: `${salutation} ${firstName} ${lastName}` }
+            ])
+        );
 
         broadcastServerEvent({ type: 'GUESTS_UPDATED', guestId: newId });
 
@@ -362,18 +408,22 @@ router.post('/', async (req: Request, res: Response) => {
     }
 });
 
-// PUT /api/guests/:id - Update existing guest profile with conflict check
+// PUT /api/guests/:id - Update existing guest profile with conflict check and audit history
 router.put('/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const body = req.body || {};
-        const firstName = String(body.firstName || body.first_name || '').trim();
-        const lastName = String(body.lastName || body.last_name || '').trim();
-        const email = String(body.email || '').trim();
-        const phone = String(body.phone || '').trim();
-        const idNumber = String(body.idNumber || body.id_number || '').trim();
+        const current = await db.prepare('SELECT * FROM guests WHERE id = ?').get(id) as any;
+        if (!current) {
+            return res.status(404).json({ success: false, error: 'Guest not found' });
+        }
 
-        const normPhone = normalizePhone(phone);
+        const firstName = String(body.firstName || body.first_name || current.first_name || '').trim();
+        const lastName = String(body.lastName || body.last_name || current.last_name || '').trim();
+        const email = String(body.email !== undefined ? body.email : current.email || '').trim();
+        const phone = String(body.phone !== undefined ? body.phone : current.phone || '').trim();
+        const idNumber = String(body.idNumber !== undefined ? body.idNumber : current.id_number || '').trim();
+
         const cleanEmail = email.toLowerCase();
 
         // Conflict check against other guests
@@ -396,6 +446,38 @@ router.put('/:id', async (req: Request, res: Response) => {
             }
         }
 
+        // Calculate diffs for audit trail
+        const diffs: any[] = [];
+        const checkDiff = (field: string, label: string, oldVal: any, newVal: any) => {
+            if (newVal !== undefined && newVal !== null && String(newVal).trim() !== '' && String(oldVal ?? '').trim() !== String(newVal).trim()) {
+                diffs.push({
+                    field,
+                    fieldLabel: label,
+                    oldValue: oldVal ?? 'None',
+                    newValue: newVal
+                });
+            }
+        };
+
+        checkDiff('first_name', 'First Name', current.first_name, firstName);
+        checkDiff('last_name', 'Last Name', current.last_name, lastName);
+        checkDiff('salutation', 'Title / Salutation', current.salutation, body.salutation);
+        checkDiff('phone', 'Phone Number', current.phone, phone);
+        checkDiff('email', 'Email Address', current.email, email);
+        checkDiff('vip_status', 'VIP Status', current.vip_status, body.vipStatus || body.vip_status);
+        checkDiff('id_type', 'ID Type', current.id_type, body.idType || body.id_type);
+        checkDiff('id_number', 'ID Number', current.id_number, idNumber);
+        checkDiff('nationality', 'Nationality', current.nationality, body.nationality);
+        checkDiff('dob', 'Date of Birth', current.dob, body.dob);
+        checkDiff('gender', 'Gender', current.gender, body.gender);
+        checkDiff('address', 'Street Address', current.address, body.address);
+        checkDiff('city', 'City', current.city, body.city);
+        checkDiff('country', 'Country', current.country, body.country);
+        checkDiff('passport_visa_number', 'Visa Number', current.passport_visa_number, body.passportVisaNumber || body.passport_visa_number);
+        checkDiff('passport_visa_type', 'Visa Type', current.passport_visa_type, body.passportVisaType || body.passport_visa_type);
+        checkDiff('id_expiry_date', 'ID Expiry Date', current.id_expiry_date, body.idExpiryDate || body.id_expiry_date);
+        checkDiff('driving_vehicle_class', 'Driving Vehicle Class', current.driving_vehicle_class, body.drivingVehicleClass || body.driving_vehicle_class);
+
         await db.prepare(`
             UPDATE guests
             SET salutation = COALESCE(?, salutation),
@@ -410,6 +492,19 @@ router.put('/:id', async (req: Request, res: Response) => {
                 address = COALESCE(?, address),
                 city = COALESCE(?, city),
                 country = COALESCE(?, country),
+                dob = COALESCE(?, dob),
+                gender = COALESCE(?, gender),
+                id_issue_date = COALESCE(?, id_issue_date),
+                id_expiry_date = COALESCE(?, id_expiry_date),
+                id_issue_country = COALESCE(?, id_issue_country),
+                id_issue_place = COALESCE(?, id_issue_place),
+                passport_visa_number = COALESCE(?, passport_visa_number),
+                passport_visa_type = COALESCE(?, passport_visa_type),
+                passport_visa_expiry = COALESCE(?, passport_visa_expiry),
+                passport_entry_port = COALESCE(?, passport_entry_port),
+                driving_vehicle_class = COALESCE(?, driving_vehicle_class),
+                identity_metadata = COALESCE(?, identity_metadata),
+                tags = COALESCE(?, tags),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `).run(
@@ -425,15 +520,194 @@ router.put('/:id', async (req: Request, res: Response) => {
             body.address || null,
             body.city || null,
             body.country || null,
+            body.dob || null,
+            body.gender || null,
+            body.idIssueDate || body.id_issue_date || null,
+            body.idExpiryDate || body.id_expiry_date || null,
+            body.idIssueCountry || body.id_issue_country || null,
+            body.idIssuePlace || body.id_issue_place || null,
+            body.passportVisaNumber || body.passport_visa_number || null,
+            body.passportVisaType || body.passport_visa_type || null,
+            body.passportVisaExpiry || body.passport_visa_expiry || null,
+            body.passportEntryPort || body.passport_entry_port || null,
+            body.drivingVehicleClass || body.driving_vehicle_class || null,
+            body.identityMetadata ? JSON.stringify(body.identityMetadata) : null,
+            body.tags ? body.tags : null,
             id
+        );
+
+        if (diffs.length > 0) {
+            const actor = body.changedBy || body.staffName || 'Front Desk Staff';
+            const summary = `Updated ${diffs.map(d => d.fieldLabel).join(', ')}`;
+            await db.prepare(`
+                INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
+                VALUES (?, ?, ?, ?)
+            `).run(id, actor, summary, JSON.stringify(diffs));
+        }
+
+        const updated = await db.prepare('SELECT * FROM guests WHERE id = ?').get(id);
+        broadcastServerEvent({ type: 'GUESTS_UPDATED', guestId: id });
+
+        res.json({
+            success: true,
+            data: updated,
+            message: 'Guest profile updated successfully',
+            diffsRecorded: diffs.length
+        });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to update guest profile' });
+    }
+});
+
+// POST /api/guests/:id/blacklist - Blacklist or Unblacklist a guest with audit log
+router.post('/:id/blacklist', async (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const { isBlacklisted, reason, category, staffName } = req.body;
+        const current = await db.prepare('SELECT is_blacklisted, blacklist_reason, blacklisted_by FROM guests WHERE id = ?').get(id) as any;
+        if (!current) return res.status(404).json({ success: false, error: 'Guest not found' });
+
+        const actor = staffName || 'Security / Duty Manager';
+        const flag = Boolean(isBlacklisted);
+        const fullReason = flag ? (category ? `[${category}] ${reason || 'Flagged by Management'}` : (reason || 'Flagged by Management')) : null;
+
+        await db.prepare(`
+            UPDATE guests
+            SET is_blacklisted = ?,
+                blacklist_reason = ?,
+                blacklisted_by = ?,
+                blacklisted_at = CASE WHEN ? = TRUE THEN CURRENT_TIMESTAMP ELSE NULL END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(
+            flag,
+            fullReason,
+            flag ? actor : null,
+            flag,
+            id
+        );
+
+        // Record in audit log
+        const actionText = flag ? 'Guest Blacklisted / Blocked' : 'Guest Unblocked / Restored to Active';
+        const diffs = [
+            {
+                field: 'is_blacklisted',
+                fieldLabel: 'Status',
+                oldValue: current.is_blacklisted ? 'BLOCKED' : 'ACTIVE',
+                newValue: flag ? 'BLOCKED' : 'ACTIVE'
+            },
+            {
+                field: 'blacklist_reason',
+                fieldLabel: 'Block Reason',
+                oldValue: current.blacklist_reason || 'N/A',
+                newValue: fullReason || 'Restored to Active'
+            }
+        ];
+
+        await db.prepare(`
+            INSERT INTO guest_edit_history (guest_id, changed_by, change_summary, changes)
+            VALUES (?, ?, ?, ?)
+        `).run(
+            id,
+            actor,
+            `${actionText}: ${reason || 'Status updated'}`,
+            JSON.stringify(diffs)
         );
 
         const updated = await db.prepare('SELECT * FROM guests WHERE id = ?').get(id);
         broadcastServerEvent({ type: 'GUESTS_UPDATED', guestId: id });
 
-        res.json({ success: true, data: updated, message: 'Guest profile updated successfully' });
+        res.json({
+            success: true,
+            data: updated,
+            message: `Guest successfully ${flag ? 'blocked / blacklisted' : 'unblocked'}`
+        });
     } catch (e: any) {
-        res.status(400).json({ success: false, error: e?.message || 'Failed to update guest profile' });
+        res.status(500).json({ success: false, error: e?.message || 'Failed to update blacklist status' });
+    }
+});
+
+// GET /api/guests/:id/edit-history - Complete profile edit history audit trail
+router.get('/:id/edit-history', async (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const rows = await db.prepare(`
+            SELECT id, guest_id, changed_by, changed_at, change_summary, changes
+            FROM guest_edit_history
+            WHERE guest_id = ?
+            ORDER BY changed_at DESC
+        `).all(id) as any[];
+
+        res.json({
+            success: true,
+            data: rows.map(r => ({
+                id: Number(r.id),
+                guestId: Number(r.guest_id),
+                changedBy: r.changed_by,
+                changedAt: r.changed_at,
+                changeSummary: r.change_summary,
+                changes: typeof r.changes === 'string' ? JSON.parse(r.changes) : (r.changes || [])
+            }))
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to fetch edit history' });
+    }
+});
+
+// GET /api/guests/lookup - Quick verification and blacklist lookup by phone, id_number, or email
+router.get('/lookup', async (req: Request, res: Response) => {
+    try {
+        const query = String(req.query.q || '').trim();
+        if (!query || query.length < 3) {
+            return res.json({ success: true, data: null });
+        }
+
+        const normQ = query.replace(/[\s\-_]/g, '').toLowerCase();
+        const all = await db.prepare(`
+            SELECT id, salutation, first_name, last_name, email, phone, id_type, id_number,
+                   is_blacklisted, blacklist_reason, blacklisted_by, blacklisted_at, vip_status,
+                   dob, gender, id_issue_country, passport_visa_number, passport_visa_type
+            FROM guests
+        `).all() as any[];
+
+        const match = all.find(g => {
+            const p = (g.phone || '').replace(/[\s\-_]/g, '');
+            const idNum = (g.id_number || '').replace(/[\s\-_]/g, '').toLowerCase();
+            const em = (g.email || '').toLowerCase();
+            const fullName = `${g.first_name || ''} ${g.last_name || ''}`.toLowerCase();
+
+            return (p && (p.includes(normQ) || normQ.includes(p))) ||
+                   (idNum && (idNum === normQ || idNum.includes(normQ))) ||
+                   (em && em === normQ) ||
+                   (fullName && fullName.includes(query.toLowerCase()));
+        });
+
+        res.json({
+            success: true,
+            data: match ? {
+                id: Number(match.id),
+                salutation: match.salutation,
+                firstName: match.first_name,
+                lastName: match.last_name,
+                name: `${match.salutation ? match.salutation + ' ' : ''}${match.first_name} ${match.last_name}`.trim(),
+                email: match.email,
+                phone: match.phone,
+                idType: match.id_type,
+                idNumber: match.id_number,
+                vipStatus: match.vip_status,
+                isBlacklisted: Boolean(match.is_blacklisted),
+                blacklistReason: match.blacklist_reason,
+                blacklistedBy: match.blacklisted_by,
+                blacklistedAt: match.blacklisted_at,
+                dob: match.dob,
+                gender: match.gender,
+                idIssueCountry: match.id_issue_country,
+                passportVisaNumber: match.passport_visa_number,
+                passportVisaType: match.passport_visa_type
+            } : null
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Lookup failed' });
     }
 });
 
