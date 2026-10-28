@@ -120,6 +120,69 @@ export interface DynamicRoomType {
     description?: string;
 }
 
+export interface ConnectingSuiteComponent {
+    roomTypeId: string;
+    count: number;
+    roomNumbers: string[];
+}
+
+export interface ConnectingSuite {
+    id: number | string;
+    propertyId?: number;
+    name: string;
+    inventoryLogic?: string;
+    pricingStrategy?: string;
+    fixedPrice?: number;
+    status: string;
+    componentRooms: ConnectingSuiteComponent[];
+}
+
+export const STORAGE_KEY_CONNECTING_SUITES = 'hotel_connecting_rooms_v1';
+
+export const getStoredConnectingSuites = (propertyId: number = 1): ConnectingSuite[] => {
+    try {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(STORAGE_KEY_CONNECTING_SUITES);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        }
+    } catch {}
+    return [
+        {
+            id: 1,
+            propertyId: propertyId || 1,
+            name: 'Interconnecting Suite (101-102)',
+            inventoryLogic: 'Auto-Sync',
+            pricingStrategy: 'Sum of Rates',
+            fixedPrice: 6000,
+            status: 'Active',
+            componentRooms: [
+                { roomTypeId: '1', count: 1, roomNumbers: ['101'] },
+                { roomTypeId: '1', count: 1, roomNumbers: ['102'] }
+            ]
+        }
+    ];
+};
+
+export const syncConnectingSuitesFromDB = async (propertyId: number = 1): Promise<ConnectingSuite[]> => {
+    try {
+        const base = typeof window !== 'undefined' ? (window.location.origin.includes(':5173') ? 'http://localhost:3002' : '') : '';
+        const res = await fetch(`${base}/api/connecting-rooms?propertyId=${propertyId}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(STORAGE_KEY_CONNECTING_SUITES, JSON.stringify(json.data));
+            }
+            return json.data;
+        }
+    } catch {}
+    return getStoredConnectingSuites(propertyId);
+};
+
 const STORAGE_KEY_ROOM_TYPES = 'hotel_room_types_v1';
 
 // Dynamic Database Baseline Seeds (synced directly with PostgreSQL room_types table)
@@ -153,7 +216,13 @@ export const isMatchingRoomType = (typeA?: string, typeB?: string): boolean => {
     if (!typeA || !typeB) return false;
     const a = typeA.trim().toLowerCase();
     const b = typeB.trim().toLowerCase();
-    if (a === b || a.includes(b) || b.includes(a)) return true;
+    if (a === b) return true;
+    const aIsConnecting = a.includes('connecting') || a.includes('interconnecting');
+    const bIsConnecting = b.includes('connecting') || b.includes('interconnecting');
+    if (aIsConnecting || bIsConnecting) {
+        return aIsConnecting && bIsConnecting && (a.includes(b) || b.includes(a));
+    }
+    if (a.includes(b) || b.includes(a)) return true;
     if (a.includes('presidential') && b.includes('presidential')) return true;
     if (a.includes('executive') && b.includes('executive')) return true;
     if (a.includes('superior') && b.includes('superior')) return true;
@@ -206,6 +275,16 @@ export const getStandardDailyRateForRoom = (roomNumber?: string, roomTypeName?: 
     }
 
     if (roomTypeName) {
+        const suites = getStoredConnectingSuites();
+        const foundSuite = suites.find(s => s.name.trim().toLowerCase() === roomTypeName.trim().toLowerCase());
+        if (foundSuite) {
+            if (Number(foundSuite.fixedPrice) > 0) return Number(foundSuite.fixedPrice);
+            const suiteRooms = foundSuite.componentRooms.flatMap(c => c.roomNumbers || []);
+            const sum = suiteRooms.reduce((acc, rn) => acc + getStandardDailyRateForRoom(rn), 0);
+            if (sum > 0) return sum;
+            return 6000;
+        }
+
         const query = roomTypeName.trim().toLowerCase();
         const matched = dynamicTypes.find(t => 
             t.name.toLowerCase() === query ||
@@ -271,6 +350,21 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
 
     if (roomTypeNameOrId !== undefined && roomTypeNameOrId !== null) {
         const queryStr = String(roomTypeNameOrId).trim().toLowerCase();
+        if (queryStr.includes('connecting') || queryStr.includes('interconnecting')) {
+            const suites = getStoredConnectingSuites();
+            const foundSuite = suites.find(s => s.name.trim().toLowerCase() === queryStr || queryStr.includes(s.name.trim().toLowerCase()));
+            const numRooms = foundSuite ? foundSuite.componentRooms.flatMap(c => c.roomNumbers || []).length : 2;
+            const multiplier = Math.max(2, numRooms);
+            return {
+                baseOccupancy: multiplier * 2,
+                maxAdults: multiplier * 2,
+                maxChildren: multiplier * 1,
+                maxOccupancy: multiplier * 3,
+                extraAdultPrice: 1000,
+                extraChildPrice: 500,
+                baseRate: Number(foundSuite?.fixedPrice) || (multiplier * 3000)
+            };
+        }
         matched = dynamicTypes.find(t => 
             String(t.id) === String(roomTypeNameOrId) ||
             t.name.toLowerCase() === queryStr ||

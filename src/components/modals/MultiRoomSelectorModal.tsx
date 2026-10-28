@@ -606,6 +606,13 @@ export const MultiRoomSelectorModal: React.FC<MultiRoomSelectorModalProps> = ({
                                     <div className="mt-2.5 text-[11px] space-y-0.5">
                                         <div className="text-slate-600 font-semibold">Floor {st.room.floorId || '1'}</div>
                                         <div className="text-slate-500 text-[10.5px] truncate">{st.room.name}</div>
+                                        {st.room.isConnecting && (
+                                            <div className="pt-0.5">
+                                                <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1">
+                                                    🔗 Connecting {st.room.connectedTo ? `to Room ${st.room.connectedTo}` : ""}
+                                                </span>
+                                            </div>
+                                        )}
                                         {!isSelectable && (
                                             <div className="text-red-500 text-[10px] truncate mt-1">
                                                 {isTakenInOther ? 'Used in another row' : (st.reason || 'Occupied')}

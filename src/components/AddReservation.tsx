@@ -60,7 +60,10 @@ import {
     getAllStoredReservations,
     saveStoredReservations,
     updateReservationInDB,
-    type StoredReservation
+    getStoredConnectingSuites,
+    syncConnectingSuitesFromDB,
+    type StoredReservation,
+    type ConnectingSuite
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
 import { useProperty } from '../context/PropertyContext';
@@ -733,10 +736,25 @@ export const AddReservation: React.FC = () => {
 
     const availableRatePlans = dbRatePlans;
 
-    const availableRoomTypesList = useMemo(() => {
-        const dynamic = getDynamicRoomTypes();
-        return dynamic.map(t => t.name);
+    // Connecting Suites from connecting_rooms table and localStorage
+    const [connectingSuites, setConnectingSuites] = useState<ConnectingSuite[]>(() => getStoredConnectingSuites());
+
+    useEffect(() => {
+        syncConnectingSuitesFromDB(1).then(suites => {
+            if (suites && suites.length > 0) {
+                setConnectingSuites(suites);
+            }
+        }).catch(() => { });
     }, [pmsSyncVersion]);
+
+    const standardRoomTypesList = useMemo(() => {
+        const dynamic = getDynamicRoomTypes();
+        return dynamic.filter(t => !t.isConnecting).map(t => t.name);
+    }, [pmsSyncVersion]);
+
+    const activeConnectingSuites = useMemo(() => {
+        return connectingSuites.filter(s => s.status === 'Active');
+    }, [connectingSuites]);
 
     // Cross-tab real-time sync subscription
     useEffect(() => {
@@ -764,6 +782,10 @@ export const AddReservation: React.FC = () => {
             const usedInForm = new Set<string>();
 
             const updated = prev.map(row => {
+                if (activeConnectingSuites.some(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase())) {
+                    (row.assignedRooms || [row.roomNumber]).forEach(rn => usedInForm.add(String(rn)));
+                    return row;
+                }
                 const count = Number(row.roomsCount) || 1;
                 const isCurrentAvailable =
                     liveAvailabilityReport.availableRooms.some(
@@ -834,6 +856,16 @@ export const AddReservation: React.FC = () => {
 
     // Total inventory free for this type in the hotel (before any form selection)
     const getTotalInventoryForType = (typeName: string): number => {
+        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === typeName.trim().toLowerCase());
+        if (suite) {
+            const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
+            if (suiteRooms.length === 0) return 0;
+            const allFree = suiteRooms.every(rmNum => {
+                const st = liveAvailabilityReport.allRoomsStatus.find(s => String(s.room.number) === rmNum);
+                return st && st.isAvailable;
+            });
+            return allFree ? 1 : 0;
+        }
         return liveAvailabilityReport.allRoomsStatus.filter(st => {
             return isMatchingRoomType(st.room.roomTypeName, typeName) && st.isAvailable;
         }).length;
@@ -841,6 +873,10 @@ export const AddReservation: React.FC = () => {
 
     // Rooms of this type already allocated across ALL rows in this form
     const getAllocatedCountForType = (typeName: string): number => {
+        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === typeName.trim().toLowerCase());
+        if (suite) {
+            return roomsList.filter(r => r.roomType.trim().toLowerCase() === typeName.trim().toLowerCase()).length;
+        }
         return roomsList
             .filter(r => isMatchingRoomType(r.roomType, typeName))
             .reduce((sum, r) => sum + (Number(r.roomsCount) || 1), 0);
@@ -848,6 +884,17 @@ export const AddReservation: React.FC = () => {
 
     // Rooms of this type allocated in OTHER rows (excluding currentRowId)
     const getAllocatedCountInOtherRows = (typeName: string, currentRowId?: number): number => {
+        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === typeName.trim().toLowerCase());
+        if (suite) {
+            const suiteRooms = new Set(suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String));
+            const conflict = roomsList.some(r => {
+                if (r.id === currentRowId) return false;
+                if (r.roomType.trim().toLowerCase() === typeName.trim().toLowerCase()) return true;
+                const assigned = r.assignedRooms && r.assignedRooms.length > 0 ? r.assignedRooms : [r.roomNumber];
+                return assigned.some(rm => suiteRooms.has(String(rm)));
+            });
+            return conflict ? 1 : 0;
+        }
         return roomsList
             .filter(r => r.id !== currentRowId && isMatchingRoomType(r.roomType, typeName))
             .reduce((sum, r) => sum + (Number(r.roomsCount) || 1), 0);
@@ -879,6 +926,12 @@ export const AddReservation: React.FC = () => {
 
     // Helper to get auto-allocated physical room numbers for a given row based on its roomsCount
     const getAutoAssignedRoomsForRow = (row: RoomRow): string[] => {
+        const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === row.roomType.trim().toLowerCase());
+        if (suite) {
+            const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
+            if (suiteRooms.length > 0) return suiteRooms;
+        }
+
         const takenBefore = new Set<string>();
         for (const r of roomsList) {
             if (r.id === row.id) break;
@@ -1092,6 +1145,63 @@ export const AddReservation: React.FC = () => {
                     };
                 }
                 if (field === 'roomType') {
+                    const newTypeName = String(value);
+                    const suite = activeConnectingSuites.find(s => s.name.trim().toLowerCase() === newTypeName.trim().toLowerCase());
+                    if (suite) {
+                        const suiteRooms = suite.componentRooms.flatMap(c => c.roomNumbers || []).map(String);
+                        const otherUsed = new Set<string>();
+                        prev.filter(other => other.id !== id).forEach(other => {
+                            if (other.assignedRooms && other.assignedRooms.length > 0) {
+                                other.assignedRooms.forEach(rn => otherUsed.add(String(rn)));
+                            } else if (other.roomNumber) {
+                                otherUsed.add(String(other.roomNumber));
+                            }
+                        });
+
+                        const conflictRoom = suiteRooms.find(rn => otherUsed.has(rn));
+                        if (conflictRoom) {
+                            toast.error(`Cannot select ${suite.name}: Room ${conflictRoom} is already selected in another row!`);
+                            return r;
+                        }
+
+                        const unavailRoom = suiteRooms.find(rn => {
+                            const st = liveAvailabilityReport.allRoomsStatus.find(s => String(s.room.number) === rn);
+                            return !st || !st.isAvailable;
+                        });
+                        if (unavailRoom) {
+                            toast.error(`Cannot select ${suite.name}: Room ${unavailRoom} is currently booked or unavailable!`);
+                            return r;
+                        }
+
+                        // Calculate tariff
+                        let suiteRate = Number(suite.fixedPrice) || 0;
+                        if (suiteRate <= 0 || suite.pricingStrategy === 'Sum of Rates') {
+                            suiteRate = suiteRooms.reduce((sum, rm) => {
+                                const rObj = liveAvailabilityReport.allRoomsStatus.find(s => String(s.room.number) === rm);
+                                const std = getStandardDailyRateForRoom(rm, rObj?.room.roomTypeName);
+                                return sum + (std || 3000);
+                            }, 0);
+                        }
+
+                        const totalAdultsCapacity = Math.max(2, suiteRooms.length * 2);
+                        const totalChildrenCapacity = Math.max(1, suiteRooms.length * 1);
+                        const clampedAdults = Math.max(1, Math.min(r.adults, totalAdultsCapacity));
+                        const clampedChildren = Math.min(r.children, totalChildrenCapacity);
+
+                        toast.success(`🔗 Connecting Suite selected: Auto-assigned interconnected rooms ${suiteRooms.join(' & ')}!`);
+
+                        return {
+                            ...r,
+                            roomType: suite.name,
+                            roomsCount: suiteRooms.length,
+                            assignedRooms: suiteRooms,
+                            roomNumber: suiteRooms[0] || '101',
+                            adults: clampedAdults,
+                            children: clampedChildren,
+                            rate: suiteRate
+                        };
+                    }
+
                     const maxForNewType = getMaxRoomsAllowedForRow(value, id);
                     if (maxForNewType <= 0) {
                         toast.error(`Overbooking Prevented: No rooms available in "${value}" for the selected dates!`);
@@ -1980,19 +2090,39 @@ export const AddReservation: React.FC = () => {
                                                             onChange={e => updateRoomRow(row.id, 'roomType', e.target.value)}
                                                             className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium text-slate-800 shadow-2xs"
                                                         >
-                                                            {availableRoomTypesList.map(typeOpt => {
-                                                                const availForRow = getMaxRoomsAllowedForRow(typeOpt, row.id);
-                                                                const isSoldOut = availForRow <= 0;
-                                                                return (
-                                                                    <option
-                                                                        key={typeOpt}
-                                                                        value={typeOpt}
-                                                                        disabled={isSoldOut && !isMatchingRoomType(row.roomType, typeOpt)}
-                                                                    >
-                                                                        {typeOpt} [{isSoldOut ? '0 - Sold Out' : availForRow}]
-                                                                    </option>
-                                                                );
-                                                            })}
+                                                            <optgroup label="Standard Categories">
+                                                                {standardRoomTypesList.map(typeOpt => {
+                                                                    const availForRow = getMaxRoomsAllowedForRow(typeOpt, row.id);
+                                                                    const isSoldOut = availForRow <= 0;
+                                                                    return (
+                                                                        <option
+                                                                            key={typeOpt}
+                                                                            value={typeOpt}
+                                                                            disabled={isSoldOut && !isMatchingRoomType(row.roomType, typeOpt)}
+                                                                        >
+                                                                            {typeOpt} [{isSoldOut ? '0 - Sold Out' : availForRow}]
+                                                                        </option>
+                                                                    );
+                                                                })}
+                                                            </optgroup>
+                                                            {activeConnectingSuites.length > 0 && (
+                                                                <optgroup label="🔗 Connecting Room Suites">
+                                                                    {activeConnectingSuites.map(suite => {
+                                                                        const availForRow = getMaxRoomsAllowedForRow(suite.name, row.id);
+                                                                        const isSoldOut = availForRow <= 0;
+                                                                        const roomNums = suite.componentRooms.flatMap(c => c.roomNumbers || []).join(' & ');
+                                                                        return (
+                                                                            <option
+                                                                                key={suite.name}
+                                                                                value={suite.name}
+                                                                                disabled={isSoldOut && row.roomType !== suite.name}
+                                                                            >
+                                                                                🔗 {suite.name} ({roomNums}) [{isSoldOut ? '0 - Sold Out' : `${availForRow} Suite`}]
+                                                                            </option>
+                                                                        );
+                                                                    })}
+                                                                </optgroup>
+                                                            )}
                                                         </select>
                                                         {/* Ultra-Compact & Elegant Active Addons Pill */}
                                                         {(() => {
