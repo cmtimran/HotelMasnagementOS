@@ -63,6 +63,7 @@ router.get('/', async (req: Request, res: Response) => {
                 g.*,
                 (SELECT COUNT(DISTINCT r.id) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_stays,
                 (SELECT COALESCE(SUM(r.total_amount), 0) FROM reservations r WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_spend,
+                (SELECT COALESCE(SUM(rr.nights), 0) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id AND r.status NOT IN ('CANCELLED', 'VOID')) as total_nights,
                 (SELECT MAX(rr.check_in_date) FROM reservation_rooms rr JOIN reservations r ON r.id = rr.reservation_id WHERE r.booker_guest_id = g.id) as last_stay_date
             FROM guests g
             ORDER BY g.id DESC
@@ -70,29 +71,87 @@ router.get('/', async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            data: rows.map(r => ({
-                id: Number(r.id),
-                salutation: r.salutation || 'Mr',
-                firstName: r.first_name,
-                lastName: r.last_name,
-                name: `${r.salutation ? r.salutation + ' ' : ''}${r.first_name} ${r.last_name}`.trim(),
-                email: r.email || '',
-                phone: r.phone || '',
-                normalizedPhone: normalizePhone(r.phone),
-                nationality: r.nationality || 'Bangladeshi',
-                idType: r.id_type || 'National ID (NID)',
-                idNumber: r.id_number || '',
-                vipStatus: r.vip_status || 'NONE',
-                address: r.address || '',
-                city: r.city || '',
-                country: r.country || 'Bangladesh',
-                totalStays: Number(r.total_stays) || 0,
-                totalSpend: Number(r.total_spend) || 0,
-                lastStayDate: r.last_stay_date || null
-            }))
+            data: rows.map(r => {
+                const spend = Number(r.total_spend) || 0;
+                const stays = Number(r.total_stays) || 0;
+                const nights = Number(r.total_nights) || stays;
+                const points = Math.round(spend / 20);
+                return {
+                    id: Number(r.id),
+                    salutation: r.salutation || 'Mr',
+                    firstName: r.first_name,
+                    lastName: r.last_name,
+                    name: `${r.salutation ? r.salutation + ' ' : ''}${r.first_name} ${r.last_name}`.trim(),
+                    email: r.email || '',
+                    phone: r.phone || '',
+                    normalizedPhone: normalizePhone(r.phone),
+                    nationality: r.nationality || 'Bangladeshi',
+                    idType: r.id_type || 'National ID (NID)',
+                    idNumber: r.id_number || '',
+                    vipStatus: r.vip_status || (spend > 50000 ? 'VVIP' : spend > 20000 ? 'VIP' : 'NONE'),
+                    address: r.address || '',
+                    city: r.city || '',
+                    country: r.country || 'Bangladesh',
+                    totalStays: stays,
+                    totalNights: nights,
+                    totalSpend: spend,
+                    loyaltyPoints: points,
+                    lastStayDate: r.last_stay_date || null
+                };
+            })
         });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e?.message || 'Failed to fetch guests' });
+    }
+});
+
+// GET /api/guests/:id/history - Full stay, reservation, and folio ledger for this guest across all properties
+router.get('/:id/history', async (req: Request, res: Response) => {
+    try {
+        const id = Number(req.params.id);
+        const rows = await db.prepare(`
+            SELECT 
+                r.id as reservation_id,
+                r.reservation_number,
+                r.property_id,
+                COALESCE(p.name, 'Main Hotel') as property_name,
+                r.status,
+                r.source,
+                r.channel,
+                COALESCE(r.total_amount, 0) as total_amount,
+                COALESCE(r.paid_amount, 0) as paid_amount,
+                COALESCE(r.due_amount, 0) as due_amount,
+                r.created_at,
+                rr.id as room_stay_id,
+                rr.sub_booking_number,
+                rr.room_id,
+                COALESCE(rm.room_number, 'Assigned') as room_number,
+                COALESCE(rt.name, 'Deluxe Room') as room_type,
+                COALESCE(rr.check_in_date, r.created_at::date::text) as check_in,
+                COALESCE(rr.check_out_date, (r.created_at + interval '1 day')::date::text) as check_out,
+                COALESCE(rr.nights, 1) as nights,
+                COALESCE(rr.room_rate, r.total_amount, 0) as room_rate,
+                f.folio_number
+            FROM reservations r
+            LEFT JOIN properties p ON p.id = r.property_id
+            LEFT JOIN reservation_rooms rr ON rr.reservation_id = r.id
+            LEFT JOIN rooms rm ON rm.id = rr.room_id
+            LEFT JOIN room_types rt ON rt.id = rm.room_type_id OR rt.id = rr.room_type_id
+            LEFT JOIN (
+                SELECT DISTINCT ON (reservation_id) reservation_id, folio_number 
+                FROM folios
+                ORDER BY reservation_id, id ASC
+            ) f ON f.reservation_id = r.id
+            WHERE r.booker_guest_id = ? OR rr.guest_id = ?
+            ORDER BY r.id DESC, rr.id ASC
+        `).all(id, id) as any[];
+
+        res.json({
+            success: true,
+            data: rows
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e?.message || 'Failed to fetch guest history' });
     }
 });
 

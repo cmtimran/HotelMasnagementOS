@@ -6,7 +6,7 @@ import {
     Building2, Clock,
     AlertTriangle, ChevronRight, ChevronLeft,
     Home, Edit3, Receipt,
-    GitMerge, CheckSquare, Square
+    GitMerge, CheckSquare, Square, Loader2
 } from 'lucide-react';
 import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 import { useNavigation } from '../context/NavigationContext';
@@ -272,10 +272,14 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
 
 export const GuestProfile: React.FC = () => {
     const [guests, setGuests] = useState<GuestRecord[]>(() => {
-        const derived = deriveGuestsFromReservations(getAllStoredReservations());
-        if (derived.length > 0) return derived;
         const saved = localStorage.getItem('hotel_guest_profiles_v2');
-        return saved ? JSON.parse(saved) : [];
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            } catch {}
+        }
+        return deriveGuestsFromReservations(getAllStoredReservations());
     });
 
     const [duplicateClusters, setDuplicateClusters] = useState<any[]>([]);
@@ -307,8 +311,25 @@ export const GuestProfile: React.FC = () => {
                         (dg.phone && isSamePhoneNumber(dg.phone, m.phone)) ||
                         (dg.email && m.email && m.email.toLowerCase() === dg.email.toLowerCase() && !dg.email.includes('hospitality.com'))
                     );
+                    const dbSpend = Number(dg.totalSpend || 0);
+                    const dbStays = Number(dg.totalStays || 0);
+                    const dbNights = Number(dg.totalNights || dg.totalStays || 0);
+                    const dbPoints = Number(dg.loyaltyPoints ?? Math.round(dbSpend / 20));
+
                     if (existing) {
-                        mergedMap.set(existing.id, {
+                        const finalSpend = Math.max(Number(existing.lifetimeSpendBDT || 0), dbSpend);
+                        const finalStays = Math.max(Number(existing.totalStays || 0), dbStays);
+                        const finalNights = Math.max(Number(existing.totalNights || 0), dbNights);
+                        const finalPoints = Math.round(finalSpend / 20);
+                        const finalLastStay = (dg.lastStayDate && dg.lastStayDate > (existing.lastStayDate || ''))
+                            ? dg.lastStayDate
+                            : (existing.lastStayDate || dg.lastStayDate || '-');
+
+                        if (existing.id !== dg.id) {
+                            mergedMap.delete(existing.id);
+                        }
+
+                        mergedMap.set(dg.id, {
                             ...existing,
                             id: dg.id,
                             title: (dg.salutation ? `${dg.salutation}.` : existing.title) as GuestRecord['title'],
@@ -318,8 +339,20 @@ export const GuestProfile: React.FC = () => {
                             idType: dg.idType || existing.idType,
                             idNumber: dg.idNumber || existing.idNumber,
                             vipTier: dg.vipStatus === 'VVIP' ? 'Platinum VIP' : dg.vipStatus === 'VIP' ? 'Gold' : existing.vipTier,
-                            totalStays: Math.max(existing.totalStays, dg.totalStays || 0),
-                            lifetimeSpendBDT: Math.max(existing.lifetimeSpendBDT, dg.totalSpend || 0)
+                            totalStays: finalStays,
+                            totalNights: finalNights,
+                            lifetimeSpendBDT: finalSpend,
+                            loyaltyPoints: finalPoints,
+                            lastStayDate: finalLastStay,
+                            preferences: existing.preferences || {
+                                roomType: 'Deluxe Double',
+                                floorPreference: 'High Floor',
+                                pillowType: 'Feather / Down',
+                                smoking: 'Non-Smoking',
+                                dietary: 'Standard Halal',
+                                newspaper: 'The Daily Star',
+                                specialNotes: 'Loaded from Hotel Database.'
+                            }
                         });
                     } else {
                         mergedMap.set(dg.id, {
@@ -337,11 +370,11 @@ export const GuestProfile: React.FC = () => {
                             homeCity: dg.city || 'Dhaka',
                             homeCountry: dg.country || 'Bangladesh',
                             address: dg.address || '',
-                            totalStays: dg.totalStays || 0,
-                            totalNights: dg.totalStays || 0,
-                            lifetimeSpendBDT: dg.totalSpend || 0,
+                            totalStays: dbStays,
+                            totalNights: dbNights,
+                            lifetimeSpendBDT: dbSpend,
                             lastStayDate: dg.lastStayDate || '-',
-                            loyaltyPoints: Math.round((dg.totalSpend || 0) / 20),
+                            loyaltyPoints: dbPoints,
                             preferences: {
                                 roomType: 'Deluxe Double',
                                 floorPreference: 'High Floor',
@@ -498,6 +531,34 @@ export const GuestProfile: React.FC = () => {
 
     const activeGuest = guests.find(g => g.id === selectedGuestId) || guests[0];
 
+    const [guestHistoryLedger, setGuestHistoryLedger] = useState<any[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+    useEffect(() => {
+        if (!activeGuest?.id) {
+            setGuestHistoryLedger([]);
+            return;
+        }
+        const apiBase = getApiBaseUrl();
+        setIsLoadingHistory(true);
+        fetch(`${apiBase}/api/guests/${activeGuest.id}/history`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && Array.isArray(res.data)) {
+                    setGuestHistoryLedger(res.data);
+                } else {
+                    setGuestHistoryLedger([]);
+                }
+            })
+            .catch(err => {
+                console.warn('Failed to fetch guest history ledger:', err);
+                setGuestHistoryLedger([]);
+            })
+            .finally(() => {
+                setIsLoadingHistory(false);
+            });
+    }, [activeGuest?.id]);
+
     const { reservationsList, checkinsList, outletBillsList, allLedgerItems } = useMemo(() => {
         if (!activeGuest) {
             return { reservationsList: [], checkinsList: [], outletBillsList: [], allLedgerItems: [] };
@@ -509,10 +570,20 @@ export const GuestProfile: React.FC = () => {
         // 1. Reservations (Real bookings only - zero mock fallback)
         const matchedRes = canonicalReservations.filter((r: StoredReservation) => {
             const rClean = parseTitleAndName(r.guestName || '').cleanName.toLowerCase().trim();
-            return (rClean && (rClean.includes(guestNameLower) || guestNameLower.includes(rClean))) || Boolean(r.phone && (r.phone === activeGuest.phone || (r as any).guestPhone === activeGuest.phone));
+            const phoneMatch = Boolean(r.phone && activeGuest.phone && isSamePhoneNumber(r.phone, activeGuest.phone));
+            const emailMatch = Boolean(r.email && activeGuest.email && r.email.trim().toLowerCase() === activeGuest.email.trim().toLowerCase() && !r.email.includes('guest.com'));
+            return (rClean && (rClean.includes(guestNameLower) || guestNameLower.includes(rClean))) || phoneMatch || emailMatch;
         });
 
-        const resItems = matchedRes.map((r: StoredReservation, i: number) => {
+        const seenResRefs = new Set<string>();
+        const seenStayRefs = new Set<string>();
+        const resItems: any[] = [];
+        const checkinItems: any[] = [];
+
+        // Add from local reservations
+        matchedRes.forEach((r: StoredReservation, i: number) => {
+            const resNum = r.reservationNumber || `RES-${r.id || 10000 + i}`;
+            seenResRefs.add(resNum);
             const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
             const amount = Number(r.totalAmount) || Number(r.totalRate) || 0;
             const status = (r.status || 'CONFIRMED').toUpperCase();
@@ -521,10 +592,11 @@ export const GuestProfile: React.FC = () => {
                 status.includes('CHECKED_OUT') || status.includes('CHECKED-OUT') ? 'bg-slate-100 text-slate-700 border-slate-200' :
                 status.includes('CANCEL') ? 'bg-rose-50 text-rose-700 border-rose-200' :
                 'bg-blue-50 text-blue-700 border-blue-200';
-            return {
-                id: `res-${r.id || r.reservationNumber || i}`,
+
+            resItems.push({
+                id: `res-${r.id || resNum}`,
                 type: 'reservation' as const,
-                refNumber: r.reservationNumber || `RES-${r.id || 10000 + i}`,
+                refNumber: resNum,
                 title: `${r.roomType || 'Room'} Reservation`,
                 particulars: `${r.ratePlan || 'Standard Rate'} • ${r.adults || 1} Adult(s) • ${nights} Nts`,
                 roomOrLocation: r.roomNumber || r.roomNo || (Array.isArray(r.allocatedRooms) ? r.allocatedRooms[0] : null) || 'Unassigned',
@@ -533,29 +605,20 @@ export const GuestProfile: React.FC = () => {
                 status: status.replace('_', ' '),
                 statusBadgeColor: badgeColor,
                 rawReservation: r
-            };
-        });
+            });
 
-        // 2. Check-Ins & Stays (Real check-in records only - zero mock fallback)
-        const checkinItems: any[] = [];
-        const seenStayRefs = new Set<string>();
-
-        matchedRes.forEach((r: StoredReservation, i: number) => {
-            const s = (r.status || '').toUpperCase();
-            if (s.includes('CHECKED_IN') || s.includes('CHECKED-IN') || s.includes('CHECKED_OUT') || s.includes('CHECKED-OUT') || s === 'IN-HOUSE') {
-                const ref = String(r.reservationNumber || r.id);
-                seenStayRefs.add(ref);
-                const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
-                const isInHouse = s.includes('CHECKED_IN') || s.includes('CHECKED-IN') || s === 'IN-HOUSE';
+            if (status.includes('CHECKED_IN') || status.includes('CHECKED-IN') || status.includes('CHECKED_OUT') || status.includes('CHECKED-OUT') || status === 'IN-HOUSE') {
+                const isInHouse = status.includes('CHECKED_IN') || status.includes('CHECKED-IN') || status === 'IN-HOUSE';
+                seenStayRefs.add(resNum);
                 checkinItems.push({
-                    id: `checkin-res-${ref}-${i}`,
+                    id: `checkin-res-${resNum}`,
                     type: 'checkin' as const,
-                    refNumber: `REG-${ref}`,
+                    refNumber: `REG-${resNum}`,
                     title: `Stay (Room ${r.roomNumber || r.roomNo || 'Assigned'})`,
                     particulars: `${r.checkIn} → ${r.checkOut} (${nights} Nts)`,
                     roomOrLocation: r.roomNumber || r.roomNo ? `Room ${r.roomNumber || r.roomNo}` : 'Front Desk',
                     dateTime: `${r.checkIn}`,
-                    amountBDT: Number(r.totalAmount) || Number(r.totalRate) || 0,
+                    amountBDT: amount,
                     status: isInHouse ? 'In-House' : 'Checked-Out',
                     statusBadgeColor: isInHouse ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200',
                     rawReservation: r
@@ -563,6 +626,106 @@ export const GuestProfile: React.FC = () => {
             }
         });
 
+        // Add from database history ledger across all properties
+        if (guestHistoryLedger.length > 0) {
+            const dbResGroupMap = new Map<string, any>();
+            guestHistoryLedger.forEach(row => {
+                const key = String(row.reservation_number || row.reservation_id);
+                if (!dbResGroupMap.has(key)) {
+                    dbResGroupMap.set(key, {
+                        ...row,
+                        rooms: [row.room_number].filter(Boolean),
+                        roomTypes: [row.room_type].filter(Boolean),
+                        stays: [row]
+                    });
+                } else {
+                    const existing = dbResGroupMap.get(key);
+                    if (row.room_number && !existing.rooms.includes(row.room_number)) {
+                        existing.rooms.push(row.room_number);
+                    }
+                    if (row.room_type && !existing.roomTypes.includes(row.room_type)) {
+                        existing.roomTypes.push(row.room_type);
+                    }
+                    existing.stays.push(row);
+                }
+            });
+
+            dbResGroupMap.forEach((group, key) => {
+                if (!seenResRefs.has(key)) {
+                    seenResRefs.add(key);
+                    const nights = Number(group.nights) || Math.max(1, Math.round((new Date(group.check_out).getTime() - new Date(group.check_in).getTime()) / 86400000));
+                    const amount = Number(group.total_amount) || 0;
+                    const status = (group.status || 'CONFIRMED').toUpperCase();
+                    const badgeColor =
+                        status.includes('CHECKED_IN') || status.includes('CHECKED-IN') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        status.includes('CHECKED_OUT') || status.includes('CHECKED-OUT') ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                        status.includes('CANCEL') ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                        'bg-blue-50 text-blue-700 border-blue-200';
+
+                    const roomDisplay = group.rooms.length > 0
+                        ? group.rooms.map((rm: string) => rm.startsWith('V') || rm.startsWith('Rm') || rm.toLowerCase().includes('room') ? rm : `Room ${rm}`).join(', ')
+                        : 'Assigned';
+                    const locationStr = group.property_name ? `${roomDisplay} • ${group.property_name}` : roomDisplay;
+                    const roomTypeStr = group.roomTypes.join(' & ') || 'Deluxe Room';
+
+                    resItems.push({
+                        id: `res-db-${key}`,
+                        type: 'reservation' as const,
+                        refNumber: key,
+                        title: `${roomTypeStr} Reservation`,
+                        particulars: `${group.property_name || 'Hotel'} • ${group.channel || 'Direct'} • ${nights} Nts`,
+                        roomOrLocation: locationStr,
+                        dateTime: `${group.check_in || group.created_at?.slice(0, 10)}`,
+                        amountBDT: amount,
+                        status: status.replace('_', ' '),
+                        statusBadgeColor: badgeColor,
+                        rawReservation: {
+                            id: group.reservation_id,
+                            reservationNumber: key,
+                            guestName: activeGuest.name,
+                            roomType: roomTypeStr,
+                            roomNumber: group.rooms.join(', '),
+                            checkIn: group.check_in,
+                            checkOut: group.check_out,
+                            nights: nights,
+                            totalAmount: amount,
+                            status: status
+                        }
+                    });
+
+                    if (status.includes('CHECKED_IN') || status.includes('CHECKED-IN') || status.includes('CHECKED_OUT') || status.includes('CHECKED-OUT') || status === 'IN-HOUSE' || status === 'CONFIRMED') {
+                        const isInHouse = status.includes('CHECKED_IN') || status.includes('CHECKED-IN') || status === 'IN-HOUSE';
+                        seenStayRefs.add(key);
+                        checkinItems.push({
+                            id: `checkin-db-${key}`,
+                            type: 'checkin' as const,
+                            refNumber: `REG-${key}`,
+                            title: `Stay (${roomTypeStr} • ${roomDisplay})`,
+                            particulars: `${group.check_in} → ${group.check_out} (${nights} Nts)`,
+                            roomOrLocation: locationStr,
+                            dateTime: `${group.check_in}`,
+                            amountBDT: amount,
+                            status: isInHouse ? 'In-House' : status === 'CONFIRMED' ? 'Confirmed Stay' : 'Checked-Out',
+                            statusBadgeColor: isInHouse ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200',
+                            rawReservation: {
+                                id: group.reservation_id,
+                                reservationNumber: key,
+                                guestName: activeGuest.name,
+                                roomType: roomTypeStr,
+                                roomNumber: group.rooms.join(', '),
+                                checkIn: group.check_in,
+                                checkOut: group.check_out,
+                                nights: nights,
+                                totalAmount: amount,
+                                status: status
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        // Add from activeGuest.stayHistory
         (activeGuest.stayHistory || []).forEach((s, i) => {
             if (s && s.resNumber && !seenStayRefs.has(String(s.resNumber)) && s.roomNumber && s.checkIn && s.status !== 'In-House') {
                 seenStayRefs.add(String(s.resNumber));
@@ -632,7 +795,7 @@ export const GuestProfile: React.FC = () => {
             outletBillsList: outletItems,
             allLedgerItems: combined
         };
-    }, [activeGuest]);
+    }, [activeGuest, guestHistoryLedger]);
 
     const filteredGuests = guests.filter(g => {
         const matchesQuery =
@@ -1203,15 +1366,15 @@ export const GuestProfile: React.FC = () => {
                             </div>
                             <div className="text-center px-1.5 border-l border-gray-100">
                                 <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Nights</span>
-                                <span className="text-xs font-bold text-gray-900 block">{activeGuest.totalNights}</span>
+                                <span className="text-xs font-bold text-gray-900 block">{activeGuest.totalNights || activeGuest.totalStays || 0}</span>
                             </div>
                             <div className="text-center px-1.5 border-l border-gray-100">
                                 <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Total Spend</span>
-                                <span className="text-xs font-bold text-blue-700 font-mono block">৳ {activeGuest.lifetimeSpendBDT.toLocaleString()}</span>
+                                <span className="text-xs font-bold text-blue-700 font-mono block">৳ {Number(activeGuest.lifetimeSpendBDT || 0).toLocaleString()}</span>
                             </div>
                             <div className="text-center px-1.5 border-l border-gray-100">
                                 <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Reward Pts</span>
-                                <span className="text-xs font-bold text-emerald-700 font-mono block">{activeGuest.loyaltyPoints}</span>
+                                <span className="text-xs font-bold text-emerald-700 font-mono block">{activeGuest.loyaltyPoints ?? Math.round(Number(activeGuest.lifetimeSpendBDT || 0) / 20)}</span>
                             </div>
                         </div>
                     </div>
@@ -1325,15 +1488,24 @@ export const GuestProfile: React.FC = () => {
                                 <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
                                     {displayedItems.length === 0 ? (
                                         <div className="py-7 px-4 text-center">
-                                            <Receipt size={22} className="mx-auto mb-1.5 text-gray-300" />
-                                            <p className="text-xs font-semibold text-gray-700">
-                                                {activityFilter === 'all'
-                                                    ? 'No folio transactions or bookings'
-                                                    : `No ${activityFilter === 'reservations' ? 'reservations' : activityFilter === 'checkins' ? 'check-in stays' : 'outlet bills'} recorded`}
-                                            </p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5">
-                                                Real room bookings and posted outlet bills will appear here automatically.
-                                            </p>
+                                            {isLoadingHistory ? (
+                                                <div className="flex flex-col items-center justify-center gap-2 py-4">
+                                                    <Loader2 size={22} className="animate-spin text-blue-600" />
+                                                    <span className="text-xs text-gray-500 font-medium">Loading guest stay history...</span>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <Receipt size={22} className="mx-auto mb-1.5 text-gray-300" />
+                                                    <p className="text-xs font-semibold text-gray-700">
+                                                        {activityFilter === 'all'
+                                                            ? 'No folio transactions or bookings'
+                                                            : `No ${activityFilter === 'reservations' ? 'reservations' : activityFilter === 'checkins' ? 'check-in stays' : 'outlet bills'} recorded`}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                                        Real room bookings and posted outlet bills will appear here automatically.
+                                                    </p>
+                                                </>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="overflow-x-auto">
