@@ -1375,72 +1375,88 @@ export const GuestProfile: React.FC = () => {
             {/* Split Content Area */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Column: Guest Directory List */}
-                <div className="w-80 bg-white border-r border-gray-200 flex flex-col p-2.5 space-y-2 flex-shrink-0 overflow-y-auto">
-                    {/* Search Bar */}
-                    <div className="relative">
-                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search name, phone, NID, email..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full h-7 pl-7 pr-2 text-[11px] bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-blue-500 transition-colors"
-                        />
-                    </div>
-
-                    {/* Tier Filters */}
-                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
-                        {['ALL', 'Platinum VIP', 'Corporate VIP', 'Gold', 'Regular'].map(tier => (
-                            <button
-                                key={tier}
-                                onClick={() => setSelectedTierFilter(tier)}
-                                className={`h-5 px-2 rounded text-[10px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-                                    selectedTierFilter === tier
-                                        ? 'bg-gray-900 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                            >
-                                {tier}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Multi-Selection Merge Action Bar */}
-                    {selectedForMerge.length >= 2 && (
-                        <div className="p-2 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between gap-2 shadow-2xs animate-in slide-in-from-top-1">
-                            <div className="flex items-center gap-1.5 text-[11px] text-indigo-900 font-semibold">
-                                <GitMerge size={13} className="text-indigo-600" />
-                                <span>{selectedForMerge.length} Selected</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
+                <div className="w-80 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 h-full overflow-hidden">
+                    {/* Fixed Top Controls: Tier Filters (Top) & Search Bar (Below) */}
+                    <div className="p-2.5 border-b border-gray-200 bg-white space-y-2 flex-shrink-0">
+                        {/* Tier Filters */}
+                        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+                            {['ALL', 'Platinum VIP', 'Corporate VIP', 'Gold', 'Regular'].map(tier => (
                                 <button
+                                    key={tier}
                                     type="button"
-                                    onClick={() => {
-                                        const candidateList = guests.filter(g => selectedForMerge.includes(g.id));
-                                        setActiveMergeCluster({
-                                            reason: 'Manual Selection for Merge',
-                                            matchValue: `${candidateList.length} Selected Guests`,
-                                            guests: candidateList
-                                        });
-                                        setShowMergeModal(true);
-                                    }}
-                                    className="h-6 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                                    onClick={() => setSelectedTierFilter(tier)}
+                                    className={`h-5.5 px-2.5 rounded text-[10px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                                        selectedTierFilter === tier
+                                            ? 'bg-gray-900 text-white shadow-2xs'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                                 >
-                                    Merge
+                                    {tier}
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedForMerge([])}
-                                    className="h-6 px-1.5 text-gray-500 hover:text-gray-800 text-[10.5px] cursor-pointer"
-                                >
-                                    Clear
-                                </button>
-                            </div>
+                            ))}
                         </div>
-                    )}
 
-                    {/* Guest Items */}
-                    <div className="space-y-1.5 pt-1">
+                        {/* Search Bar */}
+                        <div className="relative">
+                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search name, phone, NID, email..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="w-full h-7 pl-7 pr-6 text-[11px] bg-gray-50 border border-gray-200 rounded-md outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs w-4 h-4 flex items-center justify-center cursor-pointer"
+                                    title="Clear search"
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Scrollable Guest Directory List */}
+                    <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
+                        {/* Multi-Selection Merge Action Bar */}
+                        {selectedForMerge.length >= 2 && (
+                            <div className="p-2 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between gap-2 shadow-2xs animate-in slide-in-from-top-1">
+                                <div className="flex items-center gap-1.5 text-[11px] text-indigo-900 font-semibold">
+                                    <GitMerge size={13} className="text-indigo-600" />
+                                    <span>{selectedForMerge.length} Selected</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const candidateList = guests.filter(g => selectedForMerge.includes(g.id));
+                                            setActiveMergeCluster({
+                                                reason: 'Manual Selection for Merge',
+                                                matchValue: `${candidateList.length} Selected Guests`,
+                                                guests: candidateList
+                                            });
+                                            setShowMergeModal(true);
+                                        }}
+                                        className="h-6 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                        Merge
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedForMerge([])}
+                                        className="h-6 px-1.5 text-gray-500 hover:text-gray-800 text-[10.5px] cursor-pointer"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Guest Items */}
+                        <div className="space-y-1.5">
                         {filteredGuests.map(g => {
                             const isSelected = g.id === activeGuest.id;
                             const isCheckedForMerge = selectedForMerge.includes(g.id);
@@ -1523,124 +1539,132 @@ export const GuestProfile: React.FC = () => {
                                 </div>
                             );
                         })}
+                        </div>
                     </div>
                 </div>
 
                 {/* Right Column: Guest 360 Full Workspace */}
                 <div className="flex-1 bg-gray-50 flex flex-col overflow-y-auto p-3.5 space-y-3">
-                    {/* Top Identity Hero Card - Ultra Compact */}
-                    <div className="bg-white rounded-lg border border-gray-200/90 shadow-2xs px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs border border-white ring-1 ring-blue-500/20">
-                                {parseTitleAndName(activeGuest.name).cleanName.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    <h2 className="text-[13px] text-gray-900 leading-tight font-bold truncate">
+                    {/* Top Identity Hero Card - Compact Enterprise Header */}
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-2.5 flex flex-col gap-1.5 flex-shrink-0">
+                        {/* Line 1: Identity, VIP & KYC, Stats Capsule & Quick Actions */}
+                        <div className="flex items-center justify-between gap-2">
+                            {/* Left: Avatar + Title & Name + Badges */}
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                    {parseTitleAndName(activeGuest.name).cleanName.slice(0, 2).toUpperCase()}
+                                </div>
+                                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                    <h2 className="text-xs text-gray-900 font-bold truncate">
                                         {activeGuest.title} {parseTitleAndName(activeGuest.name).cleanName}
                                     </h2>
-                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-medium ${
-                                        activeGuest.vipTier.includes('Platinum') ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                                        activeGuest.vipTier.includes('Corporate') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                        'bg-amber-50 text-amber-700 border border-amber-200'
+                                    <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-semibold ${
+                                        activeGuest.vipTier.includes('Platinum') ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                                        activeGuest.vipTier.includes('Corporate') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                        activeGuest.vipTier.includes('Gold') ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                        'bg-gray-100 text-gray-700 border border-gray-200'
                                     }`}>
-                                        <Star size={9} className="inline mr-0.5 -mt-0.5" />
+                                        <Star size={8} className="inline mr-0.5 -mt-0.5" />
                                         {activeGuest.vipTier}
                                     </span>
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-0.5 font-medium">
-                                        <ShieldCheck size={9} /> KYC Verified
+                                    <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-0.5 font-medium">
+                                        <ShieldCheck size={8} /> KYC
                                     </span>
+                                    {activeGuest.isBlacklisted && (
+                                        <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-rose-100 text-rose-700 border border-rose-300 flex items-center gap-0.5">
+                                            <Ban size={8} /> Blocked
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right: Compact Stats Capsule + Quick Action Buttons */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                {/* Quick KPI Capsule */}
+                                <div className="hidden sm:flex items-center gap-1.5 text-[10px] bg-slate-50 border border-slate-200 rounded px-2 py-0.5">
+                                    <span className="text-gray-600 font-medium"><strong className="text-gray-900">{activeGuest.totalStays}</strong> Stays</span>
+                                    <span className="text-gray-300">•</span>
+                                    <span className="text-blue-700 font-bold font-mono">৳{Number(activeGuest.lifetimeSpendBDT || 0).toLocaleString()}</span>
+                                    <span className="text-gray-300">•</span>
+                                    <span className="text-emerald-700 font-bold font-mono">{activeGuest.loyaltyPoints ?? Math.round(Number(activeGuest.lifetimeSpendBDT || 0) / 20)} Pts</span>
                                 </div>
 
-                                <div className="flex items-center gap-2.5 text-[10.5px] text-gray-500 mt-0.5 flex-wrap">
-                                    <span className="flex items-center gap-1">
-                                        <Phone size={10} className="text-gray-400" />
-                                        <span className="font-mono">{activeGuest.phone}</span>
-                                    </span>
-                                    {activeGuest.altPhone && (
-                                        <span className="text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 text-[9.5px] font-mono">
-                                            WA: {activeGuest.altPhone}
-                                        </span>
+                                {/* Quick Actions */}
+                                <div className="flex items-center gap-1">
+                                    {activeGuest.isBlacklisted ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setBlacklistActionType('unblock');
+                                                setBlacklistStaffName('Duty Manager');
+                                                setShowBlacklistModal(true);
+                                            }}
+                                            className="h-6 px-2 rounded text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                            title="Lift blacklist restriction"
+                                        >
+                                            <CheckCircle2 size={11} />
+                                            <span>Unblock</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setBlacklistActionType('block');
+                                                setBlacklistCategory('Payment Default / Unpaid Folio');
+                                                setBlacklistReasonInput('');
+                                                setBlacklistStaffName('Duty Manager');
+                                                setShowBlacklistModal(true);
+                                            }}
+                                            className="h-6 px-2 rounded text-[10px] font-semibold bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 flex items-center gap-1 cursor-pointer transition-colors"
+                                            title="Block guest from reservations & check-ins"
+                                        >
+                                            <Ban size={11} />
+                                            <span>Block</span>
+                                        </button>
                                     )}
-                                    <span className="flex items-center gap-1">
-                                        <Mail size={10} className="text-gray-400" />
-                                        <span>{activeGuest.email}</span>
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <MapPin size={10} className="text-gray-400" />
-                                        <span>{activeGuest.homeCity}, {activeGuest.homeCountry}</span>
-                                    </span>
-                                    {activeGuest.emergencyContact && (
-                                        <span className="text-rose-700 bg-rose-50 px-1 py-0.2 rounded border border-rose-200 text-[9.5px]">
-                                            ICE: {activeGuest.emergencyContact.name} ({activeGuest.emergencyContact.phone})
-                                        </span>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenEditModal(activeGuest, 'kyc')}
+                                        className="h-6 px-2 rounded text-[10px] font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                        title="Edit Profile"
+                                    >
+                                        <Edit3 size={11} />
+                                        <span>Edit</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Top Lifetime Stats */}
-                        <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-gray-100 pt-1.5 md:pt-0 md:pl-3 flex-shrink-0">
-                            <div className="text-center px-1.5">
-                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Stays</span>
-                                <span className="text-xs font-bold text-gray-900 block">{activeGuest.totalStays}</span>
-                            </div>
-                            <div className="text-center px-1.5 border-l border-gray-100">
-                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Nights</span>
-                                <span className="text-xs font-bold text-gray-900 block">{activeGuest.totalNights || activeGuest.totalStays || 0}</span>
-                            </div>
-                            <div className="text-center px-1.5 border-l border-gray-100">
-                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Total Spend</span>
-                                <span className="text-xs font-bold text-blue-700 font-mono block">৳ {Number(activeGuest.lifetimeSpendBDT || 0).toLocaleString()}</span>
-                            </div>
-                            <div className="text-center px-1.5 border-l border-gray-100">
-                                <span className="text-[9px] text-gray-400 uppercase tracking-tight block">Reward Pts</span>
-                                <span className="text-xs font-bold text-emerald-700 font-mono block">{activeGuest.loyaltyPoints ?? Math.round(Number(activeGuest.lifetimeSpendBDT || 0) / 20)}</span>
-                            </div>
-
-                            {/* Action Buttons: Block/Unblock & Edit */}
-                            <div className="flex items-center gap-1.5 border-l border-gray-100 pl-3">
-                                {activeGuest.isBlacklisted ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setBlacklistActionType('unblock');
-                                            setBlacklistStaffName('Duty Manager');
-                                            setShowBlacklistModal(true);
-                                        }}
-                                        className="h-7 px-2.5 rounded text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 cursor-pointer shadow-2xs"
-                                        title="Lift blacklist restriction for this guest"
-                                    >
-                                        <CheckCircle2 size={12} />
-                                        <span>Unblock</span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setBlacklistActionType('block');
-                                            setBlacklistCategory('Payment Default / Unpaid Folio');
-                                            setBlacklistReasonInput('');
-                                            setBlacklistStaffName('Duty Manager');
-                                            setShowBlacklistModal(true);
-                                        }}
-                                        className="h-7 px-2.5 rounded text-xs font-semibold bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 flex items-center gap-1 cursor-pointer shadow-2xs"
-                                        title="Block guest from reservations & check-ins"
-                                    >
-                                        <Ban size={12} className="text-rose-600" />
-                                        <span>Block Guest</span>
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => handleOpenEditModal(activeGuest, 'kyc')}
-                                    className="h-7 px-2.5 rounded text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 cursor-pointer shadow-2xs"
-                                    title="Edit Profile"
-                                >
-                                    <Edit3 size={12} />
-                                    <span>Edit</span>
-                                </button>
-                            </div>
+                        {/* Line 2: Compact Meta Strip (Phone, WA, Email, City, Company, Emergency) */}
+                        <div className="flex items-center gap-3 text-[10px] text-gray-500 overflow-x-auto no-scrollbar pt-1 border-t border-gray-100">
+                            <span className="flex items-center gap-1 flex-shrink-0">
+                                <Phone size={10} className="text-gray-400" />
+                                <span className="font-mono text-gray-700 font-medium">{activeGuest.phone}</span>
+                            </span>
+                            {activeGuest.altPhone && (
+                                <span className="flex items-center gap-1 flex-shrink-0 text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 font-mono text-[9px]">
+                                    WA: {activeGuest.altPhone}
+                                </span>
+                            )}
+                            <span className="flex items-center gap-1 flex-shrink-0">
+                                <Mail size={10} className="text-gray-400" />
+                                <span className="text-gray-600">{activeGuest.email}</span>
+                            </span>
+                            <span className="flex items-center gap-1 flex-shrink-0">
+                                <MapPin size={10} className="text-gray-400" />
+                                <span className="text-gray-600">{activeGuest.homeCity}, {activeGuest.homeCountry}</span>
+                            </span>
+                            {activeGuest.company && (
+                                <span className="flex items-center gap-1 flex-shrink-0">
+                                    <Building2 size={10} className="text-gray-400" />
+                                    <span className="text-gray-600">{activeGuest.company}</span>
+                                </span>
+                            )}
+                            {activeGuest.emergencyContact && (
+                                <span className="flex items-center gap-1 flex-shrink-0 text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 text-[9px]">
+                                    ICE: {activeGuest.emergencyContact.name} ({activeGuest.emergencyContact.phone})
+                                </span>
+                            )}
                         </div>
                     </div>
 
