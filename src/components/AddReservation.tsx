@@ -23,7 +23,6 @@ import {
     Split,
     CalendarRange,
     Users,
-    Search,
     ShieldCheck,
     Heart,
     X,
@@ -268,14 +267,14 @@ export const AddReservation: React.FC = () => {
     const [birthCity, setBirthCity] = useState('Dhaka');
     const [occupation, setOccupation] = useState('');
     const [purposeOfVisit, setPurposeOfVisit] = useState('Business');
-    const [idType, setIdType] = useState('National ID (NID)');
+    const [idType, setIdType] = useState('ID');
     const [idNumber, setIdNumber] = useState('');
 
     // Polymorphic Step 2 Identity State
     const [passportVisaNumber, setPassportVisaNumber] = useState('');
     const [passportVisaType, setPassportVisaType] = useState('Tourist');
     const [passportVisaExpiry, setPassportVisaExpiry] = useState('');
-    const [passportEntryPort, setPassportEntryPort] = useState('Hazrat Shahjalal Int Airport, Dhaka');
+    const [passportEntryPort, setPassportEntryPort] = useState('Airport');
     const [drivingVehicleClass, setDrivingVehicleClass] = useState('Light');
     const [fatherOrSpouseName, setFatherOrSpouseName] = useState('');
     const [idIssueDate, setIdIssueDate] = useState('');
@@ -325,7 +324,7 @@ export const AddReservation: React.FC = () => {
     // Stored & Canonical Guests for instant auto-complete
     const allKnownGuests = useMemo(() => {
         const guestMap = new Map<string, any>();
-        
+
         try {
             const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
             if (rawProfiles) {
@@ -376,7 +375,7 @@ export const AddReservation: React.FC = () => {
                     });
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
 
         const reservations = getAllStoredReservations();
         reservations.forEach(r => {
@@ -448,8 +447,8 @@ export const AddReservation: React.FC = () => {
     }, [selectedExistingGuest, mobile, phone, idNumber, allKnownGuests]);
 
     const filteredKnownGuests = useMemo(() => {
-        if (!guestSearchQuery.trim()) return [];
-        const q = guestSearchQuery.toLowerCase().trim();
+        const q = (guestSearchQuery || guestName || '').toLowerCase().trim();
+        if (q.length < 2 || selectedExistingGuest) return [];
         return allKnownGuests.filter(g =>
             g.name.toLowerCase().includes(q) ||
             g.phone.includes(q) ||
@@ -458,7 +457,29 @@ export const AddReservation: React.FC = () => {
             (g.idNumber && g.idNumber.toLowerCase().includes(q)) ||
             (g.company && g.company.toLowerCase().includes(q))
         ).slice(0, 6);
-    }, [allKnownGuests, guestSearchQuery]);
+    }, [allKnownGuests, guestSearchQuery, guestName, selectedExistingGuest]);
+
+    const phoneCollision = useMemo(() => {
+        const cleanP = (mobile || phone || '').replace(/[^0-9]/g, '');
+        if (cleanP.length < 8) return null;
+        const match = allKnownGuests.find(g => {
+            const gp = (g.phone || '').replace(/[^0-9]/g, '');
+            return gp.length >= 8 && (gp.endsWith(cleanP.slice(-8)) || cleanP.endsWith(gp.slice(-8)));
+        });
+        if (match && guestName.trim()) {
+            const exName = match.name.toLowerCase().trim();
+            const inName = guestName.toLowerCase().trim();
+            if (!exName.includes(inName) && !inName.includes(exName)) {
+                return {
+                    existingGuestName: match.name,
+                    existingVip: match.vipTier || 'Regular',
+                    existingId: match.id,
+                    matchedGuest: match
+                };
+            }
+        }
+        return null;
+    }, [mobile, phone, guestName, allKnownGuests]);
 
     const handleSelectExistingGuest = (g: any) => {
         setSelectedExistingGuest(g);
@@ -469,9 +490,9 @@ export const AddReservation: React.FC = () => {
         setEmail(g.email || '');
         setVipStatus(
             g.vipTier?.includes('Platinum') ? 'VVIP' :
-            g.vipTier?.includes('Gold') ? 'VIP-2' :
-            g.vipTier?.includes('Silver') ? 'VIP-1' :
-            g.vipTier?.includes('Corporate') ? 'VIP-1' : ''
+                g.vipTier?.includes('Gold') ? 'VIP-2' :
+                    g.vipTier?.includes('Silver') ? 'VIP-1' :
+                        g.vipTier?.includes('Corporate') ? 'VIP-1' : ''
         );
         if (g.gender) setGender(g.gender);
         if (g.nationality) setNationality(g.nationality);
@@ -1478,7 +1499,7 @@ export const AddReservation: React.FC = () => {
         }
 
         if (!guestName.trim()) {
-            toast.error('Guest full name is required. Please complete Step 2 (Guest Profile).');
+            toast.error('Guest full name is required. Please complete Step 2 (Guest Information).');
             setStep(2);
             return;
         }
@@ -1575,6 +1596,7 @@ export const AddReservation: React.FC = () => {
             registrationNumber: statusVal === 'in-house' ? (editingReservation?.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : editingReservation?.registrationNumber,
             folioNumber: editingReservation?.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`,
             groupCode: isConnectingSuite ? undefined : (editingReservation?.groupCode || (totalRoomsCount > 1 ? `GRP-${reservationNumber.replace(/^RES-/, '')}` : undefined)),
+            guestId: selectedExistingGuest?.id,
             guestName: `${salutation} ${guestName.trim()}`,
             phone: mobile || phone,
             email: email,
@@ -1761,13 +1783,16 @@ export const AddReservation: React.FC = () => {
             const inputCleanEmail = (email || '').trim().toLowerCase();
             const inputCleanId = (idNumber || '').trim().toLowerCase();
 
-            const existingIdx = profiles.findIndex(p => {
-                const phoneMatch = Boolean((mobile || phone) && isSamePhoneNumber(mobile || phone, p.phone));
-                const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
-                const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
-                const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
-                return phoneMatch || emailMatch || idMatch || nameMatch;
-            });
+            const existingIdx = selectedExistingGuest
+                ? profiles.findIndex(p => String(p.id) === String(selectedExistingGuest.id) || (p.name && p.name.trim().toLowerCase() === selectedExistingGuest.name.trim().toLowerCase()))
+                : profiles.findIndex(p => {
+                    const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
+                    const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
+                    const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
+                    const phoneMatch = Boolean((mobile || phone) && isSamePhoneNumber(mobile || phone, p.phone));
+                    if ((phoneMatch || emailMatch) && !nameMatch) return false;
+                    return nameMatch || idMatch;
+                });
 
             const stayRecord = {
                 resNumber: reservationNumber,
@@ -1822,18 +1847,18 @@ export const AddReservation: React.FC = () => {
                     idNumber: idNumber || `KYC-${Math.floor(10000 + Math.random() * 90000)}`,
                     dob: dob || '1990-01-01',
                     gender: gender || 'Male',
-                    homeCity: homeCity || 'Dhaka',
-                    homeCountry: homeCountry || 'Bangladesh',
+                    homeCity: homeCity || '',
+                    homeCountry: homeCountry || '',
                     address: streetAddress || '',
                     postalCode: postalCode || '',
                     company: companyName || '',
                     designation: designation || '',
-                    passportVisaNumber: idType === 'Passport' ? passportVisaNumber : undefined,
-                    passportVisaType: idType === 'Passport' ? passportVisaType : undefined,
-                    passportVisaExpiry: idType === 'Passport' ? passportVisaExpiry : undefined,
-                    passportEntryPort: idType === 'Passport' ? passportEntryPort : undefined,
+                    passportVisaNumber: idType === '' ? passportVisaNumber : undefined,
+                    passportVisaType: idType === '' ? passportVisaType : undefined,
+                    passportVisaExpiry: idType === '' ? passportVisaExpiry : undefined,
+                    passportEntryPort: idType === 'Pasport' ? passportEntryPort : undefined,
                     drivingVehicleClass: idType === 'Driving License' ? drivingVehicleClass : undefined,
-                    fatherOrSpouseName: idType === 'National ID (NID)' ? fatherOrSpouseName : undefined,
+                    fatherOrSpouseName: idType === 'ID' ? fatherOrSpouseName : undefined,
                     idIssueDate,
                     idExpiryDate,
                     idIssueCountry,
@@ -1894,9 +1919,8 @@ export const AddReservation: React.FC = () => {
             {/* Top Navigation & Breadcrumb Bar */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3 py-1.5 flex items-center justify-between gap-2.5 flex-shrink-0">
                 <div className="flex items-center gap-2.5">
-                    <div className={`w-7 h-7 rounded-lg text-white flex items-center justify-center shadow-xs flex-shrink-0 ${
-                        isEditMode ? 'bg-amber-600' : 'bg-[#1e3a8a]'
-                    }`}>
+                    <div className={`w-7 h-7 rounded-lg text-white flex items-center justify-center shadow-xs flex-shrink-0 ${isEditMode ? 'bg-amber-600' : 'bg-[#1e3a8a]'
+                        }`}>
                         {isEditMode ? <Edit3 size={14} /> : <Plus size={14} />}
                     </div>
                     <div>
@@ -1904,11 +1928,10 @@ export const AddReservation: React.FC = () => {
                             <h1 className="text-xs text-gray-900 tracking-tight font-bold">
                                 {isEditMode ? `Edit Reservation: ${editingReservation?.reservationNumber}` : 'Add New Reservation'}
                             </h1>
-                            <span className={`px-1.5 py-0.2 text-[8.5px] rounded border font-semibold ${
-                                isEditMode
-                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                    : 'bg-blue-50 text-blue-700 border-blue-200'
-                            }`}>
+                            <span className={`px-1.5 py-0.2 text-[8.5px] rounded border font-semibold ${isEditMode
+                                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}>
                                 {isEditMode ? `Edit Mode (${(editingReservation?.status || 'Confirmed').toUpperCase()})` : '3-Step Wizard'}
                             </span>
                         </div>
@@ -2030,12 +2053,7 @@ export const AddReservation: React.FC = () => {
                                 {isGuestProfileComplete ? <Check size={11} className="stroke-[3]" /> : '2'}
                             </div>
                             <div className="flex items-center gap-1 min-w-0">
-                                <span className="truncate tracking-tight font-medium">Guest Profile</span>
-                                {guestName.trim() && (
-                                    <span className="hidden sm:inline text-[9.5px] px-1 py-0.2 rounded bg-blue-100 text-blue-800 font-medium max-w-[80px] truncate">
-                                        {guestName.trim().split(' ')[0]}
-                                    </span>
-                                )}
+                                <span className="truncate tracking-tight font-medium">Guest Info</span>
                             </div>
                         </button>
 
@@ -2590,11 +2608,10 @@ export const AddReservation: React.FC = () => {
                                                                             requiredCount: 1,
                                                                             isAutoMode: false
                                                                         })}
-                                                                        className={`w-28 h-7 px-1.5 border rounded-md text-[10.5px] flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all ${
-                                                                            singleManual
-                                                                                ? 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
-                                                                                : 'border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 ring-2 ring-amber-300/60'
-                                                                        }`}
+                                                                        className={`w-28 h-7 px-1.5 border rounded-md text-[10.5px] flex items-center justify-between cursor-pointer select-none shadow-2xs mx-auto transition-all ${singleManual
+                                                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+                                                                            : 'border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 ring-2 ring-amber-300/60'
+                                                                            }`}
                                                                         title={`Manual Assignment: Room ${singleManual || 'None'}. Click to pick room`}
                                                                     >
                                                                         <div className="flex items-center gap-1 truncate">
@@ -2935,101 +2952,14 @@ export const AddReservation: React.FC = () => {
                         ======================================================== */}
                     {step === 2 && (
                         <div className="space-y-2.5 animate-in fade-in duration-150">
-                            {/* A. Returning Guest Instant Lookup Card */}
                             <div className="bg-white border border-gray-200 rounded-lg p-2.5 shadow-2xs space-y-2">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-5 h-5 rounded bg-blue-100 text-blue-700 flex items-center justify-center">
-                                            <Search size={12} />
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] font-bold text-gray-900">Returning Guest Quick-Lookup</span>
-                                            <span className="text-[9.5px] text-gray-500 ml-1.5 hidden sm:inline">Search CRM directory by Name, Mobile, Email, or NID to auto-fill</span>
-                                        </div>
-                                    </div>
-                                    {selectedExistingGuest && (
-                                        <button
-                                            type="button"
-                                            onClick={handleClearSelectedGuest}
-                                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 hover:bg-red-50 hover:text-red-700 border border-gray-200 transition-colors cursor-pointer"
-                                        >
-                                            ✕ Unlink / New Guest
-                                        </button>
-                                    )}
-                                </div>
 
-                                {!selectedExistingGuest ? (
-                                    <div className="relative">
-                                        <div className="relative">
-                                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="Type to search returning guest (e.g. Imran, 01711, NID)..."
-                                                value={guestSearchQuery}
-                                                onChange={e => {
-                                                    setGuestSearchQuery(e.target.value);
-                                                    setIsGuestSearchOpen(true);
-                                                }}
-                                                onFocus={() => setIsGuestSearchOpen(true)}
-                                                className="w-full h-7 pl-7 pr-2 text-[11px] bg-slate-50 border border-gray-200 rounded-md outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                                            />
-                                            {guestSearchQuery && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setGuestSearchQuery('')}
-                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                >
-                                                    <X size={12} />
-                                                </button>
-                                            )}
-                                        </div>
 
-                                        {/* Dropdown Results */}
-                                        {isGuestSearchOpen && filteredKnownGuests.length > 0 && (
-                                            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-30 max-h-56 overflow-y-auto divide-y divide-gray-100">
-                                                {filteredKnownGuests.map(g => (
-                                                    <div
-                                                        key={g.id}
-                                                        onClick={() => handleSelectExistingGuest(g)}
-                                                        className="p-2 hover:bg-blue-50/70 transition-colors cursor-pointer flex items-center justify-between gap-2"
-                                                    >
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <div className="w-6 h-6 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                                                                {g.name.slice(0, 2).toUpperCase()}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="font-semibold text-gray-900 text-[11.5px] truncate">
-                                                                        {g.title} {g.name}
-                                                                    </span>
-                                                                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
-                                                                        {g.vipTier}
-                                                                    </span>
-                                                                    {g.company && (
-                                                                        <span className="text-[9.5px] text-gray-400 truncate hidden md:inline">
-                                                                            ({g.company})
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[10px] text-gray-500 font-mono flex items-center gap-2">
-                                                                    <span>📞 {g.phone}</span>
-                                                                    {g.email && <span className="truncate">✉️ {g.email}</span>}
-                                                                    {g.idNumber && <span>🪪 {g.idNumber}</span>}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 whitespace-nowrap">
-                                                            Auto-Fill ↵
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-md p-2 flex items-center justify-between gap-2">
+                                {/* Linked Guest Profile Banner */}
+                                {selectedExistingGuest && (
+                                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-md p-2 flex items-center justify-between gap-2 animate-in fade-in">
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10.5px] flex-shrink-0">
+                                            <div className="w-7 h-7 bg-slate-900 text-white rounded-full flex items-center justify-center text-[10.5px] font-bold flex-shrink-0">
                                                 {selectedExistingGuest.name.slice(0, 2).toUpperCase()}
                                             </div>
                                             <div className="min-w-0">
@@ -3051,6 +2981,32 @@ export const AddReservation: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleClearSelectedGuest}
+                                            className="px-2 py-0.5 rounded text-[10px] font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 border border-red-200 transition-colors cursor-pointer flex-shrink-0"
+                                        >
+                                            ✕ Unlink Profile
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Phone Shared / Collision Alert */}
+                                {phoneCollision && !selectedExistingGuest && (
+                                    <div className="bg-amber-50/90 border border-amber-200 rounded-md p-2 flex items-center justify-between gap-2 text-[10.5px] text-amber-900 animate-in fade-in">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="font-bold">⚠️ Phone Shared:</span>
+                                            <span className="truncate">This phone is registered to <strong>{phoneCollision.existingGuestName}</strong> ({phoneCollision.existingVip}). A new distinct profile will be created for <strong>{guestName || 'this guest'}</strong>.</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (phoneCollision.matchedGuest) handleSelectExistingGuest(phoneCollision.matchedGuest);
+                                            }}
+                                            className="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-semibold border border-amber-300 cursor-pointer flex-shrink-0"
+                                        >
+                                            Link to {phoneCollision.existingGuestName.split(' ')[0]} ↵
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -3069,11 +3025,10 @@ export const AddReservation: React.FC = () => {
                                                 key={tab.key}
                                                 type="button"
                                                 onClick={() => setStep2Tab(tab.key as any)}
-                                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
-                                                    step2Tab === tab.key
-                                                        ? 'bg-white text-blue-700 border border-gray-200 shadow-2xs'
-                                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'
-                                                }`}
+                                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${step2Tab === tab.key
+                                                    ? 'bg-white text-blue-700 border border-gray-200 shadow-2xs'
+                                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'
+                                                    }`}
                                             >
                                                 {tab.icon}
                                                 <span>{tab.label}</span>
@@ -3158,13 +3113,75 @@ export const AddReservation: React.FC = () => {
                                                             <option value="Engr">Engr.</option>
                                                             <option value="Prof">Prof.</option>
                                                         </select>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Guest full name..."
-                                                            value={guestName}
-                                                            onChange={e => setGuestName(e.target.value)}
-                                                            className="flex-1 h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-medium"
-                                                        />
+                                                        <div className="relative flex-1">
+                                                            <input
+                                                                type="text"
+                                                                name="add_reservation_guest_name"
+                                                                autoComplete="off"
+                                                                autoCorrect="off"
+                                                                spellCheck={false}
+                                                                data-lpignore="true"
+                                                                data-form-type="other"
+                                                                placeholder="Guest full name..."
+                                                                value={guestName}
+                                                                onChange={e => {
+                                                                    setGuestName(e.target.value);
+                                                                    setIsGuestSearchOpen(true);
+                                                                    if (selectedExistingGuest && e.target.value !== selectedExistingGuest.name) {
+                                                                        setSelectedExistingGuest(null);
+                                                                    }
+                                                                }}
+                                                                onFocus={() => setIsGuestSearchOpen(true)}
+                                                                onBlur={() => setTimeout(() => setIsGuestSearchOpen(false), 250)}
+                                                                className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-medium"
+                                                            />
+
+                                                            {/* Inline Name Suggestions Dropdown (Spacious overlay width) */}
+                                                            {isGuestSearchOpen && filteredKnownGuests.length > 0 && (
+                                                                <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-gray-100 animate-in fade-in duration-100">
+                                                                    {filteredKnownGuests.map(g => (
+                                                                        <div
+                                                                            key={g.id}
+                                                                            onMouseDown={(e) => {
+                                                                                e.preventDefault();
+                                                                                handleSelectExistingGuest(g);
+                                                                                setIsGuestSearchOpen(false);
+                                                                            }}
+                                                                            className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
+                                                                        >
+                                                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                                                <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                                                                    {g.name.slice(0, 2).toUpperCase()}
+                                                                                </div>
+                                                                                <div className="min-w-0">
+                                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                        <span className="font-bold text-gray-900 text-[11.5px] truncate">
+                                                                                            {g.title} {g.name}
+                                                                                        </span>
+                                                                                        <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                                                            {g.vipTier}
+                                                                                        </span>
+                                                                                        {g.company && (
+                                                                                            <span className="text-[9.5px] text-gray-400 truncate hidden md:inline">
+                                                                                                ({g.company})
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="text-[10px] text-gray-500 font-mono flex items-center gap-2 mt-0.5">
+                                                                                        <span className="text-gray-800 font-bold">📞 {g.phone}</span>
+                                                                                        {g.email && <span className="truncate">✉️ {g.email}</span>}
+                                                                                        {g.idNumber && <span>🪪 {g.idNumber}</span>}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap flex-shrink-0 shadow-2xs">
+                                                                                Auto-Fill ↵
+                                                                            </span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -3182,17 +3199,6 @@ export const AddReservation: React.FC = () => {
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5">
-                                                    <label className="text-[10px] font-semibold text-gray-700">LANDLINE / ALT PHONE</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Alternative contact..."
-                                                        value={phone}
-                                                        onChange={e => setPhone(e.target.value)}
-                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
-                                                    />
-                                                </div>
-
-                                                <div className="flex flex-col gap-0.5">
                                                     <label className="text-[10px] font-semibold text-gray-700">EMAIL ADDRESS</label>
                                                     <input
                                                         type="email"
@@ -3200,6 +3206,17 @@ export const AddReservation: React.FC = () => {
                                                         value={email}
                                                         onChange={e => setEmail(e.target.value)}
                                                         className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[10px] font-semibold text-gray-700">PHONE</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Alternative contact..."
+                                                        value={phone}
+                                                        onChange={e => setPhone(e.target.value)}
+                                                        className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none font-mono"
                                                     />
                                                 </div>
                                             </div>
@@ -3255,10 +3272,10 @@ export const AddReservation: React.FC = () => {
                                                         onChange={e => setGuestType(e.target.value)}
                                                         className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
                                                     >
-                                                        <option value="Adult">Adult Individual</option>
-                                                        <option value="Corporate">Corporate Executive</option>
+                                                        <option value="Adult">Individual</option>
+                                                        <option value="Corporate">Corporate</option>
                                                         <option value="Diplomat">Diplomat / Government</option>
-                                                        <option value="Family">Family Head</option>
+                                                        <option value="Family">Family</option>
                                                     </select>
                                                 </div>
 
@@ -3411,7 +3428,7 @@ export const AddReservation: React.FC = () => {
                                                             />
                                                         </div>
                                                         <div className="flex flex-col gap-0.5 sm:col-span-2">
-                                                            <label className="text-[9.5px] font-semibold text-gray-700">PORT OF ENTRY IN BANGLADESH</label>
+                                                            <label className="text-[9.5px] font-semibold text-gray-700">PORT OF ENTRY</label>
                                                             <input
                                                                 type="text"
                                                                 placeholder="Hazrat Shahjalal Int Airport, Dhaka"
@@ -3428,14 +3445,14 @@ export const AddReservation: React.FC = () => {
                                                 <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2 mt-2">
                                                     <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-[11px]">
                                                         <ShieldCheck size={13} className="text-emerald-700" />
-                                                        <span>Bangladesh Election Commission National ID (NID) Details</span>
+                                                        <span>ID Details</span>
                                                     </div>
                                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                                         <div className="flex flex-col gap-0.5 sm:col-span-2">
                                                             <label className="text-[9.5px] font-semibold text-gray-700">FATHER'S / SPOUSE'S FULL NAME</label>
                                                             <input
                                                                 type="text"
-                                                                placeholder="As printed on NID card..."
+                                                                placeholder="As printed on ID card..."
                                                                 value={fatherOrSpouseName}
                                                                 onChange={e => setFatherOrSpouseName(e.target.value)}
                                                                 className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none"
@@ -3563,7 +3580,7 @@ export const AddReservation: React.FC = () => {
                                                                     setHomeCity('');
                                                                 }
                                                                 const nat = getNationalityForCountry(newCountry);
-                                                                if (nat && (!nationality || nationality === 'Bangladeshi')) {
+                                                                if (nat && (!nationality)) {
                                                                     setNationality(nat);
                                                                 }
                                                             }}
@@ -3745,11 +3762,10 @@ export const AddReservation: React.FC = () => {
                                                                     key={b}
                                                                     type="button"
                                                                     onClick={() => setBedPreference(b)}
-                                                                    className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
-                                                                        bedPreference === b
-                                                                            ? 'bg-[#1e3a8a] text-white border-blue-900 shadow-2xs'
-                                                                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                                    }`}
+                                                                    className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${bedPreference === b
+                                                                        ? 'bg-[#1e3a8a] text-white border-blue-900 shadow-2xs'
+                                                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                                                                        }`}
                                                                 >
                                                                     {b}
                                                                 </button>
@@ -3765,11 +3781,10 @@ export const AddReservation: React.FC = () => {
                                                                     key={s}
                                                                     type="button"
                                                                     onClick={() => setSmokingPreference(s as any)}
-                                                                    className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
-                                                                        smokingPreference === s
-                                                                            ? 'bg-[#1e3a8a] text-white border-blue-900 shadow-2xs'
-                                                                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                                    }`}
+                                                                    className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${smokingPreference === s
+                                                                        ? 'bg-[#1e3a8a] text-white border-blue-900 shadow-2xs'
+                                                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                                                                        }`}
                                                                 >
                                                                     {s}
                                                                 </button>
@@ -3823,11 +3838,10 @@ export const AddReservation: React.FC = () => {
                                                             key={tab}
                                                             type="button"
                                                             onClick={() => setActivePrefTab(tab)}
-                                                            className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition-colors cursor-pointer ${
-                                                                activePrefTab === tab
-                                                                    ? 'bg-[#1e3a8a] text-white shadow-2xs'
-                                                                    : 'text-gray-600 hover:bg-gray-100'
-                                                            }`}
+                                                            className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition-colors cursor-pointer ${activePrefTab === tab
+                                                                ? 'bg-[#1e3a8a] text-white shadow-2xs'
+                                                                : 'text-gray-600 hover:bg-gray-100'
+                                                                }`}
                                                         >
                                                             {tab}
                                                         </button>

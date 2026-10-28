@@ -512,11 +512,11 @@ export const bookingService = {
       // 1. Resolve or Create Guest in PostgreSQL `guests` table
       const phone = payload.phone || payload.mobile || '+880 1711-000000';
       const email = payload.email || 'guest@hospitality.com';
-      const rawName = (payload.guestName || 'Valued Guest').replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim();
+      const rawName = (payload.guestName || 'Valued Guest').replace(/^(Mr|Mrs|Ms|Dr|Engr|Prof)\.?\s+/i, '').trim();
       const nameParts = rawName.split(' ');
       const firstName = nameParts[0] || 'Valued';
       const lastName = nameParts.slice(1).join(' ') || 'Guest';
-      const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr)\.?\s+/i)?.[1]) || 'Mr';
+      const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr|Engr|Prof)\.?\s+/i)?.[1]) || 'Mr';
       const vipStatus = payload.vip || payload.vipStatus || 'NONE';
 
       let guestId: number;
@@ -524,19 +524,45 @@ export const bookingService = {
       const subscriberSuffix = pureDigits.length >= 8 ? pureDigits.slice(-8) : pureDigits;
       const cleanEmail = email ? email.trim().toLowerCase() : '';
 
-      const guestLookup = await client.query(`
-        SELECT id FROM guests 
-        WHERE (
-          regexp_replace(phone, '\\D', '', 'g') = $1
-          OR ($2 != '' AND length($2) >= 8 AND regexp_replace(phone, '\\D', '', 'g') LIKE '%' || $2)
-          OR ($3 != '' AND $3 != 'guest@hospitality.com' AND LOWER(email) = $3)
-        )
-        ORDER BY id ASC
-        LIMIT 1
-      `, [pureDigits, subscriberSuffix, cleanEmail]);
+      // Check if explicit guestId is supplied (e.g. from UI profile selection)
+      let resolvedExistingGuest: any = null;
+      if (payload.guestId && !isNaN(Number(payload.guestId))) {
+        const explicitLookup = await client.query('SELECT id, first_name, last_name, phone, email FROM guests WHERE id = $1', [Number(payload.guestId)]);
+        if (explicitLookup.rows.length > 0) {
+          resolvedExistingGuest = explicitLookup.rows[0];
+        }
+      }
 
-      if (guestLookup.rows.length > 0) {
-        guestId = guestLookup.rows[0].id;
+      if (!resolvedExistingGuest) {
+        const guestLookup = await client.query(`
+          SELECT id, first_name, last_name, phone, email FROM guests 
+          WHERE (
+            regexp_replace(phone, '\\D', '', 'g') = $1
+            OR ($2 != '' AND length($2) >= 8 AND regexp_replace(phone, '\\D', '', 'g') LIKE '%' || $2)
+            OR ($3 != '' AND $3 != 'guest@hospitality.com' AND LOWER(email) = $3)
+          )
+          ORDER BY id ASC
+        `, [pureDigits, subscriberSuffix, cleanEmail]);
+
+        if (guestLookup.rows.length > 0) {
+          // Verify name match to prevent cross-contamination when phone is shared or recycled
+          const exactNameMatch = guestLookup.rows.find(g => {
+            const exFull = `${g.first_name || ''} ${g.last_name || ''}`.trim().toLowerCase();
+            const newFull = `${firstName} ${lastName}`.trim().toLowerCase();
+            return exFull === newFull || exFull.includes(newFull) || newFull.includes(exFull);
+          });
+
+          if (exactNameMatch) {
+            resolvedExistingGuest = exactNameMatch;
+          } else if (payload.updateExistingGuestName) {
+            resolvedExistingGuest = guestLookup.rows[0];
+            await client.query('UPDATE guests SET salutation = $1, first_name = $2, last_name = $3 WHERE id = $4', [salutation, firstName, lastName, resolvedExistingGuest.id]);
+          }
+        }
+      }
+
+      if (resolvedExistingGuest) {
+        guestId = resolvedExistingGuest.id;
         if (cleanEmail && !cleanEmail.includes('hospitality.com')) {
           await client.query('UPDATE guests SET email = COALESCE(email, $1) WHERE id = $2', [cleanEmail, guestId]).catch(() => {});
         }

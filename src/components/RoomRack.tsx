@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
+import { getNextDayISO } from './common/StayPeriodPicker';
 import { 
     getCanonicalRooms, 
     getAllStoredReservations, 
@@ -422,6 +423,19 @@ export const RoomRack: React.FC = () => {
             setSelectedRoom({ ...selectedRoom, status: newStatus });
         }
     };
+
+    // Quick Reserve Memoized Room Info
+    const quickReserveRoomInfo = useMemo(() => {
+        if (!prefilledRoomNumber) return undefined;
+        const sysDate = getOperatingSystemDate();
+        const nextDate = getNextDayISO(sysDate, 1);
+        return {
+            room: prefilledRoomNumber,
+            startDate: sysDate,
+            endDate: nextDate,
+            nights: 1
+        };
+    }, [prefilledRoomNumber]);
 
     // Handle book room trigger
     const handleBookRoom = (room: RoomRackItem) => {
@@ -1277,12 +1291,7 @@ export const RoomRack: React.FC = () => {
             {/* Quick Reservation Express Modal */}
             <QuickReservationModal
                 isOpen={isQuickReserveOpen}
-                roomInfo={prefilledRoomNumber ? {
-                    room: prefilledRoomNumber,
-                    startDate: '2026-07-01',
-                    endDate: '2026-07-02',
-                    nights: 1
-                } : undefined}
+                roomInfo={quickReserveRoomInfo}
                 onClose={() => {
                     setIsQuickReserveOpen(false);
                     setPrefilledRoomNumber('');

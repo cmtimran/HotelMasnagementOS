@@ -920,6 +920,28 @@ export const StayView: React.FC = () => {
         return map;
     }, [bookings]);
 
+    // Memoized Room Info for Quick Reservation Modal
+    const quickReservationRoomInfo = useMemo(() => {
+        if (!isQuickReservationOpen) return undefined;
+        const startIso = selectedRange ? days[selectedRange.startIndex]?.date : startDate;
+        const stayNights = selectedRange ? Math.max(1, selectedRange.endIndex - selectedRange.startIndex + 1) : 1;
+        const baseStart = new Date(startIso || '2026-07-01');
+        const baseEnd = new Date(baseStart);
+        baseEnd.setDate(baseEnd.getDate() + stayNights);
+        const endIso = baseEnd.toISOString().split('T')[0];
+        return {
+            room: selectedRange?.room || '101',
+            roomNumber: selectedRange?.room || '101',
+            startDate: startIso,
+            checkIn: startIso,
+            endDate: endIso,
+            checkOut: endIso,
+            nights: stayNights,
+            startIndex: selectedRange?.startIndex,
+            endIndex: selectedRange?.endIndex
+        };
+    }, [isQuickReservationOpen, selectedRange, days, startDate]);
+
     // Check if a target room and inclusive column range [startCol, endCol] conflicts with any existing booking OR Out of Order block
     const findRoomConflict = React.useCallback((
         roomNum: string,
@@ -3461,25 +3483,7 @@ export const StayView: React.FC = () => {
                     setIsQuickReservationOpen(false);
                     setSelectedRange(null);
                 }}
-                roomInfo={(() => {
-                    const startIso = selectedRange ? days[selectedRange.startIndex]?.date : startDate;
-                    const stayNights = selectedRange ? Math.max(1, selectedRange.endIndex - selectedRange.startIndex + 1) : 1;
-                    const baseStart = new Date(startIso || '2026-07-01');
-                    const baseEnd = new Date(baseStart);
-                    baseEnd.setDate(baseEnd.getDate() + stayNights);
-                    const endIso = baseEnd.toISOString().split('T')[0];
-                    return {
-                        room: selectedRange?.room || '101',
-                        roomNumber: selectedRange?.room || '101',
-                        startDate: startIso,
-                        checkIn: startIso,
-                        endDate: endIso,
-                        checkOut: endIso,
-                        nights: stayNights,
-                        startIndex: selectedRange?.startIndex,
-                        endIndex: selectedRange?.endIndex
-                    };
-                })()}
+                roomInfo={quickReservationRoomInfo}
                 onReserve={(_newBooking) => {
                     setIsQuickReservationOpen(false);
                     setSelectedRange(null);

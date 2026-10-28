@@ -288,9 +288,7 @@ const MaintenanceKanban = () => {
     return (
         <div className="page-container">
             <PageHeader
-                title="Room Maintenance & Out of Order Management"
-                subtitle="eZee / YCS Standard: Lock rooms, manage defect dates, avoid booking collisions & dispatch engineering tasks"
-                icon={<Wrench size={20} />}
+                title="Room Maintenance & Out of Order Management" icon={<Wrench size={20} />}
                 badge={
                     stats.overdueCount > 0 ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-rose-600 text-white font-bold animate-pulse">
@@ -323,7 +321,7 @@ const MaintenanceKanban = () => {
                                 className="btn-primary flex items-center gap-1.5 shadow-sm cursor-pointer"
                             >
                                 <Plus size={14} />
-                                <span>+ New PPM Program</span>
+                                <span>New PPM Program</span>
                             </button>
                         ) : (
                             <button
@@ -332,7 +330,7 @@ const MaintenanceKanban = () => {
                                 className="btn-primary flex items-center gap-1.5 shadow-sm cursor-pointer"
                             >
                                 <Plus size={14} />
-                                <span>+ New Work Order</span>
+                                <span>New Work Order</span>
                             </button>
                         )}
                         <button
@@ -353,11 +351,10 @@ const MaintenanceKanban = () => {
                 <button
                     type="button"
                     onClick={() => setActiveSection('blocks')}
-                    className={`py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                        activeSection === 'blocks'
-                            ? 'border-indigo-600 text-indigo-700'
-                            : 'border-transparent text-slate-500 hover:text-slate-900'
-                    }`}
+                    className={`py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${activeSection === 'blocks'
+                        ? 'border-indigo-600 text-indigo-700'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                        }`}
                 >
                     <Layers size={14} />
                     <span>Out of Order &amp; Room Locks (OOO / OOS)</span>
@@ -369,11 +366,10 @@ const MaintenanceKanban = () => {
                 <button
                     type="button"
                     onClick={() => setActiveSection('kanban')}
-                    className={`py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                        activeSection === 'kanban'
-                            ? 'border-indigo-600 text-indigo-700'
-                            : 'border-transparent text-slate-500 hover:text-slate-900'
-                    }`}
+                    className={`py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${activeSection === 'kanban'
+                        ? 'border-indigo-600 text-indigo-700'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                        }`}
                 >
                     <Wrench size={14} />
                     <span>Engineering Work Orders (Kanban)</span>
@@ -385,11 +381,10 @@ const MaintenanceKanban = () => {
                 <button
                     type="button"
                     onClick={() => setActiveSection('ppm')}
-                    className={`py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                        activeSection === 'ppm'
-                            ? 'border-indigo-600 text-indigo-700'
-                            : 'border-transparent text-slate-500 hover:text-slate-900'
-                    }`}
+                    className={`py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${activeSection === 'ppm'
+                        ? 'border-indigo-600 text-indigo-700'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                        }`}
                 >
                     <Calendar size={14} />
                     <span>Preventive Maintenance (PPM)</span>
@@ -485,11 +480,10 @@ const MaintenanceKanban = () => {
                                     key={fl.id}
                                     type="button"
                                     onClick={() => setStatusFilter(fl.id as any)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                                        statusFilter === fl.id
-                                            ? 'bg-indigo-600 text-white shadow-xs'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${statusFilter === fl.id
+                                        ? 'bg-indigo-600 text-white shadow-xs'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
                                 >
                                     {fl.label}
                                 </button>
@@ -578,9 +572,8 @@ const MaintenanceKanban = () => {
                                         return (
                                             <tr
                                                 key={block.id}
-                                                className={`hover:bg-slate-50/80 transition-colors ${
-                                                    isOverdue ? 'bg-rose-50/40' : ''
-                                                }`}
+                                                className={`hover:bg-slate-50/80 transition-colors ${isOverdue ? 'bg-rose-50/40' : ''
+                                                    }`}
                                             >
                                                 <td className="pr-0" onClick={e => e.stopPropagation()}>
                                                     {!isComplete && !isCancelled && (
@@ -608,11 +601,10 @@ const MaintenanceKanban = () => {
                                                     {block.roomType}
                                                 </td>
                                                 <td>
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider ${
-                                                        block.blockType === 'OOO'
-                                                            ? 'bg-rose-600 text-white'
-                                                            : 'bg-amber-600 text-white'
-                                                    }`}>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider ${block.blockType === 'OOO'
+                                                        ? 'bg-rose-600 text-white'
+                                                        : 'bg-amber-600 text-white'
+                                                        }`}>
                                                         {block.blockType}
                                                     </span>
                                                 </td>
@@ -860,7 +852,7 @@ const MaintenanceKanban = () => {
                                 {completedTasks.map(task => (
                                     <div key={task.id} className="bg-white rounded-xl p-4 shadow-2xs border border-slate-200/90 border-l-4 border-l-emerald-500 opacity-80">
                                         <div className="flex items-start justify-between mb-2">
-                                            <h3 className="text-sm font-bold text-slate-900 line-through text-slate-500">{task.title}</h3>
+                                            <h3 className="text-sm font-bold line-through text-slate-500">{task.title}</h3>
                                             <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                 Done
                                             </span>
@@ -937,8 +929,8 @@ const MaintenanceKanban = () => {
                             const statusBadge = isOverdue
                                 ? 'bg-rose-600 text-white animate-pulse'
                                 : isDue
-                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200';
                             return (
                                 <div key={prog.id} className={`bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 border-l-4 ${borderColor} flex flex-col gap-3`}>
                                     <div className="flex items-start justify-between gap-2">
@@ -997,13 +989,12 @@ const MaintenanceKanban = () => {
                                                 setPpmCompletedBy('Duty Engineer');
                                                 setPpmCompletionNotes('All preventive checks passed. Service completed per SOP.');
                                             }}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors ${
-                                                isOverdue
-                                                    ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                                                    : isDue
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors ${isOverdue
+                                                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                                : isDue
                                                     ? 'bg-amber-500 hover:bg-amber-600 text-white'
                                                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                                            }`}
+                                                }`}
                                         >
                                             <CheckCircle2 size={12} />
                                             Execute & Complete Cycle
@@ -1099,9 +1090,8 @@ const MaintenanceKanban = () => {
                                         key={st.id}
                                         type="button"
                                         onClick={() => setReleaseReturnStatus(st.id as any)}
-                                        className={`py-2 text-center text-xs rounded-lg border font-semibold cursor-pointer ${
-                                            releaseReturnStatus === st.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200'
-                                        }`}
+                                        className={`py-2 text-center text-xs rounded-lg border font-semibold cursor-pointer ${releaseReturnStatus === st.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200'
+                                            }`}
                                     >
                                         {st.label}
                                     </button>
@@ -1147,9 +1137,8 @@ const MaintenanceKanban = () => {
                                         key={st}
                                         type="button"
                                         onClick={() => setBulkUnlockReturnStatus(st as any)}
-                                        className={`py-2 text-center text-xs rounded-lg border font-semibold cursor-pointer ${
-                                            bulkUnlockReturnStatus === st ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200'
-                                        }`}
+                                        className={`py-2 text-center text-xs rounded-lg border font-semibold cursor-pointer ${bulkUnlockReturnStatus === st ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200'
+                                            }`}
                                     >
                                         {st}
                                     </button>
@@ -1180,7 +1169,7 @@ const MaintenanceKanban = () => {
                         <div className="flex items-center justify-between border-b pb-3">
                             <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm">
                                 <Plus className="w-5 h-5" />
-                                New Engineering Work Order
+                                New Work Order
                             </div>
                             <button type="button" onClick={() => setIsNewTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                                 <X className="w-4 h-4" />

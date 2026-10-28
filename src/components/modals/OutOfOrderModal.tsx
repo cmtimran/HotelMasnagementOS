@@ -431,7 +431,7 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-150">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh]">
 
                 {/* Header */}
                 <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 px-6 py-4.5 text-white flex items-center justify-between flex-shrink-0">
@@ -441,7 +441,7 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-base font-bold tracking-tight">Room Maintenance &amp; Out of Order / Out of Service</h2>
+                                <h3 className="text-base font-bold tracking-tight">Room Maintenance &amp; Out of Order / Out of Service</h3>
                                 {overdueCount > 0 && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white animate-pulse flex items-center gap-1">
                                         <AlertTriangle className="w-3 h-3" />
@@ -449,9 +449,6 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                     </span>
                                 )}
                             </div>
-                            <p className="text-xs text-slate-300 mt-0.5">
-                                eZee / YCS Standard: Lock rooms, batch block, auto-reassign bookings, and unlock back to Housekeeping.
-                            </p>
                         </div>
                     </div>
                     <button
@@ -467,29 +464,26 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('create')}
-                        className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                            activeTab === 'create'
-                                ? 'border-indigo-600 text-indigo-700'
-                                : 'border-transparent text-slate-500 hover:text-slate-800'
-                        }`}
+                        className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${activeTab === 'create'
+                            ? 'border-indigo-600 text-indigo-700'
+                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                            }`}
                     >
                         <PlusCircle className="w-4 h-4" />
-                        Mark Maintenance Block (Lock Rooms)
+                        Mark Maintenance Block
                     </button>
                     <button
                         type="button"
                         onClick={() => setActiveTab('list')}
-                        className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                            activeTab === 'list'
-                                ? 'border-indigo-600 text-indigo-700'
-                                : 'border-transparent text-slate-500 hover:text-slate-800'
-                        }`}
+                        className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${activeTab === 'list'
+                            ? 'border-indigo-600 text-indigo-700'
+                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                            }`}
                     >
                         <RefreshCw className="w-4 h-4" />
-                        Unlock Maintenance Block &amp; Active Locks
-                        <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
-                            overdueCount > 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-700'
-                        }`}>
+                        Unlock Maintenance Block
+                        <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${overdueCount > 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-700'
+                            }`}>
                             {activeBlocksCount}
                         </span>
                     </button>
@@ -532,11 +526,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div
                                         onClick={() => setBlockType('OOO')}
-                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                                            blockType === 'OOO'
-                                                ? 'border-rose-500 bg-rose-50/70 shadow-sm'
-                                                : 'border-slate-200 hover:border-slate-300 bg-white'
-                                        }`}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${blockType === 'OOO'
+                                            ? 'border-rose-500 bg-rose-50/70 shadow-sm'
+                                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between mb-1.5">
                                             <div className="flex items-center gap-2">
@@ -558,11 +551,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
 
                                     <div
                                         onClick={() => setBlockType('OOS')}
-                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                                            blockType === 'OOS'
-                                                ? 'border-amber-500 bg-amber-50/70 shadow-sm'
-                                                : 'border-slate-200 hover:border-slate-300 bg-white'
-                                        }`}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${blockType === 'OOS'
+                                            ? 'border-amber-500 bg-amber-50/70 shadow-sm'
+                                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between mb-1.5">
                                             <div className="flex items-center gap-2">
@@ -666,7 +658,7 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                             }}
                                             className="text-xs font-semibold text-indigo-700 hover:underline cursor-pointer"
                                         >
-                                            {selectedRoomNumbers.size === rooms.length ? 'Deselect All' : 'Select All Hotel Rooms'}
+                                            {selectedRoomNumbers.size === rooms.length ? 'Deselect All' : 'Select All Rooms'}
                                         </button>
                                     </div>
 
@@ -681,7 +673,7 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                                         onClick={() => toggleFloorRooms(floorRooms)}
                                                         className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer"
                                                     >
-                                                        Toggle Floor {floor}
+                                                        Select All Floor {floor}
                                                     </button>
                                                 </div>
                                                 <div className="flex flex-wrap gap-1.5">
@@ -692,11 +684,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                                                 key={r.number}
                                                                 type="button"
                                                                 onClick={() => toggleRoomSelection(r.number)}
-                                                                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
-                                                                    isSelected
-                                                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                                                                        : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
-                                                                }`}
+                                                                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${isSelected
+                                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                                                    : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
+                                                                    }`}
                                                             >
                                                                 {r.number}
                                                             </button>
@@ -849,11 +840,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                         { id: 'Inspected', label: 'Inspected', sub: 'Immediately sellable' },
                                         { id: 'Clean', label: 'Clean', sub: 'Cleaned, pending supervisor' }
                                     ].map(st => (
-                                        <label key={st.id} className={`p-2.5 rounded-lg border flex items-center gap-2 cursor-pointer transition-all ${
-                                            returnToStatus === st.id
-                                                ? 'border-indigo-600 bg-indigo-50/60 font-bold text-indigo-900'
-                                                : 'border-slate-200 text-slate-700'
-                                        }`}>
+                                        <label key={st.id} className={`p-2.5 rounded-lg border flex items-center gap-2 cursor-pointer transition-all ${returnToStatus === st.id
+                                            ? 'border-indigo-600 bg-indigo-50/60 font-bold text-indigo-900'
+                                            : 'border-slate-200 text-slate-700'
+                                            }`}>
                                             <input
                                                 type="radio"
                                                 name="returnToStatus"
@@ -883,11 +873,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                 <button
                                     type="submit"
                                     disabled={loading || (totalConflictCount > 0 && !managerOverride)}
-                                    className={`px-5 py-2 text-xs font-bold text-white rounded-lg flex items-center gap-2 transition-all shadow-md cursor-pointer ${
-                                        blockType === 'OOO'
-                                            ? 'bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300'
-                                            : 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300'
-                                    }`}
+                                    className={`px-5 py-2 text-xs font-bold text-white rounded-lg flex items-center gap-2 transition-all shadow-md cursor-pointer ${blockType === 'OOO'
+                                        ? 'bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300'
+                                        : 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300'
+                                        }`}
                                 >
                                     <Wrench className="w-4 h-4" />
                                     {loading ? 'Processing...' : `Confirm ${isBulkMode ? `${targetRoomList.length} Rooms` : 'Room'} ${blockType === 'OOO' ? 'Out of Order' : 'Out of Service'}`}
@@ -922,11 +911,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                             key={fl.id}
                                             type="button"
                                             onClick={() => setListStatusFilter(fl.id as any)}
-                                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                                                listStatusFilter === fl.id
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                            }`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${listStatusFilter === fl.id
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                }`}
                                         >
                                             {fl.label}
                                         </button>
@@ -980,15 +968,14 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                         return (
                                             <div
                                                 key={b.id}
-                                                className={`p-4 rounded-xl border transition-all ${
-                                                    isOverdue
-                                                        ? 'bg-rose-50/90 border-rose-300 shadow-sm'
-                                                        : isComplete
-                                                            ? 'bg-slate-50 border-slate-200 opacity-60'
-                                                            : isCancelled
-                                                                ? 'bg-slate-50 border-slate-200 opacity-50'
-                                                                : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-                                                }`}
+                                                className={`p-4 rounded-xl border transition-all ${isOverdue
+                                                    ? 'bg-rose-50/90 border-rose-300 shadow-sm'
+                                                    : isComplete
+                                                        ? 'bg-slate-50 border-slate-200 opacity-60'
+                                                        : isCancelled
+                                                            ? 'bg-slate-50 border-slate-200 opacity-50'
+                                                            : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                                                    }`}
                                             >
                                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                                                     <div className="flex items-start gap-3">
@@ -1013,11 +1000,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                                         )}
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider ${
-                                                                    b.blockType === 'OOO'
-                                                                        ? 'bg-rose-600 text-white'
-                                                                        : 'bg-amber-600 text-white'
-                                                                }`}>
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider ${b.blockType === 'OOO'
+                                                                    ? 'bg-rose-600 text-white'
+                                                                    : 'bg-amber-600 text-white'
+                                                                    }`}>
                                                                     {b.blockType}
                                                                 </span>
                                                                 <span className="font-bold text-sm text-slate-900 font-mono">
@@ -1250,11 +1236,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                         key={st.id}
                                         type="button"
                                         onClick={() => setReleaseReturnStatus(st.id as any)}
-                                        className={`py-2 px-2 text-center text-xs rounded-lg border font-semibold cursor-pointer transition-all ${
-                                            releaseReturnStatus === st.id
-                                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                        }`}
+                                        className={`py-2 px-2 text-center text-xs rounded-lg border font-semibold cursor-pointer transition-all ${releaseReturnStatus === st.id
+                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                            }`}
                                     >
                                         {st.label}
                                     </button>
@@ -1331,11 +1316,10 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
                                         key={st.id}
                                         type="button"
                                         onClick={() => setBulkUnlockReturnStatus(st.id as any)}
-                                        className={`py-2 px-2 text-center text-xs rounded-lg border font-semibold cursor-pointer transition-all ${
-                                            bulkUnlockReturnStatus === st.id
-                                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                        }`}
+                                        className={`py-2 px-2 text-center text-xs rounded-lg border font-semibold cursor-pointer transition-all ${bulkUnlockReturnStatus === st.id
+                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                            }`}
                                     >
                                         {st.label}
                                     </button>

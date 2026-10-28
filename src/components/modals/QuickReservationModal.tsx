@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Calendar as CalendarIcon,
@@ -44,6 +44,7 @@ import {
     acquireRoomLock,
     releaseRoomLock,
     validateAndCommitReservation,
+    getAllStoredReservations,
     getAvailableRoomsForStay,
     getCanonicalRooms,
     getDynamicRoomTypes,
@@ -229,17 +230,171 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     const [idIssuePlace, setIdIssuePlace] = useState<string>('');
     const [managerOverrideApproved, setManagerOverrideApproved] = useState<boolean>(false);
 
-    // Stored & Canonical Guests for blacklist & auto-fill
-    const knownProfiles = useMemo(() => {
+    // Stored & Canonical Guests for auto-complete & profile link-up
+    const allKnownGuests = useMemo(() => {
+        const guestMap = new Map<string, any>();
+
         try {
-            const raw = localStorage.getItem('hotel_guest_profiles_v2');
-            if (raw) {
-                const list = JSON.parse(raw);
-                if (Array.isArray(list)) return list;
+            const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
+            if (rawProfiles) {
+                const profiles = JSON.parse(rawProfiles);
+                if (Array.isArray(profiles)) {
+                    profiles.forEach(p => {
+                        const key = (p.name || '').trim().toLowerCase();
+                        if (key) {
+                            guestMap.set(key, {
+                                id: p.id,
+                                title: p.title || 'Mr.',
+                                name: p.name,
+                                phone: p.phone || '',
+                                altPhone: p.altPhone || '',
+                                email: p.email || '',
+                                vipTier: p.vipTier || 'Regular',
+                                nationality: p.nationality || 'Bangladeshi',
+                                idType: p.idType || 'National ID (NID)',
+                                idNumber: p.idNumber || '',
+                                dob: p.dob || '',
+                                gender: p.gender || 'Male',
+                                homeCity: p.homeCity || '',
+                                homeCountry: p.homeCountry || 'Bangladesh',
+                                address: p.address || '',
+                                postalCode: p.postalCode || '',
+                                company: p.company || '',
+                                designation: p.designation || '',
+                                totalStays: p.totalStays || 1,
+                                lifetimeSpendBDT: p.lifetimeSpendBDT || 0,
+                                preferences: p.preferences || {},
+                                isBlacklisted: Boolean(p.isBlacklisted),
+                                blacklistReason: p.blacklistReason,
+                                blacklistedBy: p.blacklistedBy,
+                                blacklistedAt: p.blacklistedAt,
+                                passportVisaNumber: p.passportVisaNumber,
+                                passportVisaType: p.passportVisaType,
+                                passportVisaExpiry: p.passportVisaExpiry,
+                                passportEntryPort: p.passportEntryPort,
+                                drivingVehicleClass: p.drivingVehicleClass,
+                                fatherOrSpouseName: p.fatherOrSpouseName,
+                                idIssueDate: p.idIssueDate,
+                                idExpiryDate: p.idExpiryDate || p.idExpiry,
+                                idIssueCountry: p.idIssueCountry,
+                                idIssuePlace: p.idIssuePlace
+                            });
+                        }
+                    });
+                }
             }
-        } catch {}
-        return [];
+        } catch (e) { }
+
+        const reservations = getAllStoredReservations();
+        reservations.forEach(r => {
+            const cleanName = (r.guestName || '').replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Engr\.)\s*/i, '').trim();
+            const key = cleanName.toLowerCase();
+            if (key && !guestMap.has(key)) {
+                guestMap.set(key, {
+                    id: r.id || key,
+                    title: r.guestName?.startsWith('Dr') ? 'Dr.' : r.guestName?.startsWith('Ms') ? 'Ms.' : 'Mr.',
+                    name: cleanName,
+                    phone: r.phone || (r as any).guestPhone || '',
+                    altPhone: '',
+                    email: r.email || (r as any).guestEmail || '',
+                    vipTier: r.vip || 'Regular',
+                    nationality: (r as any).nationality || 'Bangladeshi',
+                    idType: (r as any).idType || ((r as any).passportNo ? 'Passport' : 'National ID (NID)'),
+                    idNumber: (r as any).idNumber || (r as any).passportNo || '',
+                    dob: (r as any).dob || '',
+                    gender: (r as any).gender || 'Male',
+                    homeCity: (r as any).homeCity || 'Dhaka',
+                    homeCountry: (r as any).homeCountry || 'Bangladesh',
+                    totalStays: 1,
+                    lifetimeSpendBDT: Number(r.totalAmount) || 0,
+                    isBlacklisted: false
+                });
+            }
+        });
+
+        return Array.from(guestMap.values());
     }, [isOpen]);
+
+    const knownProfiles = allKnownGuests;
+
+    // Profile Link-up State
+    const [selectedGuestProfile, setSelectedGuestProfile] = useState<any | null>(null);
+    const [isNameSuggestOpen, setIsNameSuggestOpen] = useState(false);
+    const [isMobileSuggestOpen, setIsMobileSuggestOpen] = useState(false);
+
+    // Suggestions matching typed Name
+    const nameSuggestions = useMemo(() => {
+        if (!name.trim() || name.length < 2 || selectedGuestProfile) return [];
+        const q = name.toLowerCase().trim();
+        return allKnownGuests.filter(g =>
+            g.name.toLowerCase().includes(q) ||
+            (g.phone && g.phone.includes(q))
+        ).slice(0, 5);
+    }, [name, allKnownGuests, selectedGuestProfile]);
+
+    // Suggestions matching typed Mobile
+    const mobileSuggestions = useMemo(() => {
+        const cleanP = (mobile || '').replace(/[^0-9]/g, '');
+        if (cleanP.length < 3 || selectedGuestProfile) return [];
+        return allKnownGuests.filter(g => {
+            const gp = (g.phone || '').replace(/[^0-9]/g, '');
+            return gp.includes(cleanP);
+        }).slice(0, 5);
+    }, [mobile, allKnownGuests, selectedGuestProfile]);
+
+    // Phone collision detection: Phone belongs to a different registered guest
+    const phoneCollision = useMemo(() => {
+        const cleanP = (mobile || '').replace(/[^0-9]/g, '');
+        if (cleanP.length < 8) return null;
+        const match = allKnownGuests.find(g => {
+            const gp = (g.phone || '').replace(/[^0-9]/g, '');
+            return gp.length >= 8 && (gp.endsWith(cleanP.slice(-8)) || cleanP.endsWith(gp.slice(-8)));
+        });
+        if (match && name.trim()) {
+            const exName = match.name.toLowerCase().trim();
+            const inName = name.toLowerCase().trim();
+            if (!exName.includes(inName) && !inName.includes(exName)) {
+                return {
+                    existingGuestName: match.name,
+                    existingVip: match.vipTier || 'Regular',
+                    existingId: match.id,
+                    matchedGuest: match
+                };
+            }
+        }
+        return null;
+    }, [mobile, name, allKnownGuests]);
+
+    const handleSelectGuestProfile = (g: any) => {
+        setSelectedGuestProfile(g);
+        setIsNameSuggestOpen(false);
+        setIsMobileSuggestOpen(false);
+        setName(g.name);
+        if (g.title) setTitle(g.title.endsWith('.') ? g.title : `${g.title}.`);
+        if (g.phone) setMobile(g.phone);
+        if (g.email) setEmail(g.email);
+        if (g.gender) setGender(g.gender);
+        if (g.nationality) setNationality(g.nationality);
+        if (g.homeCountry) setHomeCountry(g.homeCountry);
+        if (g.homeCity) setHomeCity(g.homeCity);
+        if (g.idType) setIdType(g.idType);
+        if (g.idNumber) setIdNumber(g.idNumber);
+        if (g.dob) setDob(g.dob);
+        if (g.passportVisaNumber) setPassportVisaNumber(g.passportVisaNumber);
+        if (g.passportVisaType) setPassportVisaType(g.passportVisaType);
+        if (g.passportVisaExpiry) setPassportVisaExpiry(g.passportVisaExpiry);
+        if (g.passportEntryPort) setPassportEntryPort(g.passportEntryPort);
+        if (g.fatherOrSpouseName) setFatherOrSpouseName(g.fatherOrSpouseName);
+        if (g.idIssueDate) setIdIssueDate(g.idIssueDate);
+        if (g.idExpiryDate) setIdExpiryDate(g.idExpiryDate);
+        if (g.idIssuePlace) setIdIssuePlace(g.idIssuePlace);
+        toast.info(`Linked Guest Profile: ${g.name} (${g.vipTier || 'Regular'})`);
+    };
+
+    const handleUnlinkGuestProfile = () => {
+        setSelectedGuestProfile(null);
+        toast.info('Guest profile unlinked. Changes will create a new distinct guest.');
+    };
 
     const quickBlacklistAlert = useMemo(() => {
         if (!isOpen) return null;
@@ -278,69 +433,83 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         { id: 1, method: 'Cash', amount: 3000 }
     ]);
 
-    // Initialize from roomInfo prop when opened
+    // Track if modal was previously open to prevent reset loops while modal is open
+    const prevIsOpenRef = useRef(false);
+
+    // Initialize from roomInfo prop ONLY when modal transitions from closed to open
     useEffect(() => {
-        if (!isOpen) return;
-
-        // Reset guest info for new express booking
-        setName('');
-        setMobile('');
-        setEmail('');
-        setIdNumber('');
-        setPassportVisaNumber('');
-        setPassportVisaExpiry('');
-        setFatherOrSpouseName('');
-        setIdIssueDate('');
-        setIdExpiryDate('');
-        setIdIssuePlace('');
-        setManagerOverrideApproved(false);
-        setActiveTab('reservation');
-
-        const targetStart = roomInfo?.startDate || roomInfo?.checkIn || getSystemDateISO();
-        const isDayUseInit = Boolean((roomInfo as any)?.isDayUse || (roomInfo as any)?.dayUse || (roomInfo?.startDate && roomInfo?.endDate && roomInfo.startDate === roomInfo.endDate));
-        const targetEnd = isDayUseInit ? targetStart : (roomInfo?.endDate || roomInfo?.checkOut || getNextDayISO(targetStart, 1));
-        const targetRoom = roomInfo?.room || roomInfo?.roomNumber || '101';
-
-        setDayUse(isDayUseInit);
-        setCheckInDate(targetStart);
-        setCheckOutDate(targetEnd);
-
-        let targetNights = isDayUseInit ? 0 : roomInfo?.nights;
-        if (!isDayUseInit && !targetNights) {
-            const s = new Date(targetStart);
-            const e = new Date(targetEnd);
-            targetNights = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
+        if (!isOpen) {
+            prevIsOpenRef.current = false;
+            return;
         }
-        setNights(targetNights ?? 0);
 
-        const cleanRoom = targetRoom.replace(/[^0-9a-zA-Z-]/g, '') || '101';
-        const canonical = getCanonicalRooms().find(r => r.number === cleanRoom);
-        const resolvedType = roomInfo?.roomType || canonical?.roomTypeName || 'Deluxe Double';
-        const canonicalRate = roomInfo?.baseRate || canonical?.baseRate || 3000;
-        const defaultPlan = availableRatePlans[0]?.name || '';
-        const initialCalculatedRate = calculateTariffForRatePlan(defaultPlan, resolvedType, canonicalRate, 2, 0, availableRatePlans);
+        // Only run initialization once when modal opens from closed state
+        if (!prevIsOpenRef.current) {
+            prevIsOpenRef.current = true;
 
-        setRoomsList([
-            {
-                id: 1,
-                roomType: resolvedType,
-                noOfRooms: 1,
-                ratePlan: defaultPlan,
-                roomNumber: cleanRoom,
-                assignedRooms: [cleanRoom],
-                adults: 2,
-                children: 0,
-                childrenAges: [],
-                rate: initialCalculatedRate,
-                checkInDate: targetStart,
-                checkOutDate: targetEnd,
-                nights: targetNights
+            // Reset guest info for new express booking
+            setName('');
+            setMobile('');
+            setEmail('');
+            setIdNumber('');
+            setPassportVisaNumber('');
+            setPassportVisaExpiry('');
+            setFatherOrSpouseName('');
+            setIdIssueDate('');
+            setIdExpiryDate('');
+            setIdIssuePlace('');
+            setManagerOverrideApproved(false);
+            setSelectedGuestProfile(null);
+            setIsNameSuggestOpen(false);
+            setIsMobileSuggestOpen(false);
+            setActiveTab('reservation');
+
+            const targetStart = roomInfo?.startDate || roomInfo?.checkIn || getSystemDateISO();
+            const isDayUseInit = Boolean((roomInfo as any)?.isDayUse || (roomInfo as any)?.dayUse || (roomInfo?.startDate && roomInfo?.endDate && roomInfo.startDate === roomInfo.endDate));
+            const targetEnd = isDayUseInit ? targetStart : (roomInfo?.endDate || roomInfo?.checkOut || getNextDayISO(targetStart, 1));
+            const targetRoom = roomInfo?.room || roomInfo?.roomNumber || '101';
+
+            setDayUse(isDayUseInit);
+            setCheckInDate(targetStart);
+            setCheckOutDate(targetEnd);
+
+            let targetNights = isDayUseInit ? 0 : roomInfo?.nights;
+            if (!isDayUseInit && !targetNights) {
+                const s = new Date(targetStart);
+                const e = new Date(targetEnd);
+                targetNights = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
             }
-        ]);
-        setPaymentRows([
-            { id: 1, method: 'Cash', amount: initialCalculatedRate * (targetNights || 1) }
-        ]);
-    }, [roomInfo, isOpen]);
+            setNights(targetNights ?? 0);
+
+            const cleanRoom = targetRoom.replace(/[^0-9a-zA-Z-]/g, '') || '101';
+            const canonical = getCanonicalRooms().find(r => r.number === cleanRoom);
+            const resolvedType = roomInfo?.roomType || canonical?.roomTypeName || 'Deluxe Double';
+            const canonicalRate = roomInfo?.baseRate || canonical?.baseRate || 3000;
+            const defaultPlan = availableRatePlans[0]?.name || '';
+            const initialCalculatedRate = calculateTariffForRatePlan(defaultPlan, resolvedType, canonicalRate, 2, 0, availableRatePlans);
+
+            setRoomsList([
+                {
+                    id: 1,
+                    roomType: resolvedType,
+                    noOfRooms: 1,
+                    ratePlan: defaultPlan,
+                    roomNumber: cleanRoom,
+                    assignedRooms: [cleanRoom],
+                    adults: 2,
+                    children: 0,
+                    childrenAges: [],
+                    rate: initialCalculatedRate,
+                    checkInDate: targetStart,
+                    checkOutDate: targetEnd,
+                    nights: targetNights
+                }
+            ]);
+            setPaymentRows([
+                { id: 1, method: 'Cash', amount: initialCalculatedRate * (targetNights || 1) }
+            ]);
+        }
+    }, [isOpen, roomInfo]);
 
 
     // Room Add-On Services (Full Bundle) State
@@ -976,6 +1145,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             registeredAt: (status === 'arrived' || (status as string) === 'in-house') ? new Date().toISOString() : undefined,
             folioNumber: folioNo,
             guestName: guestDisplayName,
+            guestId: selectedGuestProfile?.id,
+            vip: selectedGuestProfile?.vipTier || 'None',
             phone: mobile || 'N/A',
             email: email || '',
             idType,
@@ -1092,13 +1263,16 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             const inputCleanId = (idNumber || '').trim().toLowerCase();
 
             if (cleanName) {
-                const existingIdx = profiles.findIndex(p => {
-                    const phoneMatch = Boolean(mobile && p.phone && (mobile.replace(/[^0-9]/g, '') === p.phone.replace(/[^0-9]/g, '')));
-                    const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
-                    const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
-                    const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
-                    return phoneMatch || emailMatch || idMatch || nameMatch;
-                });
+                const existingIdx = selectedGuestProfile
+                    ? profiles.findIndex(p => String(p.id) === String(selectedGuestProfile.id) || (p.name && p.name.trim().toLowerCase() === selectedGuestProfile.name.trim().toLowerCase()))
+                    : profiles.findIndex(p => {
+                        const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
+                        const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
+                        const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
+                        const phoneMatch = Boolean(mobile && p.phone && (mobile.replace(/[^0-9]/g, '') === p.phone.replace(/[^0-9]/g, '')));
+                        if ((phoneMatch || emailMatch) && !nameMatch) return false;
+                        return nameMatch || idMatch;
+                    });
 
                 const stayRecord = {
                     resNumber: reservationNumber,
@@ -1792,6 +1966,61 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     </div>
                                 )}
 
+                                {/* Guest Profile Link-Up Status Banner */}
+                                {selectedGuestProfile && (
+                                    <div className="bg-blue-50/90 border border-blue-200 rounded-md p-2 flex items-center justify-between gap-2 animate-in fade-in">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-6 h-6 rounded-full bg-[#1e3a8a] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                                {selectedGuestProfile.name.slice(0, 2).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[11px] font-bold text-slate-900">
+                                                    Linked Profile: {selectedGuestProfile.title} {selectedGuestProfile.name}
+                                                </span>
+                                                <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                    {selectedGuestProfile.vipTier || 'Regular'}
+                                                </span>
+                                                {selectedGuestProfile.company && (
+                                                    <span className="text-[9.5px] text-slate-500">
+                                                        ({selectedGuestProfile.company})
+                                                    </span>
+                                                )}
+                                                {selectedGuestProfile.totalStays > 0 && (
+                                                    <span className="text-[9.5px] text-emerald-700 font-medium">
+                                                        • {selectedGuestProfile.totalStays} Stay{selectedGuestProfile.totalStays > 1 ? 's' : ''}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleUnlinkGuestProfile}
+                                            className="text-[10px] text-red-600 hover:text-red-800 font-semibold cursor-pointer underline flex-shrink-0"
+                                        >
+                                            Unlink / New Guest
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Phone Collision Indicator */}
+                                {phoneCollision && !selectedGuestProfile && (
+                                    <div className="bg-amber-50/90 border border-amber-200 rounded-md p-2 flex items-center justify-between gap-2 text-[10.5px] text-amber-900 animate-in fade-in">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="font-bold">⚠️ Phone Shared:</span>
+                                            <span className="truncate">Registered to <strong>{phoneCollision.existingGuestName}</strong> ({phoneCollision.existingVip}). Will create a new profile for <strong>{name || 'this guest'}</strong>.</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (phoneCollision.matchedGuest) handleSelectGuestProfile(phoneCollision.matchedGuest);
+                                            }}
+                                            className="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-semibold border border-amber-300 cursor-pointer flex-shrink-0"
+                                        >
+                                            Link to {phoneCollision.existingGuestName.split(' ')[0]} ↵
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Row 1: Title, Name, Mobile, Email */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                                     <div className="flex flex-col gap-1">
@@ -1809,30 +2038,151 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </select>
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-semibold text-slate-600">
-                                            Name <span className="text-red-500">*</span>
+                                    {/* Name input with Auto-Suggest Dropdown */}
+                                    <div className="relative flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600 flex items-center justify-between">
+                                            <span>Name <span className="text-red-500">*</span></span>
+                                            {nameSuggestions.length > 0 && isNameSuggestOpen && (
+                                                <span className="text-[9px] text-blue-600 font-semibold">Found {nameSuggestions.length} returning guest{nameSuggestions.length > 1 ? 's' : ''}</span>
+                                            )}
                                         </label>
                                         <input
                                             type="text"
+                                            name="quick_guest_full_name"
+                                            autoComplete="off"
+                                            autoCorrect="off"
+                                            spellCheck={false}
+                                            data-lpignore="true"
+                                            data-form-type="other"
                                             placeholder="Guest full name..."
                                             value={name}
-                                            onChange={e => setName(e.target.value)}
+                                            onChange={e => {
+                                                setName(e.target.value);
+                                                setIsNameSuggestOpen(true);
+                                                if (selectedGuestProfile && e.target.value !== selectedGuestProfile.name) {
+                                                    setSelectedGuestProfile(null);
+                                                }
+                                            }}
+                                            onFocus={() => setIsNameSuggestOpen(true)}
+                                            onBlur={() => setTimeout(() => setIsNameSuggestOpen(false), 250)}
                                             className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-medium"
                                         />
+
+                                        {/* Inline Name Suggestions Dropdown (Spacious overlay width) */}
+                                        {isNameSuggestOpen && nameSuggestions.length > 0 && (
+                                            <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                                {nameSuggestions.map(g => (
+                                                    <div
+                                                        key={g.id}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            handleSelectGuestProfile(g);
+                                                        }}
+                                                        className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
+                                                    >
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <div className="w-7 h-7 rounded-full bg-[#1e3a8a] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                                                {g.name.slice(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="font-bold text-slate-900 text-[11.5px] truncate">
+                                                                        {g.title} {g.name}
+                                                                    </span>
+                                                                    <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                                        {g.vipTier || 'Regular'}
+                                                                    </span>
+                                                                    {g.company && (
+                                                                        <span className="text-[9.5px] text-slate-500 truncate">
+                                                                            ({g.company})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                                                                    <span className="text-slate-700 font-medium">📞 {g.phone}</span>
+                                                                    {g.email && <span className="truncate">✉️ {g.email}</span>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap flex-shrink-0 shadow-2xs">
+                                                            Link Profile ↵
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-semibold text-slate-600">
-                                            Mobile No. <span className="text-red-500">*</span>
+                                    {/* Mobile input with Auto-Suggest Dropdown */}
+                                    <div className="relative flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-600 flex items-center justify-between">
+                                            <span>Mobile No. <span className="text-red-500">*</span></span>
+                                            {mobileSuggestions.length > 0 && isMobileSuggestOpen && (
+                                                <span className="text-[9px] text-blue-600 font-semibold">Found {mobileSuggestions.length} profile{mobileSuggestions.length > 1 ? 's' : ''}</span>
+                                            )}
                                         </label>
                                         <input
                                             type="text"
+                                            name="quick_guest_mobile_number"
+                                            autoComplete="off"
+                                            autoCorrect="off"
+                                            spellCheck={false}
+                                            data-lpignore="true"
+                                            data-form-type="other"
                                             placeholder="e.g. 01712-345678"
                                             value={mobile}
-                                            onChange={e => setMobile(e.target.value)}
+                                            onChange={e => {
+                                                setMobile(e.target.value);
+                                                setIsMobileSuggestOpen(true);
+                                            }}
+                                            onFocus={() => setIsMobileSuggestOpen(true)}
+                                            onBlur={() => setTimeout(() => setIsMobileSuggestOpen(false), 250)}
                                             className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono"
                                         />
+
+                                        {/* Inline Mobile Suggestions Dropdown (Spacious overlay width) */}
+                                        {isMobileSuggestOpen && mobileSuggestions.length > 0 && (
+                                            <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                                {mobileSuggestions.map(g => (
+                                                    <div
+                                                        key={g.id}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            handleSelectGuestProfile(g);
+                                                        }}
+                                                        className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
+                                                    >
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <div className="w-7 h-7 rounded-full bg-[#1e3a8a] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                                                {g.name.slice(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="font-bold text-slate-900 text-[11.5px] truncate">
+                                                                        {g.title} {g.name}
+                                                                    </span>
+                                                                    <span className="px-1.5 py-0.2 rounded text-[8.5px] bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+                                                                        {g.vipTier || 'Regular'}
+                                                                    </span>
+                                                                    {g.company && (
+                                                                        <span className="text-[9.5px] text-slate-500 truncate">
+                                                                            ({g.company})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                                                                    <span className="text-slate-800 font-bold">📞 {g.phone}</span>
+                                                                    {g.email && <span className="truncate">✉️ {g.email}</span>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap flex-shrink-0 shadow-2xs">
+                                                            Link Profile ↵
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex flex-col gap-1">
