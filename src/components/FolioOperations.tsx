@@ -45,12 +45,24 @@ interface FolioAccount {
 
 const buildFoliosFromCanonicalReservations = (): FolioAccount[] => {
     const canonical = getAllStoredReservations();
-    return canonical.map((r, idx) => {
+    const seen = new Set<string>();
+    const active = canonical.filter(r => {
+        const st = String(r.status || '').toLowerCase();
+        if (st === 'cancelled' || st === 'voided' || st === 'void') return false;
+        const resKey = r.reservationNumber || String(r.id);
+        if (seen.has(resKey)) return false;
+        seen.add(resKey);
+        return true;
+    });
+
+    return active.map((r, idx) => {
         const folioId = Number(r.id) || (idx + 1);
         const nights = Number(r.nights) || Math.max(1, Math.round((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
         const total = Number(r.totalAmount) || Number(r.totalRate) || 0;
         const paid = Number(r.paidAmount) || 0;
-        const roomLabel = r.roomNumber || r.roomNo || (r.allocatedRooms && r.allocatedRooms.join(', ')) || '101';
+        const roomLabel = (r.isConnectingSuite && r.allocatedRooms && r.allocatedRooms.length > 1)
+            ? r.allocatedRooms.join(' + ')
+            : (r.roomNumber || r.roomNo || (r.allocatedRooms && r.allocatedRooms.join(', ')) || '101');
         const txns: Transaction[] = [
             {
                 id: folioId * 100 + 1,
@@ -136,7 +148,17 @@ export const FolioOperations: React.FC = () => {
                     localStorage.removeItem('hotel_folios_v2');
                     return;
                 }
-                const mapped: FolioAccount[] = json.data.map((f: any) => {
+                const seenRes = new Set<string>();
+                const filteredData = json.data.filter((f: any) => {
+                    const st = String(f.status || '').toUpperCase();
+                    if (st === 'CLOSED' || st === 'CANCELLED' || st === 'VOID') return false;
+                    const resKey = f.reservation_number || String(f.reservation_id || f.id);
+                    if (seenRes.has(resKey)) return false;
+                    seenRes.add(resKey);
+                    return true;
+                });
+
+                const mapped: FolioAccount[] = filteredData.map((f: any) => {
                     const charges = f.charges || [];
                     const payments = f.payments || [];
                     const txns: Transaction[] = [];

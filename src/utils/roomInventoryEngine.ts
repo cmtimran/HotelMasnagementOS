@@ -751,6 +751,7 @@ export type PMSBroadcastMessage = (
     | { type: 'FOLIO_UPDATED'; folioId?: string | number }
     | { type: 'SYSTEM_DATE_CHANGED'; systemDate: string; displayDate: string }
     | { type: 'INVENTORY_REFRESH' }
+    | { type: 'GUESTS_UPDATED'; guestId?: string | number }
 ) & { propertyId?: number | string };
 
 export const broadcastPMSEvent = (message: PMSBroadcastMessage) => {

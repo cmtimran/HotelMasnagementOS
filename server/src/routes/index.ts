@@ -11,6 +11,7 @@ import schemaRoutes from './schema.routes.js';
 import ratesRoutes from './rates.routes.js';
 import connectingRoutes from './connecting.routes.js';
 import tenantRoutes from './tenant.routes.js';
+import guestRoutes from './guest.routes.js';
 
 const apiRouter = Router();
 
@@ -53,6 +54,7 @@ apiRouter.use('/hrm', hrmRoutes);
 apiRouter.use('/schema', schemaRoutes);
 apiRouter.use('/rates', ratesRoutes);
 apiRouter.use('/connecting-rooms', connectingRoutes);
+apiRouter.use('/guests', guestRoutes);
 apiRouter.use('/central', tenantRoutes);
 apiRouter.use('/tenants', tenantRoutes);
 

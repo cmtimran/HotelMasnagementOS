@@ -1,14 +1,26 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     User, Search, Plus, Star, Phone, Mail,
     MapPin, ShieldCheck,
     Heart, CheckCircle2,
     Building2, Clock,
     AlertTriangle, ChevronRight, ChevronLeft,
-    Home, Edit3, Receipt
+    Home, Edit3, Receipt,
+    GitMerge, CheckSquare, Square
 } from 'lucide-react';
 import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 import { useNavigation } from '../context/NavigationContext';
+import { getApiBaseUrl } from '../utils/apiUrl';
+import MergeGuestModal from './modals/MergeGuestModal';
+
+export const normalizePhone = (raw: string | null | undefined): string => {
+    if (!raw) return '';
+    let digits = raw.replace(/\D/g, '');
+    if (digits.startsWith('880') && digits.length >= 13) {
+        digits = '0' + digits.slice(3);
+    }
+    return digits;
+};
 
 export interface GuestRecord {
     id: number;
@@ -133,7 +145,28 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
             status: r.status === 'CANCELLED' ? 'Cancelled' : r.status === 'CHECKED_OUT' || r.status === 'checked-out' ? 'Checked-Out' : 'In-House'
         };
 
-        const existing = map.get(key);
+        const rawPhone = r.phone || r.guestPhone || '';
+        const normP = normalizePhone(rawPhone);
+        const cleanE = (r.email || r.guestEmail || '').trim().toLowerCase();
+
+        // Check if an existing guest in map matches by normalized phone, email, or clean name
+        let matchedKey: string | undefined;
+        for (const [k, g] of map.entries()) {
+            if (normP && normalizePhone(g.phone) === normP) {
+                matchedKey = k;
+                break;
+            }
+            if (cleanE && !cleanE.includes('guest.com') && !cleanE.includes('hospitality.com') && g.email && g.email.trim().toLowerCase() === cleanE) {
+                matchedKey = k;
+                break;
+            }
+            if (k === key) {
+                matchedKey = k;
+                break;
+            }
+        }
+
+        const existing = matchedKey ? map.get(matchedKey) : undefined;
         if (existing) {
             existing.totalStays += 1;
             existing.totalNights += nights;
@@ -147,8 +180,10 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
             // Check if user already customized/edited this profile in hotel_guest_profiles_v2
             const savedMatch = savedProfiles.find(p => {
                 const pClean = parseTitleAndName(p.name).cleanName.toLowerCase();
-                const phoneMatch = Boolean(p.phone && (p.phone === r.phone || p.phone === r.guestPhone));
-                return pClean === key || phoneMatch;
+                const pNorm = normalizePhone(p.phone);
+                const phoneMatch = Boolean(normP && pNorm && normP === pNorm);
+                const emailMatch = Boolean(cleanE && p.email && cleanE === p.email.trim().toLowerCase() && !cleanE.includes('guest.com') && !cleanE.includes('hospitality.com'));
+                return phoneMatch || emailMatch || pClean === key;
             });
 
             if (savedMatch) {
@@ -226,7 +261,13 @@ const deriveGuestsFromReservations = (reservations: StoredReservation[]): GuestR
     savedProfiles.forEach((sp, spIdx) => {
         const { title, cleanName } = parseTitleAndName(sp.name);
         const key = cleanName.toLowerCase();
-        if (!map.has(key)) {
+        const spNorm = normalizePhone(sp.phone);
+        const alreadyExists = Array.from(map.values()).some(g =>
+            (spNorm && normalizePhone(g.phone) === spNorm) ||
+            (sp.email && g.email && sp.email.trim().toLowerCase() === g.email.trim().toLowerCase() && !sp.email.includes('guest.com')) ||
+            parseTitleAndName(g.name).cleanName.toLowerCase() === key
+        );
+        if (!alreadyExists && !map.has(key)) {
             map.set(key, {
                 ...sp,
                 id: sp.id || (1000 + spIdx),
@@ -247,29 +288,103 @@ export const GuestProfile: React.FC = () => {
         return saved ? JSON.parse(saved) : [];
     });
 
+    const [duplicateClusters, setDuplicateClusters] = useState<any[]>([]);
+    const [showMergeModal, setShowMergeModal] = useState(false);
+    const [activeMergeCluster, setActiveMergeCluster] = useState<any | null>(null);
+    const [selectedForMerge, setSelectedForMerge] = useState<number[]>([]);
+
+    const refreshGuests = useCallback(async () => {
+        try {
+            const apiBase = getApiBaseUrl();
+            const [dbRes, dupRes] = await Promise.all([
+                fetch(`${apiBase}/api/guests`).then(r => r.json()).catch(() => null),
+                fetch(`${apiBase}/api/guests/duplicates`).then(r => r.json()).catch(() => null)
+            ]);
+
+            if (dupRes?.success && Array.isArray(dupRes.data)) {
+                setDuplicateClusters(dupRes.data);
+            }
+
+            const reservations = await syncReservationsFromDB().catch(() => getAllStoredReservations());
+            const derived = deriveGuestsFromReservations(reservations);
+
+            if (dbRes?.success && Array.isArray(dbRes.data) && dbRes.data.length > 0) {
+                const mergedMap = new Map<number | string, GuestRecord>();
+                derived.forEach(d => mergedMap.set(d.id, d));
+                dbRes.data.forEach((dg: any) => {
+                    const existing = Array.from(mergedMap.values()).find(m =>
+                        m.id === dg.id ||
+                        (dg.normalizedPhone && normalizePhone(m.phone) === dg.normalizedPhone) ||
+                        (dg.email && m.email && m.email.toLowerCase() === dg.email.toLowerCase() && !dg.email.includes('hospitality.com'))
+                    );
+                    if (existing) {
+                        mergedMap.set(existing.id, {
+                            ...existing,
+                            id: dg.id,
+                            title: (dg.salutation ? `${dg.salutation}.` : existing.title) as GuestRecord['title'],
+                            name: `${dg.firstName} ${dg.lastName}`.trim() || existing.name,
+                            phone: dg.phone || existing.phone,
+                            email: dg.email || existing.email,
+                            idType: dg.idType || existing.idType,
+                            idNumber: dg.idNumber || existing.idNumber,
+                            vipTier: dg.vipStatus === 'VVIP' ? 'Platinum VIP' : dg.vipStatus === 'VIP' ? 'Gold' : existing.vipTier,
+                            totalStays: Math.max(existing.totalStays, dg.totalStays || 0),
+                            lifetimeSpendBDT: Math.max(existing.lifetimeSpendBDT, dg.totalSpend || 0)
+                        });
+                    } else {
+                        mergedMap.set(dg.id, {
+                            id: dg.id,
+                            title: (dg.salutation ? `${dg.salutation}.` : 'Mr.') as GuestRecord['title'],
+                            name: `${dg.firstName} ${dg.lastName}`.trim(),
+                            phone: dg.phone || '',
+                            email: dg.email || '',
+                            vipTier: dg.vipStatus === 'VVIP' ? 'Platinum VIP' : dg.vipStatus === 'VIP' ? 'Gold' : 'Regular',
+                            nationality: dg.nationality || 'Bangladesh',
+                            idType: dg.idType || 'National ID (NID)',
+                            idNumber: dg.idNumber || '',
+                            dob: '1990-01-01',
+                            gender: 'Male',
+                            homeCity: dg.city || 'Dhaka',
+                            homeCountry: dg.country || 'Bangladesh',
+                            address: dg.address || '',
+                            totalStays: dg.totalStays || 0,
+                            totalNights: dg.totalStays || 0,
+                            lifetimeSpendBDT: dg.totalSpend || 0,
+                            lastStayDate: dg.lastStayDate || '-',
+                            loyaltyPoints: Math.round((dg.totalSpend || 0) / 20),
+                            preferences: {
+                                roomType: 'Deluxe Double',
+                                floorPreference: 'High Floor',
+                                pillowType: 'Feather / Down',
+                                smoking: 'Non-Smoking',
+                                dietary: 'Standard Halal',
+                                newspaper: 'The Daily Star',
+                                specialNotes: 'Loaded from Hotel Database.'
+                            },
+                            stayHistory: []
+                        });
+                    }
+                });
+                const finalGuests = Array.from(mergedMap.values());
+                setGuests(finalGuests);
+                localStorage.setItem('hotel_guest_profiles_v2', JSON.stringify(finalGuests));
+            } else if (derived.length > 0) {
+                setGuests(derived);
+            }
+        } catch (err) {
+            console.warn('Error refreshing guests:', err);
+        }
+    }, []);
+
     useEffect(() => {
-        const refreshGuests = () => {
-            syncReservationsFromDB().then(res => {
-                if (res.length > 0) {
-                    const derived = deriveGuestsFromReservations(res);
-                    if (derived.length > 0) setGuests(derived);
-                }
-            }).catch(() => {
-                const fallback = getAllStoredReservations();
-                if (fallback.length > 0) {
-                    const derived = deriveGuestsFromReservations(fallback);
-                    if (derived.length > 0) setGuests(derived);
-                }
-            });
-        };
-
         refreshGuests();
-
-        const unsub = subscribeToPMSEvents(() => {
-            refreshGuests();
+        const unsub = subscribeToPMSEvents((event) => {
+            if (event.type === 'GUESTS_UPDATED' || event.type === 'INVENTORY_REFRESH') {
+                refreshGuests();
+            }
         });
         return () => unsub();
-    }, []);
+    }, [refreshGuests]);
 
     const { setActivePage } = useNavigation();
 
@@ -542,10 +657,38 @@ export const GuestProfile: React.FC = () => {
         return matchesQuery && matchesTier;
     });
 
-    const handleSaveGuestProfile = (e: React.FormEvent) => {
+    const handleSaveGuestProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newGuestForm.name.trim() || !newGuestForm.phone.trim()) {
             alert('Please enter guest full legal name and primary phone number.');
+            return;
+        }
+
+        const normP = normalizePhone(newGuestForm.phone);
+        const cleanE = newGuestForm.email.trim().toLowerCase();
+        const cleanId = newGuestForm.idNumber.trim().toLowerCase();
+
+        // 1. Strict Duplicate Prevention Verification
+        const conflict = guests.find(g => {
+            if (modalMode === 'edit' && g.id === editingGuestId) return false;
+            const pMatch = Boolean(normP && normalizePhone(g.phone) === normP);
+            const eMatch = Boolean(cleanE && !cleanE.includes('guest.com') && !cleanE.includes('hospitality.com') && g.email && g.email.trim().toLowerCase() === cleanE);
+            const idMatch = Boolean(cleanId && g.idNumber && g.idNumber.trim().toLowerCase() === cleanId);
+            return pMatch || eMatch || idMatch;
+        });
+
+        if (conflict) {
+            const conflictField = (normP && normalizePhone(conflict.phone) === normP)
+                ? `Phone Number (${conflict.phone})`
+                : (cleanE && conflict.email && conflict.email.trim().toLowerCase() === cleanE)
+                ? `Email Address (${conflict.email})`
+                : `Identity Document Number (${conflict.idNumber})`;
+
+            alert(
+                `DUPLICATE GUEST DETECTED!\n\n` +
+                `This ${conflictField} already belongs to an existing profile: "${conflict.title} ${conflict.name}".\n\n` +
+                `As a certified hotel PMS practice, creating duplicate profiles splits stay records and folio accounts. Please update the existing profile or use the "Merge Profiles" feature.`
+            );
             return;
         }
 
@@ -553,8 +696,38 @@ export const GuestProfile: React.FC = () => {
         const finalTitle = newGuestForm.title || parsedTitle;
         const finalName = parsedName;
         const fullNameWithTitle = `${finalTitle} ${finalName}`;
+        const apiBase = getApiBaseUrl();
+
+        const nameParts = finalName.split(' ');
+        const firstName = nameParts[0] || 'Valued';
+        const lastName = nameParts.slice(1).join(' ') || firstName;
+        const backendPayload = {
+            salutation: finalTitle.replace('.', ''),
+            firstName,
+            lastName,
+            email: newGuestForm.email.trim() || undefined,
+            phone: newGuestForm.phone.trim(),
+            nationality: newGuestForm.nationality.trim() || 'Bangladeshi',
+            idType: newGuestForm.idType,
+            idNumber: newGuestForm.idNumber.trim() || undefined,
+            vipStatus: newGuestForm.vipTier.includes('Platinum') ? 'VVIP' : newGuestForm.vipTier.includes('Gold') ? 'VIP' : 'NONE',
+            address: newGuestForm.address.trim() || undefined,
+            city: newGuestForm.homeCity.trim() || 'Dhaka',
+            country: newGuestForm.homeCountry.trim() || 'Bangladesh'
+        };
 
         if (modalMode === 'edit' && editingGuestId) {
+            // Update backend PostgreSQL record
+            try {
+                await fetch(`${apiBase}/api/guests/${editingGuestId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(backendPayload)
+                });
+            } catch (err) {
+                console.warn('Backend guest update error:', err);
+            }
+
             const updatedGuests = guests.map(g => {
                 if (g.id !== editingGuestId) return g;
                 return {
@@ -644,11 +817,28 @@ export const GuestProfile: React.FC = () => {
 
             setShowAddGuestModal(false);
             showToast(`Guest profile updated successfully for ${finalTitle} ${finalName}`);
+            refreshGuests();
             return;
         }
 
+        // Create new guest
+        let createdDbId: number | null = null;
+        try {
+            const createRes = await fetch(`${apiBase}/api/guests`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(backendPayload)
+            });
+            const createJson = await createRes.json();
+            if (createJson.success && createJson.data?.id) {
+                createdDbId = Number(createJson.data.id);
+            }
+        } catch (err) {
+            console.warn('Backend guest create error:', err);
+        }
+
         const newRecord: GuestRecord = {
-            id: Date.now(),
+            id: createdDbId || Date.now(),
             title: finalTitle,
             name: finalName,
             phone: newGuestForm.phone.trim(),
@@ -704,6 +894,7 @@ export const GuestProfile: React.FC = () => {
         setNewGuestForm(initialGuestForm);
         setModalTab('kyc');
         showToast(`Guest 360 profile created for ${newRecord.title} ${newRecord.name}`);
+        refreshGuests();
     };
 
     return (
@@ -738,6 +929,31 @@ export const GuestProfile: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                     <button
+                        type="button"
+                        onClick={() => {
+                            if (duplicateClusters.length > 0) {
+                                setActiveMergeCluster(duplicateClusters[0]);
+                                setShowMergeModal(true);
+                            } else {
+                                showToast('No duplicate clusters found. Select 2 or more guests from the list to merge manually.');
+                            }
+                        }}
+                        className={`h-7 px-2.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                            duplicateClusters.length > 0
+                                ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs'
+                                : 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-700'
+                        }`}
+                        title="Merge duplicate guest profiles"
+                    >
+                        <GitMerge size={13} />
+                        <span>Merge Profiles</span>
+                        {duplicateClusters.length > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-bold bg-white text-amber-800">
+                                {duplicateClusters.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
                         onClick={handleOpenCreateModal}
                         className="btn-primary"
                     >
@@ -755,6 +971,38 @@ export const GuestProfile: React.FC = () => {
                     )}
                 </div>
             </header>
+
+            {/* Duplicate Detection Alert Banner */}
+            {duplicateClusters.length > 0 && (
+                <div className="bg-amber-50 border-b border-amber-200 px-3.5 py-2 flex items-center justify-between gap-3 text-xs text-amber-900 flex-shrink-0 animate-in fade-in">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center flex-shrink-0 text-amber-800">
+                            <AlertTriangle size={13} />
+                        </div>
+                        <div>
+                            <span className="font-bold text-amber-950">
+                                {duplicateClusters.length} Duplicate Profile Cluster{duplicateClusters.length > 1 ? 's' : ''} Detected!
+                            </span>
+                            <span className="text-amber-800 ml-1.5 text-[11px]">
+                                Guest profiles sharing identical phone numbers, emails, or government IDs were found in the database.
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveMergeCluster(duplicateClusters[0]);
+                                setShowMergeModal(true);
+                            }}
+                            className="h-6 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                        >
+                            <GitMerge size={12} />
+                            <span>Review & Merge Clusters</span>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Split Content Area */}
             <div className="flex flex-1 overflow-hidden">
@@ -789,10 +1037,45 @@ export const GuestProfile: React.FC = () => {
                         ))}
                     </div>
 
+                    {/* Multi-Selection Merge Action Bar */}
+                    {selectedForMerge.length >= 2 && (
+                        <div className="p-2 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between gap-2 shadow-2xs animate-in slide-in-from-top-1">
+                            <div className="flex items-center gap-1.5 text-[11px] text-indigo-900 font-semibold">
+                                <GitMerge size={13} className="text-indigo-600" />
+                                <span>{selectedForMerge.length} Selected</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const candidateList = guests.filter(g => selectedForMerge.includes(g.id));
+                                        setActiveMergeCluster({
+                                            reason: 'Manual Selection for Merge',
+                                            matchValue: `${candidateList.length} Selected Guests`,
+                                            guests: candidateList
+                                        });
+                                        setShowMergeModal(true);
+                                    }}
+                                    className="h-6 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                    Merge
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedForMerge([])}
+                                    className="h-6 px-1.5 text-gray-500 hover:text-gray-800 text-[10.5px] cursor-pointer"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Guest Items */}
                     <div className="space-y-1.5 pt-1">
                         {filteredGuests.map(g => {
                             const isSelected = g.id === activeGuest.id;
+                            const isCheckedForMerge = selectedForMerge.includes(g.id);
                             return (
                                 <div
                                     key={g.id}
@@ -800,11 +1083,33 @@ export const GuestProfile: React.FC = () => {
                                     className={`w-full p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col gap-1 relative group ${
                                         isSelected
                                             ? 'bg-blue-50/60 border-blue-500 shadow-2xs ring-1 ring-blue-500'
+                                            : isCheckedForMerge
+                                            ? 'bg-indigo-50/50 border-indigo-300'
                                             : 'bg-white border-gray-200 hover:bg-gray-50'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1.5 min-w-0">
+                                            {/* Selection checkbox */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedForMerge(prev =>
+                                                        prev.includes(g.id) ? prev.filter(x => x !== g.id) : [...prev, g.id]
+                                                    );
+                                                }}
+                                                className={`p-0.5 rounded transition-colors ${
+                                                    isCheckedForMerge ? 'text-indigo-600' : 'text-gray-300 hover:text-gray-500'
+                                                }`}
+                                                title={isCheckedForMerge ? 'Deselect for merge' : 'Select for merge'}
+                                            >
+                                                {isCheckedForMerge ? (
+                                                    <CheckSquare size={13} className="text-indigo-600" />
+                                                ) : (
+                                                    <Square size={13} />
+                                                )}
+                                            </button>
                                             <span className="text-gray-900 truncate text-[11.5px] font-medium">
                                                 {g.title} {parseTitleAndName(g.name).cleanName}
                                             </span>
@@ -832,13 +1137,13 @@ export const GuestProfile: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between text-[10px] text-gray-500">
+                                    <div className="flex items-center justify-between text-[10px] text-gray-500 pl-4.5">
                                         <span className="font-mono">{g.phone}</span>
                                         <span className="font-mono text-gray-800">৳ {(g.lifetimeSpendBDT / 1000).toFixed(0)}k</span>
                                     </div>
 
                                     {g.company && (
-                                        <div className="text-[9.5px] text-gray-400 truncate">
+                                        <div className="text-[9.5px] text-gray-400 truncate pl-4.5">
                                             {g.company}
                                         </div>
                                     )}
@@ -1947,6 +2252,50 @@ export const GuestProfile: React.FC = () => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Merge Duplicate Profiles Modal */}
+            {showMergeModal && (
+                <MergeGuestModal
+                    isOpen={showMergeModal}
+                    onClose={() => {
+                        setShowMergeModal(false);
+                        setActiveMergeCluster(null);
+                    }}
+                    candidateGuests={
+                        activeMergeCluster?.guests
+                            ? activeMergeCluster.guests.map((g: any) => {
+                                const richLocal = guests.find(lg => lg.id === Number(g.id) || (g.phone && normalizePhone(lg.phone) === normalizePhone(g.phone)));
+                                return {
+                                    id: Number(g.id || richLocal?.id || 1),
+                                    title: g.salutation ? `${g.salutation}.` : (richLocal?.title || 'Mr.'),
+                                    salutation: g.salutation || richLocal?.title?.replace('.', '') || 'Mr',
+                                    name: richLocal ? `${richLocal.title} ${parseTitleAndName(richLocal.name).cleanName}` : `${g.first_name || ''} ${g.last_name || ''}`.trim() || g.name || 'Guest',
+                                    phone: g.phone || richLocal?.phone || '',
+                                    email: g.email || richLocal?.email || '',
+                                    idType: g.id_type || g.idType || richLocal?.idType || 'National ID (NID)',
+                                    idNumber: g.id_number || g.idNumber || richLocal?.idNumber || '',
+                                    vipTier: richLocal?.vipTier || g.vip_status || 'Regular',
+                                    vipStatus: g.vip_status || richLocal?.vipTier || 'NONE',
+                                    nationality: g.nationality || richLocal?.nationality || 'Bangladeshi',
+                                    address: g.address || richLocal?.address || '',
+                                    city: g.city || richLocal?.homeCity || 'Dhaka',
+                                    totalStays: Number(g.total_stays ?? g.totalStays ?? richLocal?.totalStays ?? 0),
+                                    totalSpend: Number(g.total_spend ?? g.totalSpend ?? richLocal?.lifetimeSpendBDT ?? 0),
+                                    lifetimeSpendBDT: Number(g.total_spend ?? g.totalSpend ?? richLocal?.lifetimeSpendBDT ?? 0)
+                                };
+                            })
+                            : []
+                    }
+                    mergeReason={activeMergeCluster?.reason || 'Duplicate Records Identified'}
+                    onMergeSuccess={(mergedData) => {
+                        refreshGuests();
+                        setSelectedForMerge([]);
+                        setActiveMergeCluster(null);
+                        broadcastPMSEvent({ type: 'GUESTS_UPDATED' });
+                        showToast(`Successfully merged duplicate profiles into: ${mergedData?.first_name || ''} ${mergedData?.last_name || ''}`);
+                    }}
+                />
             )}
         </div>
     );

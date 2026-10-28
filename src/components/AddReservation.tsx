@@ -1654,10 +1654,24 @@ export const AddReservation: React.FC = () => {
             const rawProfiles = localStorage.getItem('hotel_guest_profiles_v2');
             const profiles: any[] = rawProfiles ? JSON.parse(rawProfiles) : [];
             const cleanName = guestName.trim();
-            const existingIdx = profiles.findIndex(p =>
-                (p.name && p.name.toLowerCase() === cleanName.toLowerCase()) ||
-                (p.phone && (p.phone === mobile || p.phone === phone))
-            );
+            const normDigits = (raw: string | null | undefined) => {
+                if (!raw) return '';
+                let d = raw.replace(/\D/g, '');
+                if (d.startsWith('880') && d.length >= 13) d = '0' + d.slice(3);
+                return d;
+            };
+            const inputNormPhone = normDigits(mobile || phone);
+            const inputCleanEmail = (email || '').trim().toLowerCase();
+            const inputCleanId = (idNumber || '').trim().toLowerCase();
+
+            const existingIdx = profiles.findIndex(p => {
+                const pNorm = normDigits(p.phone);
+                const phoneMatch = Boolean(inputNormPhone && pNorm && inputNormPhone === pNorm);
+                const emailMatch = Boolean(inputCleanEmail && p.email && inputCleanEmail === p.email.trim().toLowerCase() && !inputCleanEmail.includes('guest.com'));
+                const idMatch = Boolean(inputCleanId && p.idNumber && inputCleanId === p.idNumber.trim().toLowerCase());
+                const nameMatch = Boolean(cleanName && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase());
+                return phoneMatch || emailMatch || idMatch || nameMatch;
+            });
 
             const stayRecord = {
                 resNumber: reservationNumber,

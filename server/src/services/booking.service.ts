@@ -1,6 +1,7 @@
 import { generateMasterReservationNumber, generateGroupCode } from '../database/db.js';
 import { pgPool } from '../database/postgres.js';
 import { getActiveTenantPool } from '../database/tenantContext.js';
+import { normalizePhone } from '../routes/guest.routes.js';
 
 const getPool = () => getActiveTenantPool(pgPool);
 
@@ -519,9 +520,26 @@ export const bookingService = {
       const vipStatus = payload.vip || payload.vipStatus || 'NONE';
 
       let guestId: number;
-      const guestLookup = await client.query('SELECT id FROM guests WHERE phone = $1 LIMIT 1', [phone]);
+      const normPhone = normalizePhone(phone);
+      const altNorm = normPhone.startsWith('0') ? '880' + normPhone.slice(1) : (normPhone.startsWith('880') ? '0' + normPhone.slice(3) : normPhone);
+      const cleanEmail = email ? email.trim().toLowerCase() : '';
+
+      const guestLookup = await client.query(`
+        SELECT id FROM guests 
+        WHERE (
+          regexp_replace(phone, '\\D', '', 'g') = $1
+          OR regexp_replace(phone, '\\D', '', 'g') = $2
+          OR ($3 != '' AND $3 != 'guest@hospitality.com' AND LOWER(email) = $3)
+        )
+        ORDER BY id ASC
+        LIMIT 1
+      `, [normPhone, altNorm, cleanEmail]);
+
       if (guestLookup.rows.length > 0) {
         guestId = guestLookup.rows[0].id;
+        if (cleanEmail && !cleanEmail.includes('hospitality.com')) {
+          await client.query('UPDATE guests SET email = COALESCE(email, $1) WHERE id = $2', [cleanEmail, guestId]).catch(() => {});
+        }
       } else {
         const gIns = await client.query(`
           INSERT INTO guests (organization_id, salutation, first_name, last_name, email, phone, vip_status)
@@ -1252,6 +1270,19 @@ export const bookingService = {
         SET status = $1
         WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $2 AND (id = $3 OR reservation_number = $4))
       `, [roomStayStatus, propId, numericId, String(id)]);
+
+      if (dbStatus === 'CANCELLED' || dbStatus === 'VOIDED') {
+        await getPool().query(`
+          UPDATE folios 
+          SET status = 'CLOSED', balance = 0.00, updated_at = CURRENT_TIMESTAMP
+          WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1 AND (id = $2 OR reservation_number = $3))
+        `, [propId, numericId, String(id)]).catch(() => {});
+        await getPool().query(`
+          UPDATE folio_charges 
+          SET is_voided = true, void_reason = 'Reservation Cancelled'
+          WHERE folio_id IN (SELECT id FROM folios WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1 AND (id = $2 OR reservation_number = $3)))
+        `, [propId, numericId, String(id)]).catch(() => {});
+      }
     }
 
     return bookingService.getBookingById(id, propId);
@@ -1262,11 +1293,25 @@ export const bookingService = {
    */
   deleteBooking: async (id: string | number, propertyId: string | number): Promise<boolean> => {
     const propId = resolvePropertyId(propertyId);
+    const targetId = isNaN(Number(id)) ? -1 : Number(id);
     await getPool().query(`
       UPDATE reservations
       SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
       WHERE property_id = $1 AND (id = $2 OR reservation_number = $3)
-    `, [propId, isNaN(Number(id)) ? -1 : Number(id), String(id)]);
+    `, [propId, targetId, String(id)]);
+
+    await getPool().query(`
+      UPDATE folios 
+      SET status = 'CLOSED', balance = 0.00, updated_at = CURRENT_TIMESTAMP
+      WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1 AND (id = $2 OR reservation_number = $3))
+    `, [propId, targetId, String(id)]).catch(() => {});
+
+    await getPool().query(`
+      UPDATE folio_charges 
+      SET is_voided = true, void_reason = 'Reservation Cancelled'
+      WHERE folio_id IN (SELECT id FROM folios WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1 AND (id = $2 OR reservation_number = $3)))
+    `, [propId, targetId, String(id)]).catch(() => {});
+
     return true;
   },
 

@@ -54,7 +54,9 @@ router.get('/folios', async (req: Request, res: Response) => {
             FROM folios f
             LEFT JOIN reservations r ON r.id = f.reservation_id
             LEFT JOIN guests g ON g.id = f.guest_id
-            ${propertyId ? 'WHERE r.property_id = ?' : ''}
+            WHERE (r.status NOT IN ('CANCELLED', 'VOID') OR r.status IS NULL)
+              AND f.status = 'OPEN'
+              ${propertyId ? 'AND r.property_id = ?' : ''}
             ORDER BY f.id DESC
         `;
 
