@@ -22,24 +22,24 @@ export const getApiBaseUrl = (): string => {
     const hostname = window.location.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 
-    // When running locally in Vite dev server (e.g. http://localhost:5173), target port 3001
+    // When running locally in Vite dev server (e.g. http://localhost:5173), target port 3002
     if (isLocalhost) {
-      return `http://${hostname}:3001`;
+      return `http://${hostname}:3002`;
     }
 
     // When running on HTTPS (Vercel, custom domain, or cloud deployment):
     // Use relative path "" so requests route to `https://<domain>/api/...`
-    // This avoids port 3001 blocks and Mixed Content issues completely.
+    // This avoids port blocks and Mixed Content issues completely.
     if (isHttps) {
       return '';
     }
 
     // Default for plain HTTP on a local LAN IP (e.g. 192.168.1.X)
-    return `http://${hostname}:3001`;
+    return `http://${hostname}:3002`;
   }
 
   // Fallback for SSR or non-browser execution
-  return 'http://localhost:3001';
+  return 'http://localhost:3002';
 };
 
 export const API_BASE_URL = getApiBaseUrl();

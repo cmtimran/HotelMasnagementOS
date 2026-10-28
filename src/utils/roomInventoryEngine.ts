@@ -171,7 +171,7 @@ export const getStoredConnectingSuites = (propertyId: number = 1): ConnectingSui
 
 export const syncConnectingSuitesFromDB = async (propertyId: number = 1): Promise<ConnectingSuite[]> => {
     try {
-        const base = typeof window !== 'undefined' ? (window.location.origin.includes(':5173') ? 'http://localhost:3002' : '') : '';
+        const base = getApiBaseUrl();
         const res = await fetch(`${base}/api/connecting-rooms?propertyId=${propertyId}`);
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {

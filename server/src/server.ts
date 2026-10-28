@@ -25,7 +25,7 @@ initRedis((clusterEvent) => {
 });
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 // Global Middleware - Multi-Environment Dynamic CORS
 app.use(cors({
