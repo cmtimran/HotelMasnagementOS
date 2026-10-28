@@ -84,10 +84,10 @@ const Login = ({ onLogin }: LoginProps) => {
 
                     const role = isSuper ? 'super_admin' : isCox ? 'general_manager' : 'front_desk';
                     const propertyIdNum = isSuper ? 0 : isCox ? 2 : 1;
-                    const propertyName = isSuper 
-                        ? 'HotelOS Corporate HQ' 
-                        : isCox 
-                            ? "Grand Ocean Resort (Cox's Bazar)" 
+                    const propertyName = isSuper
+                        ? 'HotelOS Corporate HQ'
+                        : isCox
+                            ? "Grand Ocean Resort (Cox's Bazar)"
                             : 'Grand Palace Dhaka';
 
                     const cleanEmailName = email.split('@')[0]
@@ -104,7 +104,7 @@ const Login = ({ onLogin }: LoginProps) => {
                         property: propertyName,
                         property_id: propertyIdNum,
                         email: email,
-                        image: isSuper 
+                        image: isSuper
                             ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80'
                             : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&h=256&q=80'
                     };
@@ -340,11 +340,10 @@ const Login = ({ onLogin }: LoginProps) => {
                             <button
                                 type="button"
                                 onClick={fillSuperAdmin}
-                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
-                                    propertyId === 'HQ-CORP' 
-                                        ? 'border-indigo-500 bg-indigo-50/70 text-indigo-950 shadow-2xs' 
-                                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                                }`}
+                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${propertyId === 'HQ-CORP'
+                                    ? 'border-indigo-500 bg-indigo-50/70 text-indigo-950 shadow-2xs'
+                                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                    }`}
                                 title="Load Super Admin (HQ Master Console)"
                             >
                                 <div className="flex items-center gap-1">
@@ -357,11 +356,10 @@ const Login = ({ onLogin }: LoginProps) => {
                             <button
                                 type="button"
                                 onClick={fillDhakaFrontDesk}
-                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
-                                    propertyId === 'GPD-001' 
-                                        ? 'border-emerald-500 bg-emerald-50/70 text-emerald-950 shadow-2xs' 
-                                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                                }`}
+                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${propertyId === 'GPD-001'
+                                    ? 'border-emerald-500 bg-emerald-50/70 text-emerald-950 shadow-2xs'
+                                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                    }`}
                                 title="Load Front Desk Staff (Grand Palace Dhaka PMS)"
                             >
                                 <div className="flex items-center gap-1">
@@ -374,11 +372,10 @@ const Login = ({ onLogin }: LoginProps) => {
                             <button
                                 type="button"
                                 onClick={fillCoxsBazarGM}
-                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${
-                                    propertyId === 'GOR-002' 
-                                        ? 'border-blue-500 bg-blue-50/70 text-blue-950 shadow-2xs' 
-                                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                                }`}
+                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${propertyId === 'GOR-002'
+                                    ? 'border-blue-500 bg-blue-50/70 text-blue-950 shadow-2xs'
+                                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                    }`}
                                 title="Load Resort Operations (Grand Ocean Cox's Bazar PMS)"
                             >
                                 <div className="flex items-center gap-1">
@@ -392,7 +389,7 @@ const Login = ({ onLogin }: LoginProps) => {
 
                     <div className="pt-6 text-center">
                         <p className="text-[10px] font-semibold text-slate-400 tracking-tight uppercase">
-                            © 2026 HotelOS Enterprise • Multi-Property Hospitality System
+                            © 2026 HotelOS Enterprise • Property Management System
                         </p>
                     </div>
                 </div>

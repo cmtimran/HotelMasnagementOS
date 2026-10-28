@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Search, Sparkles, BedDouble, AlertCircle, Users, CheckCircle2, XCircle,
     Clock, RefreshCw, X, Edit3, Zap, Coffee, ShieldAlert, Star,
-    CheckSquare, Square, Layers, UserCheck, Filter, Wrench, PackageSearch, Plus
+    CheckSquare, Square, Layers, UserCheck, Filter, Wrench, PackageSearch, Plus,
+    Printer, ShoppingBag, AlertTriangle, FileCheck, Hammer
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { createLostAndFoundItem } from '../utils/lostAndFoundEngine';
@@ -15,6 +16,15 @@ import { getApiBaseUrl } from '../utils/apiUrl';
 import { getHousekeepingSettings, getHousekeepersList, isLinenChangeDue } from '../utils/housekeepingSettingsEngine';
 import PageHeader from './common/PageHeader';
 import OutOfOrderModal from './modals/OutOfOrderModal';
+import { createMaintenanceTask, type MaintenanceTask } from '../utils/maintenanceEngine';
+import {
+    getStoredDiscrepancies, flagRoomDiscrepancy, resolveRoomDiscrepancy,
+    type RoomDiscrepancy, type DiscrepancyType
+} from '../utils/housekeepingDiscrepancyEngine';
+import {
+    STANDARD_MINIBAR_CATALOG, postMinibarToFolio,
+    type MinibarConsumptionItem
+} from '../utils/minibarEngine';
 
 interface HousekeepingRoom {
     id: number | string;
@@ -54,6 +64,18 @@ const nightsSince = (checkInDate: string): number => {
     return Math.floor((now.getTime() - ci.getTime()) / 86400000);
 };
 
+// ─── SOP Checklist Standard Items ───────────────────────────────────────────
+const SOP_ITEMS = [
+    { key: 'linen', label: 'Bedding & Linen', desc: 'Fresh crisp sheets, mattress taut, duvet fluffed, pillow protectors clean' },
+    { key: 'bathroom', label: 'Bathroom Sanitation', desc: 'Commode & bidet disinfected, tiles wiped, shower glass & chrome polished' },
+    { key: 'amenities', label: 'Toiletries & Towels', desc: 'Bath & hand towels fresh, organic soaps, shampoo, conditioner & lotion restocked' },
+    { key: 'hvac', label: 'Climate & Thermostat', desc: 'AC cooling verified at 22°C, return vent spotless, remote controls responsive' },
+    { key: 'lighting', label: 'Lighting & Electronics', desc: 'All bulbs operational, bedside master switches & keycard energy slot working' },
+    { key: 'cleanliness', label: 'Surfaces & Flooring', desc: 'Wardrobe dusted, desk smudge-free, carpet vacuumed, balcony swept' },
+    { key: 'appliances', label: 'TV, Fridge & Safe', desc: 'Samsung smart TV HDMI channels clear, mini-fridge chilled, digital safe unlocked' },
+    { key: 'safety', label: 'Safety & Hardware', desc: 'Smoke detector green pulse, main door peephole clear, deadbolt engaging smoothly' }
+];
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 const HousekeepingGrid = () => {
@@ -73,13 +95,45 @@ const HousekeepingGrid = () => {
     const [bulkStatus, setBulkStatus] = useState<HousekeepingRoom['status']>('clean');
     const [showBulkBar, setShowBulkBar] = useState(false);
 
-    // Inspection Modal
+    // Inspection Modal Navigation & Tab
     const [selectedRoomForModal, setSelectedRoomForModal] = useState<HousekeepingRoom | null>(null);
+    const [modalActiveTab, setModalActiveTab] = useState<'status' | 'sop' | 'minibar' | 'discrepancy'>('status');
     const [modalStatus, setModalStatus] = useState<HousekeepingRoom['status']>('clean');
     const [modalAssignedTo, setModalAssignedTo] = useState<string>('');
     const [modalPriority, setModalPriority] = useState<'rush' | 'high' | 'normal' | 'low'>('normal');
     const [modalNotes, setModalNotes] = useState<string>('');
     const [modalDND, setModalDND] = useState(false);
+
+    // SOP Inspection Checks state
+    const [sopChecks, setSopChecks] = useState<Record<string, boolean>>({
+        linen: true, bathroom: true, amenities: true, hvac: true,
+        lighting: true, cleanliness: true, appliances: true, safety: true
+    });
+
+    // 1-Click Defect Escalation Form (inside SOP Tab)
+    const [isDefectFormOpen, setIsDefectFormOpen] = useState(false);
+    const [defectTitle, setDefectTitle] = useState('');
+    const [defectPriority, setDefectPriority] = useState<MaintenanceTask['priority']>('medium');
+    const [defectDesc, setDefectDesc] = useState('');
+    const [defectAlsoMarkOOO, setDefectAlsoMarkOOO] = useState(false);
+
+    // Minibar Folio Billing state
+    const [minibarQuantities, setMinibarQuantities] = useState<Record<string, number>>({});
+    const [isPostingMinibar, setIsPostingMinibar] = useState(false);
+
+    // Room Discrepancies state & forms
+    const [discrepancies, setDiscrepancies] = useState<RoomDiscrepancy[]>(() => getStoredDiscrepancies());
+    const [selectedDiscrepancyForResolve, setSelectedDiscrepancyForResolve] = useState<RoomDiscrepancy | null>(null);
+    const [discrepancyResolveNotes, setDiscrepancyResolveNotes] = useState('');
+    const [discType, setDiscType] = useState<DiscrepancyType>('Sleep Discrepancy');
+    const [discObservation, setDiscObservation] = useState('');
+
+    // Printable Daily Housekeeper Maid Worksheet modal
+    const [isWorksheetOpen, setIsWorksheetOpen] = useState(false);
+    const [worksheetHousekeeper, setWorksheetHousekeeper] = useState('all');
+    const [worksheetFloor, setWorksheetFloor] = useState('all');
+    const [worksheetShift, setWorksheetShift] = useState('Morning Shift (08:00 - 16:00)');
+    const [worksheetStatusFilter, setWorksheetStatusFilter] = useState<'all' | 'dirty_only'>('all');
 
     // Maintenance / Out of Order Modal
     const [isOooModalOpen, setIsOooModalOpen] = useState(false);
@@ -115,6 +169,25 @@ const HousekeepingGrid = () => {
         setModalPriority(room.priority);
         setModalNotes(room.notes || '');
         setModalDND(room.isDND);
+        setModalActiveTab('status');
+        setIsDefectFormOpen(false);
+        setDefectTitle('');
+        setDefectDesc('');
+        setDefectAlsoMarkOOO(false);
+        setMinibarQuantities({});
+        setDiscType('Sleep Discrepancy');
+        setDiscObservation('');
+        const isCleanOrInspected = room.status === 'clean' || room.status === 'inspected';
+        setSopChecks({
+            linen: isCleanOrInspected,
+            bathroom: isCleanOrInspected,
+            amenities: isCleanOrInspected,
+            hvac: isCleanOrInspected,
+            lighting: isCleanOrInspected,
+            cleanliness: isCleanOrInspected,
+            appliances: isCleanOrInspected,
+            safety: isCleanOrInspected
+        });
     };
 
     // ── Save modal ───────────────────────────────────────────────────────────
@@ -156,6 +229,109 @@ const HousekeepingGrid = () => {
 
         showToast(`Room ${roomNumber} updated & synced to database.`);
         setSelectedRoomForModal(null);
+    };
+
+    // ── Defect Escalation to Maintenance ──────────────────────────────────────
+    const handleDispatchDefect = () => {
+        if (!selectedRoomForModal) return;
+        if (!defectTitle.trim()) {
+            showToast('Please enter defect title or select a preset');
+            return;
+        }
+
+        const newTask = createMaintenanceTask({
+            title: defectTitle.trim(),
+            room: selectedRoomForModal.roomNumber,
+            priority: defectPriority,
+            description: defectDesc.trim() || `Reported during SOP inspection of Room ${selectedRoomForModal.roomNumber}`,
+            source: 'inspection',
+            reportedBy: modalAssignedTo || 'Housekeeper'
+        });
+
+        if (defectAlsoMarkOOO) {
+            setModalStatus('out-of-order');
+        }
+
+        showToast(`Work Order #${newTask.id} created for Room ${selectedRoomForModal.roomNumber}`);
+        setIsDefectFormOpen(false);
+        setDefectTitle('');
+        setDefectDesc('');
+    };
+
+    // ── Minibar Direct Folio Billing ──────────────────────────────────────────
+    const handlePostMinibarBilling = async () => {
+        if (!selectedRoomForModal) return;
+        const items: MinibarConsumptionItem[] = Object.entries(minibarQuantities)
+            .filter(([_, qty]) => qty > 0)
+            .map(([id, qty]) => {
+                const product = STANDARD_MINIBAR_CATALOG.find(p => p.id === id)!;
+                return {
+                    productId: id,
+                    name: product.name,
+                    quantity: qty,
+                    unitPrice: product.unitPrice,
+                    subtotal: product.unitPrice * qty
+                };
+            });
+
+        if (items.length === 0) {
+            showToast('Please select at least 1 minibar item with quantity > 0');
+            return;
+        }
+
+        setIsPostingMinibar(true);
+        try {
+            const res = await postMinibarToFolio(selectedRoomForModal.roomNumber, items, modalAssignedTo);
+            if (res.success) {
+                showToast(`৳${res.total} BDT Minibar charged to Room ${selectedRoomForModal.roomNumber} folio!`);
+                setMinibarQuantities({});
+            } else {
+                showToast(res.message);
+            }
+        } finally {
+            setIsPostingMinibar(false);
+        }
+    };
+
+    // ── Flag Room Discrepancy ─────────────────────────────────────────────────
+    const handleFlagDiscrepancy = () => {
+        if (!selectedRoomForModal) return;
+        if (!discObservation.trim()) {
+            showToast('Please enter observation notes describing physical room condition');
+            return;
+        }
+
+        const frontDeskDesc = selectedRoomForModal.guestName 
+            ? `Occupied (${selectedRoomForModal.guestName})` 
+            : 'Vacant in PMS';
+
+        flagRoomDiscrepancy({
+            roomNumber: selectedRoomForModal.roomNumber,
+            discrepancyType: discType,
+            frontDeskStatus: frontDeskDesc,
+            housekeepingFound: discObservation.trim(),
+            guestName: selectedRoomForModal.guestName,
+            reportedBy: modalAssignedTo || 'Housekeeper',
+            notes: `Discrepancy flagged during Housekeeping turnover inspection.`
+        });
+
+        setDiscrepancies(getStoredDiscrepancies());
+        showToast(`Discrepancy flagged for Room ${selectedRoomForModal.roomNumber}. Front Desk notified.`);
+        setDiscObservation('');
+    };
+
+    // ── Resolve Room Discrepancy ──────────────────────────────────────────────
+    const handleResolveDiscrepancy = () => {
+        if (!selectedDiscrepancyForResolve) return;
+        resolveRoomDiscrepancy(
+            selectedDiscrepancyForResolve.id,
+            'Housekeeping Supervisor',
+            discrepancyResolveNotes.trim() || 'Physical inspection reconciled with Front Desk registry.'
+        );
+        setDiscrepancies(getStoredDiscrepancies());
+        showToast(`Discrepancy #${selectedDiscrepancyForResolve.id} resolved.`);
+        setSelectedDiscrepancyForResolve(null);
+        setDiscrepancyResolveNotes('');
     };
 
     // ── Status map ───────────────────────────────────────────────────────────
@@ -324,6 +500,11 @@ const HousekeepingGrid = () => {
 
     useEffect(() => {
         fetchRooms();
+        const handleDiscrepanciesUpdate = () => {
+            setDiscrepancies(getStoredDiscrepancies());
+        };
+        window.addEventListener('pms_discrepancy_updated', handleDiscrepanciesUpdate);
+
         const unsubscribe = subscribeToPMSEvents((msg) => {
             if (msg.type === 'INVENTORY_REFRESH') {
                 fetchRooms();
@@ -337,7 +518,10 @@ const HousekeepingGrid = () => {
                 }));
             }
         });
-        return () => unsubscribe();
+        return () => {
+            unsubscribe();
+            window.removeEventListener('pms_discrepancy_updated', handleDiscrepanciesUpdate);
+        };
     }, [fetchRooms]);
 
     // ── Derived data ─────────────────────────────────────────────────────────
@@ -346,16 +530,25 @@ const HousekeepingGrid = () => {
         [rooms]
     );
 
+    const activeDiscrepancies = useMemo(() =>
+        discrepancies.filter(d => d.status === 'active' || d.status === 'investigating'),
+        [discrepancies]
+    );
+
     const filteredRooms = useMemo(() => rooms.filter(room => {
         const matchesSearch =
             room.roomNumber.includes(searchTerm) ||
             (room.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
             (room.guestName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
         const matchesFloor = filterFloor === 'all' || room.floor.toString() === filterFloor;
-        const matchesStatus = filterStatus === 'all' || room.status === filterStatus;
+        const matchesStatus = filterStatus === 'all'
+            ? true
+            : filterStatus === 'discrepancy'
+            ? activeDiscrepancies.some(d => d.roomNumber === room.roomNumber)
+            : room.status === filterStatus;
         const matchesPriority = filterPriority === 'all' || room.priority === filterPriority;
         return matchesSearch && matchesFloor && matchesStatus && matchesPriority;
-    }), [rooms, searchTerm, filterFloor, filterStatus, filterPriority]);
+    }), [rooms, searchTerm, filterFloor, filterStatus, filterPriority, activeDiscrepancies]);
 
     const stats = useMemo(() => ({
         total: rooms.length,
@@ -366,7 +559,8 @@ const HousekeepingGrid = () => {
         rush: rooms.filter(r => r.isRush).length,
         dnd: rooms.filter(r => r.isDND).length,
         linenDue: rooms.filter(r => r.isLinenDue).length,
-    }), [rooms]);
+        discrepancies: activeDiscrepancies.length,
+    }), [rooms, activeDiscrepancies]);
 
     // ── Cycle status (with safe OOO check) ──────────────────────────────────
     const cycleStatus = async (roomNumber: string) => {
@@ -608,6 +802,15 @@ const HousekeepingGrid = () => {
                         </button>
                         <button
                             type="button"
+                            onClick={() => setIsWorksheetOpen(true)}
+                            className="btn-secondary flex items-center gap-1.5 cursor-pointer text-slate-700 hover:text-indigo-700"
+                            title="Print Daily Housekeeper Assignment Worksheets (Enterprise SOP)"
+                        >
+                            <Printer size={13} className="text-indigo-600" />
+                            <span>Maid Worksheet</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => setShowBulkBar(v => !v)}
                             className={`btn-secondary flex items-center gap-1.5 cursor-pointer ${showBulkBar ? 'ring-1 ring-primary' : ''}`}
                         >
@@ -628,7 +831,7 @@ const HousekeepingGrid = () => {
             />
 
             {/* ── KPI Cards ──────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
                 {[
                     { label: 'Total', value: stats.total, sub: 'All rooms', color: 'text-slate-900', bg: 'bg-primary-subtle text-primary', icon: <BedDouble size={15} /> },
                     { label: 'Dirty', value: stats.dirty, sub: 'Needs cleaning', color: 'text-rose-600', bg: 'bg-rose-50 text-rose-600', icon: <AlertCircle size={15} /> },
@@ -638,6 +841,7 @@ const HousekeepingGrid = () => {
                     { label: 'Rush', value: stats.rush, sub: 'Imminent arrival', color: 'text-red-600', bg: 'bg-red-50 text-red-600', icon: <Zap size={15} /> },
                     { label: 'DND', value: stats.dnd, sub: 'Do Not Disturb', color: 'text-violet-600', bg: 'bg-violet-50 text-violet-600', icon: <ShieldAlert size={15} /> },
                     { label: 'Linen Due', value: stats.linenDue, sub: 'Long stay', color: 'text-sky-600', bg: 'bg-sky-50 text-sky-600', icon: <Coffee size={15} /> },
+                    { label: 'Discrepancy', value: stats.discrepancies, sub: 'Audit mismatch', color: stats.discrepancies > 0 ? 'text-rose-600 font-bold' : 'text-slate-600', bg: stats.discrepancies > 0 ? 'bg-rose-100 text-rose-700 animate-pulse' : 'bg-slate-100 text-slate-500', icon: <AlertTriangle size={15} /> },
                 ].map(kpi => (
                     <div key={kpi.label} className="kpi-card !py-3">
                         <div className="flex-1 min-w-0">
@@ -721,6 +925,7 @@ const HousekeepingGrid = () => {
                         <option value="clean">Clean</option>
                         <option value="inspected">Inspected</option>
                         <option value="out-of-order">Out of Order</option>
+                        <option value="discrepancy">Discrepancies ({stats.discrepancies})</option>
                     </select>
                     <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select-standard">
                         <option value="all">All Priorities</option>
@@ -820,6 +1025,24 @@ const HousekeepingGrid = () => {
                                     <td>{getPriorityBadge(room)}</td>
                                     <td>
                                         <div className="flex items-center gap-1.5 flex-wrap">
+                                            {(() => {
+                                                const roomDisc = activeDiscrepancies.find(d => d.roomNumber === room.roomNumber);
+                                                if (!roomDisc) return null;
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedDiscrepancyForResolve(roomDisc);
+                                                            setDiscrepancyResolveNotes('');
+                                                        }}
+                                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-red-600 hover:bg-red-700 text-white font-bold animate-pulse cursor-pointer shadow-2xs"
+                                                        title={`Audit Discrepancy: ${roomDisc.discrepancyType}. Click to inspect & resolve.`}
+                                                    >
+                                                        <AlertTriangle size={9} /> DISC
+                                                    </button>
+                                                );
+                                            })()}
                                             {room.isDND && (
                                                 <span title="Do Not Disturb" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-violet-50 text-violet-700 border border-violet-200 font-bold">
                                                     <ShieldAlert size={9} /> DND
@@ -907,16 +1130,16 @@ const HousekeepingGrid = () => {
             {/* ── Inspection & Assignment Modal ───────────────────────────── */}
             {selectedRoomForModal && (
                 <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[560px] w-full overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[760px] w-full overflow-hidden animate-in zoom-in-95 duration-150 my-auto max-h-[92vh] flex flex-col">
                         {/* Header */}
-                        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
                             <div className="flex items-center gap-3.5">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center font-mono font-bold text-base shadow-sm ring-2 ring-blue-100">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#1e3a8a] to-blue-700 text-white flex items-center justify-center font-mono font-bold text-base shadow-sm ring-2 ring-blue-100 shrink-0">
                                     {selectedRoomForModal.roomNumber}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="text-sm font-bold text-slate-900">Room {selectedRoomForModal.roomNumber} — Inspection</h3>
+                                        <h3 className="text-sm font-bold text-slate-900">Room {selectedRoomForModal.roomNumber} — Inspection Hub</h3>
                                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${getStatusStyle(modalStatus)}`}>
                                             {modalStatus === 'out-of-order' ? 'Out of Order' : modalStatus}
                                         </span>
@@ -947,155 +1170,628 @@ const HousekeepingGrid = () => {
                             </button>
                         </div>
 
-                        {/* Guest Info strip (if occupied) */}
-                        {selectedRoomForModal.specialRequest && (
-                            <div className="mx-6 mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
-                                <Star size={13} className="shrink-0 mt-0.5 text-amber-600" />
-                                <div>
-                                    <span className="font-bold">Guest Special Request: </span>
-                                    {selectedRoomForModal.specialRequest}
-                                </div>
-                            </div>
-                        )}
-                        {selectedRoomForModal.isLinenDue && (
-                            <div className="mx-6 mt-3 p-3 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-800 flex items-start gap-2">
-                                <Coffee size={13} className="shrink-0 mt-0.5 text-sky-600" />
-                                <div>
-                                    <span className="font-bold">Linen Change Due</span> — Guest in-house for {selectedRoomForModal.nightsInHouse} night{selectedRoomForModal.nightsInHouse !== 1 ? 's' : ''}. Policy requires fresh linen.
-                                </div>
-                            </div>
-                        )}
+                        {/* Navigation Tabs */}
+                        <div className="flex border-b border-slate-200 px-6 bg-slate-50/50 gap-4 text-xs font-bold shrink-0 overflow-x-auto">
+                            <button
+                                type="button"
+                                onClick={() => setModalActiveTab('status')}
+                                className={`py-3 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    modalActiveTab === 'status'
+                                        ? 'border-[#1e3a8a] text-[#1e3a8a]'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                <Sparkles size={14} />
+                                Status &amp; Turnover
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setModalActiveTab('sop')}
+                                className={`py-3 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    modalActiveTab === 'sop'
+                                        ? 'border-[#1e3a8a] text-[#1e3a8a]'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                <FileCheck size={14} />
+                                SOP Inspection
+                                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                                    Object.values(sopChecks).filter(Boolean).length === 8
+                                        ? 'bg-emerald-100 text-emerald-800 font-bold'
+                                        : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                    {Object.values(sopChecks).filter(Boolean).length}/8
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setModalActiveTab('minibar')}
+                                className={`py-3 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    modalActiveTab === 'minibar'
+                                        ? 'border-[#1e3a8a] text-[#1e3a8a]'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                <ShoppingBag size={14} />
+                                Minibar Billing
+                                {Object.values(minibarQuantities).some(q => q > 0) && (
+                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+                                        ৳{Object.entries(minibarQuantities).reduce((acc, [id, qty]) => {
+                                            const prod = STANDARD_MINIBAR_CATALOG.find(p => p.id === id);
+                                            return acc + (prod ? prod.unitPrice * qty : 0);
+                                        }, 0)}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setModalActiveTab('discrepancy')}
+                                className={`py-3 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    modalActiveTab === 'discrepancy'
+                                        ? 'border-red-600 text-red-600'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                <AlertTriangle size={14} className={modalActiveTab === 'discrepancy' ? 'text-red-600' : 'text-slate-400'} />
+                                Discrepancy Audit
+                            </button>
+                        </div>
 
-                        {/* Modal Body */}
-                        <div className="p-6 space-y-4">
-                            {/* Status Selector */}
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                                    Housekeeping Status
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {[
-                                        { id: 'clean', label: 'Clean', icon: <Sparkles size={13} />, activeStyle: 'bg-emerald-600 text-white border-emerald-600 font-bold ring-2 ring-emerald-200', inactiveStyle: 'bg-emerald-50/70 text-emerald-800 border-emerald-200 hover:bg-emerald-100/80 font-medium' },
-                                        { id: 'inspected', label: 'Inspected', icon: <CheckCircle2 size={13} />, activeStyle: 'bg-blue-600 text-white border-blue-600 font-bold ring-2 ring-blue-200', inactiveStyle: 'bg-blue-50/70 text-blue-800 border-blue-200 hover:bg-blue-100/80 font-medium' },
-                                        { id: 'dirty', label: 'Dirty', icon: <BedDouble size={13} />, activeStyle: 'bg-rose-600 text-white border-rose-600 font-bold ring-2 ring-rose-200', inactiveStyle: 'bg-rose-50/70 text-rose-800 border-rose-200 hover:bg-rose-100/80 font-medium' },
-                                        { id: 'out-of-order', label: 'OOO', icon: <XCircle size={13} />, activeStyle: 'bg-slate-700 text-white border-slate-700 font-bold ring-2 ring-slate-300', inactiveStyle: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/80 font-medium' }
-                                    ].map(st => (
-                                        <button
-                                            key={st.id}
-                                            type="button"
-                                            onClick={() => setModalStatus(st.id as any)}
-                                            className={`py-2 rounded-xl text-xs border flex flex-col items-center gap-1 cursor-pointer transition-all ${modalStatus === st.id ? st.activeStyle : st.inactiveStyle}`}
-                                        >
-                                            {st.icon}
-                                            <span>{st.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                        {/* Modal Scrollable Body */}
+                        <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                            {/* ── TAB 1: STATUS & TURNOVER ────────────────────────────── */}
+                            {modalActiveTab === 'status' && (
+                                <div className="space-y-4">
+                                    {/* Guest Info strip (if occupied) */}
+                                    {selectedRoomForModal.specialRequest && (
+                                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                                            <Star size={13} className="shrink-0 mt-0.5 text-amber-600" />
+                                            <div>
+                                                <span className="font-bold">Guest Special Request: </span>
+                                                {selectedRoomForModal.specialRequest}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {selectedRoomForModal.isLinenDue && (
+                                        <div className="p-3 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-800 flex items-start gap-2">
+                                            <Coffee size={13} className="shrink-0 mt-0.5 text-sky-600" />
+                                            <div>
+                                                <span className="font-bold">Linen Change Due</span> — Guest in-house for {selectedRoomForModal.nightsInHouse} night{selectedRoomForModal.nightsInHouse !== 1 ? 's' : ''}. Policy requires fresh linen.
+                                            </div>
+                                        </div>
+                                    )}
 
-                            {/* Housekeeper / Priority / DND */}
-                            <div className="grid grid-cols-3 gap-3 text-xs">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assign Housekeeper</label>
-                                    <select
-                                        value={modalAssignedTo}
-                                        onChange={e => setModalAssignedTo(e.target.value)}
-                                        className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none cursor-pointer focus:border-blue-500 shadow-2xs"
-                                    >
-                                        {housekeeperNames.map(name => (
-                                            <option key={name} value={name}>{name}</option>
-                                        ))}
-                                        <option value="Duty Housekeeping Team">Duty Housekeeping Team</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Priority</label>
-                                    <select
-                                        value={modalPriority}
-                                        onChange={e => setModalPriority(e.target.value as any)}
-                                        className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none cursor-pointer focus:border-blue-500 shadow-2xs"
-                                    >
-                                        <option value="rush">Rush (VIP / Imminent)</option>
-                                        <option value="high">High Priority</option>
-                                        <option value="normal">Normal Routine</option>
-                                        <option value="low">Low Priority</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Guest Flags</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setModalDND(v => !v)}
-                                        className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer transition-all ${modalDND ? 'bg-violet-600 text-white border-violet-700 ring-2 ring-violet-200' : 'bg-white text-slate-700 border-slate-200 hover:bg-violet-50'}`}
-                                    >
-                                        <ShieldAlert size={12} />
-                                        {modalDND ? 'DND Active' : 'Set DND'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Notes */}
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                                    Turnover & Maintenance Notes
-                                </label>
-                                <textarea
-                                    rows={2}
-                                    value={modalNotes}
-                                    onChange={e => setModalNotes(e.target.value)}
-                                    placeholder="e.g. VIP arriving at 2 PM, extra towels placed, minibar restocked..."
-                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 resize-none shadow-2xs placeholder:text-slate-400"
-                                />
-                            </div>
-
-                            {/* OOO Defect Closure Action */}
-                            {modalStatus === 'out-of-order' && (
-                                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between">
-                                    <div className="text-xs text-rose-900">
-                                        <span className="font-bold block">Out of Order Maintenance Block</span>
-                                        <span className="text-[11px] text-rose-700">Set start/end dates, reason & vendor lock</span>
+                                    {/* Status Selector */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                            Housekeeping Status
+                                        </label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {[
+                                                { id: 'clean', label: 'Clean', icon: <Sparkles size={13} />, activeStyle: 'bg-emerald-600 text-white border-emerald-600 font-bold ring-2 ring-emerald-200', inactiveStyle: 'bg-emerald-50/70 text-emerald-800 border-emerald-200 hover:bg-emerald-100/80 font-medium' },
+                                                { id: 'inspected', label: 'Inspected', icon: <CheckCircle2 size={13} />, activeStyle: 'bg-blue-600 text-white border-blue-600 font-bold ring-2 ring-blue-200', inactiveStyle: 'bg-blue-50/70 text-blue-800 border-blue-200 hover:bg-blue-100/80 font-medium' },
+                                                { id: 'dirty', label: 'Dirty', icon: <BedDouble size={13} />, activeStyle: 'bg-rose-600 text-white border-rose-600 font-bold ring-2 ring-rose-200', inactiveStyle: 'bg-rose-50/70 text-rose-800 border-rose-200 hover:bg-rose-100/80 font-medium' },
+                                                { id: 'out-of-order', label: 'OOO', icon: <XCircle size={13} />, activeStyle: 'bg-slate-700 text-white border-slate-700 font-bold ring-2 ring-slate-300', inactiveStyle: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/80 font-medium' }
+                                            ].map(st => (
+                                                <button
+                                                    key={st.id}
+                                                    type="button"
+                                                    onClick={() => setModalStatus(st.id as any)}
+                                                    className={`py-2 rounded-xl text-xs border flex flex-col items-center gap-1 cursor-pointer transition-all ${modalStatus === st.id ? st.activeStyle : st.inactiveStyle}`}
+                                                >
+                                                    {st.icon}
+                                                    <span>{st.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setOooInitialRoom(selectedRoomForModal.roomNumber);
-                                            setIsOooModalOpen(true);
-                                        }}
-                                        className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                                    >
-                                        <Wrench size={12} />
-                                        Configure Block Dates
-                                    </button>
+
+                                    {/* Housekeeper / Priority / DND */}
+                                    <div className="grid grid-cols-3 gap-3 text-xs">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assign Housekeeper</label>
+                                            <select
+                                                value={modalAssignedTo}
+                                                onChange={e => setModalAssignedTo(e.target.value)}
+                                                className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none cursor-pointer focus:border-blue-500 shadow-2xs"
+                                            >
+                                                {housekeeperNames.map(name => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                                <option value="Duty Housekeeping Team">Duty Housekeeping Team</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Priority</label>
+                                            <select
+                                                value={modalPriority}
+                                                onChange={e => setModalPriority(e.target.value as any)}
+                                                className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none cursor-pointer focus:border-blue-500 shadow-2xs"
+                                            >
+                                                <option value="rush">Rush (VIP / Imminent)</option>
+                                                <option value="high">High Priority</option>
+                                                <option value="normal">Normal Routine</option>
+                                                <option value="low">Low Priority</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Guest Flags</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setModalDND(v => !v)}
+                                                className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer transition-all ${modalDND ? 'bg-violet-600 text-white border-violet-700 ring-2 ring-violet-200' : 'bg-white text-slate-700 border-slate-200 hover:bg-violet-50'}`}
+                                            >
+                                                <ShieldAlert size={12} />
+                                                {modalDND ? 'DND Active' : 'Set DND'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Notes */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                            Turnover & Maintenance Notes
+                                        </label>
+                                        <textarea
+                                            rows={2}
+                                            value={modalNotes}
+                                            onChange={e => setModalNotes(e.target.value)}
+                                            placeholder="e.g. VIP arriving at 2 PM, extra towels placed, minibar restocked..."
+                                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 resize-none shadow-2xs placeholder:text-slate-400"
+                                        />
+                                    </div>
+
+                                    {/* OOO Defect Closure Action */}
+                                    {modalStatus === 'out-of-order' && (
+                                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between">
+                                            <div className="text-xs text-rose-900">
+                                                <span className="font-bold block">Out of Order Maintenance Block</span>
+                                                <span className="text-[11px] text-rose-700">Set start/end dates, reason & vendor lock</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setOooInitialRoom(selectedRoomForModal.roomNumber);
+                                                    setIsOooModalOpen(true);
+                                                }}
+                                                className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                                            >
+                                                <Wrench size={12} />
+                                                Configure Block Dates
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Quick Lost & Found Logging Action */}
+                                    <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl flex items-center justify-between">
+                                        <div className="text-xs text-amber-950">
+                                            <span className="font-bold flex items-center gap-1.5">
+                                                <PackageSearch size={14} className="text-amber-700" />
+                                                Guest Property Left Behind?
+                                            </span>
+                                            <span className="text-[11px] text-amber-700">Auto-link room {selectedRoomForModal.roomNumber} guest profile & log item</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setQuickLostItemName('');
+                                                setQuickLostDescription('');
+                                                setQuickLostIsValuable(false);
+                                                setIsQuickLostModalOpen(true);
+                                            }}
+                                            className="px-3 py-1.5 text-xs font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                                        >
+                                            <Plus size={12} />
+                                            Report Item
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
-                            {/* Quick Lost & Found Logging Action */}
-                            <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl flex items-center justify-between">
-                                <div className="text-xs text-amber-950">
-                                    <span className="font-bold flex items-center gap-1.5">
-                                        <PackageSearch size={14} className="text-amber-700" />
-                                        Guest Property Left Behind?
-                                    </span>
-                                    <span className="text-[11px] text-amber-700">Auto-link room {selectedRoomForModal.roomNumber} guest profile & log item</span>
+                            {/* ── TAB 2: SOP INSPECTION (8-POINT CHECKLIST & DEFECT ESCALATION) */}
+                            {modalActiveTab === 'sop' && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/60 border border-blue-200">
+                                        <div>
+                                            <p className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                                                <FileCheck size={14} className="text-primary" />
+                                                AHLA / 5-Star SOP Turnover Checklist
+                                            </p>
+                                            <p className="text-[11px] text-blue-700 mt-0.5">
+                                                {Object.values(sopChecks).filter(Boolean).length} of 8 inspection checkpoints verified
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSopChecks({
+                                                        linen: true, bathroom: true, amenities: true, hvac: true,
+                                                        lighting: true, cleanliness: true, appliances: true, safety: true
+                                                    });
+                                                }}
+                                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                                            >
+                                                <CheckCircle2 size={12} />
+                                                Pass All 8
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSopChecks({
+                                                        linen: false, bathroom: false, amenities: false, hvac: false,
+                                                        lighting: false, cleanliness: false, appliances: false, safety: false
+                                                    });
+                                                }}
+                                                className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg bg-white cursor-pointer"
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 8 Checkpoints Grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        {SOP_ITEMS.map((item) => {
+                                            const isChecked = !!sopChecks[item.key];
+                                            return (
+                                                <div
+                                                    key={item.key}
+                                                    onClick={() => setSopChecks(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
+                                                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
+                                                        isChecked
+                                                            ? 'bg-emerald-50/40 border-emerald-200'
+                                                            : 'bg-white border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="mt-0.5">
+                                                        {isChecked ? (
+                                                            <CheckSquare size={16} className="text-emerald-600" />
+                                                        ) : (
+                                                            <Square size={16} className="text-slate-400" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between gap-1">
+                                                            <p className={`text-xs font-bold ${isChecked ? 'text-emerald-900' : 'text-slate-800'}`}>
+                                                                {item.label}
+                                                            </p>
+                                                            <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                                                                isChecked ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                                                            }`}>
+                                                                {isChecked ? 'Pass' : 'Pending'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                                            {item.desc}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Defect Escalation to Maintenance */}
+                                    <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-xl space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Hammer size={16} className="text-rose-600" />
+                                                <div>
+                                                    <p className="text-xs font-bold text-rose-950">
+                                                        Room Defect Escalation → Maintenance Kanban
+                                                    </p>
+                                                    <p className="text-[11px] text-rose-700">
+                                                        Dispatch instant work order to engineering duty team
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsDefectFormOpen(v => !v)}
+                                                className="px-3 py-1 bg-white hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-2xs"
+                                            >
+                                                {isDefectFormOpen ? 'Close Ticket Form' : '+ New Work Order'}
+                                            </button>
+                                        </div>
+
+                                        {isDefectFormOpen && (
+                                            <div className="pt-2 border-t border-rose-200 space-y-3 animate-in fade-in-50">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider mb-1">Common Quick-Pick Presets:</p>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {[
+                                                            'AC Cooling Weak / Leaking Water',
+                                                            'Bathroom Basin Faucet Continuous Drip',
+                                                            'Bedside Reading Lamp Bulb Burnt Out',
+                                                            'Electronic Keycard Lock Low Battery',
+                                                            'TV Remote Unresponsive / Needs Batteries',
+                                                            'Shower Drain Water Stagnation'
+                                                        ].map(preset => (
+                                                            <button
+                                                                key={preset}
+                                                                type="button"
+                                                                onClick={() => setDefectTitle(preset)}
+                                                                className="px-2 py-0.5 bg-white border border-rose-200 hover:border-rose-400 text-rose-900 rounded text-[10px] font-medium transition cursor-pointer"
+                                                            >
+                                                                {preset}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div className="col-span-2">
+                                                        <label className="text-[10px] font-bold text-slate-700 block mb-1">Defect Title *</label>
+                                                        <input
+                                                            type="text"
+                                                            value={defectTitle}
+                                                            onChange={e => setDefectTitle(e.target.value)}
+                                                            placeholder="e.g. Broken towel rail"
+                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-rose-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold text-slate-700 block mb-1">Priority</label>
+                                                        <select
+                                                            value={defectPriority}
+                                                            onChange={e => setDefectPriority(e.target.value as any)}
+                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none bg-white"
+                                                        >
+                                                            <option value="urgent">Urgent</option>
+                                                            <option value="high">High</option>
+                                                            <option value="medium">Medium</option>
+                                                            <option value="low">Low</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-700 block mb-1">Observation Details</label>
+                                                    <textarea
+                                                        rows={2}
+                                                        value={defectDesc}
+                                                        onChange={e => setDefectDesc(e.target.value)}
+                                                        placeholder="Provide technical details, location, or severity..."
+                                                        className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs outline-none resize-none focus:ring-1 focus:ring-rose-500"
+                                                    />
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-1">
+                                                    <label className="flex items-center gap-2 cursor-pointer text-xs text-rose-900 font-medium">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={defectAlsoMarkOOO}
+                                                            onChange={e => setDefectAlsoMarkOOO(e.target.checked)}
+                                                            className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                                                        />
+                                                        Lock room as Out of Order (OOO)
+                                                    </label>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleDispatchDefect}
+                                                        disabled={!defectTitle.trim()}
+                                                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                                    >
+                                                        <Wrench size={12} />
+                                                        Dispatch Work Order
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setQuickLostItemName('');
-                                        setQuickLostDescription('');
-                                        setQuickLostIsValuable(false);
-                                        setIsQuickLostModalOpen(true);
-                                    }}
-                                    className="px-3 py-1.5 text-xs font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    <Plus size={12} />
-                                    Report Item
-                                </button>
-                            </div>
+                            )}
+
+                            {/* ── TAB 3: MINIBAR FOLIO BILLING ────────────────────────── */}
+                            {modalActiveTab === 'minibar' && (
+                                <div className="space-y-4">
+                                    <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                                                <ShoppingBag size={14} className="text-emerald-700" />
+                                                In-Room Minibar Direct Folio Billing
+                                            </p>
+                                            <p className="text-[11px] text-emerald-700 mt-0.5">
+                                                {selectedRoomForModal.guestName ? (
+                                                    <>Active Guest: <strong className="text-emerald-900">{selectedRoomForModal.guestName}</strong> (Auto-posts itemized bill to guest ledger)</>
+                                                ) : (
+                                                    <span className="text-slate-500">Room is currently vacant. Restock counts logged for turnover audit.</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] text-emerald-700 uppercase tracking-wider font-bold">Total Consumption</p>
+                                            <p className="text-lg font-mono font-bold text-emerald-900">
+                                                ৳{Object.entries(minibarQuantities).reduce((acc, [id, qty]) => {
+                                                    const prod = STANDARD_MINIBAR_CATALOG.find(p => p.id === id);
+                                                    return acc + (prod ? prod.unitPrice * qty : 0);
+                                                }, 0)}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Catalog Grid */}
+                                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                                        <table className="w-full text-left text-xs border-collapse">
+                                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-bold">
+                                                <tr>
+                                                    <th className="py-2.5 px-3">Item Description</th>
+                                                    <th className="py-2.5 px-2">Category</th>
+                                                    <th className="py-2.5 px-2 text-right">Unit Price</th>
+                                                    <th className="py-2.5 px-3 text-center w-28">Quantity</th>
+                                                    <th className="py-2.5 px-3 text-right">Subtotal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {STANDARD_MINIBAR_CATALOG.map(prod => {
+                                                    const qty = minibarQuantities[prod.id] || 0;
+                                                    const subtotal = prod.unitPrice * qty;
+                                                    return (
+                                                        <tr key={prod.id} className={qty > 0 ? 'bg-emerald-50/30' : 'hover:bg-slate-50/60'}>
+                                                            <td className="py-2 px-3 font-semibold text-slate-800">{prod.name}</td>
+                                                            <td className="py-2 px-2">
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                                                                    {prod.category}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2 px-2 text-right font-mono text-slate-600">৳{prod.unitPrice}</td>
+                                                            <td className="py-2 px-3">
+                                                                <div className="flex items-center justify-center gap-1.5">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setMinibarQuantities(prev => ({
+                                                                            ...prev,
+                                                                            [prod.id]: Math.max(0, (prev[prod.id] || 0) - 1)
+                                                                        }))}
+                                                                        className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer"
+                                                                    >
+                                                                        -
+                                                                    </button>
+                                                                    <span className="w-6 text-center font-mono font-bold text-slate-900 text-xs">
+                                                                        {qty}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setMinibarQuantities(prev => ({
+                                                                            ...prev,
+                                                                            [prod.id]: (prev[prod.id] || 0) + 1
+                                                                        }))}
+                                                                        className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                                                                {qty > 0 ? `৳${subtotal}` : '-'}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Action Post Button */}
+                                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                                        <p className="text-xs text-slate-600">
+                                            Recorded by: <span className="font-semibold text-slate-800">{modalAssignedTo || 'Duty Housekeeper'}</span>
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handlePostMinibarBilling}
+                                            disabled={isPostingMinibar || !Object.values(minibarQuantities).some(q => q > 0)}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer disabled:opacity-40 transition flex items-center gap-1.5"
+                                        >
+                                            <ShoppingBag size={13} />
+                                            {isPostingMinibar ? 'Posting to Folio...' : `Post Charge to Guest Folio (৳${Object.entries(minibarQuantities).reduce((acc, [id, qty]) => {
+                                                const prod = STANDARD_MINIBAR_CATALOG.find(p => p.id === id);
+                                                return acc + (prod ? prod.unitPrice * qty : 0);
+                                            }, 0)})`}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── TAB 4: ROOM DISCREPANCY AUDIT ───────────────────────── */}
+                            {modalActiveTab === 'discrepancy' && (
+                                <div className="space-y-4">
+                                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1">
+                                        <div className="flex items-center gap-1.5 font-bold">
+                                            <AlertTriangle size={15} className="text-rose-600" />
+                                            AHLA &amp; Opera Cloud Discrepancy Standard
+                                        </div>
+                                        <p className="text-[11px] text-rose-700">
+                                            Flag when physical room conditions observed by Housekeeping contradict the Front Desk system records (e.g. unregistered sleeper, skipped guest, or unauthorized baggage).
+                                        </p>
+                                    </div>
+
+                                    {/* Status Comparison */}
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                                            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Front Desk Record</p>
+                                            <p className="text-sm font-bold text-slate-900 mt-1">
+                                                {selectedRoomForModal.guestName ? `Occupied (${selectedRoomForModal.guestName})` : 'Vacant in PMS'}
+                                            </p>
+                                            <p className="text-[11px] text-slate-500 mt-0.5 capitalize">
+                                                Status: {selectedRoomForModal.reservationStatus || 'Vacant'}
+                                            </p>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                                            <p className="text-[10px] text-amber-600 uppercase font-bold tracking-wider">Housekeeper Current Status</p>
+                                            <p className="text-sm font-bold text-amber-900 mt-1 capitalize">
+                                                {modalStatus} Room
+                                            </p>
+                                            <p className="text-[11px] text-amber-700 mt-0.5">
+                                                Inspector: {modalAssignedTo}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Discrepancy Type */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">
+                                            Discrepancy Category *
+                                        </label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {[
+                                                { id: 'Sleep Discrepancy' as DiscrepancyType, title: 'Sleep Discrepancy', desc: 'Front Desk shows VACANT, but luggage or slept bed found' },
+                                                { id: 'Skip Discrepancy (Skipper)' as DiscrepancyType, title: 'Skip Discrepancy (Skipper)', desc: 'Front Desk shows OCCUPIED, but room is empty & guest left' },
+                                                { id: 'Person Count Mismatch' as DiscrepancyType, title: 'Person Count Mismatch', desc: 'More occupants detected than registered in system' },
+                                                { id: 'Luggage Without Guest' as DiscrepancyType, title: 'Luggage Without Guest', desc: 'Checkout time exceeded, room vacant of guests but bags left' }
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    type="button"
+                                                    onClick={() => setDiscType(opt.id)}
+                                                    className={`p-3 text-left rounded-xl border transition-all cursor-pointer ${
+                                                        discType === opt.id
+                                                            ? 'border-red-600 bg-red-50 text-red-900 font-bold ring-2 ring-red-200'
+                                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <p className="text-xs">{opt.title}</p>
+                                                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">{opt.desc}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Observation Notes */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">
+                                            Housekeeper Physical Room Observation *
+                                        </label>
+                                        <textarea
+                                            rows={3}
+                                            value={discObservation}
+                                            onChange={e => setDiscObservation(e.target.value)}
+                                            placeholder="Describe evidence found (e.g. 2 open suitcases and laptop found on desk, bed unmade, door card on vanity...)"
+                                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-red-500 shadow-2xs resize-none"
+                                        />
+                                    </div>
+
+                                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                                        <p className="text-[11px] text-slate-500">
+                                            Reporting staff: <strong className="text-slate-700">{modalAssignedTo}</strong>
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleFlagDiscrepancy}
+                                            disabled={!discObservation.trim()}
+                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                        >
+                                            <AlertTriangle size={13} />
+                                            Flag Discrepancy &amp; Alert Front Desk
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setSelectedRoomForModal(null)}
@@ -1109,8 +1805,272 @@ const HousekeepingGrid = () => {
                                 className="h-9 px-4.5 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all"
                             >
                                 <CheckCircle2 size={14} />
-                                <span>Save & Sync Room Status</span>
+                                <span>Save &amp; Sync Room Status</span>
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Discrepancy Resolution Modal ─────────────────────────────── */}
+            {selectedDiscrepancyForResolve && (
+                <div className="fixed inset-0 z-60 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-150">
+                        <div className="px-6 py-4 bg-red-600 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle size={18} />
+                                <div>
+                                    <h3 className="text-sm font-bold">Resolve Discrepancy — Room {selectedDiscrepancyForResolve.roomNumber}</h3>
+                                    <p className="text-[11px] text-red-100">{selectedDiscrepancyForResolve.discrepancyType}</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedDiscrepancyForResolve(null)}
+                                className="text-red-100 hover:text-white cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs text-slate-700">
+                                <p><span className="text-slate-400 uppercase text-[10px] font-bold block">Front Desk Record</span> <strong>{selectedDiscrepancyForResolve.frontDeskStatus}</strong></p>
+                                <p><span className="text-slate-400 uppercase text-[10px] font-bold block">Housekeeper Physical Observation</span> {selectedDiscrepancyForResolve.housekeepingFound}</p>
+                                <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
+                                    Reported by: <strong>{selectedDiscrepancyForResolve.reportedBy}</strong> • {new Date(selectedDiscrepancyForResolve.reportedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                                    Supervisor Investigation &amp; Resolution Notes *
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    value={discrepancyResolveNotes}
+                                    onChange={e => setDiscrepancyResolveNotes(e.target.value)}
+                                    placeholder="e.g. Front Desk confirmed guest checked in late without scanning keycard. Folio updated and room marked Occupied Clean."
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-red-500 shadow-2xs resize-none"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedDiscrepancyForResolve(null)}
+                                    className="px-3.5 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleResolveDiscrepancy}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <CheckCircle2 size={13} />
+                                    Reconcile &amp; Clear Discrepancy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Daily Housekeeper Maid Worksheet Modal (Printable) ────────── */}
+            {isWorksheetOpen && (
+                <div className="fixed inset-0 z-60 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-5xl w-full overflow-hidden animate-in zoom-in-95 duration-150 max-h-[95vh] flex flex-col">
+                        {/* Header & Print Filter Bar */}
+                        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0 print:hidden">
+                            <div className="flex items-center gap-2">
+                                <Printer size={18} className="text-blue-400" />
+                                <div>
+                                    <h3 className="text-sm font-bold">Daily Housekeeper Maid Assignment Worksheet</h3>
+                                    <p className="text-[11px] text-slate-400">Opera Cloud / 5-Star Hotel Turnaround Clipboard Standard</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => window.print()}
+                                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <Printer size={13} />
+                                    Print / Save PDF
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsWorksheetOpen(false)}
+                                    className="text-slate-400 hover:text-white cursor-pointer p-1"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Filter Bar (Screen only) */}
+                        <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-3 flex-wrap text-xs print:hidden shrink-0">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-slate-500 font-semibold">Housekeeper:</span>
+                                <select
+                                    value={worksheetHousekeeper}
+                                    onChange={e => setWorksheetHousekeeper(e.target.value)}
+                                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none"
+                                >
+                                    <option value="all">All Housekeepers</option>
+                                    {housekeeperNames.map(hk => (
+                                        <option key={hk} value={hk}>{hk}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-slate-500 font-semibold">Floor:</span>
+                                <select
+                                    value={worksheetFloor}
+                                    onChange={e => setWorksheetFloor(e.target.value)}
+                                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none"
+                                >
+                                    <option value="all">All Floors</option>
+                                    {uniqueFloors.map(fl => (
+                                        <option key={fl} value={String(fl)}>Floor {fl}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-slate-500 font-semibold">Shift:</span>
+                                <select
+                                    value={worksheetShift}
+                                    onChange={e => setWorksheetShift(e.target.value)}
+                                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none"
+                                >
+                                    <option>Morning Shift (08:00 - 16:00)</option>
+                                    <option>Evening Shift (16:00 - 00:00)</option>
+                                    <option>Night Shift (00:00 - 08:00)</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-slate-500 font-semibold">Filter:</span>
+                                <select
+                                    value={worksheetStatusFilter}
+                                    onChange={e => setWorksheetStatusFilter(e.target.value as any)}
+                                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none"
+                                >
+                                    <option value="all">All Assigned Rooms</option>
+                                    <option value="dirty_only">Dirty Rooms Only</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Printable Document Area */}
+                        <div id="printable-maid-worksheet" className="p-6 overflow-y-auto space-y-4 flex-1 bg-white text-slate-900 font-sans">
+                            {/* Worksheet Header */}
+                            <div className="border-b-2 border-slate-900 pb-3 flex items-start justify-between">
+                                <div>
+                                    <h1 className="text-xl font-black tracking-tight text-slate-900 uppercase">
+                                        HotelManagementOS • Housekeeping Maid Worksheet
+                                    </h1>
+                                    <p className="text-xs text-slate-600 mt-0.5">
+                                        Daily Room Turnover &amp; Linen Control Clipboard Sheet
+                                    </p>
+                                </div>
+                                <div className="text-right text-xs">
+                                    <p><strong>Date:</strong> {getOperatingSystemDate()} ({new Date().toLocaleDateString('en-US', { weekday: 'short' })})</p>
+                                    <p><strong>Shift:</strong> {worksheetShift}</p>
+                                    <p><strong>Attendant:</strong> {worksheetHousekeeper === 'all' ? 'Floor Team' : worksheetHousekeeper}</p>
+                                </div>
+                            </div>
+
+                            {/* Summary Metrics */}
+                            {(() => {
+                                const wsRooms = rooms.filter(r => {
+                                    const matchHk = worksheetHousekeeper === 'all' || r.assignedTo === worksheetHousekeeper;
+                                    const matchFl = worksheetFloor === 'all' || String(r.floor) === worksheetFloor;
+                                    const matchSt = worksheetStatusFilter === 'all' || r.status === 'dirty';
+                                    return matchHk && matchFl && matchSt;
+                                });
+                                const dirtyC = wsRooms.filter(r => r.status === 'dirty').length;
+                                const cleanC = wsRooms.filter(r => r.status === 'clean' || r.status === 'inspected').length;
+                                const inHouseC = wsRooms.filter(r => r.reservationStatus === 'in-house').length;
+                                const arrivingC = wsRooms.filter(r => r.reservationStatus === 'arriving').length;
+                                const linenC = wsRooms.filter(r => r.isLinenDue).length;
+
+                                return (
+                                    <>
+                                        <div className="grid grid-cols-5 gap-2 text-center text-xs py-1">
+                                            <div className="p-2 border border-slate-300 rounded font-semibold">Total: {wsRooms.length}</div>
+                                            <div className="p-2 border border-slate-300 rounded font-semibold text-rose-700 bg-rose-50/50">Dirty: {dirtyC}</div>
+                                            <div className="p-2 border border-slate-300 rounded font-semibold text-emerald-700 bg-emerald-50/50">Ready: {cleanC}</div>
+                                            <div className="p-2 border border-slate-300 rounded font-semibold text-blue-700 bg-blue-50/50">In-House: {inHouseC} | Arr: {arrivingC}</div>
+                                            <div className="p-2 border border-slate-300 rounded font-semibold text-sky-700 bg-sky-50/50">Linen Due: {linenC}</div>
+                                        </div>
+
+                                        {/* Table */}
+                                        <table className="w-full text-left text-xs border border-slate-300 border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-100 text-slate-800 text-[10px] uppercase font-bold border-b border-slate-300">
+                                                    <th className="p-2 border-r border-slate-300 w-12 text-center">Room</th>
+                                                    <th className="p-2 border-r border-slate-300 w-14">Floor</th>
+                                                    <th className="p-2 border-r border-slate-300 w-28">Type</th>
+                                                    <th className="p-2 border-r border-slate-300">Guest / Front Desk</th>
+                                                    <th className="p-2 border-r border-slate-300 w-16 text-center">HK Status</th>
+                                                    <th className="p-2 border-r border-slate-300 w-14 text-center">Linen?</th>
+                                                    <th className="p-2 border-r border-slate-300 w-24">VIP / Requests</th>
+                                                    <th className="p-2 border-r border-slate-300 w-16 text-center">Minibar</th>
+                                                    <th className="p-2 border-r border-slate-300 w-16 text-center">Maid Sign</th>
+                                                    <th className="p-2 text-center w-16">Supv Ok</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200">
+                                                {wsRooms.map(r => (
+                                                    <tr key={r.id} className="hover:bg-slate-50">
+                                                        <td className="p-2 border-r border-slate-300 font-mono font-bold text-center text-slate-900">{r.roomNumber}</td>
+                                                        <td className="p-2 border-r border-slate-300 text-slate-600">Fl {r.floor}</td>
+                                                        <td className="p-2 border-r border-slate-300 text-slate-600">{r.roomType}</td>
+                                                        <td className="p-2 border-r border-slate-300 text-slate-800">
+                                                            {r.guestName ? (
+                                                                <span className="font-semibold">{r.guestName} <span className="text-[10px] text-slate-500 font-normal">({r.reservationStatus})</span></span>
+                                                            ) : (
+                                                                <span className="text-slate-400 italic">Vacant</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-2 border-r border-slate-300 text-center font-bold uppercase text-[10px]">
+                                                            {r.status}
+                                                        </td>
+                                                        <td className="p-2 border-r border-slate-300 text-center text-slate-700">
+                                                            {r.isLinenDue ? <strong className="text-blue-700 font-bold">YES</strong> : '—'}
+                                                        </td>
+                                                        <td className="p-2 border-r border-slate-300 text-[10px] text-slate-600">
+                                                            {r.specialRequest || (r.isRush ? 'RUSH ARRIVAL' : '—')}
+                                                        </td>
+                                                        <td className="p-2 border-r border-slate-300 text-center">
+                                                            <div className="w-4 h-4 border border-slate-400 mx-auto rounded-xs"></div>
+                                                        </td>
+                                                        <td className="p-2 border-r border-slate-300 text-center">
+                                                            <div className="w-4 h-4 border border-slate-400 mx-auto rounded-xs"></div>
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <div className="w-4 h-4 border border-slate-400 mx-auto rounded-xs"></div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </>
+                                );
+                            })()}
+
+                            {/* Sign-off Footer */}
+                            <div className="pt-6 mt-4 border-t border-slate-300 grid grid-cols-2 gap-8 text-xs text-slate-700">
+                                <div className="border-t border-slate-400 pt-1 text-center">
+                                    <p className="font-bold">Housekeeper Attendant Signature</p>
+                                    <p className="text-[10px] text-slate-500">Date &amp; Time completed</p>
+                                </div>
+                                <div className="border-t border-slate-400 pt-1 text-center">
+                                    <p className="font-bold">Floor Supervisor Inspection Sign-off</p>
+                                    <p className="text-[10px] text-slate-500">Verified and approved to Front Desk</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../database/postgres.js';
-import { requirePermission } from '../middleware/auth.js';
+import { db } from '../database/db.js';
+import { requirePermission } from '../middleware/rbacGuard.js';
 
 const router = Router();
 

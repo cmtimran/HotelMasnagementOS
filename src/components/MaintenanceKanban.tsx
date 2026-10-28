@@ -13,7 +13,12 @@ import {
     CheckSquare,
     Square,
     Sparkles,
-    Check
+    Check,
+    Calendar,
+    Settings2,
+    ShieldCheck,
+    Cpu,
+    FileCheck
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import OutOfOrderModal from './modals/OutOfOrderModal';
@@ -27,20 +32,19 @@ import {
     syncOOOBlocksFromBackend
 } from '../utils/outOfOrderEngine';
 import { toast } from '../context/ToastContext';
-
-interface MaintenanceTask {
-    id: number;
-    title: string;
-    room: string;
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    assignedTo?: string;
-    description: string;
-    createdAt: string;
-    status: 'todo' | 'in-progress' | 'completed';
-}
+import {
+    type MaintenanceTask,
+    type PPMProgram,
+    getMaintenanceTasks,
+    createMaintenanceTask,
+    updateMaintenanceTaskStatus,
+    getPPMPrograms,
+    completePPMCycle,
+    savePPMPrograms
+} from '../utils/maintenanceEngine';
 
 const MaintenanceKanban = () => {
-    const [activeSection, setActiveSection] = useState<'blocks' | 'kanban'>('blocks');
+    const [activeSection, setActiveSection] = useState<'blocks' | 'kanban' | 'ppm'>('blocks');
 
     // ── OOO Blocks State ──────────────────────────────────────────────────────
     const [blocks, setBlocks] = useState<OutOfOrderBlock[]>([]);
@@ -92,14 +96,7 @@ const MaintenanceKanban = () => {
     }, [fetchBlocks]);
 
     // ── Kanban Tasks State ────────────────────────────────────────────────────
-    const [tasks, setTasks] = useState<MaintenanceTask[]>([
-        { id: 1, title: 'AC Not Working', room: '203', priority: 'urgent', assignedTo: 'Ahmed', description: 'Guest complaint - AC not cooling', createdAt: '2h ago', status: 'in-progress' },
-        { id: 2, title: 'Leaking Faucet', room: '105', priority: 'medium', description: 'Bathroom sink faucet dripping', createdAt: '4h ago', status: 'todo' },
-        { id: 3, title: 'Light Bulb Replacement', room: '301', priority: 'low', assignedTo: 'Karim', description: 'Bedroom light not working', createdAt: '1d ago', status: 'todo' },
-        { id: 4, title: 'Door Lock Issue', room: '208', priority: 'high', assignedTo: 'Ahmed', description: 'Electronic lock malfunction', createdAt: '30min ago', status: 'in-progress' },
-        { id: 5, title: 'TV Remote', room: '102', priority: 'low', description: 'Remote batteries dead', createdAt: '3h ago', status: 'completed' },
-        { id: 6, title: 'Window Blind Broken', room: '405', priority: 'medium', description: 'Curtain rod needs fixing', createdAt: '5h ago', status: 'completed' },
-    ]);
+    const [tasks, setTasks] = useState<MaintenanceTask[]>(() => getMaintenanceTasks());
     const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskRoom, setNewTaskRoom] = useState('');
@@ -107,32 +104,79 @@ const MaintenanceKanban = () => {
     const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
     const [newTaskDesc, setNewTaskDesc] = useState('');
 
+    // ── PPM State ─────────────────────────────────────────────────────────────
+    const [ppmPrograms, setPpmPrograms] = useState<PPMProgram[]>(() => getPPMPrograms());
+    const [completingPPM, setCompletingPPM] = useState<PPMProgram | null>(null);
+    const [ppmCompletedBy, setPpmCompletedBy] = useState('Duty Engineer');
+    const [ppmCompletionNotes, setPpmCompletionNotes] = useState('All preventive checks passed. Service completed per SOP.');
+    const [isNewPPMModalOpen, setIsNewPPMModalOpen] = useState(false);
+    const [newPPMTitle, setNewPPMTitle] = useState('');
+    const [newPPMCategory, setNewPPMCategory] = useState<PPMProgram['category']>('HVAC & Climate');
+    const [newPPMCycleDays, setNewPPMCycleDays] = useState(30);
+    const [newPPMTargetRooms, setNewPPMTargetRooms] = useState('All Guest Rooms');
+    const [newPPMDesc, setNewPPMDesc] = useState('');
+    const [newPPMTech, setNewPPMTech] = useState('');
+
     const handleCreateTask = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTaskTitle.trim() || !newTaskRoom.trim()) {
             toast.error('Task title and room number are required');
             return;
         }
-        const created: MaintenanceTask = {
-            id: Date.now(),
+        const created = createMaintenanceTask({
             title: newTaskTitle.trim(),
             room: newTaskRoom.trim(),
             priority: newTaskPriority,
             assignedTo: newTaskAssignedTo.trim() || undefined,
             description: newTaskDesc.trim() || 'General maintenance required',
-            createdAt: 'Just now',
-            status: 'todo'
-        };
-        setTasks([created, ...tasks]);
+            source: 'frontdesk'
+        });
+        setTasks(getMaintenanceTasks());
         setIsNewTaskModalOpen(false);
         setNewTaskTitle('');
         setNewTaskRoom('');
         setNewTaskDesc('');
-        toast.success(`Work order created for Room ${created.room}`);
+        setNewTaskAssignedTo('');
+        toast.success(`Work order #${created.id} created for Room ${created.room}`);
     };
 
-    const handleTaskStatusChange = (taskId: number, newStatus: MaintenanceTask['status']) => {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    const handleTaskStatusChange = (taskId: number | string, newStatus: MaintenanceTask['status']) => {
+        updateMaintenanceTaskStatus(taskId, newStatus);
+        setTasks(getMaintenanceTasks());
+    };
+
+    const handleExecutePPM = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!completingPPM) return;
+        completePPMCycle(completingPPM.id, ppmCompletedBy, ppmCompletionNotes);
+        setPpmPrograms(getPPMPrograms());
+        toast.success(`PPM cycle completed: "${completingPPM.title}" — rolled to next schedule.`);
+        setCompletingPPM(null);
+        setPpmCompletionNotes('All preventive checks passed. Service completed per SOP.');
+    };
+
+    const handleCreatePPM = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newPPMTitle.trim()) { toast.error('Program title required'); return; }
+        const programs = getPPMPrograms();
+        const nextDate = new Date(Date.now() + newPPMCycleDays * 86400000).toISOString().slice(0, 10);
+        const newProg: PPMProgram = {
+            id: `PPM-${String(programs.length + 1).padStart(3, '0')}`,
+            title: newPPMTitle.trim(),
+            category: newPPMCategory,
+            cycleDays: newPPMCycleDays,
+            targetRooms: newPPMTargetRooms.trim() || 'All Rooms',
+            description: newPPMDesc.trim(),
+            nextDueDate: nextDate,
+            status: 'scheduled',
+            assignedTechnician: newPPMTech.trim() || 'Engineering Team',
+            checklist: ['Inspect asset condition', 'Perform service per manufacturer SOP', 'Log results & sign off']
+        };
+        savePPMPrograms([newProg, ...programs]);
+        setPpmPrograms(getPPMPrograms());
+        setIsNewPPMModalOpen(false);
+        setNewPPMTitle(''); setNewPPMDesc(''); setNewPPMTech('');
+        toast.success(`PPM scheduled: ${newProg.title}`);
     };
 
     // ── Single and Bulk Unlock actions ────────────────────────────────────────
@@ -272,6 +316,15 @@ const MaintenanceKanban = () => {
                                 <Plus size={14} />
                                 <span>Mark Maintenance Block</span>
                             </button>
+                        ) : activeSection === 'ppm' ? (
+                            <button
+                                type="button"
+                                onClick={() => setIsNewPPMModalOpen(true)}
+                                className="btn-primary flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            >
+                                <Plus size={14} />
+                                <span>+ New PPM Program</span>
+                            </button>
                         ) : (
                             <button
                                 type="button"
@@ -327,6 +380,29 @@ const MaintenanceKanban = () => {
                     <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700 font-bold">
                         {tasks.length}
                     </span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveSection('ppm')}
+                    className={`py-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                        activeSection === 'ppm'
+                            ? 'border-indigo-600 text-indigo-700'
+                            : 'border-transparent text-slate-500 hover:text-slate-900'
+                    }`}
+                >
+                    <Calendar size={14} />
+                    <span>Preventive Maintenance (PPM)</span>
+                    {ppmPrograms.filter(p => p.status === 'overdue' || p.status === 'due').length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-100 text-rose-700 border border-rose-200 font-bold animate-pulse">
+                            {ppmPrograms.filter(p => p.status === 'overdue' || p.status === 'due').length} Due
+                        </span>
+                    )}
+                    {ppmPrograms.filter(p => p.status === 'overdue' || p.status === 'due').length === 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700 font-bold">
+                            {ppmPrograms.length}
+                        </span>
+                    )}
                 </button>
             </div>
 
@@ -801,6 +877,148 @@ const MaintenanceKanban = () => {
                 </div>
             )}
 
+            {/* =========================================================================
+                SECTION 3: PLANNED PREVENTIVE MAINTENANCE (PPM)
+               ========================================================================= */}
+            {activeSection === 'ppm' && (
+                <div className="space-y-4">
+                    {/* PPM KPI Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="kpi-card">
+                            <div>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Programs</p>
+                                <p className="text-xl sm:text-2xl text-slate-900 mt-1">{ppmPrograms.length}</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">Active PPM schedules</p>
+                            </div>
+                            <div className="size-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                                <Calendar size={17} />
+                            </div>
+                        </div>
+                        <div className="kpi-card">
+                            <div>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Overdue</p>
+                                <p className={`text-xl sm:text-2xl mt-1 ${ppmPrograms.filter(p => p.status === 'overdue').length > 0 ? 'text-rose-600 font-black' : 'text-emerald-600'}`}>
+                                    {ppmPrograms.filter(p => p.status === 'overdue').length}
+                                </p>
+                                <p className="text-[11px] text-rose-500 font-medium mt-0.5">Past service date</p>
+                            </div>
+                            <div className={`size-9 rounded-xl flex items-center justify-center shrink-0 ${ppmPrograms.filter(p => p.status === 'overdue').length > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                <AlertCircle size={17} />
+                            </div>
+                        </div>
+                        <div className="kpi-card">
+                            <div>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">Due This Week</p>
+                                <p className="text-xl sm:text-2xl text-amber-600 mt-1">{ppmPrograms.filter(p => p.status === 'due').length}</p>
+                                <p className="text-[11px] text-amber-600 font-medium mt-0.5">Within 7 days</p>
+                            </div>
+                            <div className="size-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                <Clock size={17} />
+                            </div>
+                        </div>
+                        <div className="kpi-card">
+                            <div>
+                                <p className="text-[11px] text-slate-400 uppercase tracking-wider">On Schedule</p>
+                                <p className="text-xl sm:text-2xl text-emerald-600 mt-1">{ppmPrograms.filter(p => p.status === 'scheduled').length}</p>
+                                <p className="text-[11px] text-emerald-600 font-medium mt-0.5">No immediate action</p>
+                            </div>
+                            <div className="size-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <ShieldCheck size={17} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* PPM Program Cards Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {ppmPrograms.map(prog => {
+                            const isOverdue = prog.status === 'overdue';
+                            const isDue = prog.status === 'due';
+                            const borderColor = isOverdue ? 'border-l-rose-500' : isDue ? 'border-l-amber-500' : 'border-l-emerald-500';
+                            const statusBadge = isOverdue
+                                ? 'bg-rose-600 text-white animate-pulse'
+                                : isDue
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+                            return (
+                                <div key={prog.id} className={`bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 border-l-4 ${borderColor} flex flex-col gap-3`}>
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div>
+                                            <p className="text-[10px] font-mono text-slate-400">{prog.id}</p>
+                                            <h3 className="text-sm font-bold text-slate-900 mt-0.5">{prog.title}</h3>
+                                        </div>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize shrink-0 ${statusBadge}`}>
+                                            {prog.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2 text-[11px]">
+                                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold flex items-center gap-1">
+                                            <Cpu size={10} /> {prog.category}
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">
+                                            Every {prog.cycleDays}d
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded bg-slate-50 text-slate-600 font-medium">
+                                            {prog.targetRooms}
+                                        </span>
+                                    </div>
+
+                                    {prog.description && (
+                                        <p className="text-xs text-slate-500">{prog.description}</p>
+                                    )}
+
+                                    {/* Checklist Preview */}
+                                    <div className="space-y-1">
+                                        {prog.checklist.slice(0, 4).map((item, i) => (
+                                            <div key={i} className="flex items-start gap-1.5 text-[11px] text-slate-600">
+                                                <FileCheck size={11} className="text-slate-400 mt-0.5 shrink-0" />
+                                                {item}
+                                            </div>
+                                        ))}
+                                        {prog.checklist.length > 4 && (
+                                            <p className="text-[10px] text-slate-400 italic">+{prog.checklist.length - 4} more checks…</p>
+                                        )}
+                                    </div>
+
+                                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Next Service</p>
+                                            <p className={`text-xs font-bold font-mono mt-0.5 ${isOverdue ? 'text-rose-600' : isDue ? 'text-amber-600' : 'text-slate-700'}`}>
+                                                {prog.nextDueDate}
+                                            </p>
+                                            {prog.lastCompletedDate && (
+                                                <p className="text-[10px] text-slate-400 mt-0.5">Last done: {prog.lastCompletedDate}</p>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCompletingPPM(prog);
+                                                setPpmCompletedBy('Duty Engineer');
+                                                setPpmCompletionNotes('All preventive checks passed. Service completed per SOP.');
+                                            }}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors ${
+                                                isOverdue
+                                                    ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                                    : isDue
+                                                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                            }`}
+                                        >
+                                            <CheckCircle2 size={12} />
+                                            Execute & Complete Cycle
+                                        </button>
+                                    </div>
+                                    {prog.assignedTechnician && (
+                                        <p className="text-[10px] text-slate-400">Tech: <span className="font-semibold text-slate-600">{prog.assignedTechnician}</span></p>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Out of Order Modal */}
             <OutOfOrderModal
                 isOpen={isOooModalOpen}
@@ -1028,6 +1246,152 @@ const MaintenanceKanban = () => {
                         <div className="flex items-center justify-end gap-2 pt-2 border-t">
                             <button type="button" onClick={() => setIsNewTaskModalOpen(false)} className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer">Cancel</button>
                             <button type="submit" className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer shadow-xs">Create Ticket</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            {/* PPM Execute & Complete Cycle Modal */}
+            {completingPPM && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
+                    <form onSubmit={handleExecutePPM} className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+                        <div className="flex items-center justify-between border-b pb-3">
+                            <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm">
+                                <ShieldCheck className="w-5 h-5" />
+                                Complete PPM Cycle
+                            </div>
+                            <button type="button" onClick={() => setCompletingPPM(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-700 space-y-1">
+                            <p className="font-bold text-slate-900">{completingPPM.title}</p>
+                            <p className="text-slate-500">{completingPPM.category} · Every {completingPPM.cycleDays} days · {completingPPM.targetRooms}</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Completed By *</label>
+                            <input
+                                type="text"
+                                required
+                                value={ppmCompletedBy}
+                                onChange={e => setPpmCompletedBy(e.target.value)}
+                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-400"
+                                placeholder="Technician name / ID"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Service Notes</label>
+                            <textarea
+                                rows={3}
+                                value={ppmCompletionNotes}
+                                onChange={e => setPpmCompletionNotes(e.target.value)}
+                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-400"
+                                placeholder="Describe work done, parts replaced, findings..."
+                            />
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-[11px] text-blue-700">
+                            <strong>Auto-Roll:</strong> Next due date will be set to <strong className="font-mono">{new Date(Date.now() + (completingPPM?.cycleDays ?? 30) * 86400000).toISOString().slice(0, 10)}</strong> ({completingPPM?.cycleDays} days from today).
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                            <button type="button" onClick={() => setCompletingPPM(null)} className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer">Cancel</button>
+                            <button type="submit" className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5">
+                                <CheckCircle2 size={13} /> Confirm Cycle Completion
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* New PPM Program Modal */}
+            {isNewPPMModalOpen && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
+                    <form onSubmit={handleCreatePPM} className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b pb-3">
+                            <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm">
+                                <Settings2 className="w-5 h-5" />
+                                New PPM Program
+                            </div>
+                            <button type="button" onClick={() => setIsNewPPMModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Program Title *</label>
+                            <input
+                                type="text"
+                                required
+                                value={newPPMTitle}
+                                onChange={e => setNewPPMTitle(e.target.value)}
+                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none"
+                                placeholder="e.g. Generator Load Test & Inspection"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Category</label>
+                                <select
+                                    value={newPPMCategory}
+                                    onChange={e => setNewPPMCategory(e.target.value as PPMProgram['category'])}
+                                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none bg-white"
+                                >
+                                    <option>HVAC &amp; Climate</option>
+                                    <option>Plumbing &amp; Water</option>
+                                    <option>Electrical &amp; Power</option>
+                                    <option>Furniture &amp; Fixtures</option>
+                                    <option>Fire &amp; Safety</option>
+                                    <option>Pest Control</option>
+                                    <option>Elevators &amp; Lifts</option>
+                                    <option>Exterior &amp; Grounds</option>
+                                    <option>Kitchen &amp; Laundry</option>
+                                    <option>General</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Cycle (Days)</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={730}
+                                    value={newPPMCycleDays}
+                                    onChange={e => setNewPPMCycleDays(Number(e.target.value))}
+                                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Target Rooms / Areas</label>
+                            <input
+                                type="text"
+                                value={newPPMTargetRooms}
+                                onChange={e => setNewPPMTargetRooms(e.target.value)}
+                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none"
+                                placeholder="e.g. All Guest Rooms, Kitchen, Lobby"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Technician / Team</label>
+                            <input
+                                type="text"
+                                value={newPPMTech}
+                                onChange={e => setNewPPMTech(e.target.value)}
+                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none"
+                                placeholder="e.g. Engineering Team / Ahmed"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+                            <textarea
+                                rows={2}
+                                value={newPPMDesc}
+                                onChange={e => setNewPPMDesc(e.target.value)}
+                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none"
+                                placeholder="Brief description of this maintenance program..."
+                            />
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                            <button type="button" onClick={() => setIsNewPPMModalOpen(false)} className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer">Cancel</button>
+                            <button type="submit" className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5">
+                                <Calendar size={13} /> Schedule PPM Program
+                            </button>
                         </div>
                     </form>
                 </div>
