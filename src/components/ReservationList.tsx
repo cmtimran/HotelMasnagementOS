@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Calendar, Users, MapPin, Phone, Mail, Download, CheckCircle, ArrowUpDown, Edit3 } from 'lucide-react';
 import GuestProfile360 from './GuestProfile360';
-import { EditReservationModal } from './modals/EditReservationModal';
+import { useNavigation } from '../context/NavigationContext';
 import {
     getAllStoredReservations,
     syncReservationsFromDB,
@@ -35,42 +35,16 @@ interface Reservation {
 }
 
 const ReservationList = () => {
+    const { setActivePage } = useNavigation();
     const [activeTab, setActiveTab] = useState<'arrivals' | 'in-house' | 'departures' | 'all'>('arrivals');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedReservations, setSelectedReservations] = useState<(number | string)[]>([]);
     const [showGuestProfile, setShowGuestProfile] = useState(false);
-    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
 
     const handleOpenEdit = (res: Reservation) => {
-        const all = getAllStoredReservations();
-        const found = all.find(x =>
-            (res.reservationNumber && x.reservationNumber === res.reservationNumber) ||
-            (res.id && String(x.id) === String(res.id))
-        );
-        if (found) {
-            setEditingReservation(found);
-        } else {
-            setEditingReservation({
-                id: res.id,
-                reservationNumber: res.reservationNumber,
-                guestName: res.guestName,
-                phone: res.phone,
-                email: res.email,
-                roomNumber: res.roomNumber,
-                roomType: res.roomType,
-                checkIn: res.checkIn,
-                checkOut: res.checkOut,
-                nights: res.nights,
-                adults: res.adults,
-                children: res.children,
-                status: (res.status || 'CONFIRMED').toUpperCase(),
-                totalAmount: res.totalAmount,
-                paidAmount: 0,
-                dueAmount: res.totalAmount,
-                source: res.source,
-                allocatedRooms: [res.roomNumber]
-            } as any);
-        }
+        const resId = res.reservationNumber || String(res.id);
+        sessionStorage.setItem('hotel_edit_reservation_id', resId);
+        setActivePage('add-reservation');
     };
 
     const mapStoredToUi = useCallback((stored: StoredReservation[]): Reservation[] => {
@@ -488,19 +462,6 @@ const ReservationList = () => {
 
             {/* Guest Profile Modal */}
             {showGuestProfile && <GuestProfile360 onClose={() => setShowGuestProfile(false)} />}
-
-            {/* Complete 360-Degree Reservation Edit Modal */}
-            <EditReservationModal
-                isOpen={Boolean(editingReservation)}
-                onClose={() => setEditingReservation(null)}
-                reservation={editingReservation}
-                onSaved={async () => {
-                    setEditingReservation(null);
-                    await syncReservationsFromDB();
-                    const all = getAllStoredReservations();
-                    setReservations(mapStoredToUi(all));
-                }}
-            />
         </div>
     );
 };

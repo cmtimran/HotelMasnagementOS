@@ -10,7 +10,6 @@ import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
 import { QuickReservationModal } from './modals/QuickReservationModal';
 import { RoomAddonServicesModal, type ServiceTabType } from './modals/RoomAddonServicesModal';
-import { EditReservationModal } from './modals/EditReservationModal';
 import {
     syncReservationsFromDB,
     updateReservationStatusInDB,
@@ -22,8 +21,7 @@ import {
     getAllStoredReservations,
     saveStoredReservations,
     broadcastPMSEvent,
-    subscribeToPMSEvents,
-    type StoredReservation
+    subscribeToPMSEvents
 } from '../utils/roomInventoryEngine';
 import type {
     RoomServicesBundle,
@@ -275,38 +273,10 @@ export const FrontDesk: React.FC = () => {
     const [checkOutModalRecord, setCheckOutModalRecord] = useState<FrontDeskGuestRecord | null>(null);
     const [regCardRecord, setRegCardRecord] = useState<FrontDeskGuestRecord | null>(null);
     const [folioModalRecord, setFolioModalRecord] = useState<FrontDeskGuestRecord | null>(null);
-    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
 
     const handleOpenEditReservation = (item: FrontDeskGuestRecord) => {
-        const all = getAllStoredReservations();
-        const found = all.find(x =>
-            (item.reservationNumber && x.reservationNumber === item.reservationNumber) ||
-            (item.id && String(x.id) === String(item.id))
-        );
-        if (found) {
-            setEditingReservation(found);
-        } else {
-            setEditingReservation({
-                id: item.id,
-                reservationNumber: item.reservationNumber,
-                guestName: item.guestName,
-                phone: item.phone,
-                email: item.email || '',
-                roomNumber: item.roomNumber,
-                roomType: item.roomType,
-                checkIn: item.checkIn,
-                checkOut: item.checkOut,
-                nights: item.nights,
-                adults: item.adults,
-                children: item.children,
-                status: (item.status || 'CONFIRMED').toUpperCase(),
-                totalAmount: item.totalAmount,
-                paidAmount: item.paidAmount,
-                dueAmount: item.dueAmount,
-                source: item.source,
-                allocatedRooms: [item.roomNumber]
-            } as any);
-        }
+        sessionStorage.setItem('hotel_edit_reservation_id', item.reservationNumber || String(item.id));
+        setActivePage('add-reservation');
     };
     const [serviceModalConfig, setServiceModalConfig] = useState<{
         isOpen: boolean;
@@ -1724,20 +1694,6 @@ export const FrontDesk: React.FC = () => {
                     onSave={handleSaveGuestServices}
                 />
             )}
-            {/* Complete 360-Degree Reservation Edit Modal */}
-            <EditReservationModal
-                isOpen={Boolean(editingReservation)}
-                onClose={() => setEditingReservation(null)}
-                reservation={editingReservation}
-                onSaved={async () => {
-                    setEditingReservation(null);
-                    const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
-                    const synced = await syncReservationsFromDB(activePropertyId);
-                    if (Array.isArray(synced)) {
-                        setReservations(mapToFrontDeskRecords(synced));
-                    }
-                }}
-            />
         </div>
     );
 };

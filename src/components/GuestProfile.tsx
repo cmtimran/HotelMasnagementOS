@@ -8,7 +8,7 @@ import {
     Home, Edit3, Receipt
 } from 'lucide-react';
 import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
-import { EditReservationModal } from './modals/EditReservationModal';
+import { useNavigation } from '../context/NavigationContext';
 
 export interface GuestRecord {
     id: number;
@@ -271,6 +271,8 @@ export const GuestProfile: React.FC = () => {
         return () => unsub();
     }, []);
 
+    const { setActivePage } = useNavigation();
+
     const [selectedGuestId, setSelectedGuestId] = useState<number>(() => guests[0]?.id || 1);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTierFilter, setSelectedTierFilter] = useState<string>('ALL');
@@ -324,7 +326,6 @@ export const GuestProfile: React.FC = () => {
     };
 
     const [newGuestForm, setNewGuestForm] = useState(initialGuestForm);
-    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
 
     const handleOpenCreateModal = () => {
         setModalMode('create');
@@ -1072,10 +1073,12 @@ export const GuestProfile: React.FC = () => {
                                                                             type="button"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                setEditingReservation(item.rawReservation);
+                                                                                const resNum = item.rawReservation?.reservationNumber || item.refNumber;
+                                                                                sessionStorage.setItem('hotel_edit_reservation_id', resNum);
+                                                                                setActivePage('add-reservation');
                                                                             }}
                                                                             className="px-1.5 py-0.5 text-[9px] bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded font-semibold inline-flex items-center gap-0.5 cursor-pointer shadow-2xs transition-colors"
-                                                                            title="Edit Reservation Details"
+                                                                            title="Edit Complete Reservation in Engine"
                                                                         >
                                                                             <Edit3 size={9} />
                                                                             <span>Edit</span>
@@ -1945,16 +1948,6 @@ export const GuestProfile: React.FC = () => {
                     </div>
                 </div>
             )}
-            {/* Complete 360-Degree Reservation Edit Modal */}
-            <EditReservationModal
-                isOpen={Boolean(editingReservation)}
-                onClose={() => setEditingReservation(null)}
-                reservation={editingReservation}
-                onSaved={() => {
-                    setEditingReservation(null);
-                    setGuests(prev => [...prev]);
-                }}
-            />
         </div>
     );
 };

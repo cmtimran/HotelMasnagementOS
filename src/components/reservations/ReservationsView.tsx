@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import AddReservationModal from '../modals/AddReservationModal';
 import ReservationActionDrawer, { type DrawerMode } from '../modals/ReservationActionDrawer';
-import { EditReservationModal } from '../modals/EditReservationModal';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import { useNavigation } from '../../context/NavigationContext';
 import {
@@ -34,8 +33,7 @@ import {
     getAllStoredReservations,
     getCanonicalRooms,
     getOperatingSystemDate,
-    subscribeToPMSEvents,
-    type StoredReservation
+    subscribeToPMSEvents
 } from '../../utils/roomInventoryEngine';
 
 export interface ReservationItem {
@@ -106,40 +104,10 @@ export const ReservationsView: React.FC = () => {
     const [actionDrawerBooking, setActionDrawerBooking] = useState<AmendBookingData | null>(null);
     const [actionDrawerMode, setActionDrawerMode] = useState<DrawerMode>('overview');
 
-    // Edit Reservation Full Modal State
-    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
-
     const handleOpenEditReservation = (r: ReservationItem | AmendBookingData | any) => {
-        const all = getAllStoredReservations();
-        const found = all.find(x =>
-            (r.reservationNumber && x.reservationNumber === r.reservationNumber) ||
-            (r.id && String(x.id) === String(r.id))
-        );
-        if (found) {
-            setEditingReservation(found);
-        } else {
-            // Synthesize reservation from row
-            setEditingReservation({
-                id: r.id || Date.now(),
-                reservationNumber: r.reservationNumber || `RES-${Date.now().toString().slice(-6)}`,
-                guestName: r.guestName || '',
-                phone: r.phone || '',
-                email: r.email || '',
-                roomNumber: r.roomNumber || '',
-                roomType: r.roomType || 'Standard Room',
-                checkIn: r.checkIn || r.arrivalDate || new Date().toISOString().slice(0, 10),
-                checkOut: r.checkOut || r.departureDate || new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-                nights: Number(r.nights) || 1,
-                adults: Number(r.adults) || 1,
-                children: Number(r.children) || 0,
-                status: (r.status || 'CONFIRMED').toUpperCase(),
-                totalAmount: Number(r.totalAmount) || 0,
-                paidAmount: Number(r.paidAmount) || 0,
-                dueAmount: Number(r.dueAmount) || 0,
-                source: r.source || 'Direct',
-                allocatedRooms: [r.roomNumber]
-            } as any);
-        }
+        const resNum = r.reservationNumber || String(r.id);
+        sessionStorage.setItem('hotel_edit_reservation_id', resNum);
+        setActivePage('add-reservation');
     };
 
     const allRooms = useMemo(() => {
@@ -1515,17 +1483,6 @@ export const ReservationsView: React.FC = () => {
                     if (target) {
                         handleStatusChange(target.id, 'checked-out');
                     }
-                    await loadReservationsFromDB();
-                }}
-            />
-
-            {/* Complete 360-Degree Reservation Edit Modal */}
-            <EditReservationModal
-                isOpen={Boolean(editingReservation)}
-                onClose={() => setEditingReservation(null)}
-                reservation={editingReservation}
-                onSaved={async () => {
-                    setEditingReservation(null);
                     await loadReservationsFromDB();
                 }}
             />

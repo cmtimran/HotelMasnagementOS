@@ -26,7 +26,8 @@ import {
     Search,
     ShieldCheck,
     Heart,
-    X
+    X,
+    Edit3
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from './common/StayPeriodPicker';
@@ -56,7 +57,10 @@ import {
     getDynamicRoomTypes,
     calculateTariffForRatePlan,
     getRoomTypeCapacity,
-    getAllStoredReservations
+    getAllStoredReservations,
+    saveStoredReservations,
+    updateReservationInDB,
+    type StoredReservation
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
 import { useProperty } from '../context/PropertyContext';
@@ -481,6 +485,133 @@ export const AddReservation: React.FC = () => {
         isAutoMode: false
     });
 
+    // ==========================================
+    // EDIT MODE & PRE-POPULATION STATE
+    // ==========================================
+    const [editingReservation, setEditingReservation] = useState<StoredReservation | null>(null);
+    const [isEditMode, setIsEditMode] = useState<boolean>(false);
+
+    useEffect(() => {
+        const editId = sessionStorage.getItem('hotel_edit_reservation_id');
+        if (!editId) return;
+
+        const all = getAllStoredReservations();
+        const found = all.find(r =>
+            String(r.id) === String(editId) ||
+            r.reservationNumber === editId ||
+            (r as any).subBookingNumber === editId
+        );
+
+        if (found) {
+            setEditingReservation(found);
+            setIsEditMode(true);
+
+            // Step 1: Dates & Horizon
+            if (found.checkIn) setCheckIn(found.checkIn);
+            if (found.checkOut) setCheckOut(found.checkOut);
+            if (found.nights) setNights(Number(found.nights) || 1);
+            if (found.source || (found as any).bookingSource) setBusinessSource(found.source || (found as any).bookingSource || 'Direct');
+            if ((found as any).agent) setBusinessAgent((found as any).agent);
+            if ((found as any).dayUse !== undefined) setDayUse(Boolean((found as any).dayUse));
+            if ((found as any).taxApplicable !== undefined) setTaxApplicable(Boolean((found as any).taxApplicable));
+            if ((found as any).taxConfigId) setSelectedTaxConfigId((found as any).taxConfigId);
+
+            // Step 1: Rooms List
+            if (Array.isArray(found.roomsList) && found.roomsList.length > 0) {
+                setRoomsList(found.roomsList.map((rm: any, idx: number) => ({
+                    id: idx + 1,
+                    roomType: rm.roomType || found.roomType || 'Deluxe Double',
+                    roomsCount: 1,
+                    ratePlan: rm.ratePlan || found.ratePlan || '',
+                    roomNumber: rm.roomNumber || found.roomNumber || '',
+                    assignedRooms: rm.assignedRooms || [rm.roomNumber || found.roomNumber || ''],
+                    adults: Number(rm.adults || found.adults) || 2,
+                    children: Number(rm.children || found.children) || 0,
+                    childrenAges: rm.childrenAges || [],
+                    rate: Number(rm.rate || rm.amount || (found as any).roomRate) || 3000,
+                    isAssign: Boolean(rm.roomNumber || found.roomNumber),
+                    checkInDate: rm.checkInDate || found.checkIn,
+                    checkOutDate: rm.checkOutDate || found.checkOut,
+                    nights: Number(rm.nights || found.nights) || 1,
+                    servicesBundle: rm.servicesBundle || (found as any).servicesBundle
+                })));
+            } else if (Array.isArray(found.allocatedRooms) && found.allocatedRooms.length > 0) {
+                setRoomsList(found.allocatedRooms.map((rm: string, idx: number) => ({
+                    id: idx + 1,
+                    roomType: found.roomType || 'Deluxe Double',
+                    roomsCount: 1,
+                    ratePlan: found.ratePlan || '',
+                    roomNumber: rm,
+                    assignedRooms: [rm],
+                    adults: Number(found.adults) || 2,
+                    children: Number(found.children) || 0,
+                    childrenAges: [],
+                    rate: Number((found as any).roomRate) || (Number(found.totalAmount) ? Math.round(Number(found.totalAmount) / Math.max(1, Number(found.nights) || 1)) : 3000),
+                    isAssign: true,
+                    checkInDate: found.checkIn,
+                    checkOutDate: found.checkOut,
+                    nights: Number(found.nights) || 1,
+                    servicesBundle: (found as any).servicesBundle
+                })));
+            } else if (found.roomNumber) {
+                setRoomsList([{
+                    id: 1,
+                    roomType: found.roomType || 'Deluxe Double',
+                    roomsCount: 1,
+                    ratePlan: found.ratePlan || '',
+                    roomNumber: found.roomNumber,
+                    assignedRooms: [found.roomNumber],
+                    adults: Number(found.adults) || 2,
+                    children: Number(found.children) || 0,
+                    childrenAges: [],
+                    rate: Number((found as any).roomRate) || (Number(found.totalAmount) ? Math.round(Number(found.totalAmount) / Math.max(1, Number(found.nights) || 1)) : 3000),
+                    isAssign: true,
+                    checkInDate: found.checkIn,
+                    checkOutDate: found.checkOut,
+                    nights: Number(found.nights) || 1,
+                    servicesBundle: (found as any).servicesBundle
+                }]);
+            }
+
+            // Step 2: Guest & KYC
+            const rawName = found.guestName || '';
+            const cleanName = rawName.replace(/^(Mr|Mrs|Ms|Dr|Prof|Engr)\.?\s+/i, '');
+            const matchedTitle = rawName.match(/^(Mr|Mrs|Ms|Dr|Prof|Engr)\.?/i);
+            if (matchedTitle) setSalutation(matchedTitle[1]);
+            if (cleanName) setGuestName(cleanName);
+            if (found.phone) setPhone(found.phone);
+            if (found.phone || (found as any).mobile) setMobile(found.phone || (found as any).mobile);
+            if (found.email) setEmail(found.email);
+            if (found.vip) setVipStatus(found.vip);
+            if ((found as any).nationality) setNationality((found as any).nationality);
+            if ((found as any).idType) setIdType((found as any).idType);
+            if ((found as any).idNumber || (found as any).nidNumber || (found as any).passportNo) {
+                setIdNumber((found as any).idNumber || (found as any).nidNumber || (found as any).passportNo || '');
+            }
+            if ((found as any).specialRequests) {
+                setRemarksMap(prev => ({ ...prev, Guest: (found as any).specialRequests }));
+            }
+
+            // Step 3: Billing & Payments
+            if (found.discount) setDiscountValue(Number(found.discount) || 0);
+            if (found.paidAmount && Number(found.paidAmount) > 0) {
+                setPaymentRows([{
+                    id: 1,
+                    method: ((found as any).paymentMethod as any) || 'Cash',
+                    amount: Number(found.paidAmount)
+                }]);
+            }
+        }
+    }, []);
+
+    const handleCancelEdit = () => {
+        sessionStorage.removeItem('hotel_edit_reservation_id');
+        setEditingReservation(null);
+        setIsEditMode(false);
+        resetForm();
+        setActivePage('reservations');
+    };
+
     // Anchored portal state for 3-dots dropdown menu (prevents table overflow clipping & scrollbars)
     const [menuAnchor, setMenuAnchor] = useState<{
         rowId: number;
@@ -620,11 +751,14 @@ export const AddReservation: React.FC = () => {
 
     // Live Availability Report for selected stay window
     const liveAvailabilityReport = useMemo(() => {
-        return getAvailableRoomsForStay(checkIn, checkOut);
-    }, [checkIn, checkOut, pmsSyncVersion]);
+        return getAvailableRoomsForStay(checkIn, checkOut, undefined, {
+            excludeReservationId: editingReservation?.reservationNumber || editingReservation?.id
+        });
+    }, [checkIn, checkOut, pmsSyncVersion, editingReservation]);
 
     // Self-healing room validation: Ensure no row is assigned to an Occupied room, wrong category room, or duplicate room!
     useEffect(() => {
+        if (isEditMode) return; // When editing, preserve the assigned room from the existing reservation
         setRoomsList(prev => {
             let changed = false;
             const usedInForm = new Set<string>();
@@ -1127,7 +1261,9 @@ export const AddReservation: React.FC = () => {
             return;
         }
 
-        const reservationNumber = `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
+        const reservationNumber = editingReservation?.reservationNumber || `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
+        const reservationId = editingReservation?.id || Date.now();
+        const statusVal = actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : (editingReservation?.status || 'confirmed');
 
         // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
         const usedRoomsAcrossBooking = new Set<string>();
@@ -1177,8 +1313,11 @@ export const AddReservation: React.FC = () => {
         const primaryRoomNumber = allocatedRoomNumbers[0] || mainRoom.roomNumber;
 
         const newReservation = {
-            id: Date.now(),
+            id: reservationId,
             reservationNumber,
+            registrationNumber: statusVal === 'in-house' ? (editingReservation?.registrationNumber || `REG-${reservationNumber.replace(/^RES-/, '')}`) : editingReservation?.registrationNumber,
+            folioNumber: editingReservation?.folioNumber || `FOL-${reservationNumber.replace(/^RES-/, '')}`,
+            groupCode: editingReservation?.groupCode || (totalRoomsCount > 1 ? `GRP-${reservationNumber.replace(/^RES-/, '')}` : undefined),
             guestName: `${salutation} ${guestName.trim()}`,
             phone: mobile || phone,
             email: email,
@@ -1194,7 +1333,7 @@ export const AddReservation: React.FC = () => {
             dayUse,
             adults: mainRoom.adults,
             children: mainRoom.children,
-            status: actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : 'confirmed',
+            status: statusVal,
             totalAmount: finalPayable,
             paidAmount: actionType === 'hold' ? 0 : totalPaid,
             dueAmount: actionType === 'hold' ? finalPayable : totalDue,
@@ -1269,6 +1408,36 @@ export const AddReservation: React.FC = () => {
                 }
             }
             return;
+        }
+
+        // If in Edit Mode, update existing booking in Local Storage and PostgreSQL DB
+        if (isEditMode && editingReservation) {
+            try {
+                const allStored = getAllStoredReservations();
+                const updatedReservations = allStored.map(r =>
+                    (String(r.id) === String(editingReservation.id) || r.reservationNumber === editingReservation.reservationNumber)
+                        ? { ...r, ...newReservation, id: editingReservation.id, reservationNumber: editingReservation.reservationNumber }
+                        : r
+                );
+                saveStoredReservations(updatedReservations);
+                updateReservationInDB(editingReservation.id, {
+                    ...newReservation,
+                    id: editingReservation.id,
+                    reservationNumber: editingReservation.reservationNumber
+                });
+                sessionStorage.removeItem('hotel_edit_reservation_id');
+                toast.success(`Reservation ${editingReservation.reservationNumber} updated successfully!`);
+                setCreatedReservation({
+                    ...newReservation,
+                    id: editingReservation.id,
+                    reservationNumber: editingReservation.reservationNumber
+                });
+                return;
+            } catch (err) {
+                console.error('Error updating existing reservation:', err);
+                toast.error('Failed to update reservation.');
+                return;
+            }
         }
 
         // If hold, also push to holds list
@@ -1379,6 +1548,9 @@ export const AddReservation: React.FC = () => {
     };
 
     const resetForm = () => {
+        sessionStorage.removeItem('hotel_edit_reservation_id');
+        setEditingReservation(null);
+        setIsEditMode(false);
         setStep(1);
         const sys = getSystemDateISO();
         setCheckIn(sys);
@@ -1399,26 +1571,49 @@ export const AddReservation: React.FC = () => {
             {/* Top Navigation & Breadcrumb Bar */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs px-3 py-1.5 flex items-center justify-between gap-2.5 flex-shrink-0">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-[#1e3a8a] text-white flex items-center justify-center shadow-xs flex-shrink-0">
-                        <Plus size={14} />
+                    <div className={`w-7 h-7 rounded-lg text-white flex items-center justify-center shadow-xs flex-shrink-0 ${
+                        isEditMode ? 'bg-amber-600' : 'bg-[#1e3a8a]'
+                    }`}>
+                        {isEditMode ? <Edit3 size={14} /> : <Plus size={14} />}
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-xs text-gray-900 tracking-tight">Add New Reservation</h1>
-                            <span className="px-1.5 py-0.2 text-[8.5px] rounded bg-blue-50 text-blue-700 border border-blue-200">
-                                3-Step Wizard
+                            <h1 className="text-xs text-gray-900 tracking-tight font-bold">
+                                {isEditMode ? `Edit Reservation: ${editingReservation?.reservationNumber}` : 'Add New Reservation'}
+                            </h1>
+                            <span className={`px-1.5 py-0.2 text-[8.5px] rounded border font-semibold ${
+                                isEditMode
+                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}>
+                                {isEditMode ? `Edit Mode (${(editingReservation?.status || 'Confirmed').toUpperCase()})` : '3-Step Wizard'}
                             </span>
                         </div>
                         <p className="text-[10px] text-gray-500">
-                            Check availability, allocate rooms, record guest profile, and settle advance tariffs.
+                            {isEditMode
+                                ? `Modifying booking for ${editingReservation?.guestName || 'guest'}. All stay dates, rooms, guest KYC, and billing can be updated.`
+                                : 'Check availability, allocate rooms, record guest profile, and settle advance tariffs.'}
                         </p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {isEditMode && (
+                        <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            className="h-8 px-3 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                            <X size={13} />
+                            <span>Cancel Edit</span>
+                        </button>
+                    )}
                     <button
                         type="button"
-                        onClick={() => setActivePage('reservations')}
+                        onClick={() => {
+                            sessionStorage.removeItem('hotel_edit_reservation_id');
+                            setActivePage('reservations');
+                        }}
                         className="h-8 px-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 rounded-lg text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
                         title="Reservations List"
                     >
@@ -1427,7 +1622,10 @@ export const AddReservation: React.FC = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setActivePage('stay-view')}
+                        onClick={() => {
+                            sessionStorage.removeItem('hotel_edit_reservation_id');
+                            setActivePage('stay-view');
+                        }}
                         className="h-8 px-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-blue-300 text-blue-700 rounded-lg text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
                         title="Open Stay View Calendar"
                     >
@@ -1436,6 +1634,25 @@ export const AddReservation: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {/* In-House Notice Banner if Editing an Active In-House Stay */}
+            {editingReservation && (editingReservation.status === 'in-house' || editingReservation.status === 'checked-in') && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-2.5 flex items-center justify-between text-amber-950 text-xs shadow-2xs">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
+                        <span>
+                            <strong>In-House Guest Notice:</strong> This reservation is already checked in (Room {editingReservation.roomNumber}). Stay extensions or room moves should be performed via <strong>Stay View (Room Move / Amend)</strong>.
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setActivePage('stay-view')}
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-semibold cursor-pointer shadow-2xs whitespace-nowrap"
+                    >
+                        Open in Stay View
+                    </button>
+                </div>
+            )}
 
             {/* Main Form Card Container */}
             <div className="bg-white rounded-lg border border-gray-200/80 shadow-2xs overflow-hidden flex flex-col flex-1">
@@ -3336,27 +3553,51 @@ export const AddReservation: React.FC = () => {
                             </button>
                         ) : (
                             <div className="flex items-center gap-1.5">
-                                <button
-                                    type="button"
-                                    onClick={() => handleFinalizeBooking('hold')}
-                                    className="h-7 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs"
-                                >
-                                    Hold Till
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleFinalizeBooking('checkin')}
-                                    className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
-                                >
-                                    Check In
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleFinalizeBooking('reserve')}
-                                    className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
-                                >
-                                    Confirm Reserve
-                                </button>
+                                {isEditMode ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleFinalizeBooking('reserve')}
+                                            className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs flex items-center gap-1"
+                                        >
+                                            <Check size={12} className="stroke-[2.5]" />
+                                            <span>Update Reservation</span>
+                                        </button>
+                                        {editingReservation?.status !== 'in-house' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleFinalizeBooking('checkin')}
+                                                className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs"
+                                            >
+                                                Update &amp; Check In
+                                            </button>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleFinalizeBooking('hold')}
+                                            className="h-7 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs"
+                                        >
+                                            Hold Till
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleFinalizeBooking('checkin')}
+                                            className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                                        >
+                                            Check In
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleFinalizeBooking('reserve')}
+                                            className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                                        >
+                                            Confirm Reserve
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
