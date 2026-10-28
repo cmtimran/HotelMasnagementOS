@@ -183,6 +183,36 @@ export const syncConnectingSuitesFromDB = async (propertyId: number = 1): Promis
     return getStoredConnectingSuites(propertyId);
 };
 
+/**
+ * Dynamically builds a mapping from room number to comma-separated partner room numbers
+ * based on all active connecting suites configured in Settings.
+ */
+export const getConnectingPartnerMap = (propertyId?: number): Map<string, string> => {
+    const propId = propertyId || getActivePropertyId();
+    const suites = getStoredConnectingSuites(propId);
+    const partnerMap = new Map<string, string>();
+    suites.filter(s => s.status === 'Active').forEach(suite => {
+        const suiteRooms: string[] = [];
+        suite.componentRooms?.forEach(cr => {
+            if (Array.isArray(cr.roomNumbers)) {
+                cr.roomNumbers.forEach(n => {
+                    const num = String(n).trim();
+                    if (num && !suiteRooms.includes(num)) suiteRooms.push(num);
+                });
+            }
+        });
+        if (suiteRooms.length >= 2) {
+            suiteRooms.forEach(rm => {
+                const others = suiteRooms.filter(x => x !== rm);
+                const existing = partnerMap.get(rm);
+                const combined = existing ? Array.from(new Set([...existing.split(', ').map(s => s.trim()), ...others])) : others;
+                partnerMap.set(rm, combined.join(', '));
+            });
+        }
+    });
+    return partnerMap;
+};
+
 const STORAGE_KEY_ROOM_TYPES = 'hotel_room_types_v1';
 
 // Dynamic Database Baseline Seeds (synced directly with PostgreSQL room_types table)
@@ -835,15 +865,21 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
         const saved = typeof window !== 'undefined' 
             ? (localStorage.getItem(scopedKey) || (propId === 1 ? localStorage.getItem(STORAGE_KEY_ROOMS) : null))
             : null;
+        const partnerMap = getConnectingPartnerMap(propId);
+
         if (saved !== null) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed)) {
                 const dynamicTypes = getDynamicRoomTypes();
                 return parsed.map((r: any) => {
+                    const roomNum = String(r.number).trim();
+                    const dynamicPartner = partnerMap.get(roomNum);
+                    const isConnecting = Boolean(dynamicPartner || r.isConnecting);
+                    const connectedTo = dynamicPartner || r.connectedTo || '';
                     const matchedType = dynamicTypes.find(t => String(t.id) === String(r.roomTypeId));
                     return {
                         id: r.id,
-                        number: String(r.number),
+                        number: roomNum,
                         name: r.name || `Room ${r.number}`,
                         buildingId: String(r.buildingId || '1'),
                         floorId: String(r.floorId || '1'),
@@ -851,13 +887,27 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
                         roomTypeName: r.roomTypeName || matchedType?.name || ROOM_TYPE_MAP[String(r.roomTypeId)] || 'Deluxe Double',
                         status: r.status || 'Active',
                         housekeepingStatus: r.housekeepingStatus || 'Clean',
-                        isConnecting: Boolean(r.isConnecting),
-                        connectedTo: r.connectedTo || '',
+                        isConnecting,
+                        connectedTo,
                         remarks: r.remarks
                     };
                 });
             }
         }
+
+        const activeProp = propertyId || getActivePropertyId();
+        if (activeProp === 1) {
+            return DEFAULT_CANONICAL_ROOMS.map(r => {
+                const roomNum = String(r.number).trim();
+                const dynamicPartner = partnerMap.get(roomNum);
+                return {
+                    ...r,
+                    isConnecting: Boolean(dynamicPartner || r.isConnecting),
+                    connectedTo: dynamicPartner || r.connectedTo || ''
+                };
+            });
+        }
+        return [];
     } catch {}
     // If property 1 (HQ baseline) and not yet synced from DB, return default catalog.
     // For all other properties (new tenants), start completely clean with 0 rooms!

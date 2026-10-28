@@ -124,13 +124,8 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
             r.smokingAllowed ? 'Smoking Permitted' : 'Non-Smoking'
         ];
 
-        const isConn = Boolean(
-            r.isConnecting ||
-            (r.number === '101' && (r.connectedTo === '102' || !r.connectedTo)) ||
-            (r.number === '102' && (r.connectedTo === '101' || !r.connectedTo)) ||
-            r.connectedTo
-        );
-        const connTo = r.connectedTo || (r.number === '101' ? '102' : r.number === '102' ? '101' : undefined);
+        const isConn = Boolean(r.isConnecting || r.connectedTo);
+        const connTo = r.connectedTo || undefined;
 
         return {
             id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || 1,
@@ -193,7 +188,24 @@ export const RoomRack: React.FC = () => {
         const unsub = subscribeToPMSEvents(() => {
             setRooms(deriveRoomsFromInventory(rackDate));
         });
-        return () => unsub();
+
+        const handleRoomsUpdated = () => {
+            setRooms(deriveRoomsFromInventory(rackDate));
+        };
+        window.addEventListener('hotel_rooms_updated', handleRoomsUpdated);
+
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'hotel_connecting_rooms_v1' || (e.key && e.key.startsWith('hotel_rooms'))) {
+                setRooms(deriveRoomsFromInventory(rackDate));
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+
+        return () => {
+            unsub();
+            window.removeEventListener('hotel_rooms_updated', handleRoomsUpdated);
+            window.removeEventListener('storage', handleStorage);
+        };
     }, [rackDate]);
 
     const persistRooms = (updated: RoomRackItem[]) => {

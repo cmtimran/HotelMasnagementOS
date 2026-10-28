@@ -32,6 +32,7 @@ import {
     saveStoredReservations,
     getActiveLocks,
     getCanonicalRooms,
+    syncConnectingSuitesFromDB,
     validateAndCommitReservation,
     syncReservationsFromDB,
     syncRoomTypesAndRoomsFromDB,
@@ -199,6 +200,7 @@ const calculateStayViewStartDate = (sysDateISO: string): string => {
 
 export const StayView: React.FC = () => {
     const { activeProperty } = useProperty();
+    const activePropertyId = activeProperty?.id || 1;
     const { setActivePage } = useNavigation();
     const currencySymbol = useMemo(() => {
         const code = activeProperty?.currency || 'BDT';
@@ -456,7 +458,7 @@ export const StayView: React.FC = () => {
 
     // Dynamic Canonical Rooms Structure (All 34 Rooms across 5 Floors)
     const roomTree: BuildingNode[] = useMemo(() => {
-        const canonical = getCanonicalRooms();
+        const canonical = getCanonicalRooms(activePropertyId);
         const buildingNames: Record<string, string> = {
             '1': 'Building 1',
             '2': 'Building 2'
@@ -516,13 +518,8 @@ export const StayView: React.FC = () => {
                             ? 'dirty'
                             : 'clean';
 
-            const isConn = Boolean(
-                r.isConnecting ||
-                (r.number === '101' && (r.connectedTo === '102' || !r.connectedTo)) ||
-                (r.number === '102' && (r.connectedTo === '101' || !r.connectedTo)) ||
-                r.connectedTo
-            );
-            const connTo = r.connectedTo || (r.number === '101' ? '102' : r.number === '102' ? '101' : undefined);
+            const isConn = Boolean(r.isConnecting || r.connectedTo);
+            const connTo = r.connectedTo || undefined;
 
             floorMap.get(fId)!.push({
                 id: `r-${r.number}`,
@@ -556,7 +553,7 @@ export const StayView: React.FC = () => {
         });
 
         return tree;
-    }, [roomsVersion]);
+    }, [roomsVersion, activePropertyId]);
 
     // Total rooms count across entire hotel
     const totalRoomsCount = useMemo(() => {
@@ -805,7 +802,11 @@ export const StayView: React.FC = () => {
     useEffect(() => {
         // Sync initially on mount from local cache and live DB (PostgreSQL)
         syncStoredReservations();
-        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+        Promise.all([
+            syncRoomTypesAndRoomsFromDB(),
+            syncReservationsFromDB(),
+            syncConnectingSuitesFromDB(activePropertyId)
+        ]).then(() => {
             setRoomsVersion(v => v + 1);
             syncStoredReservations();
         });
@@ -825,11 +826,19 @@ export const StayView: React.FC = () => {
             }
         });
 
+        const handleRoomsUpdated = () => {
+            setRoomsVersion(v => v + 1);
+        };
+        window.addEventListener('hotel_rooms_updated', handleRoomsUpdated);
+
         const handleStorage = (e: StorageEvent) => {
             if (e.key === 'hotel_system_date' || e.key === 'hotel_system_date_iso') {
                 const newSys = getOperatingSystemDate();
                 setOperatingDateStr(newSys);
                 setStartDate(calculateStayViewStartDate(newSys));
+            }
+            if (e.key === 'hotel_connecting_rooms_v1' || (e.key && e.key.startsWith('hotel_rooms'))) {
+                setRoomsVersion(v => v + 1);
             }
         };
         window.addEventListener('storage', handleStorage);
@@ -840,10 +849,11 @@ export const StayView: React.FC = () => {
 
         return () => {
             unsubscribe();
+            window.removeEventListener('hotel_rooms_updated', handleRoomsUpdated);
             window.removeEventListener('storage', handleStorage);
             clearInterval(timer);
         };
-    }, [syncStoredReservations]);
+    }, [syncStoredReservations, activePropertyId]);
 
     // O(1) Pre-calculated Bookings Lookup Map by Room Number
     const bookingsByRoom = useMemo(() => {

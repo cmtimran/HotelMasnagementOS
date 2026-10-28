@@ -41,7 +41,8 @@ import {
     getAllStoredReservations,
     linkBookingsInDB,
     unlinkBookingInDB,
-    generateRegistrationNumber
+    generateRegistrationNumber,
+    getConnectingPartnerMap
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
 
@@ -293,11 +294,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         );
 
         if (isConn) {
-            const rooms = Array.isArray(booking.allocatedRooms) && booking.allocatedRooms.length > 1
-                ? booking.allocatedRooms
-                : (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+')
-                    ? booking.roomNumber.split('+').map((s: string) => s.trim())
-                    : ['101', '102']);
+            let rooms: string[] = [];
+            if (Array.isArray(booking.allocatedRooms) && booking.allocatedRooms.length > 1) {
+                rooms = booking.allocatedRooms;
+            } else if (typeof booking.roomNumber === 'string' && booking.roomNumber.includes('+')) {
+                rooms = booking.roomNumber.split('+').map((s: string) => s.trim());
+            } else if (booking.roomNumber) {
+                const partnerMap = getConnectingPartnerMap();
+                const partner = booking.connectedTo || partnerMap.get(String(booking.roomNumber).trim());
+                rooms = partner ? [String(booking.roomNumber), partner] : [String(booking.roomNumber)];
+            } else {
+                rooms = ['Suite'];
+            }
             const roomDisplay = rooms.join(' + ');
 
             return [{
@@ -1253,7 +1261,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             </h2>
                                             {isConnectingSuite ? (
                                                 <div className="text-[8.5px] font-medium text-emerald-300 mt-0.5 flex items-center gap-1">
-                                                    <span>🚪 Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : 'Rooms 101 & 102')})</span>
+                                                    <span>🚪 Adjoining door connected ({resolvedGroupRooms[0]?.roomNumber || (booking.allocatedRooms && booking.allocatedRooms.length > 1 ? booking.allocatedRooms.join(' & ') : (booking.roomNumber ? `Rooms ${booking.roomNumber}` : 'Adjoining Rooms'))})</span>
                                                 </div>
                                             ) : booking.groupCode ? (
                                                 <div className="text-[8.5px] font-mono text-blue-200/90 mt-0.5">

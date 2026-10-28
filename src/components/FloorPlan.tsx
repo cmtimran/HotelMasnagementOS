@@ -120,13 +120,8 @@ const deriveArchitecturalRooms = (targetDate?: string): ArchitecturalRoom[] => {
             const width = 140;
             const height = 95;
 
-            const isConn = Boolean(
-                r.isConnecting ||
-                (r.number === '101' && (r.connectedTo === '102' || !r.connectedTo)) ||
-                (r.number === '102' && (r.connectedTo === '101' || !r.connectedTo)) ||
-                r.connectedTo
-            );
-            const connTo = r.connectedTo || (r.number === '101' ? '102' : r.number === '102' ? '101' : undefined);
+            const isConn = Boolean(r.isConnecting || r.connectedTo);
+            const connTo = r.connectedTo || undefined;
 
             result.push({
                 id: typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10) || idx + 1,
@@ -187,7 +182,24 @@ export const FloorPlan: React.FC = () => {
         const unsub = subscribeToPMSEvents(() => {
             setRooms(deriveArchitecturalRooms(planDate));
         });
-        return () => unsub();
+
+        const handleRoomsUpdated = () => {
+            setRooms(deriveArchitecturalRooms(planDate));
+        };
+        window.addEventListener('hotel_rooms_updated', handleRoomsUpdated);
+
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'hotel_connecting_rooms_v1' || (e.key && e.key.startsWith('hotel_rooms'))) {
+                setRooms(deriveArchitecturalRooms(planDate));
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+
+        return () => {
+            unsub();
+            window.removeEventListener('hotel_rooms_updated', handleRoomsUpdated);
+            window.removeEventListener('storage', handleStorage);
+        };
     }, [planDate]);
 
     const [selectedFloor, setSelectedFloor] = useState<number>(1);
@@ -543,18 +555,30 @@ export const FloorPlan: React.FC = () => {
                             );
                         })}
 
-                        {/* Connecting Door Symbol between Room 101 & 102 on Floor 1 */}
-                        {selectedFloor === 1 && (
-                            <g className="cursor-pointer">
-                                <title>Adjoining Interconnecting Door (Rooms 101 &amp; 102)</title>
-                                <rect x="170" y="65" width="20" height="24" fill="#e0e7ff" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="3,2" rx="3" />
-                                <path d="M 173 77 L 187 77" stroke="#4f46e5" strokeWidth="2" />
-                                <circle cx="180" cy="77" r="2.5" fill="#4f46e5" />
-                                <text x="180" y="60" textAnchor="middle" fill="#4338ca" fontSize="6.5" fontWeight="bold">
-                                    DOOR
-                                </text>
-                            </g>
-                        )}
+                        {/* Dynamic Connecting Door Symbols for all connected rooms on this floor */}
+                        {floorRooms.map(r => {
+                            if (!r.isConnecting || !r.connectedTo) return null;
+                            const partner = floorRooms.find(p => p.roomNumber === r.connectedTo || (r.connectedTo && r.connectedTo.includes(p.roomNumber)));
+                            if (!partner) return null;
+                            if (r.roomNumber >= partner.roomNumber) return null; // Avoid duplicate doors between pairs
+
+                            const minX = Math.min(r.x, partner.x);
+                            const maxX = Math.max(r.x, partner.x);
+                            const midX = (minX + r.width + maxX) / 2 - 10;
+                            const midY = (r.y + partner.y) / 2 + r.height / 2 - 12;
+
+                            return (
+                                <g key={`conn-door-${r.roomNumber}-${partner.roomNumber}`} className="cursor-pointer">
+                                    <title>{`Adjoining Interconnecting Door (Rooms ${r.roomNumber} & ${partner.roomNumber})`}</title>
+                                    <rect x={midX} y={midY} width="20" height="24" fill="#e0e7ff" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="3,2" rx="3" />
+                                    <path d={`M ${midX + 3} ${midY + 12} L ${midX + 17} ${midY + 12}`} stroke="#4f46e5" strokeWidth="2" />
+                                    <circle cx={midX + 10} cy={midY + 12} r="2.5" fill="#4f46e5" />
+                                    <text x={midX + 10} y={midY - 5} textAnchor="middle" fill="#4338ca" fontSize="6.5" fontWeight="bold">
+                                        DOOR
+                                    </text>
+                                </g>
+                            );
+                        })}
                     </svg>
                 </div>
 

@@ -33,7 +33,8 @@ import {
     getAllStoredReservations,
     getCanonicalRooms,
     getOperatingSystemDate,
-    subscribeToPMSEvents
+    subscribeToPMSEvents,
+    getConnectingPartnerMap
 } from '../../utils/roomInventoryEngine';
 
 export interface ReservationItem {
@@ -251,11 +252,16 @@ export const ReservationsView: React.FC = () => {
             const roomNumbers = (r.allocatedRooms && r.allocatedRooms.length > 0)
                 ? r.allocatedRooms
                 : (rooms && rooms.length > 0 ? rooms.map((x: any) => x.roomNumber).filter(Boolean) : (typeof r.roomNumber === 'string' && r.roomNumber.includes('+') ? r.roomNumber.split('+').map((s: string) => s.trim()) : [r.roomNumber]));
+            
+            const partnerMap = isConnectingSuite ? getConnectingPartnerMap() : undefined;
+            const singlePartner = partnerMap && r.roomNumber ? partnerMap.get(String(r.roomNumber).trim()) : undefined;
+            const dynamicConnDisplay = singlePartner ? `${r.roomNumber} + ${singlePartner}` : (r.roomNumber ? String(r.roomNumber) : 'Connecting Suite');
+
             const roomDisplay = isConnectingSuite && roomNumbers.length > 1
                 ? roomNumbers.join(' + ')
                 : (typeof r.roomNumber === 'string' && r.roomNumber.includes('+')
                     ? r.roomNumber
-                    : (isConnectingSuite ? '101 + 102' : String(r.roomNumber || (rooms && rooms[0]?.roomNumber) || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned')));
+                    : (isConnectingSuite ? dynamicConnDisplay : String(r.roomNumber || (rooms && rooms[0]?.roomNumber) || (r.allocatedRooms && r.allocatedRooms[0]) || 'Unassigned')));
 
             return [{
                 id: r.id || idx + 1,
