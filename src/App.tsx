@@ -534,6 +534,7 @@ function App() {
         return <KitchenDisplay />;
       case 'table-layout':
         return <TableLayout />;
+      case 'out-of-order':
       case 'maintenance':
         return <MaintenanceKanban />;
       case 'corporate-profiles':

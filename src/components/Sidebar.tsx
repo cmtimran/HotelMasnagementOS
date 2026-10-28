@@ -164,6 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 { id: 'floor-plan', label: 'Floor Plan', icon: <Layers size={14} /> },
                 { id: 'occupancy-heatmap', label: 'Occupancy Matrix', icon: <Grid3X3 size={14} /> },
                 { id: 'night-audit', label: 'Night Audit', icon: <Moon size={14} /> },
+                { id: 'out-of-order', label: 'Out of Order / Blocks', icon: <Wrench size={14} /> },
             ]
         },
         {

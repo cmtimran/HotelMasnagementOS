@@ -18,6 +18,7 @@ import ConnectingRoomManagement from './ConnectingRoomManagement';
 import TaxVatManagement from './TaxVatManagement';
 import PrinterSettingsManagement from './PrinterSettingsManagement';
 import HolidayManagement from './HolidayManagement';
+import HousekeepingSettingsTab from './HousekeepingSettingsTab';
 
 export interface AddPropertyProps {
     onBack?: () => void;
@@ -305,7 +306,8 @@ const AddProperty: React.FC<AddPropertyProps> = ({
         'connecting-rooms',
         'holidays',
         'taxes-vat',
-        'printer-settings'
+        'printer-settings',
+        'housekeeping-settings'
     ]), []);
     const isSelfManagedTab = SELF_MANAGED_TABS.has(activeTab);
 
@@ -648,7 +650,10 @@ const AddProperty: React.FC<AddPropertyProps> = ({
         { id: 'numbering', label: 'Folio & Numbering', icon: <Receipt size={15} /> },
         { id: 'finance', label: 'Bank Accounts & FX', icon: <CreditCard size={15} /> },
 
-        // 4. POS & Hardware
+        // 4. Housekeeping Operations
+        { id: 'housekeeping-settings', label: 'Housekeeping', icon: <Sparkles size={15} />, group: 'Housekeeping & Operations' },
+
+        // 5. POS & Hardware
         { id: 'outlets', label: 'Outlet Configurations', icon: <Utensils size={15} />, group: 'Outlets & Peripherals' },
         { id: 'printer-settings', label: 'Printer Settings', icon: <Printer size={15} /> },
         { id: 'system', label: 'System & Channels', icon: <Monitor size={15} /> },
@@ -1332,6 +1337,15 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                     {activeTab === 'printer-settings' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
                             <PrinterSettingsManagement />
+                        </div>
+                    )}
+
+                    {/* ========================================================================
+                        HOUSEKEEPING SETTINGS
+                       ======================================================================== */}
+                    {activeTab === 'housekeeping-settings' && (
+                        <div className="p-4 sm:p-6 animate-in fade-in duration-150">
+                            <HousekeepingSettingsTab propertyId={targetProperty?.id || 1} />
                         </div>
                     )}
 
