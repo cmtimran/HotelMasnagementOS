@@ -27,22 +27,8 @@ const POSPage = () => {
 
     const categories = ['All', 'Fast Food', 'Beverage', 'Desert', 'Platter'];
 
-    const tables = [
-        { id: 190, name: 'Table 190', status: 'available' },
-        { id: 109, name: 'Table 109', status: 'available' },
-        { id: 101, name: 'Table 101', status: 'occupied' },
-        { id: 102, name: 'Table 102', status: 'reserved' },
-        { id: 103, name: 'Table 103', status: 'available' },
-    ];
-
-    const products = [
-        { id: 1, name: 'Chicken BBQ', price: 100.00, time: '05:00:00', image: null },
-        { id: 2, name: 'Fried Rice', price: 250.00, time: '00:05:00', image: null },
-        { id: 3, name: 'Burger', price: 285.00, time: '03:02:02', image: null },
-        { id: 4, name: 'French Fries', price: 150.00, time: '00:10:00', image: null },
-        { id: 5, name: 'Pizza', price: 450.00, time: '00:15:00', image: null },
-        { id: 6, name: 'Coke', price: 40.00, time: '00:00:00', image: null },
-    ];
+    const [tables] = useState<any[]>([]);
+    const [products] = useState<any[]>([]);
 
     const addToCart = (product: any) => {
         setCart([...cart, { ...product, qty: 1 }]);
@@ -52,14 +38,9 @@ const POSPage = () => {
     const [isAddTableOpen, setIsAddTableOpen] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-    // Mock Floors & Tables for Modal
-    const floors = ['Ground Floor', 'First Floor', 'Rooftop', 'Patio'];
-    const availableTables = [
-        { id: 'T101', name: 'Table T101', seats: 4, type: 'Standard' },
-        { id: 'T102', name: 'Table T102', seats: 4, type: 'Standard' },
-        { id: 'T109', name: 'Table T109', seats: 3, type: 'Round' },
-        { id: 'T110', name: 'Table T110', seats: 6, type: 'Booth' },
-    ];
+    // Dining Area Floors & Tables
+    const floors: string[] = [];
+    const availableTables: any[] = [];
 
     // ... inside POSPage component
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);

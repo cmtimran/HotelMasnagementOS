@@ -140,10 +140,11 @@ export const generateLostAndFoundRefNo = (): string => {
  * Auto-detect guest profile from room number
  * Checks current in-house or recently checked-out reservations
  */
-export const findGuestForRoom = (roomNumber: string, propertyId: number = 1) => {
+export const findGuestForRoom = (roomNumber: string, propertyId?: number) => {
     if (!roomNumber) return null;
+    const propId = propertyId || getActivePropertyId();
     const cleanRoom = roomNumber.trim().toLowerCase();
-    const reservations = getAllStoredReservations(propertyId);
+    const reservations = getAllStoredReservations(propId);
     if (!reservations || reservations.length === 0) return null;
 
     // 1. Look for Checked-In guests in this room
@@ -188,14 +189,15 @@ export const findGuestForRoom = (roomNumber: string, propertyId: number = 1) => 
 /**
  * Synchronize with PostgreSQL Backend
  */
-export const fetchLostAndFoundFromBackend = async (propertyId: number = 1): Promise<LostAndFoundItem[]> => {
-    const local = getStoredLostAndFoundItems(propertyId);
+export const fetchLostAndFoundFromBackend = async (propertyId?: number): Promise<LostAndFoundItem[]> => {
+    const propId = propertyId || getActivePropertyId();
+    const local = getStoredLostAndFoundItems(propId);
     try {
         const baseUrl = getApiBaseUrl();
         const res = await fetch(`${baseUrl}/api/lost-and-found`, {
             headers: {
                 'Content-Type': 'application/json',
-                'X-Property-Id': String(propertyId)
+                'X-Property-Id': String(propId)
             }
         });
         if (!res.ok) {
@@ -220,11 +222,12 @@ export const fetchLostAndFoundFromBackend = async (propertyId: number = 1): Prom
  */
 export const createLostAndFoundItem = async (
     itemData: Partial<LostAndFoundItem>, 
-    propertyId: number = 1
+    propertyId?: number
 ): Promise<LostAndFoundItem> => {
+    const propId = propertyId || getActivePropertyId();
     const newItem: LostAndFoundItem = {
         id: itemData.id || `LF-${Date.now()}`,
-        propertyId,
+        propertyId: propId,
         referenceNo: itemData.referenceNo || generateLostAndFoundRefNo(),
         itemName: itemData.itemName || 'Unspecified Item',
         category: itemData.category || 'Other',
@@ -298,9 +301,10 @@ export const claimLostAndFoundItem = async (
         releasedBy: string;
         releaseNotes?: string;
     },
-    propertyId: number = 1
+    propertyId?: number
 ): Promise<LostAndFoundItem | null> => {
-    const existing = getStoredLostAndFoundItems(propertyId);
+    const propId = propertyId || getActivePropertyId();
+    const existing = getStoredLostAndFoundItems(propId);
     const index = existing.findIndex(i => String(i.id) === String(id));
     if (index === -1) return null;
 
@@ -347,9 +351,10 @@ export const shipLostAndFoundItem = async (
         releasedBy: string;
         releaseNotes?: string;
     },
-    propertyId: number = 1
+    propertyId?: number
 ): Promise<LostAndFoundItem | null> => {
-    const existing = getStoredLostAndFoundItems(propertyId);
+    const propId = propertyId || getActivePropertyId();
+    const existing = getStoredLostAndFoundItems(propId);
     const index = existing.findIndex(i => String(i.id) === String(id));
     if (index === -1) return null;
 
@@ -392,9 +397,10 @@ export const disposeLostAndFoundItem = async (
         disposedBy: string;
         status?: 'disposed' | 'donated';
     },
-    propertyId: number = 1
+    propertyId?: number
 ): Promise<LostAndFoundItem | null> => {
-    const existing = getStoredLostAndFoundItems(propertyId);
+    const propId = propertyId || getActivePropertyId();
+    const existing = getStoredLostAndFoundItems(propId);
     const index = existing.findIndex(i => String(i.id) === String(id));
     if (index === -1) return null;
 

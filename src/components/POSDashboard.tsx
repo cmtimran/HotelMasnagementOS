@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { DollarSign, ShoppingBag, ArrowUpRight, Plus, Calendar, ChevronDown, MoreHorizontal, LayoutGrid, UtensilsCrossed, Receipt, Utensils } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB } from '../utils/roomInventoryEngine';
+import { formatMoney } from '../utils/currencyUtils';
 
 const POSDashboard = () => {
     const [timeRange, setTimeRange] = useState('Weekly');
@@ -44,17 +45,17 @@ const POSDashboard = () => {
         const avgCheck = active.length > 0 ? Math.round(fnbRevenue / active.length) : 0;
 
         const computedStats = [
-            { title: 'F&B & Add-on Revenue', value: `৳ ${fnbRevenue.toLocaleString()}`, change: '+12%', isPositive: true, icon: <DollarSign size={14} className="text-white" />, bg: 'bg-blue-600' },
+            { title: 'F&B & Add-on Revenue', value: formatMoney(fnbRevenue), change: '+12%', isPositive: true, icon: <DollarSign size={14} className="text-white" />, bg: 'bg-blue-600' },
             { title: 'In-House Dining Covers', value: `${inHouse.length} / ${Math.max(20, rooms.length)}`, change: 'Active', isPositive: true, icon: <LayoutGrid size={14} className="text-white" />, bg: 'bg-emerald-600' },
             { title: 'Active Room Folios', value: `${active.length} Open`, change: 'Live Queue', isPositive: false, icon: <Utensils size={14} className="text-white" />, bg: 'bg-amber-500' },
-            { title: 'Avg Folio F&B Check', value: `৳ ${avgCheck.toLocaleString()}`, change: '+5%', isPositive: true, icon: <Receipt size={14} className="text-white" />, bg: 'bg-purple-600' },
+            { title: 'Avg Folio F&B Check', value: formatMoney(avgCheck), change: '+5%', isPositive: true, icon: <Receipt size={14} className="text-white" />, bg: 'bg-purple-600' },
         ];
 
         const topItems = Array.from(itemTracker.entries())
             .map(([name, val]) => ({
                 name,
                 sold: val.sold,
-                revenue: `৳ ${val.revenue.toLocaleString()}`
+                revenue: formatMoney(val.revenue)
             }))
             .sort((a, b) => b.sold - a.sold)
             .slice(0, 4);

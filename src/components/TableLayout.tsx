@@ -18,23 +18,8 @@ interface Table {
 const TableLayout = () => {
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
-    // Mock table data with positions
-    const [tables] = useState<Table[]>([
-        // Square tables
-        { id: 1, number: '1', x: 50, y: 50, seats: 4, shape: 'square', status: 'occupied', guests: 3, orderAmount: 2500, duration: '45 min' },
-        { id: 2, number: '2', x: 200, y: 50, seats: 4, shape: 'square', status: 'available' },
-        { id: 3, number: '3', x: 350, y: 50, seats: 4, shape: 'square', status: 'reserved', guests: 4 },
-        { id: 4, number: '4', x: 500, y: 50, seats: 4, shape: 'square', status: 'occupied', guests: 2, orderAmount: 1800, duration: '20 min' },
-
-        // Round tables
-        { id: 5, number: '5', x: 100, y: 200, seats: 6, shape: 'round', status: 'available' },
-        { id: 6, number: '6', x: 300, y: 200, seats: 6, shape: 'round', status: 'occupied', guests: 5, orderAmount: 4200, duration: '1h 10min' },
-        { id: 7, number: '7', x: 500, y: 200, seats: 6, shape: 'round', status: 'reserved', guests: 6 },
-
-        // Rectangle tables
-        { id: 8, number: '8', x: 50, y: 350, seats: 8, shape: 'rectangle', status: 'occupied', guests: 7, orderAmount: 6500, duration: '55 min' },
-        { id: 9, number: '9', x: 350, y: 350, seats: 8, shape: 'rectangle', status: 'available' },
-    ]);
+    // Restaurant Tables State (Clean Zero-Mock State)
+    const [tables] = useState<Table[]>([]);
 
     const getStatusColor = (status: Table['status']) => {
         switch (status) {

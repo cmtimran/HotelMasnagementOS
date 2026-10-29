@@ -24,18 +24,7 @@ export interface MinibarConsumptionItem {
     subtotal: number;
 }
 
-export const STANDARD_MINIBAR_CATALOG: MinibarProduct[] = [
-    { id: 'mb-01', name: 'Coca Cola Can (250ml)', category: 'Beverages', unitPrice: 150, currency: 'BDT' },
-    { id: 'mb-02', name: 'Sprite Can (250ml)', category: 'Beverages', unitPrice: 150, currency: 'BDT' },
-    { id: 'mb-03', name: 'Diet Coke (250ml)', category: 'Beverages', unitPrice: 180, currency: 'BDT' },
-    { id: 'mb-04', name: 'Evian Mineral Water (500ml)', category: 'Water', unitPrice: 250, currency: 'BDT' },
-    { id: 'mb-05', name: 'Local Mineral Water (500ml)', category: 'Water', unitPrice: 60, currency: 'BDT' },
-    { id: 'mb-06', name: 'Red Bull Energy Drink (250ml)', category: 'Beverages', unitPrice: 350, currency: 'BDT' },
-    { id: 'mb-07', name: 'Pringles Potato Crisps (Original)', category: 'Snacks', unitPrice: 280, currency: 'BDT' },
-    { id: 'mb-08', name: 'KitKat 4-Finger Milk Chocolate', category: 'Snacks', unitPrice: 180, currency: 'BDT' },
-    { id: 'mb-09', name: 'Roasted Salted Almonds / Cashews', category: 'Snacks', unitPrice: 320, currency: 'BDT' },
-    { id: 'mb-10', name: 'Heineken Beer Bottle (330ml)', category: 'Alcohol', unitPrice: 650, currency: 'BDT' },
-];
+export const STANDARD_MINIBAR_CATALOG: MinibarProduct[] = [];
 
 /**
  * Post minibar consumption directly to the in-house guest's folio / reservation

@@ -85,42 +85,10 @@ const REPORT_CONFIG: Record<string, { columns: string[] }> = {
     'Void Transaction': { columns: ["Date", "Trans ID", "Guest", "Room", "Amount", "Void By", "Reason"] },
 };
 
-// 2. Generic Data Generator
-const generateGenericMockData = (reportName: string, count: number = 25): ReportRow[] => {
-    const config = REPORT_CONFIG[reportName];
-    if (!config) return [];
-
-    return Array.from({ length: count }, (_, i) => {
-        const row: ReportRow = {};
-        config.columns.forEach(col => {
-            const lowerCol = col.toLowerCase();
-            let value = '';
-
-            if (lowerCol.includes('date') || lowerCol.includes('arr') || lowerCol.includes('dept') || lowerCol === 'stay') {
-                value = new Date(2024, 5, 10 + (i % 20)).toLocaleDateString();
-            } else if (lowerCol.includes('no') || lowerCol.includes('#') || lowerCol.includes('id')) {
-                value = `${1000 + i}`;
-            } else if (lowerCol.includes('amount') || lowerCol.includes('rate') || lowerCol.includes('rev') || lowerCol.includes('balance') || lowerCol.includes('credit') || lowerCol.includes('debit') || lowerCol.includes('paid')) {
-                value = (Math.random() * 500 + 50).toFixed(2);
-            } else if (lowerCol.includes('guest') || lowerCol.includes('name')) {
-                const names = ['John Doe', 'Jane Smith', 'Mike Ross', 'Rachel Green', 'Chandler Bing', 'Monica Geller'];
-                value = names[i % names.length];
-            } else if (lowerCol.includes('room')) {
-                if (lowerCol.includes('type')) value = ['Deluxe', 'Standard', 'Suite'][i % 3];
-                else value = `${100 + (i % 50)}`;
-            } else if (lowerCol.includes('status')) {
-                value = ['Confirmed', 'Checked In', 'Cancelled', 'Pending'][i % 4];
-            } else if (lowerCol.includes('pax')) {
-                value = `${Math.floor(Math.random() * 3) + 1}/0`;
-            } else if (lowerCol.includes('user') || lowerCol.includes('by')) {
-                value = ['admin', 'manager', 'reception'][i % 3];
-            } else {
-                value = '-';
-            }
-            row[col] = value;
-        });
-        return row;
-    });
+// 2. Report Data Resolver (Zero Mock Fallback - Only Real Data)
+const generateGenericMockData = (_reportName: string, _count: number = 25): ReportRow[] => {
+    // Pure zero-mock compliance: When the database is clean, reports render empty states
+    return [];
 };
 
 interface ReportsProps {
@@ -3702,9 +3670,10 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
             format: pageSize.toLowerCase()
         });
 
+        const activePropertyName = localStorage.getItem('hotel_active_property_name') || 'Hotel Management OS';
         // Header
         doc.setFontSize(18);
-        doc.text('House of Dream', 14, 22);
+        doc.text(activePropertyName, 14, 22);
         doc.setFontSize(14);
         doc.setTextColor(220, 38, 38); // Red color
         doc.text(activeReport, 14, 30);
@@ -3836,12 +3805,12 @@ const Reports = ({ user, onLogout, setActivePage }: ReportsProps) => {
             <div className="mb-3">
                 <div className="flex justify-between items-end border-b-2 border-slate-800 pb-1.5 mb-1.5">
                     <div>
-                        <h1 className="text-lg text-slate-900 leading-tight">House of Dream</h1>
+                        <h1 className="text-lg text-slate-900 leading-tight">{localStorage.getItem('hotel_active_property_name') || 'Hotel Management OS'}</h1>
                         <p className="text-[10px] text-slate-500 font-medium">Hotel Management System • Operational Report</p>
                     </div>
                     <div className="text-right">
                         <h2 className="text-sm text-red-600 uppercase tracking-wider">{activeReport}</h2>
-                        <span className="text-[9px] text-slate-400 font-mono">Property Base Currency: USD ($)</span>
+                        <span className="text-[9px] text-slate-400 font-mono">Property Base Currency: {localStorage.getItem('hotel_active_property_currency') || 'USD'}</span>
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-[10px] font-medium text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-200/60">

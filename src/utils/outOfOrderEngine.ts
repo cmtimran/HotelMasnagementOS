@@ -135,17 +135,19 @@ export const saveStoredOOOBlocks = (blocks: OutOfOrderBlock[], propertyId?: numb
 /**
  * Retrieve active or extended maintenance blocks
  */
-export const getActiveOOOBlocks = (propertyId: number = 1): OutOfOrderBlock[] => {
-    const all = getStoredOOOBlocks(propertyId);
+export const getActiveOOOBlocks = (propertyId?: number): OutOfOrderBlock[] => {
+    const propId = propertyId || getActivePropertyId();
+    const all = getStoredOOOBlocks(propId);
     return all.filter(b => b.status === 'active' || b.status === 'extended');
 };
 
 /**
  * Retrieve maintenance blocks for a specific room
  */
-export const getRoomOOOBlocks = (roomNumber: string, propertyId: number = 1): OutOfOrderBlock[] => {
+export const getRoomOOOBlocks = (roomNumber: string, propertyId?: number): OutOfOrderBlock[] => {
+    const propId = propertyId || getActivePropertyId();
     const cleanRoomNo = String(roomNumber || '').trim();
-    return getStoredOOOBlocks(propertyId).filter(b => String(b.roomNumber).trim() === cleanRoomNo);
+    return getStoredOOOBlocks(propId).filter(b => String(b.roomNumber).trim() === cleanRoomNo);
 };
 
 /**
@@ -156,10 +158,11 @@ export const isRoomOOOForDates = (
     roomNumber: string,
     checkIn: string,
     checkOut: string,
-    propertyId: number = 1
+    propertyId?: number
 ): { isBlocked: boolean; block?: OutOfOrderBlock; reason?: string } => {
+    const propId = propertyId || getActivePropertyId();
     const cleanRoomNo = String(roomNumber || '').trim();
-    const activeBlocks = getActiveOOOBlocks(propertyId);
+    const activeBlocks = getActiveOOOBlocks(propId);
 
     const match = activeBlocks.find(b => {
         if (String(b.roomNumber).trim() !== cleanRoomNo) return false;
@@ -220,8 +223,9 @@ export const isBlockOverdue = (block: OutOfOrderBlock, todayStr?: string): boole
 /**
  * Returns all active maintenance blocks that are currently overdue.
  */
-export const getOverdueOOOBlocks = (todayStr?: string, propertyId: number = 1): OutOfOrderBlock[] => {
-    const active = getActiveOOOBlocks(propertyId);
+export const getOverdueOOOBlocks = (todayStr?: string, propertyId?: number): OutOfOrderBlock[] => {
+    const propId = propertyId || getActivePropertyId();
+    const active = getActiveOOOBlocks(propId);
     return active.filter(b => isBlockOverdue(b, todayStr));
 };
 
@@ -232,10 +236,11 @@ export const findConflictingReservations = (
     roomNumber: string,
     startDate: string,
     endDate: string,
-    propertyId: number = 1
+    propertyId?: number
 ): StoredReservation[] => {
+    const propId = propertyId || getActivePropertyId();
     const cleanRoomNo = String(roomNumber || '').trim();
-    const allReservations = getAllStoredReservations(propertyId);
+    const allReservations = getAllStoredReservations(propId);
 
     return allReservations.filter(res => {
         const normStatus = String(res.status || '').toLowerCase();
@@ -266,16 +271,17 @@ export const findConflictingReservations = (
 /**
  * Syncs OOO blocks from the backend API into localStorage
  */
-export const syncOOOBlocksFromBackend = async (propertyId: number = 1): Promise<OutOfOrderBlock[]> => {
+export const syncOOOBlocksFromBackend = async (propertyId?: number): Promise<OutOfOrderBlock[]> => {
+    const propId = propertyId || getActivePropertyId();
     try {
         const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/rooms/ooo-blocks?status=all`, {
             headers: {
-                'x-property-id': String(propertyId),
+                'x-property-id': String(propId),
                 'x-user-role': 'admin'
             }
         });
-        if (!res.ok) return getStoredOOOBlocks(propertyId);
+        if (!res.ok) return getStoredOOOBlocks(propId);
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
             const normalized: OutOfOrderBlock[] = json.data.map((item: any) => ({

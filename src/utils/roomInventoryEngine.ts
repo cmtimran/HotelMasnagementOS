@@ -174,7 +174,7 @@ if (typeof window !== 'undefined') {
     }
 }
 
-export const getStoredConnectingSuites = (propertyId: number = 1): ConnectingSuite[] => {
+export const getStoredConnectingSuites = (propertyId?: number): ConnectingSuite[] => {
     const propId = propertyId || getActivePropertyId();
     try {
         if (typeof window !== 'undefined') {
@@ -203,7 +203,7 @@ export const saveConnectingSuites = (suites: ConnectingSuite[], propertyId?: num
     } catch {}
 };
 
-export const syncConnectingSuitesFromDB = async (propertyId: number = 1): Promise<ConnectingSuite[]> => {
+export const syncConnectingSuitesFromDB = async (propertyId?: number): Promise<ConnectingSuite[]> => {
     const propId = propertyId || getActivePropertyId();
     try {
         const base = getApiBaseUrl();
@@ -1990,18 +1990,19 @@ export const changeGroupOwnerInDB = async (
 export const linkBookingsInDB = async (
     targetReservationNumber: string,
     reservationToLinkNumber: string,
-    propertyId: number = 1
+    propertyId?: number
 ): Promise<{ success: boolean; groupCode?: string; message?: string }> => {
     try {
+        const propId = propertyId || getActivePropertyId();
         const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/bookings/group/link`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ targetReservationNumber, reservationToLinkNumber, propertyId })
+            body: JSON.stringify({ targetReservationNumber, reservationToLinkNumber, propertyId: propId })
         });
         const data = await res.json();
         if (data.success) {
-            await syncReservationsFromDB(propertyId);
+            await syncReservationsFromDB(propId);
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             return data;
         }
@@ -2017,14 +2018,15 @@ export const linkBookingsInDB = async (
  */
 export const unlinkBookingInDB = async (
     reservationNumber: string,
-    propertyId: number = 1
+    propertyId?: number
 ): Promise<{ success: boolean; message?: string }> => {
     try {
+        const propId = propertyId || getActivePropertyId();
         const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/bookings/group/unlink`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reservationNumber, propertyId })
+            body: JSON.stringify({ reservationNumber, propertyId: propId })
         });
         const data = await res.json();
         if (data.success) {

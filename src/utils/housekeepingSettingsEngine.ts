@@ -92,16 +92,19 @@ export const DEFAULT_HOUSEKEEPING_SETTINGS: HousekeepingSettings = {
 
 export const DEFAULT_HOUSEKEEPERS: Housekeeper[] = [];
 
+import { getActivePropertyId } from './apiUrl';
+
 export const STORAGE_KEY_HK_SETTINGS = 'hotel_housekeeping_settings_v1';
 export const STORAGE_KEY_HOUSEKEEPERS = 'hotel_housekeepers_roster_v1';
 
 /**
  * Retrieve current Housekeeping Settings (scoped per property)
  */
-export const getHousekeepingSettings = (propertyId: number = 1): HousekeepingSettings => {
+export const getHousekeepingSettings = (propertyId?: number): HousekeepingSettings => {
     try {
         if (typeof window === 'undefined') return DEFAULT_HOUSEKEEPING_SETTINGS;
-        const key = `${STORAGE_KEY_HK_SETTINGS}_prop_${propertyId}`;
+        const propId = propertyId || getActivePropertyId();
+        const key = `${STORAGE_KEY_HK_SETTINGS}_prop_${propId}`;
         const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_HK_SETTINGS);
         if (raw) {
             return { ...DEFAULT_HOUSEKEEPING_SETTINGS, ...JSON.parse(raw) };
@@ -117,17 +120,18 @@ export const getHousekeepingSettings = (propertyId: number = 1): HousekeepingSet
  */
 export const saveHousekeepingSettings = (
     updated: Partial<HousekeepingSettings>,
-    propertyId: number = 1
+    propertyId?: number
 ): HousekeepingSettings => {
-    const current = getHousekeepingSettings(propertyId);
+    const propId = propertyId || getActivePropertyId();
+    const current = getHousekeepingSettings(propId);
     const merged = { ...current, ...updated };
     try {
         if (typeof window !== 'undefined') {
-            const key = `${STORAGE_KEY_HK_SETTINGS}_prop_${propertyId}`;
+            const key = `${STORAGE_KEY_HK_SETTINGS}_prop_${propId}`;
             localStorage.setItem(key, JSON.stringify(merged));
             localStorage.setItem(STORAGE_KEY_HK_SETTINGS, JSON.stringify(merged));
             window.dispatchEvent(new CustomEvent('hotel_housekeeping_settings_updated', {
-                detail: { propertyId, settings: merged }
+                detail: { propertyId: propId, settings: merged }
             }));
         }
     } catch (e) {
@@ -139,10 +143,11 @@ export const saveHousekeepingSettings = (
 /**
  * Retrieve Housekeepers roster
  */
-export const getHousekeepersList = (propertyId: number = 1): Housekeeper[] => {
+export const getHousekeepersList = (propertyId?: number): Housekeeper[] => {
     try {
         if (typeof window === 'undefined') return [];
-        const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propertyId}`;
+        const propId = propertyId || getActivePropertyId();
+        const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propId}`;
         const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_HOUSEKEEPERS);
         if (raw) {
             const parsed = JSON.parse(raw);
@@ -157,14 +162,15 @@ export const getHousekeepersList = (propertyId: number = 1): Housekeeper[] => {
 /**
  * Save Housekeepers roster
  */
-export const saveHousekeepersList = (list: Housekeeper[], propertyId: number = 1): void => {
+export const saveHousekeepersList = (list: Housekeeper[], propertyId?: number): void => {
     try {
         if (typeof window !== 'undefined') {
-            const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propertyId}`;
+            const propId = propertyId || getActivePropertyId();
+            const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propId}`;
             localStorage.setItem(key, JSON.stringify(list));
             localStorage.setItem(STORAGE_KEY_HOUSEKEEPERS, JSON.stringify(list));
             window.dispatchEvent(new CustomEvent('hotel_housekeepers_roster_updated', {
-                detail: { propertyId, housekeepers: list }
+                detail: { propertyId: propId, housekeepers: list }
             }));
         }
     } catch (e) {

@@ -177,39 +177,15 @@ function App() {
   };
 
 
-  // Mock Data
-  const categoriesData = [
-    { id: 1, name: 'Burger', type: 'Food', status: 'Active' },
-    { id: 2, name: 'Pizza', type: 'Food', status: 'Active' },
-  ];
-
-  const tablesData = [
-    { id: 101, name: 'Table 1', capacity: 4, area: 'Main Hall' },
-  ];
-
-  const addonsData = [
-    { id: 1, name: 'Extra Cheese', price: 50, status: 'Active' },
-  ];
-
-  const unitsData = [
-    { id: 1, name: 'Kilogram', code: 'kg', status: 'Active' },
-  ];
-
-  const floorPlanData = [
-    { id: 1, name: 'Ground Floor', area: 'Indoor', tables: 12 },
-  ];
-
-  const countersData = [
-    { id: 1, name: 'Main Counter', type: 'General', status: 'Active' },
-  ];
-
-  const kitchensData = [
-    { id: 1, name: 'Main Kitchen', floor: 'Ground', printer: '192.168.1.100' },
-  ];
-
-  const waitersData = [
-    { id: 1, name: 'John Doe', phone: '555-0101', role: 'Senior Waiter' },
-  ];
+  // Dynamic Master Configuration Data (Clean Zero-Mock State)
+  const [categoriesData] = useState<any[]>([]);
+  const [tablesData] = useState<any[]>([]);
+  const [addonsData] = useState<any[]>([]);
+  const [unitsData] = useState<any[]>([]);
+  const [floorPlanData] = useState<any[]>([]);
+  const [countersData] = useState<any[]>([]);
+  const [kitchensData] = useState<any[]>([]);
+  const [waitersData] = useState<any[]>([]);
 
   const livePropertiesData = useMemo(() => {
     if (properties && properties.length > 0) {
@@ -631,7 +607,9 @@ function App() {
   const handleLogin = (user: UserData) => {
     setIsAuthenticated(true);
     setCurrentUser(user);
-    localStorage.setItem('auth_token', 'valid_token_placeholder');
+    if (!localStorage.getItem('auth_token')) {
+      localStorage.setItem('auth_token', 'valid_session');
+    }
     localStorage.setItem('user_data', JSON.stringify(user));
     updateUserSession(user);
     setActivePage('front-desk');

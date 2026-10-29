@@ -20,6 +20,7 @@ import {
     type Housekeeper
 } from '../utils/housekeepingSettingsEngine';
 import { toast } from '../context/ToastContext';
+import { getActivePropertyId } from '../utils/apiUrl';
 
 interface HousekeepingSettingsTabProps {
     propertyId?: number;
@@ -27,7 +28,7 @@ interface HousekeepingSettingsTabProps {
 }
 
 export const HousekeepingSettingsTab: React.FC<HousekeepingSettingsTabProps> = ({
-    propertyId = 1,
+    propertyId = getActivePropertyId(),
     onSaveSuccess
 }) => {
     const [settings, setSettings] = useState<HousekeepingSettings>(() => getHousekeepingSettings(propertyId));
