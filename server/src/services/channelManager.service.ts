@@ -29,11 +29,11 @@ export class ChannelManagerService {
     static async getARIMatrix(propertyId: number, startDate: string, endDate: string) {
         // 1. Get Room Types for Property
         const roomTypes = await db.prepare(`
-            SELECT rt.id, rt.name, rt.base_price, rt.total_rooms,
+            SELECT rt.id, rt.name, rt.base_rate,
                    (SELECT COUNT(*) FROM rooms r WHERE r.room_type_id = rt.id AND r.property_id = ?) as physical_rooms
             FROM room_types rt
             WHERE rt.property_id = ?
-            ORDER BY rt.display_order ASC, rt.id ASC
+            ORDER BY rt.id ASC
         `).all(propertyId, propertyId) as any[];
 
         // 2. Query Booked counts in date range
@@ -61,7 +61,7 @@ export class ChannelManagerService {
         `).all(propertyId, endDate, startDate).catch(() => []) as any[];
 
         const matrix = roomTypes.map(rt => {
-            const total = Number(rt.physical_rooms) || Number(rt.total_rooms) || 0;
+            const total = Number(rt.physical_rooms) || 0;
             const booked = bookedRows
                 .filter(b => Number(b.room_type_id) === Number(rt.id))
                 .reduce((sum, b) => sum + Number(b.count), 0);
@@ -77,7 +77,7 @@ export class ChannelManagerService {
                 currentlyBooked: booked,
                 outOfOrder: ooo,
                 availableToSell,
-                ratePerNight: Number(rt.base_price) || 0,
+                ratePerNight: Number(rt.base_rate) || 0,
                 stopSell: availableToSell <= 0,
                 minStay: 1,
                 maxStay: 30,
@@ -120,7 +120,7 @@ export class ChannelManagerService {
 
         // 2. Find Room Type & Available Physical Room
         const roomType = await db.prepare(`
-            SELECT id, name, base_price 
+            SELECT id, name, base_rate 
             FROM room_types 
             WHERE property_id = ? AND (LOWER(name) = LOWER(?) OR id = ?)
             LIMIT 1
@@ -165,7 +165,7 @@ export class ChannelManagerService {
             room_type: roomType.name,
             check_in_date: checkInDate,
             check_out_date: checkOutDate,
-            total_amount: Number(payload.totalAmount) || Number(roomType.base_price),
+            total_amount: Number(payload.totalAmount) || Number(roomType.base_rate),
             special_requests: notes,
             source: channelName
         } as any);
