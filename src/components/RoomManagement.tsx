@@ -138,6 +138,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                 if (dbRooms && dbRooms.length > 0) {
                     setRooms(dbRooms as unknown as Room[]);
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(dbRooms));
+                    localStorage.setItem('hotel_rooms_prop_1', JSON.stringify(dbRooms));
                 } else {
                     // Fall back to canonical rooms from localStorage
                     const canonical = getCanonicalRooms();
@@ -189,6 +190,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
         setRooms(updated);
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            localStorage.setItem('hotel_rooms_prop_1', JSON.stringify(updated));
         } catch {
             // fallback
         }
@@ -312,6 +314,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                 if (dbRooms && dbRooms.length > 0) {
                     setRooms(dbRooms as unknown as Room[]);
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(dbRooms));
+                    localStorage.setItem('hotel_rooms_prop_1', JSON.stringify(dbRooms));
                 }
                 broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             } catch {

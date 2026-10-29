@@ -142,21 +142,24 @@ export interface ConnectingSuite {
 export const STORAGE_KEY_CONNECTING_SUITES = 'hotel_connecting_rooms_v1';
 
 export const getStoredConnectingSuites = (propertyId: number = 1): ConnectingSuite[] => {
+    const propId = propertyId || getActivePropertyId();
     try {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem(STORAGE_KEY_CONNECTING_SUITES);
-            if (saved) {
+            const scopedKey = `hotel_connecting_rooms_prop_${propId}`;
+            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? localStorage.getItem(STORAGE_KEY_CONNECTING_SUITES) : null);
+            if (saved !== null) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
+                if (Array.isArray(parsed)) {
                     return parsed;
                 }
             }
         }
     } catch {}
-    return [
+    // Baseline seed for Property 1; other properties start with 0 connecting suites
+    return (propId === 1 || !propId) ? [
         {
             id: 1,
-            propertyId: propertyId || 1,
+            propertyId: 1,
             name: 'Interconnecting Suite (101-102)',
             inventoryLogic: 'Auto-Sync',
             pricingStrategy: 'Sum of Rates',
@@ -167,22 +170,33 @@ export const getStoredConnectingSuites = (propertyId: number = 1): ConnectingSui
                 { roomTypeId: '1', count: 1, roomNumbers: ['102'] }
             ]
         }
-    ];
+    ] : [];
+};
+
+export const saveConnectingSuites = (suites: ConnectingSuite[], propertyId?: number): void => {
+    const propId = propertyId || getActivePropertyId();
+    try {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(`hotel_connecting_rooms_prop_${propId}`, JSON.stringify(suites));
+            if (propId === 1) {
+                localStorage.setItem(STORAGE_KEY_CONNECTING_SUITES, JSON.stringify(suites));
+            }
+        }
+    } catch {}
 };
 
 export const syncConnectingSuitesFromDB = async (propertyId: number = 1): Promise<ConnectingSuite[]> => {
+    const propId = propertyId || getActivePropertyId();
     try {
         const base = getApiBaseUrl();
-        const res = await fetch(`${base}/api/connecting-rooms?propertyId=${propertyId}`);
+        const res = await fetch(`${base}/api/connecting-rooms?propertyId=${propId}`);
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(STORAGE_KEY_CONNECTING_SUITES, JSON.stringify(json.data));
-            }
+            saveConnectingSuites(json.data, propId);
             return json.data;
         }
     } catch {}
-    return getStoredConnectingSuites(propertyId);
+    return getStoredConnectingSuites(propId);
 };
 
 /**
@@ -266,11 +280,13 @@ export const isMatchingRoomType = (typeA?: string, typeB?: string): boolean => {
 /**
  * Retrieves all registered Room Types dynamically cached from the database
  */
-export const getDynamicRoomTypes = (): DynamicRoomType[] => {
+export const getDynamicRoomTypes = (propertyId?: number): DynamicRoomType[] => {
+    const propId = propertyId || getActivePropertyId();
     try {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem(STORAGE_KEY_ROOM_TYPES);
-            if (saved) {
+            const scopedKey = `hotel_room_types_prop_${propId}`;
+            const saved = localStorage.getItem(scopedKey) || (propId === 1 ? localStorage.getItem(STORAGE_KEY_ROOM_TYPES) : null);
+            if (saved !== null) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     return parsed;
@@ -278,7 +294,106 @@ export const getDynamicRoomTypes = (): DynamicRoomType[] => {
             }
         }
     } catch {}
-    return DEFAULT_ROOM_TYPES;
+    return (propId === 1 || !propId) ? DEFAULT_ROOM_TYPES : [];
+};
+
+export const saveDynamicRoomTypes = (roomTypes: DynamicRoomType[], propertyId?: number): void => {
+    const propId = propertyId || getActivePropertyId();
+    try {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(`hotel_room_types_prop_${propId}`, JSON.stringify(roomTypes));
+            if (propId === 1) {
+                localStorage.setItem(STORAGE_KEY_ROOM_TYPES, JSON.stringify(roomTypes));
+            }
+        }
+    } catch {}
+};
+
+export const saveCanonicalRooms = (rooms: CanonicalRoom[], propertyId?: number): void => {
+    const propId = propertyId || getActivePropertyId();
+    try {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(`hotel_rooms_prop_${propId}`, JSON.stringify(rooms));
+            if (propId === 1) {
+                localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(rooms));
+            }
+        }
+    } catch {}
+};
+
+export interface HotelGeneralSettings {
+    checkInTime: string;
+    checkOutTime: string;
+    visitorIdentityRule: string;
+    cancellationText?: string;
+    childStayPolicy?: string;
+    petPolicyText?: string;
+    smokingPolicyText?: string;
+    noShowPolicy?: string;
+}
+
+export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettings => {
+    const propId = propertyId || getActivePropertyId();
+    try {
+        if (typeof window !== 'undefined') {
+            const unified = localStorage.getItem(`hotel_unified_settings_prop_${propId}`);
+            if (unified) {
+                const parsed = JSON.parse(unified);
+                if (parsed.settings) {
+                    return {
+                        checkInTime: parsed.settings.checkInTime || '14:00',
+                        checkOutTime: parsed.settings.checkOutTime || '12:00',
+                        visitorIdentityRule: parsed.settings.visitorIdentityRule || 'Government-issued Photo ID / Passport required upon arrival.',
+                        cancellationText: parsed.settings.cancellationText || 'Free cancellation up to 48 hours prior to standard check-in time.',
+                        childStayPolicy: parsed.settings.childStayPolicy,
+                        petPolicyText: parsed.settings.petPolicyText,
+                        smokingPolicyText: parsed.settings.smokingPolicyText,
+                        noShowPolicy: parsed.settings.noShowPolicy
+                    };
+                }
+            }
+            const general = localStorage.getItem('hotel_general_settings_v1');
+            if (general) {
+                const parsed = JSON.parse(general);
+                return {
+                    checkInTime: parsed.checkInTime || '14:00',
+                    checkOutTime: parsed.checkOutTime || '12:00',
+                    visitorIdentityRule: parsed.visitorIdentityRule || 'Government-issued Photo ID / Passport required upon arrival.',
+                    cancellationText: parsed.cancellationText || 'Free cancellation up to 48 hours prior to standard check-in time.',
+                    childStayPolicy: parsed.childStayPolicy,
+                    petPolicyText: parsed.petPolicyText,
+                    smokingPolicyText: parsed.smokingPolicyText,
+                    noShowPolicy: parsed.noShowPolicy
+                };
+            }
+        }
+    } catch {}
+    return {
+        checkInTime: '14:00',
+        checkOutTime: '12:00',
+        visitorIdentityRule: 'Government-issued Photo ID / Passport required upon arrival.',
+        cancellationText: 'Free cancellation up to 48 hours prior to standard check-in time.'
+    };
+};
+
+/**
+ * Dynamically resolves full reservation policies from General Settings and assigned room smoking policy
+ */
+export const getHotelReservationPolicies = (roomNumber?: string, propertyId?: number): string[] => {
+    const settings = getHotelGeneralSettings(propertyId);
+    const smoking = getRoomSmokingPolicy(roomNumber || '101', propertyId);
+    const policies: string[] = [
+        smoking.guestFacingClause,
+        `Standard Hotel Check-In: ${settings.checkInTime} | Check-Out: ${settings.checkOutTime}`,
+        settings.visitorIdentityRule
+    ];
+    if (settings.cancellationText) {
+        policies.push(settings.cancellationText);
+    }
+    if (settings.childStayPolicy) {
+        policies.push(`Child Policy: ${settings.childStayPolicy}`);
+    }
+    return policies;
 };
 
 /**
@@ -872,8 +987,8 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
 
         if (saved !== null) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-                const dynamicTypes = getDynamicRoomTypes();
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                const dynamicTypes = getDynamicRoomTypes(propId);
                 return parsed.map((r: any) => {
                     const roomNum = String(r.number).trim();
                     const dynamicPartner = partnerMap.get(roomNum);
@@ -2156,6 +2271,7 @@ export const syncRatesAndPlansFromDB = async (targetPropertyId?: number): Promis
 if (typeof window !== 'undefined') {
     setTimeout(() => {
         syncRoomTypesAndRoomsFromDB();
+        syncConnectingSuitesFromDB();
         syncReservationsFromDB();
         syncRatesAndPlansFromDB();
     }, 500);

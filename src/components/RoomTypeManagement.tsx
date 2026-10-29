@@ -123,6 +123,7 @@ const RoomTypeManagement = () => {
                     }));
                     setRoomTypes(mapped);
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+                    localStorage.setItem('hotel_room_types_prop_1', JSON.stringify(mapped));
                 }
             } catch (err) {
                 console.warn('Could not load room types from DB, using dynamic cached engine:', err);
@@ -140,6 +141,7 @@ const RoomTypeManagement = () => {
         setRoomTypes(updated);
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            localStorage.setItem('hotel_room_types_prop_1', JSON.stringify(updated));
         } catch {
             // fallback
         }

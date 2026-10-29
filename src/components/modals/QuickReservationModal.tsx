@@ -57,7 +57,8 @@ import {
     generateSubBookingNumber,
     generateRegistrationNumber,
     generateFolioNumber,
-    getRoomSmokingPolicy
+    getRoomSmokingPolicy,
+    getHotelReservationPolicies
 } from '../../utils/roomInventoryEngine';
 import {
     calculateReservationTaxes,
@@ -1180,11 +1181,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             smokingPolicy: primarySmokingPolicy.smokingStatus,
             smokingPolicyText: primarySmokingPolicy.policyBadgeText,
             smokingClause: primarySmokingPolicy.guestFacingClause,
-            policies: [
-                primarySmokingPolicy.guestFacingClause,
-                'Standard Hotel Check-In: 14:00 | Check-Out: 12:00 PM',
-                'Government-issued Photo ID / Passport required upon arrival.'
-            ],
+            policies: getHotelReservationPolicies(primaryRoom),
             allocatedRooms: allocatedRoomNumbers,
             roomsCount: totalRoomsAllocatedInForm,
             checkIn: checkInDate,

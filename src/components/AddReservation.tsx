@@ -66,6 +66,7 @@ import {
     getStoredConnectingSuites,
     syncConnectingSuitesFromDB,
     getRoomSmokingPolicy,
+    getHotelReservationPolicies,
     type StoredReservation,
     type ConnectingSuite
 } from '../utils/roomInventoryEngine';
@@ -1606,11 +1607,7 @@ export const AddReservation: React.FC = () => {
             smokingPolicy: getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).smokingStatus,
             smokingPolicyText: getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).policyBadgeText,
             smokingClause: getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).guestFacingClause,
-            policies: [
-                getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).guestFacingClause,
-                'Standard Hotel Check-In: 14:00 | Check-Out: 12:00 PM',
-                'Government-issued Photo ID / Passport required upon arrival.'
-            ],
+            policies: getHotelReservationPolicies(allocatedRoomNumbers[0] || mainRoom.roomNumber),
             allocatedRooms: allocatedRoomNumbers,
             roomsCount: isConnectingSuite ? 1 : totalRoomsCount,
             checkIn: groupHorizon.hasCustomDates ? groupHorizon.minIn : checkIn,

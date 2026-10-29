@@ -198,6 +198,7 @@ const ConnectingRoomManagement = () => {
         setConnectingRooms(updated);
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            localStorage.setItem(`hotel_connecting_rooms_prop_${activePropertyId}`, JSON.stringify(updated));
         } catch {}
         syncPhysicalRoomsTwoWay(updated);
     };
