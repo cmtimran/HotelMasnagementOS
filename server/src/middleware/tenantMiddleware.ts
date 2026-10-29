@@ -16,6 +16,23 @@ declare global {
  * Intercepts every incoming API request and routes queries to the tenant's isolated database.
  */
 export async function tenantMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+    // Platform-level & authentication routes bypass tenant isolation routing
+    const path = (req.path || '').toLowerCase();
+    if (
+        path.startsWith('/auth') || 
+        path.startsWith('/api/auth') || 
+        path.startsWith('/health') || 
+        path.startsWith('/api/health') || 
+        path.startsWith('/schema') || 
+        path.startsWith('/api/schema') || 
+        path.startsWith('/central') || 
+        path.startsWith('/api/central') ||
+        path.startsWith('/tenants') ||
+        path.startsWith('/api/tenants')
+    ) {
+        return next();
+    }
+
     try {
         // Priority order for Tenant Slug resolution:
         // 1. HTTP Request Header: 'X-Tenant-Id' or 'X-Property-Slug'

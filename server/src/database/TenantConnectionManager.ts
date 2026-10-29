@@ -103,20 +103,20 @@ export class TenantConnectionManager {
      * Resolve TenantContext and retrieve or instantiate a managed connection pool
      */
     public static async resolveTenantContext(tenantSlug: string): Promise<TenantContext> {
-        const cleanSlug = (tenantSlug || 'default').toLowerCase().trim();
+        const cleanSlug = (tenantSlug || 'central').toLowerCase().trim();
         const masterDbName = process.env.PGDATABASE || 'postgres';
 
-        // 1. If master/default, return master pool
-        if (cleanSlug === 'default' || cleanSlug === 'grand-palace') {
+        // 1. If central / master / default / hq-corp / corp / platform, return master pool
+        if (!cleanSlug || cleanSlug === 'default' || cleanSlug === 'central' || cleanSlug === 'master' || cleanSlug === 'hq' || cleanSlug === 'corp' || cleanSlug === 'hq-corp' || cleanSlug === 'grand-palace') {
             return {
-                tenantSlug: 'grand-palace',
-                tenantName: 'Grand Palace Hotel & Resort (HQ)',
+                tenantSlug: cleanSlug || 'central',
+                tenantName: 'Primary Cluster / Central Control Plane',
                 dbName: masterDbName,
                 pool: pgPool,
                 isCentral: true,
                 isolationMode: 'SHARED',
                 subscriptionTier: 'ENTERPRISE',
-                propertyId: 1
+                propertyId: undefined
             };
         }
 
@@ -147,7 +147,17 @@ export class TenantConnectionManager {
         );
 
         if (res.rows.length === 0) {
-            throw new Error(`Tenant '${cleanSlug}' not found in Central Multi-Tenant Registry.`);
+            console.warn(`⚠️ [Tenant Manager] Slug '${cleanSlug}' not found in registry. Gracefully routing to primary database cluster.`);
+            return {
+                tenantSlug: cleanSlug,
+                tenantName: 'Primary Cluster / Platform Database',
+                dbName: masterDbName,
+                pool: pgPool,
+                isCentral: true,
+                isolationMode: 'SHARED',
+                subscriptionTier: 'ENTERPRISE',
+                propertyId: undefined
+            };
         }
 
         const t = res.rows[0];

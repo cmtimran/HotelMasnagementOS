@@ -37,7 +37,8 @@ const quotes = [
 
 const Login = ({ onLogin }: LoginProps) => {
     const [showPassword, setShowPassword] = useState(false);
-    const [propertyId, setPropertyId] = useState('HQ-CORP');
+    const [propertyId, setPropertyId] = useState('');
+    const [showPropertyCode, setShowPropertyCode] = useState(false);
     const [email, setEmail] = useState('superadmin@hotelmanagement.os');
     const [password, setPassword] = useState('admin');
     const [isLoading, setIsLoading] = useState(false);
@@ -52,9 +53,20 @@ const Login = ({ onLogin }: LoginProps) => {
         return () => clearInterval(interval);
     }, []);
 
+    // Clean up any stale or corrupted tenant keys on login screen
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const stale = localStorage.getItem('hotel_active_tenant_slug');
+            if (stale === 'gpd' || stale === 'default' || stale === 'hq-corp') {
+                localStorage.removeItem('hotel_active_tenant_slug');
+            }
+        }
+    }, []);
+
     // Quick helper to fill Super Admin credentials
     const fillSuperAdmin = () => {
-        setPropertyId('HQ-CORP');
+        setPropertyId('');
+        setShowPropertyCode(false);
         setEmail('superadmin@hotelmanagement.os');
         setPassword('admin');
     };
@@ -91,10 +103,15 @@ const Login = ({ onLogin }: LoginProps) => {
 
                 if (isSuper) {
                     localStorage.setItem('hotel_portal_mode', 'super_admin');
+                    localStorage.removeItem('hotel_active_tenant_slug');
+                    localStorage.removeItem('hotel_active_property_id');
                 } else {
                     localStorage.setItem('hotel_portal_mode', 'property_pms');
                     if (user.propertyId) {
                         localStorage.setItem('hotel_active_property_id', String(user.propertyId));
+                    }
+                    if (propertyId.trim()) {
+                        localStorage.setItem('hotel_active_tenant_slug', propertyId.trim().toLowerCase());
                     }
                 }
                 localStorage.setItem('user_data', JSON.stringify(userData));
@@ -209,20 +226,6 @@ const Login = ({ onLogin }: LoginProps) => {
                         )}
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Workspace / Domain</label>
-                            <div className="relative">
-                                <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="text"
-                                    value={propertyId}
-                                    onChange={(e) => setPropertyId(e.target.value.toUpperCase())}
-                                    placeholder="HQ-CORP"
-                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#2050d5] focus:ring-2 focus:ring-[#2050d5]/10 transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
                             <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email Address</label>
                             <div className="relative">
                                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -238,7 +241,16 @@ const Login = ({ onLogin }: LoginProps) => {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Password</label>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-xs font-semibold text-slate-700">Password</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPropertyCode(!showPropertyCode)}
+                                    className="text-[11px] text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
+                                >
+                                    {showPropertyCode ? "− Hide Property Code" : "+ Staff Property Code (Optional)"}
+                                </button>
+                            </div>
                             <div className="relative">
                                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
@@ -252,12 +264,29 @@ const Login = ({ onLogin }: LoginProps) => {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                                 >
                                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
                         </div>
+
+                        {showPropertyCode && (
+                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                                <label className="block text-[11px] font-semibold text-slate-600">Property / Workspace Code (Optional)</label>
+                                <div className="relative">
+                                    <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        value={propertyId}
+                                        onChange={(e) => setPropertyId(e.target.value.toUpperCase())}
+                                        placeholder="Leave empty for Super Admin"
+                                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded text-xs text-slate-800 font-medium placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <span className="text-[10px] text-slate-400 block">Super Administrators do not require a property code.</span>
+                            </div>
+                        )}
 
                         <button
                             type="submit"

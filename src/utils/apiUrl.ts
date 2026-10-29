@@ -63,7 +63,11 @@ export const getActivePropertyId = (): number => {
  */
 export const getActiveTenantSlug = (): string => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('hotel_active_tenant_slug') || '';
+    const slug = localStorage.getItem('hotel_active_tenant_slug');
+    if (!slug || slug === 'gpd' || slug === 'default' || slug === 'hq-corp') {
+      return '';
+    }
+    return slug;
   }
   return '';
 };
@@ -94,6 +98,11 @@ if (typeof window !== 'undefined' && !(window as any).__hotelTenantFetchInstalle
       : input instanceof URL 
         ? input.toString() 
         : (input as Request).url;
+
+    // Auth endpoints authenticate against the central platform database directly
+    if (urlStr && (urlStr.includes('/api/auth/') || urlStr.endsWith('/api/auth/login') || urlStr.endsWith('/auth/login'))) {
+      return originalFetch.call(this, input, init);
+    }
 
     // Only inject for API routes targeting backend (excluding external CDNs/assets)
     if (urlStr && (urlStr.includes('/api/') || urlStr.startsWith('/api'))) {
