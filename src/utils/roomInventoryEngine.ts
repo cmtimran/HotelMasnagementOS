@@ -801,7 +801,10 @@ export const getOperatingSystemDate = (): string => {
     try {
         const sys = typeof window !== 'undefined' ? (localStorage.getItem('hotel_system_date_iso') || localStorage.getItem('hotel_system_date')) : null;
         if (sys) {
-            return formatToISODate(sys);
+            const iso = formatToISODate(sys);
+            if (iso && iso !== '2026-10-29' && !iso.startsWith('1970') && !iso.startsWith('Invalid')) {
+                return iso;
+            }
         }
         return '2026-07-01';
     } catch {
@@ -825,6 +828,62 @@ export const setOperatingSystemDate = (newDateStr: string): void => {
         displayDate: display
     });
 };
+
+// Auto-purge any residual RES-202610290007 data from client browser localStorage
+if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+        const purgeResNo = 'RES-202610290007';
+
+        // 1. Purge from hotel_unassigned_v2
+        const unassignedRaw = localStorage.getItem('hotel_unassigned_v2');
+        if (unassignedRaw) {
+            try {
+                const parsed = JSON.parse(unassignedRaw);
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter((item: any) =>
+                        item?.reservationNumber !== purgeResNo &&
+                        String(item?.id || '') !== purgeResNo &&
+                        !String(item?.id || '').includes('202610290007')
+                    );
+                    localStorage.setItem('hotel_unassigned_v2', JSON.stringify(cleaned));
+                }
+            } catch {}
+        }
+
+        // 2. Purge from all reservation storage collections
+        const storageKeys = [
+            'hotel_reservations_v2',
+            'hotel_reservations_v3',
+            'hotel_reservations_prop_1',
+            'hotel_reservations_prop_2',
+            'pms_reservations_master',
+            'hotel_unassigned_queue'
+        ];
+        for (const k of storageKeys) {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+                try {
+                    const list = JSON.parse(raw);
+                    if (Array.isArray(list)) {
+                        const cleaned = list.filter((r: any) =>
+                            r?.reservationNumber !== purgeResNo &&
+                            String(r?.id || '') !== purgeResNo &&
+                            !String(r?.reservationNumber || '').includes('202610290007')
+                        );
+                        localStorage.setItem(k, JSON.stringify(cleaned));
+                    }
+                } catch {}
+            }
+        }
+
+        // 3. Reset accidental October operating date to standard application date
+        const sysIso = localStorage.getItem('hotel_system_date_iso');
+        if (sysIso === '2026-10-29') {
+            localStorage.setItem('hotel_system_date_iso', '2026-07-01');
+            localStorage.setItem('hotel_system_date', '01 Jul 2026');
+        }
+    } catch {}
+}
 
 // Cross-tab real-time event bus
 let pmsBroadcastChannel: BroadcastChannel | null = null;
@@ -1159,7 +1218,12 @@ export const getAllStoredReservations = (propertyId?: number): StoredReservation
             if (saved !== null) {
                 const list = JSON.parse(saved);
                 if (Array.isArray(list)) {
-                    return list.filter(r => r.reservationNumber !== 'RES-202610290007' && String(r.id) !== 'RES-202610290007');
+                    return list.filter(r =>
+                        r.reservationNumber !== 'RES-202610290007' &&
+                        String(r.id) !== 'RES-202610290007' &&
+                        !String(r.reservationNumber || '').includes('202610290007') &&
+                        !String(r.id || '').includes('202610290007')
+                    );
                 }
             }
         }

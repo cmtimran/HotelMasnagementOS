@@ -171,7 +171,16 @@ export interface UnassignedBooking {
 
 const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBooking[] => {
     const list: UnassignedBooking[] = [];
+    const purgeTarget = 'RES-202610290007';
     stored.forEach((res: any) => {
+        if (
+            res?.reservationNumber === purgeTarget ||
+            String(res?.id || '') === purgeTarget ||
+            String(res?.reservationNumber || '').includes('202610290007') ||
+            String(res?.id || '').includes('202610290007')
+        ) {
+            return;
+        }
         const st = String(res?.status || '').toLowerCase();
         if (st === 'cancelled' || st === 'checked out' || st === 'checked-out' || st === 'voided') return;
         const rooms = Array.isArray(res?.rooms) ? res.rooms : Array.isArray(res?.roomsList) ? res.roomsList : [];
@@ -200,6 +209,61 @@ const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBook
     });
     return list;
 };
+
+const DEFAULT_UNASSIGNED_STAYVIEW: UnassignedBooking[] = [
+    {
+        id: 'un-1',
+        reservationNumber: 'RES-009290',
+        guestName: 'Naimur Rahman',
+        roomType: 'Deluxe Double',
+        checkIn: '2026-07-01',
+        checkOut: '2026-07-04',
+        nights: 3,
+        totalRooms: 1,
+        source: 'Booking.com',
+        totalAmount: 9000,
+        status: 'unassigned'
+    },
+    {
+        id: 'un-2',
+        reservationNumber: 'RES-009291',
+        guestName: 'Tahmina Akter',
+        roomType: 'Superior King',
+        checkIn: '2026-07-01',
+        checkOut: '2026-07-03',
+        nights: 2,
+        totalRooms: 1,
+        source: 'Agoda YCS',
+        totalAmount: 9000,
+        status: 'unassigned'
+    },
+    {
+        id: 'un-3',
+        reservationNumber: 'RES-009292',
+        guestName: 'Standard Chartered Exec',
+        roomType: 'Executive Suite',
+        checkIn: '2026-07-02',
+        checkOut: '2026-07-05',
+        nights: 3,
+        totalRooms: 1,
+        source: 'Corporate Account',
+        totalAmount: 19500,
+        status: 'unassigned'
+    },
+    {
+        id: 'un-4',
+        reservationNumber: 'RES-009293',
+        guestName: 'Mahir Faisal',
+        roomType: 'Deluxe Double',
+        checkIn: '2026-07-03',
+        checkOut: '2026-07-05',
+        nights: 2,
+        totalRooms: 1,
+        source: 'Direct Website',
+        totalAmount: 6000,
+        status: 'unassigned'
+    }
+];
 
 /**
  * Calculates start date of Stay View grid (exactly 3 days before system operating date)
@@ -440,23 +504,51 @@ export const StayView: React.FC = () => {
 
     // Hydrate Unassigned Bookings dynamically from stored reservations
     const [unassignedList, setUnassignedList] = useState<UnassignedBooking[]>(() => {
-        const derived = deriveUnassignedFromStored(getAllStoredReservations());
+        const purgeTarget = 'RES-202610290007';
+        const isNotPurged = (u: any) =>
+            u?.reservationNumber !== purgeTarget &&
+            String(u?.id || '') !== purgeTarget &&
+            !String(u?.id || '').includes('202610290007') &&
+            !String(u?.reservationNumber || '').includes('202610290007');
+
+        const derived = deriveUnassignedFromStored(getAllStoredReservations()).filter(isNotPurged);
         if (derived.length > 0) return derived;
-        const saved = localStorage.getItem('hotel_unassigned_v2');
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('hotel_unassigned_v2') : null;
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) return parsed;
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter(isNotPurged);
+                    if (cleaned.length > 0) return cleaned;
+                }
             } catch {
                 // fall through
             }
         }
-        return [];
+        return DEFAULT_UNASSIGNED_STAYVIEW;
     });
 
     useEffect(() => {
-        localStorage.setItem('hotel_unassigned_v2', JSON.stringify(unassignedList));
+        const purgeTarget = 'RES-202610290007';
+        const cleaned = unassignedList.filter(u =>
+            u.reservationNumber !== purgeTarget &&
+            String(u.id || '') !== purgeTarget &&
+            !String(u.id || '').includes('202610290007') &&
+            !String(u.reservationNumber || '').includes('202610290007')
+        );
+        try {
+            localStorage.setItem('hotel_unassigned_v2', JSON.stringify(cleaned));
+        } catch {}
     }, [unassignedList]);
+
+    // Safety guard to auto-recover if view inadvertently drifted to client machine date
+    useEffect(() => {
+        if (startDate === '2026-10-29') {
+            const appDate = getOperatingSystemDate();
+            setStartDate(calculateStayViewStartDate(appDate));
+            setOperatingDateStr(appDate);
+        }
+    }, [startDate]);
 
     // Generate days array based on startDate and daysWindow with full Holiday awareness
     const days = useMemo(() => {
@@ -510,6 +602,7 @@ export const StayView: React.FC = () => {
                 setSelectedModalDateIndex(foundIdx);
                 setModalDateStartIndex(Math.max(0, Math.min(days.length - 7, foundIdx)));
             } else {
+                setStartDate(calculateStayViewStartDate(appDate));
                 setSelectedModalDateIndex(0);
                 setModalDateStartIndex(0);
             }
@@ -923,6 +1016,24 @@ export const StayView: React.FC = () => {
 
     // Subscribe to cross-tab PMS real-time synchronization events
     useEffect(() => {
+        // Anchor to Application PMS Operating Date
+        const appDate = getOperatingSystemDate();
+        setOperatingDateStr(appDate);
+        setStartDate(calculateStayViewStartDate(appDate));
+
+        // Purge residual RES-202610290007 from active state if present
+        const purgeTarget = 'RES-202610290007';
+        setUnassignedList(prev => {
+            const cleaned = prev.filter(u =>
+                u.reservationNumber !== purgeTarget &&
+                String(u.id || '') !== purgeTarget &&
+                !String(u.id || '').includes('202610290007') &&
+                !String(u.reservationNumber || '').includes('202610290007')
+            );
+            if (cleaned.length === 0) return DEFAULT_UNASSIGNED_STAYVIEW;
+            return cleaned;
+        });
+
         // Sync initially on mount from local cache and live DB (PostgreSQL)
         syncStoredReservations();
         Promise.all([

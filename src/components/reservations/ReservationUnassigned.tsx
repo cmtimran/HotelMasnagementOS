@@ -144,12 +144,20 @@ export const ReservationUnassigned: React.FC = () => {
 
     // Hydrate state safely from localStorage
     const [unassignedList, setUnassignedList] = useState<UnassignedItem[]>(() => {
+        const purgeTarget = 'RES-202610290007';
+        const isNotPurged = (u: any) =>
+            u?.reservationNumber !== purgeTarget &&
+            String(u?.id || '') !== purgeTarget &&
+            !String(u?.id || '').includes('202610290007') &&
+            !String(u?.reservationNumber || '').includes('202610290007');
+
         try {
             const saved = localStorage.getItem('hotel_unassigned_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed;
+                    const cleaned = parsed.filter(isNotPurged);
+                    if (cleaned.length > 0) return cleaned;
                 }
             }
         } catch (e) {
@@ -159,12 +167,35 @@ export const ReservationUnassigned: React.FC = () => {
     });
 
     useEffect(() => {
+        const purgeTarget = 'RES-202610290007';
+        const isNotPurged = (u: any) =>
+            u?.reservationNumber !== purgeTarget &&
+            String(u?.id || '') !== purgeTarget &&
+            !String(u?.id || '').includes('202610290007') &&
+            !String(u?.reservationNumber || '').includes('202610290007');
+
         try {
-            localStorage.setItem('hotel_unassigned_v2', JSON.stringify(unassignedList));
+            const cleaned = unassignedList.filter(isNotPurged);
+            localStorage.setItem('hotel_unassigned_v2', JSON.stringify(cleaned));
         } catch (e) {
             console.error('Failed to save unassigned bookings', e);
         }
     }, [unassignedList]);
+
+    // Force purge on mount if residual exists
+    useEffect(() => {
+        const purgeTarget = 'RES-202610290007';
+        setUnassignedList(prev => {
+            const cleaned = prev.filter(u =>
+                u.reservationNumber !== purgeTarget &&
+                String(u.id || '') !== purgeTarget &&
+                !String(u.id || '').includes('202610290007') &&
+                !String(u.reservationNumber || '').includes('202610290007')
+            );
+            if (cleaned.length === 0) return INITIAL_UNASSIGNED;
+            return cleaned;
+        });
+    }, []);
 
     // Active assignment modal
     const [assignTarget, setAssignTarget] = useState<UnassignedItem | null>(null);
