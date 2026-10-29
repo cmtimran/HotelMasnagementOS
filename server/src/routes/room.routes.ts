@@ -46,9 +46,10 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
         const result = await db.prepare(`
             INSERT INTO rooms (
                 property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status, remarks,
-                phone_ext, lock_id, is_connecting, connected_to, smoking_status, near_elevator
+                phone_ext, lock_id, is_connecting, connected_to, smoking_status, near_elevator,
+                bed_type, bed_count, is_bed_convertible, current_bed_setup, view_type, is_accessible, connecting_door_status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             propertyId,
             buildingId,
@@ -64,7 +65,14 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
             Boolean(body.isConnecting),
             body.connectedTo || body.connected_to || null,
             body.smokingStatus || body.smoking_status || 'Non-Smoking',
-            Boolean(body.nearElevator)
+            Boolean(body.nearElevator),
+            body.bedType || body.bed_type || null,
+            body.bedCount !== undefined ? Number(body.bedCount) : null,
+            Boolean(body.isBedConvertible || body.is_bed_convertible),
+            body.currentBedSetup || body.current_bed_setup || 'Standard',
+            body.viewType || body.view_type || 'City View',
+            Boolean(body.isAccessible || body.is_accessible),
+            body.connectingDoorStatus || body.connecting_door_status || 'LOCKED'
         );
 
         res.status(201).json({
@@ -74,6 +82,296 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
         });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to create room' });
+    }
+});
+
+// POST /api/rooms/bulk-generate - Smart Batch Floor & Room Generator Wizard
+router.post('/bulk-generate', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+    try {
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
+        const {
+            buildingId,
+            buildingName,
+            floorStart = 1,
+            floorEnd = 1,
+            skipFloors = [],
+            roomsPerFloor = 10,
+            numberingScheme = 'standard', // 'standard' | 'building_prefix' | 'floor_dash' | 'four_digit'
+            buildingPrefix = 'A',
+            phoneExtPrefix = '2',
+            lockPrefix = 'LOCK-',
+            roomTypeDistribution = [],
+            defaultHousekeepingStatus = 'CLEAN',
+            defaultStatus = 'ACTIVE'
+        } = req.body || {};
+
+        if (Number(floorStart) > Number(floorEnd)) {
+            return res.status(400).json({ success: false, error: 'floorStart must be less than or equal to floorEnd' });
+        }
+        if (Number(roomsPerFloor) <= 0 || Number(roomsPerFloor) > 100) {
+            return res.status(400).json({ success: false, error: 'roomsPerFloor must be between 1 and 100' });
+        }
+
+        // 1. Resolve or Create Building
+        let targetBuildingId = Number(buildingId);
+        if (!targetBuildingId) {
+            const bName = buildingName || 'Main Tower';
+            const bCode = (bName.slice(0, 4) + '-' + propertyId).toUpperCase();
+            const existingB = await db.prepare('SELECT id FROM buildings WHERE property_id = ? LIMIT 1').get(propertyId) as any;
+            if (existingB) {
+                targetBuildingId = existingB.id;
+            } else {
+                const bResult = await db.prepare(`
+                    INSERT INTO buildings (property_id, code, name, total_floors)
+                    VALUES (?, ?, ?, ?)
+                `).run(propertyId, bCode, bName, Math.max(1, Number(floorEnd)));
+                targetBuildingId = Number(bResult.lastInsertRowid);
+            }
+        }
+
+        // 2. Resolve or Create Floors
+        const floorMap = new Map<number, number>();
+        const existingFloors = await db.prepare('SELECT id, floor_number FROM floors WHERE building_id = ?').all(targetBuildingId) as any[];
+        for (const ef of existingFloors) {
+            floorMap.set(Number(ef.floor_number), Number(ef.id));
+        }
+
+        const skipSet = new Set(Array.isArray(skipFloors) ? skipFloors.map(Number) : []);
+        let floorsCreatedCount = 0;
+
+        for (let fl = Number(floorStart); fl <= Number(floorEnd); fl++) {
+            if (skipSet.has(fl)) continue;
+            if (!floorMap.has(fl)) {
+                const fResult = await db.prepare(`
+                    INSERT INTO floors (building_id, floor_number, name, sort_order)
+                    VALUES (?, ?, ?, ?)
+                `).run(targetBuildingId, fl, `Floor ${fl}`, fl);
+                floorMap.set(fl, Number(fResult.lastInsertRowid));
+                floorsCreatedCount++;
+            }
+        }
+
+        // 3. Resolve fallback Room Type if none provided in distribution
+        let defaultRoomTypeId = 0;
+        const availableRTs = await db.prepare('SELECT id, default_bed_type, bed_type FROM room_types WHERE property_id = ?').all(propertyId) as any[];
+        if (availableRTs.length > 0) {
+            defaultRoomTypeId = Number(availableRTs[0].id);
+        }
+
+        // 4. Generate Room Items
+        const roomsToInsert: any[] = [];
+        for (let fl = Number(floorStart); fl <= Number(floorEnd); fl++) {
+            if (skipSet.has(fl)) continue;
+            const floorId = floorMap.get(fl);
+            if (!floorId) continue;
+
+            for (let rIdx = 1; rIdx <= Number(roomsPerFloor); rIdx++) {
+                const roomIndexPadded = String(rIdx).padStart(2, '0');
+                let generatedRoomNo = '';
+                if (numberingScheme === 'four_digit') {
+                    generatedRoomNo = `${String(fl).padStart(2, '0')}${roomIndexPadded}`;
+                } else if (numberingScheme === 'floor_dash') {
+                    generatedRoomNo = `${fl}-${roomIndexPadded}`;
+                } else if (numberingScheme === 'building_prefix') {
+                    generatedRoomNo = `${buildingPrefix}-${fl}${roomIndexPadded}`;
+                } else {
+                    generatedRoomNo = `${fl}${roomIndexPadded}`;
+                }
+
+                const matchedRule = (roomTypeDistribution || []).find((rule: any) =>
+                    rIdx >= Number(rule.fromIndex) && rIdx <= Number(rule.toIndex)
+                );
+
+                const finalRoomTypeId = Number(matchedRule?.roomTypeId || defaultRoomTypeId);
+                const finalBedType = matchedRule?.bedType || 'King';
+                const finalBedCount = matchedRule?.bedCount ? Number(matchedRule.bedCount) : 1;
+                const finalViewType = matchedRule?.viewType || 'City View';
+                const finalSmoking = matchedRule?.smokingStatus || 'Non-Smoking';
+                const finalAccessible = Boolean(matchedRule?.isAccessible);
+
+                roomsToInsert.push({
+                    propertyId,
+                    buildingId: targetBuildingId,
+                    floorId,
+                    roomTypeId: finalRoomTypeId,
+                    roomNumber: generatedRoomNo,
+                    name: `Room ${generatedRoomNo}`,
+                    status: defaultStatus,
+                    housekeepingStatus: defaultHousekeepingStatus,
+                    phoneExt: `${phoneExtPrefix}${generatedRoomNo}`,
+                    lockId: `${lockPrefix}${generatedRoomNo}`,
+                    smokingStatus: finalSmoking,
+                    bedType: finalBedType,
+                    bedCount: finalBedCount,
+                    viewType: finalViewType,
+                    isAccessible: finalAccessible,
+                    isConnecting: Boolean(matchedRule?.isConnecting),
+                    connectingDoorStatus: 'LOCKED'
+                });
+            }
+        }
+
+        // 5. Batch Insert with Conflict Avoidance
+        let createdRoomsCount = 0;
+        let skippedExistingCount = 0;
+
+        const insertStmt = db.prepare(`
+            INSERT INTO rooms (
+                property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status,
+                phone_ext, lock_id, is_connecting, smoking_status, bed_type, bed_count, view_type, is_accessible, connecting_door_status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        for (const r of roomsToInsert) {
+            try {
+                const existing = await db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propertyId, r.roomNumber);
+                if (existing) {
+                    skippedExistingCount++;
+                    continue;
+                }
+                await insertStmt.run(
+                    r.propertyId,
+                    r.buildingId,
+                    r.floorId,
+                    r.roomTypeId,
+                    r.roomNumber,
+                    r.name,
+                    r.status,
+                    r.housekeepingStatus,
+                    r.phoneExt,
+                    r.lockId,
+                    r.isConnecting,
+                    r.smokingStatus,
+                    r.bedType,
+                    r.bedCount,
+                    r.viewType,
+                    r.isAccessible,
+                    r.connectingDoorStatus
+                );
+                createdRoomsCount++;
+            } catch {
+                skippedExistingCount++;
+            }
+        }
+
+        res.status(201).json({
+            success: true,
+            message: `Batch generation complete! Created ${createdRoomsCount} rooms across ${floorsCreatedCount} new floors (${skippedExistingCount} skipped/duplicates).`,
+            data: {
+                totalGenerated: roomsToInsert.length,
+                createdRoomsCount,
+                skippedExistingCount,
+                floorsCreatedCount
+            }
+        });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to bulk-generate rooms' });
+    }
+});
+
+// POST /api/rooms/bulk-import - Bulk CSV / Excel Room Importer
+router.post('/bulk-import', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+    try {
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
+        const { rows = [] } = req.body || {};
+        if (!Array.isArray(rows) || rows.length === 0) {
+            return res.status(400).json({ success: false, error: 'No room rows provided for import' });
+        }
+
+        const buildings = await db.prepare('SELECT id, name, code FROM buildings WHERE property_id = ?').all(propertyId) as any[];
+        const floors = await db.prepare('SELECT f.id, f.floor_number, f.name, f.building_id FROM floors f JOIN buildings b ON b.id = f.building_id WHERE b.property_id = ?').all(propertyId) as any[];
+        const roomTypes = await db.prepare('SELECT id, code, name FROM room_types WHERE property_id = ?').all(propertyId) as any[];
+
+        let defaultBuildingId = buildings[0]?.id;
+        if (!defaultBuildingId) {
+            const bRes = await db.prepare('INSERT INTO buildings (property_id, code, name, total_floors) VALUES (?, ?, ?, ?)').run(propertyId, 'TOWER-1', 'Main Tower', 5);
+            defaultBuildingId = Number(bRes.lastInsertRowid);
+        }
+
+        let importedCount = 0;
+        let skippedCount = 0;
+        const errors: string[] = [];
+
+        const insertStmt = db.prepare(`
+            INSERT INTO rooms (
+                property_id, building_id, floor_id, room_type_id, room_number, name, status, housekeeping_status,
+                phone_ext, lock_id, is_connecting, smoking_status, bed_type, bed_count, view_type, is_accessible, connecting_door_status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        for (let idx = 0; idx < rows.length; idx++) {
+            const row = rows[idx];
+            const roomNo = String(row.roomNumber || row.roomNo || row.number || '').trim();
+            if (!roomNo) {
+                errors.push(`Row ${idx + 1}: Room number is required`);
+                skippedCount++;
+                continue;
+            }
+
+            const existing = await db.prepare('SELECT id FROM rooms WHERE property_id = ? AND room_number = ? LIMIT 1').get(propertyId, roomNo);
+            if (existing) {
+                skippedCount++;
+                continue;
+            }
+
+            const rtCode = String(row.roomTypeCode || row.roomType || '').trim().toLowerCase();
+            const matchedRT = roomTypes.find(rt => rt.code.toLowerCase() === rtCode || rt.name.toLowerCase() === rtCode) || roomTypes[0];
+            if (!matchedRT) {
+                errors.push(`Row ${idx + 1} (${roomNo}): Room type not found`);
+                skippedCount++;
+                continue;
+            }
+
+            const flNum = Number(row.floor || row.floorNumber) || 1;
+            let matchedFloor = floors.find(f => f.floor_number === flNum && f.building_id === defaultBuildingId);
+            if (!matchedFloor) {
+                const fRes = await db.prepare('INSERT INTO floors (building_id, floor_number, name, sort_order) VALUES (?, ?, ?, ?)').run(defaultBuildingId, flNum, `Floor ${flNum}`, flNum);
+                matchedFloor = { id: Number(fRes.lastInsertRowid), floor_number: flNum, building_id: defaultBuildingId };
+                floors.push(matchedFloor);
+            }
+
+            try {
+                await insertStmt.run(
+                    propertyId,
+                    defaultBuildingId,
+                    matchedFloor.id,
+                    matchedRT.id,
+                    roomNo,
+                    row.name || `Room ${roomNo}`,
+                    row.status || 'ACTIVE',
+                    row.housekeepingStatus || 'CLEAN',
+                    row.phoneExt || `2${roomNo}`,
+                    row.lockId || `LOCK-${roomNo}`,
+                    Boolean(row.isConnecting),
+                    row.smokingStatus || 'Non-Smoking',
+                    row.bedType || 'King',
+                    Number(row.bedCount) || 1,
+                    row.viewType || 'City View',
+                    Boolean(row.isAccessible),
+                    'LOCKED'
+                );
+                importedCount++;
+            } catch (err: any) {
+                errors.push(`Row ${idx + 1} (${roomNo}): ${err.message}`);
+                skippedCount++;
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Bulk import completed! ${importedCount} rooms imported, ${skippedCount} skipped.`,
+            data: { importedCount, skippedCount, errors }
+        });
+    } catch (e: any) {
+        res.status(400).json({ success: false, error: e?.message || 'Failed to bulk-import rooms' });
     }
 });
 
@@ -137,6 +435,13 @@ const handleUpdateRoom = async (req: Request, res: Response) => {
                 connected_to = COALESCE(?, connected_to),
                 smoking_status = COALESCE(?, smoking_status),
                 near_elevator = COALESCE(?, near_elevator),
+                bed_type = COALESCE(?, bed_type),
+                bed_count = COALESCE(?, bed_count),
+                is_bed_convertible = COALESCE(?, is_bed_convertible),
+                current_bed_setup = COALESCE(?, current_bed_setup),
+                view_type = COALESCE(?, view_type),
+                is_accessible = COALESCE(?, is_accessible),
+                connecting_door_status = COALESCE(?, connecting_door_status),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `).run(
@@ -154,6 +459,13 @@ const handleUpdateRoom = async (req: Request, res: Response) => {
             body.connectedTo || body.connected_to || null,
             body.smokingStatus || body.smoking_status || null,
             body.nearElevator !== undefined ? Boolean(body.nearElevator) : null,
+            body.bedType || body.bed_type || null,
+            body.bedCount !== undefined ? Number(body.bedCount) : null,
+            body.isBedConvertible !== undefined ? Boolean(body.isBedConvertible || body.is_bed_convertible) : null,
+            body.currentBedSetup || body.current_bed_setup || null,
+            body.viewType || body.view_type || null,
+            body.isAccessible !== undefined ? Boolean(body.isAccessible || body.is_accessible) : null,
+            body.connectingDoorStatus || body.connecting_door_status || null,
             targetRoom.id
         );
 

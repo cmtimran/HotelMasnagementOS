@@ -15,6 +15,12 @@ export interface RoomRecord {
   connectedTo?: string;
   smokingStatus?: string;
   smokingPolicy?: string;
+  bedType?: string;
+  bedCount?: number;
+  isBedConvertible?: boolean;
+  viewType?: string;
+  isAccessible?: boolean;
+  connectingDoorStatus?: string;
 }
 
 const resolvePropertyId = (propertyId: string | number | undefined): number | null => {
@@ -48,6 +54,12 @@ export const roomService = {
         rt.base_rate as "baseRate",
         COALESCE(r.smoking_status, rt.smoking_policy, 'Non-Smoking') as "smokingStatus",
         COALESCE(rt.smoking_policy, 'Non-Smoking') as "smokingPolicy",
+        COALESCE(r.bed_type, rt.default_bed_type, rt.bed_type, 'King') as "bedType",
+        COALESCE(r.bed_count, rt.bed_count, 1) as "bedCount",
+        COALESCE(r.is_bed_convertible, false) as "isBedConvertible",
+        COALESCE(r.view_type, rt.view_type, 'City View') as "viewType",
+        COALESCE(r.is_accessible, false) as "isAccessible",
+        COALESCE(r.connecting_door_status, 'LOCKED') as "connectingDoorStatus",
         (
           SELECT rr.status 
           FROM reservation_rooms rr 
@@ -117,7 +129,13 @@ export const roomService = {
         isConnecting: Boolean(row.isConnecting || row.is_connecting),
         connectedTo: row.connectedTo || row.connected_to || undefined,
         smokingStatus: row.smokingStatus || 'Non-Smoking',
-        smokingPolicy: row.smokingPolicy || 'Non-Smoking'
+        smokingPolicy: row.smokingPolicy || 'Non-Smoking',
+        bedType: row.bedType || 'King',
+        bedCount: Number(row.bedCount) || 1,
+        isBedConvertible: Boolean(row.isBedConvertible),
+        viewType: row.viewType || 'City View',
+        isAccessible: Boolean(row.isAccessible),
+        connectingDoorStatus: row.connectingDoorStatus || 'LOCKED'
       };
     });
 

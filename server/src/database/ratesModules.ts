@@ -316,6 +316,8 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             'ALTER TABLE room_types ADD COLUMN IF NOT EXISTS show_on_website BOOLEAN DEFAULT TRUE;',
             'ALTER TABLE room_types ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT \'Active\';',
             'ALTER TABLE room_types ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 1;',
+            'ALTER TABLE room_types ADD COLUMN IF NOT EXISTS default_bed_type VARCHAR(64) DEFAULT \'King\';',
+            'ALTER TABLE room_types ADD COLUMN IF NOT EXISTS bed_count INT DEFAULT 1;',
 
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS phone_ext VARCHAR(32);',
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_id VARCHAR(64);',
@@ -325,6 +327,13 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS smoking_status VARCHAR(64) DEFAULT \'Non-Smoking\';',
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS near_elevator BOOLEAN DEFAULT FALSE;',
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS remarks TEXT;',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS bed_type VARCHAR(64);',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS bed_count INT;',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_bed_convertible BOOLEAN DEFAULT FALSE;',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS current_bed_setup VARCHAR(64) DEFAULT \'Standard\';',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS view_type VARCHAR(64) DEFAULT \'City View\';',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_accessible BOOLEAN DEFAULT FALSE;',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS connecting_door_status VARCHAR(32) DEFAULT \'LOCKED\';',
 
             'ALTER TABLE buildings ADD COLUMN IF NOT EXISTS type VARCHAR(64) DEFAULT \'Main Tower\';',
             'ALTER TABLE buildings ADD COLUMN IF NOT EXISTS description TEXT;',

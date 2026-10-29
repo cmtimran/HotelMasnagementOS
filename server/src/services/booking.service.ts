@@ -266,7 +266,7 @@ export const bookingService = {
 
     // Fetch active connecting suites for automatic linking
     const connSuitesRes = await getPool().query(
-      `SELECT name, component_rooms FROM connecting_rooms WHERE property_id = $1 AND status = 'Active'`,
+      `SELECT name, component_rooms_json as component_rooms FROM connecting_rooms WHERE property_id = $1 AND status = 'Active'`,
       [propId]
     ).catch(() => ({ rows: [] }));
     const activeSuites = connSuitesRes.rows || [];

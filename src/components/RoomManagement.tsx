@@ -7,6 +7,7 @@ import {
 import PageHeader from './common/PageHeader';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import OutOfOrderModal from './modals/OutOfOrderModal';
+import BulkRoomGeneratorModal from './modals/BulkRoomGeneratorModal';
 import { getStoredOOOBlocks } from '../utils/outOfOrderEngine';
 import { toast } from '../context/ToastContext';
 import {
@@ -32,10 +33,17 @@ interface Room {
     wifiVoucher?: string;
     qrString?: string;
 
-    // Attributes
+    // Attributes & Bed Configuration
     isConnecting: boolean;
     connectedTo?: string;
     viewOverride?: string;
+    viewType?: string;
+    bedType?: string;
+    bedCount?: number;
+    isBedConvertible?: boolean;
+    currentBedSetup?: string;
+    isAccessible?: boolean;
+    connectingDoorStatus?: 'LOCKED' | 'UNLOCKED';
     smokingStatus: 'Smoking' | 'Non-Smoking' | 'Balcony Smoking Only';
     nearElevator: boolean;
 
@@ -109,6 +117,9 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
     const [selectedOOORoom, setSelectedOOORoom] = useState<string | undefined>(undefined);
     const [oooVersion, setOooVersion] = useState(0);
 
+    // Bulk Room & Floor Generator Wizard Modal
+    const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+
     const oooBlocks = useMemo(() => {
         return getStoredOOOBlocks(activePropId);
     }, [oooVersion, activePropId]);
@@ -130,6 +141,13 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
         isConnecting: false,
         smokingStatus: 'Non-Smoking',
         nearElevator: false,
+        bedType: '',
+        bedCount: 1,
+        isBedConvertible: false,
+        currentBedSetup: 'Standard',
+        viewType: 'City View',
+        isAccessible: false,
+        connectingDoorStatus: 'LOCKED',
         status: 'Active',
         housekeepingStatus: 'Clean'
     });
@@ -226,6 +244,13 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
             isConnecting: false,
             smokingStatus: 'Non-Smoking',
             nearElevator: false,
+            bedType: '',
+            bedCount: 1,
+            isBedConvertible: false,
+            currentBedSetup: 'Standard',
+            viewType: 'City View',
+            isAccessible: false,
+            connectingDoorStatus: 'LOCKED',
             status: 'Active',
             housekeepingStatus: 'Clean'
         });
@@ -294,6 +319,13 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                     connectedTo: formData.connectedTo,
                     smokingStatus: formData.smokingStatus,
                     nearElevator: formData.nearElevator,
+                    bedType: formData.bedType || undefined,
+                    bedCount: formData.bedCount,
+                    isBedConvertible: formData.isBedConvertible,
+                    currentBedSetup: formData.currentBedSetup,
+                    viewType: formData.viewType,
+                    isAccessible: formData.isAccessible,
+                    connectingDoorStatus: formData.connectingDoorStatus,
                     status: formData.status,
                     housekeepingStatus: formData.housekeepingStatus,
                     remarks: formData.remarks
@@ -336,6 +368,13 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                         connectedTo: formData.connectedTo,
                         smokingStatus: formData.smokingStatus,
                         nearElevator: formData.nearElevator,
+                        bedType: formData.bedType || null,
+                        bedCount: formData.bedCount !== undefined ? formData.bedCount : null,
+                        isBedConvertible: formData.isBedConvertible,
+                        currentBedSetup: formData.currentBedSetup || null,
+                        viewType: formData.viewType || null,
+                        isAccessible: formData.isAccessible,
+                        connectingDoorStatus: formData.connectingDoorStatus || null,
                         remarks: formData.remarks
                     })
                 });
@@ -432,6 +471,17 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                             >
                                 <Wrench className="size-3.5 text-rose-600" />
                                 <span>Manage OOO / OOS</span>
+                            </button>
+                        )}
+                        {view === 'list' && (
+                            <button
+                                type="button"
+                                onClick={() => setIsBulkModalOpen(true)}
+                                className="btn-secondary !h-8 !py-1 !px-3 text-xs flex items-center gap-1.5 cursor-pointer text-blue-700 bg-blue-50/80 hover:bg-blue-100 border-blue-200 shadow-2xs"
+                                title="Smart Batch Room & Floor Generator Wizard or Excel/CSV Bulk Import (Supports 500+ rooms)"
+                            >
+                                <Sparkles className="size-3.5 text-blue-600 animate-pulse" />
+                                <span>Bulk Generator / CSV</span>
                             </button>
                         )}
                         {view === 'list' ? (
@@ -631,6 +681,8 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                         <tr>
                                             <th className="py-2.5 px-3">Room #</th>
                                             <th className="py-2.5 px-3">Room Type</th>
+                                            <th className="py-2.5 px-3">Bed Setup</th>
+                                            <th className="py-2.5 px-3">View</th>
                                             <th className="py-2.5 px-3">Floor / Loc</th>
                                             <th className="py-2.5 px-3">Status</th>
                                             <th className="py-2.5 px-3">Housekeeping</th>
@@ -657,6 +709,12 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                     </td>
                                                     <td className="py-2.5 px-3 whitespace-nowrap font-medium text-slate-700">
                                                         <span className="text-primary font-semibold">{roomType?.name || 'Standard'}</span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap text-slate-700 text-[11px]">
+                                                        🛏️ {room.bedType || roomType?.bedType || 'King'} ({room.bedCount || 1})
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap text-slate-600 text-[11px]">
+                                                        {room.viewType || 'City View'}
                                                     </td>
                                                     <td className="py-2.5 px-3 whitespace-nowrap text-slate-600 text-[11px]">
                                                         {floor?.name.split(' (')[0] || `Floor ${room.floorId}`}
@@ -689,7 +747,7 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                         <div><span className="text-slate-400">Ext:</span> {room.phoneExt || `2${room.number}`}</div>
                                                     </td>
                                                     <td className="py-2.5 px-3 whitespace-nowrap">
-                                                        <div className="flex items-center gap-1 text-[10px]">
+                                                        <div className="flex items-center gap-1 text-[10px] flex-wrap">
                                                             {room.smokingStatus === 'Smoking' ? (
                                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
                                                                     <Cigarette size={9} /> Smoking
@@ -706,6 +764,16 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                             {room.isConnecting && (
                                                                 <span className="text-primary bg-primary-subtle px-1.5 py-0.5 rounded text-[9px] border border-primary-border/40">
                                                                     Conn {room.connectedTo ? `(${room.connectedTo})` : ''}
+                                                                </span>
+                                                            )}
+                                                            {room.isAccessible && (
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center gap-0.5" title="Wheelchair / ADA Accessible">
+                                                                    ♿ ADA
+                                                                </span>
+                                                            )}
+                                                            {room.isBedConvertible && (
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 inline-flex items-center gap-0.5" title="Convertible Hollywood Twin">
+                                                                    🔄 Zip
                                                                 </span>
                                                             )}
                                                         </div>
@@ -799,6 +867,14 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                     <span className="font-semibold text-slate-800 truncate">{floor?.name.split(' (')[0] || `Floor ${room.floorId}`}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[10px]">
+                                                    <span className="text-slate-400">Bed Setup:</span>
+                                                    <span className="font-semibold text-slate-700 truncate">🛏️ {room.bedType || roomType?.bedType || 'King'} ({room.bedCount || 1})</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[10px]">
+                                                    <span className="text-slate-400">View:</span>
+                                                    <span className="text-slate-700 truncate">{room.viewType || 'City View'}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[10px]">
                                                     <span className="text-slate-400">Lock RFID:</span>
                                                     <span className="font-mono text-slate-700 truncate">{room.lockId || `KEY-${room.number}`}</span>
                                                 </div>
@@ -830,6 +906,16 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                 {room.isConnecting && (
                                                     <span className="text-primary bg-primary-subtle px-1.5 py-0.5 rounded text-[9px] border border-primary-border/40">
                                                         Conn {room.connectedTo ? `(${room.connectedTo})` : ''}
+                                                    </span>
+                                                )}
+                                                {room.isAccessible && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-0.5" title="Wheelchair / ADA Accessible">
+                                                        ♿ ADA
+                                                    </span>
+                                                )}
+                                                {room.isBedConvertible && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-0.5" title="Convertible Hollywood Twin">
+                                                        🔄 Zip
                                                     </span>
                                                 )}
                                             </div>
@@ -1013,6 +1099,39 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold text-slate-700">Bed Configuration (Override)</label>
+                                            <select
+                                                value={formData.bedType || ''}
+                                                onChange={e => updateField('bedType', e.target.value)}
+                                                className="select-standard"
+                                            >
+                                                <option value="">Inherit from Room Type (Default)</option>
+                                                <option value="King">1 King Bed</option>
+                                                <option value="Queen">1 Queen Bed</option>
+                                                <option value="Twin">2 Twin / Single Beds</option>
+                                                <option value="Single">1 Single Bed</option>
+                                                <option value="Double">1 Double Bed</option>
+                                                <option value="Hollywood Twin">Hollywood Twin (Convertible)</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold text-slate-700">Scenic View Type</label>
+                                            <select
+                                                value={formData.viewType || 'City View'}
+                                                onChange={e => updateField('viewType', e.target.value)}
+                                                className="select-standard"
+                                            >
+                                                <option value="City View">City View</option>
+                                                <option value="Sea View">Sea View</option>
+                                                <option value="Garden View">Garden View</option>
+                                                <option value="Pool View">Pool View</option>
+                                                <option value="Mountain View">Mountain View</option>
+                                                <option value="Courtyard View">Courtyard View</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
                                             <label className="text-xs font-semibold text-slate-700">Smoking Policy</label>
                                             <select
                                                 value={formData.smokingStatus}
@@ -1035,6 +1154,35 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                 <option value="yes">Near Elevator / Lift Lobby</option>
                                             </select>
                                         </div>
+                                    </div>
+
+                                    {/* Specialized Room Facilities */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                        <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 cursor-pointer text-xs">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(formData.isAccessible)}
+                                                onChange={e => updateField('isAccessible', e.target.checked)}
+                                                className="size-4 text-primary rounded"
+                                            />
+                                            <div>
+                                                <span className="font-semibold text-slate-800">ADA / Wheelchair Accessible</span>
+                                                <p className="text-[10px] text-slate-500">Wide doorways, roll-in shower, grab bars</p>
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 cursor-pointer text-xs">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(formData.isBedConvertible)}
+                                                onChange={e => updateField('isBedConvertible', e.target.checked)}
+                                                className="size-4 text-primary rounded"
+                                            />
+                                            <div>
+                                                <span className="font-semibold text-slate-800">Convertible Zip-Bed (Hollywood Twin)</span>
+                                                <p className="text-[10px] text-slate-500">Can be joined into King or split into 2 Singles</p>
+                                            </div>
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -1119,6 +1267,20 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                 initialRoomNumber={selectedOOORoom}
                 onBlockUpdated={() => {
                     setOooVersion(v => v + 1);
+                }}
+            />
+
+            {/* Smart Bulk Room & Floor Generator / CSV Importer Modal */}
+            <BulkRoomGeneratorModal
+                isOpen={isBulkModalOpen}
+                onClose={() => setIsBulkModalOpen(false)}
+                propertyId={activePropId}
+                roomTypes={availableRoomTypes}
+                buildings={availableBuildings}
+                existingRooms={rooms}
+                onSuccess={async () => {
+                    await syncRoomTypesAndRoomsFromDB(activePropId);
+                    setRooms(getCanonicalRooms(activePropId) as unknown as Room[]);
                 }}
             />
         </div>
