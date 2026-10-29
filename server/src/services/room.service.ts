@@ -13,6 +13,8 @@ export interface RoomRecord {
   propertyId: string | number;
   isConnecting?: boolean;
   connectedTo?: string;
+  smokingStatus?: string;
+  smokingPolicy?: string;
 }
 
 const resolvePropertyId = (propertyId: string | number | undefined): number => {
@@ -41,6 +43,8 @@ export const roomService = {
         f.floor_number as floor,
         rt.name as "roomType",
         rt.base_rate as "baseRate",
+        COALESCE(r.smoking_status, rt.smoking_policy, 'Non-Smoking') as "smokingStatus",
+        COALESCE(rt.smoking_policy, 'Non-Smoking') as "smokingPolicy",
         (
           SELECT rr.status 
           FROM reservation_rooms rr 
@@ -106,7 +110,9 @@ export const roomService = {
         baseRate: Number(row.baseRate || row.baserate) || 3000,
         propertyId: propId,
         isConnecting: Boolean(row.isConnecting || row.is_connecting),
-        connectedTo: row.connectedTo || row.connected_to || undefined
+        connectedTo: row.connectedTo || row.connected_to || undefined,
+        smokingStatus: row.smokingStatus || 'Non-Smoking',
+        smokingPolicy: row.smokingPolicy || 'Non-Smoking'
       };
     });
 

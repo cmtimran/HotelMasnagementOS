@@ -65,6 +65,7 @@ import {
     updateReservationInDB,
     getStoredConnectingSuites,
     syncConnectingSuitesFromDB,
+    getRoomSmokingPolicy,
     type StoredReservation,
     type ConnectingSuite
 } from '../utils/roomInventoryEngine';
@@ -1602,6 +1603,14 @@ export const AddReservation: React.FC = () => {
             email: email,
             roomNumber: primaryRoomNumber,
             roomType: mainRoom.roomType,
+            smokingPolicy: getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).smokingStatus,
+            smokingPolicyText: getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).policyBadgeText,
+            smokingClause: getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).guestFacingClause,
+            policies: [
+                getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).guestFacingClause,
+                'Standard Hotel Check-In: 14:00 | Check-Out: 12:00 PM',
+                'Government-issued Photo ID / Passport required upon arrival.'
+            ],
             allocatedRooms: allocatedRoomNumbers,
             roomsCount: isConnectingSuite ? 1 : totalRoomsCount,
             checkIn: groupHorizon.hasCustomDates ? groupHorizon.minIn : checkIn,
@@ -3116,11 +3125,16 @@ export const AddReservation: React.FC = () => {
                                                         <div className="relative flex-1">
                                                             <input
                                                                 type="text"
-                                                                name="add_reservation_guest_name"
-                                                                autoComplete="off"
+                                                                name="pms_add_guest_name_query"
+                                                                autoComplete="one-time-code"
                                                                 autoCorrect="off"
+                                                                autoCapitalize="off"
                                                                 spellCheck={false}
+                                                                role="combobox"
+                                                                aria-autocomplete="list"
+                                                                aria-expanded={isGuestSearchOpen && filteredKnownGuests.length > 0}
                                                                 data-lpignore="true"
+                                                                data-1p-ignore="true"
                                                                 data-form-type="other"
                                                                 placeholder="Guest full name..."
                                                                 value={guestName}
@@ -3138,7 +3152,7 @@ export const AddReservation: React.FC = () => {
 
                                                             {/* Inline Name Suggestions Dropdown (Spacious overlay width) */}
                                                             {isGuestSearchOpen && filteredKnownGuests.length > 0 && (
-                                                                <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-gray-100 animate-in fade-in duration-100">
+                                                                <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-gray-100 animate-in fade-in duration-100">
                                                                     {filteredKnownGuests.map(g => (
                                                                         <div
                                                                             key={g.id}
@@ -3191,6 +3205,13 @@ export const AddReservation: React.FC = () => {
                                                     </label>
                                                     <input
                                                         type="text"
+                                                        name="pms_add_guest_mobile_query"
+                                                        autoComplete="one-time-code"
+                                                        autoCorrect="off"
+                                                        spellCheck={false}
+                                                        data-lpignore="true"
+                                                        data-1p-ignore="true"
+                                                        data-form-type="other"
                                                         placeholder="+880 1711-000000"
                                                         value={mobile}
                                                         onChange={e => setMobile(e.target.value)}
@@ -3202,6 +3223,13 @@ export const AddReservation: React.FC = () => {
                                                     <label className="text-[10px] font-semibold text-gray-700">EMAIL ADDRESS</label>
                                                     <input
                                                         type="email"
+                                                        name="pms_add_guest_email_query"
+                                                        autoComplete="one-time-code"
+                                                        autoCorrect="off"
+                                                        spellCheck={false}
+                                                        data-lpignore="true"
+                                                        data-1p-ignore="true"
+                                                        data-form-type="other"
                                                         placeholder="guest@example.com"
                                                         value={email}
                                                         onChange={e => setEmail(e.target.value)}
@@ -3213,6 +3241,13 @@ export const AddReservation: React.FC = () => {
                                                     <label className="text-[10px] font-semibold text-gray-700">PHONE</label>
                                                     <input
                                                         type="text"
+                                                        name="pms_add_guest_phone_query"
+                                                        autoComplete="one-time-code"
+                                                        autoCorrect="off"
+                                                        spellCheck={false}
+                                                        data-lpignore="true"
+                                                        data-1p-ignore="true"
+                                                        data-form-type="other"
                                                         placeholder="Alternative contact..."
                                                         value={phone}
                                                         onChange={e => setPhone(e.target.value)}

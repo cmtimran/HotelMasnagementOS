@@ -21,7 +21,8 @@ import {
     getAllStoredReservations,
     saveStoredReservations,
     broadcastPMSEvent,
-    subscribeToPMSEvents
+    subscribeToPMSEvents,
+    getRoomSmokingPolicy
 } from '../utils/roomInventoryEngine';
 import type {
     RoomServicesBundle,
@@ -75,6 +76,9 @@ export interface FrontDeskGuestRecord {
     timingFlex?: TimingFlexConfig | null;
     customAddons?: CustomAddonItem[];
     addonCharges?: any;
+    smokingPolicy?: string;
+    smokingPolicyText?: string;
+    smokingClause?: string;
 }
 
 const DEFAULT_FRONT_DESK_DATA: FrontDeskGuestRecord[] = [];
@@ -134,7 +138,10 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
                     celebration: rm.celebration || item.celebration,
                     spaWellness: rm.spaWellness || item.spaWellness,
                     timingFlex: rm.timingFlex || item.timingFlex,
-                    customAddons: rm.customAddons || item.customAddons || []
+                    customAddons: rm.customAddons || item.customAddons || [],
+                    smokingPolicy: rm.smokingPolicy || item.smokingPolicy,
+                    smokingPolicyText: rm.smokingPolicyText || item.smokingPolicyText,
+                    smokingClause: rm.smokingClause || item.smokingClause
                 };
             });
         }
@@ -179,7 +186,10 @@ const mapToFrontDeskRecords = (rawList: any[]): FrontDeskGuestRecord[] => {
             spaWellness: item.spaWellness || item.servicesBundle?.spaWellness || null,
             timingFlex: item.timingFlex || item.servicesBundle?.timingFlex || null,
             customAddons: item.customAddons || item.servicesBundle?.customAddons || [],
-            addonCharges: item.addonCharges
+            addonCharges: item.addonCharges,
+            smokingPolicy: item.smokingPolicy,
+            smokingPolicyText: item.smokingPolicyText,
+            smokingClause: item.smokingClause
         }];
     });
 };
@@ -1627,8 +1637,10 @@ export const FrontDesk: React.FC = () => {
                                     <p className="text-slate-900">{regCardRecord.phone}</p>
                                 </div>
                                 <div>
-                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Assigned Room</span>
-                                    <p className="text-blue-800 font-mono">Room {regCardRecord.roomNumber} ({regCardRecord.roomType})</p>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Assigned Room & Policy</span>
+                                    <p className="text-blue-800 font-mono">
+                                        Room {regCardRecord.roomNumber} ({regCardRecord.roomType}) • <span className="font-sans font-bold text-slate-700">{regCardRecord.smokingPolicyText || getRoomSmokingPolicy(regCardRecord.roomNumber).policyBadgeText}</span>
+                                    </p>
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Period of Stay</span>
@@ -1636,8 +1648,13 @@ export const FrontDesk: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="border-t border-slate-200 pt-2 text-[10px] text-slate-500 leading-relaxed">
-                                I agree to the hotel rules and regulations. The hotel reserves the right to charge my payment method for any damages or unsettled folio services during my stay.
+                            <div className="border-t border-slate-200 pt-2 text-[10px] text-slate-500 leading-relaxed space-y-1">
+                                <p className="font-semibold text-slate-700">
+                                    Room Smoking Policy: {regCardRecord.smokingClause || getRoomSmokingPolicy(regCardRecord.roomNumber).guestFacingClause}
+                                </p>
+                                <p>
+                                    I agree to the hotel rules and regulations. The hotel reserves the right to charge my payment method for any damages, smoking policy violations, or unsettled folio services during my stay.
+                                </p>
                             </div>
 
                             <div className="pt-6 flex justify-between items-end border-t border-slate-200">

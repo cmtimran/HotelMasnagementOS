@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Building2, Eye, CheckCircle2, User, Calendar, ExternalLink, Plus, Sparkles, Clock
+    Building2, Eye, CheckCircle2, User, Calendar, ExternalLink, Plus, Sparkles, Clock,
+    Cigarette, CigaretteOff
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { 
@@ -39,6 +40,8 @@ export interface ArchitecturalRoom {
     height: number;
     isConnecting?: boolean;
     connectedTo?: string;
+    smokingStatus?: string;
+    smokingAllowed?: boolean;
 }
 
 const deriveArchitecturalRooms = (targetDate?: string): ArchitecturalRoom[] => {
@@ -130,6 +133,8 @@ const deriveArchitecturalRooms = (targetDate?: string): ArchitecturalRoom[] => {
                 roomType: r.roomTypeName || 'Deluxe Room',
                 isConnecting: isConn,
                 connectedTo: connTo,
+                smokingStatus: r.smokingStatus || 'Non-Smoking',
+                smokingAllowed: Boolean(r.smokingAllowed || r.smokingStatus === 'Smoking'),
                 status,
                 guestName: activeRes ? activeRes.guestName : undefined,
                 checkIn: activeRes ? (activeRes.checkIn || activeRes.arrivalDate) : undefined,
@@ -419,6 +424,17 @@ export const FloorPlan: React.FC = () => {
                                         Rm {room.roomNumber}
                                     </text>
 
+                                    {/* Smoking Policy SVG Indicator */}
+                                    <text
+                                        x={room.isConnecting ? room.x + room.width - 66 : room.x + room.width - 22}
+                                        y={room.y + 17}
+                                        fontSize="11"
+                                        className="cursor-help select-none"
+                                    >
+                                        {room.smokingStatus === 'Smoking' ? '🚬' : (room.smokingStatus === 'Balcony Smoking Only' ? '🚬' : '🚭')}
+                                        <title>{room.smokingStatus === 'Smoking' ? 'Smoking Permitted Room' : (room.smokingStatus === 'Balcony Smoking Only' ? 'Balcony Smoking Only' : 'Non-Smoking Room')}</title>
+                                    </text>
+
                                     {/* Interconnecting Badge */}
                                     {room.isConnecting && (
                                         <g>
@@ -617,6 +633,46 @@ export const FloorPlan: React.FC = () => {
                                     </p>
                                 </div>
                             )}
+
+                            {/* Smoking Policy Notice Card */}
+                            <div className={`p-2.5 rounded-lg border space-y-1 ${
+                                selectedRoom.smokingStatus === 'Smoking'
+                                    ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                                    : selectedRoom.smokingStatus === 'Balcony Smoking Only'
+                                        ? 'bg-blue-50/80 border-blue-200 text-blue-950'
+                                        : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                            }`}>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10.5px] font-bold uppercase tracking-wide flex items-center gap-1.5">
+                                        {selectedRoom.smokingStatus === 'Smoking' ? (
+                                            <>
+                                                <Cigarette size={13} className="text-amber-600" />
+                                                <span className="text-amber-900">Smoking Permitted Room</span>
+                                            </>
+                                        ) : selectedRoom.smokingStatus === 'Balcony Smoking Only' ? (
+                                            <>
+                                                <Cigarette size={13} className="text-blue-600" />
+                                                <span className="text-blue-900">Balcony Smoking Only</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CigaretteOff size={13} className="text-emerald-700" />
+                                                <span className="text-emerald-900">Strict Non-Smoking Room</span>
+                                            </>
+                                        )}
+                                    </span>
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-white/80 border border-current/20">
+                                        Policy
+                                    </span>
+                                </div>
+                                <p className="text-[10.5px] leading-tight text-gray-700">
+                                    {selectedRoom.smokingStatus === 'Smoking'
+                                        ? 'Smoking is allowed in this room. Safety ashtrays are provided.'
+                                        : selectedRoom.smokingStatus === 'Balcony Smoking Only'
+                                            ? 'Smoking is restricted to private outdoor balcony only. Indoor smoking prohibited.'
+                                            : 'This is a 100% smoke-free room. BDT 5,000 deep cleaning violation penalty applies.'}
+                                </p>
+                            </div>
 
                             {/* Guest Details - If Reserved (Incoming Arriving Guest) */}
                             {selectedRoom.status === 'RESERVED' && (

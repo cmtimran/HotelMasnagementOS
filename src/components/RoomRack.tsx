@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, BedDouble, Sparkles, User, Calendar, 
     MapPin, Plus, RefreshCw, LayoutGrid, List, CheckCircle2, 
-    Wrench, ArrowRight, X, ExternalLink, Phone, Building2, Clock
+    Wrench, ArrowRight, X, ExternalLink, Phone, Building2, Clock,
+    Cigarette, CigaretteOff
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { QuickReservationModal } from './modals/QuickReservationModal';
@@ -45,6 +46,8 @@ export interface RoomRackItem {
     upcomingReservationNumber?: string;
     isConnecting?: boolean;
     connectedTo?: string;
+    smokingStatus?: string;
+    smokingAllowed?: boolean;
 }
 
 const getBuildingNameById = (bId: string): string => {
@@ -119,10 +122,12 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
             status = hk === 'dirty' ? 'dirty' : hk === 'inspected' ? 'inspected' : 'clean';
         }
 
+        const isSmoking = r.smokingStatus === 'Smoking' || r.smokingAllowed;
+        const isBalcony = r.smokingStatus === 'Balcony Smoking Only';
         const features = [
             r.viewType || 'Scenic View',
             r.isConnecting ? 'Connecting Door' : 'Soundproof',
-            r.smokingAllowed ? 'Smoking Permitted' : 'Non-Smoking'
+            isBalcony ? 'Balcony Smoking' : (isSmoking ? 'Smoking Permitted' : 'Non-Smoking Room')
         ];
 
         const isConn = Boolean(r.isConnecting || r.connectedTo);
@@ -137,6 +142,8 @@ const deriveRoomsFromInventory = (targetDate?: string): RoomRackItem[] => {
             roomType: (r.roomTypeName as any) || 'Deluxe Double',
             isConnecting: isConn,
             connectedTo: connTo,
+            smokingStatus: r.smokingStatus || (isBalcony ? 'Balcony Smoking Only' : (isSmoking ? 'Smoking' : 'Non-Smoking')),
+            smokingAllowed: Boolean(isSmoking || isBalcony),
             status,
             guestName: activeRes ? activeRes.guestName : undefined,
             phone: activeRes ? activeRes.phone : undefined,
@@ -771,6 +778,29 @@ export const RoomRack: React.FC = () => {
                                                             <h3 className="text-base font-black text-slate-900 leading-tight font-mono tracking-tight">
                                                                 {room.roomNumber}
                                                             </h3>
+                                                            {/* Smoking Policy Pill */}
+                                                            {room.smokingStatus === 'Smoking' ? (
+                                                                <span
+                                                                    className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-bold flex items-center gap-1 shadow-2xs"
+                                                                    title="Smoking Permitted in Room"
+                                                                >
+                                                                    <Cigarette size={9} /> Smoking
+                                                                </span>
+                                                            ) : room.smokingStatus === 'Balcony Smoking Only' ? (
+                                                                <span
+                                                                    className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 text-[9px] font-bold flex items-center gap-1 shadow-2xs"
+                                                                    title="Balcony Smoking Only"
+                                                                >
+                                                                    <Cigarette size={9} /> Balcony
+                                                                </span>
+                                                            ) : (
+                                                                <span
+                                                                    className="px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-500 text-[9px] font-medium flex items-center gap-1"
+                                                                    title="Non-Smoking Room"
+                                                                >
+                                                                    <CigaretteOff size={9} /> Non-Smoking
+                                                                </span>
+                                                            )}
                                                             {room.isConnecting && (
                                                                 <span
                                                                     className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-bold flex items-center gap-1 shadow-2xs"
@@ -1028,6 +1058,44 @@ export const RoomRack: React.FC = () => {
                                                 {feat}
                                             </span>
                                         ))}
+                                    </div>
+                                </div>
+                                <div className="col-span-2 pt-2 border-t border-slate-200/60">
+                                    <div className={`p-2.5 rounded-lg border flex items-center justify-between gap-2 ${
+                                        selectedRoom.smokingStatus === 'Smoking'
+                                            ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+                                            : selectedRoom.smokingStatus === 'Balcony Smoking Only'
+                                                ? 'bg-blue-50/90 border-blue-200 text-blue-900'
+                                                : 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
+                                    }`}>
+                                        <div className="flex items-center gap-2">
+                                            {selectedRoom.smokingStatus === 'Smoking' ? (
+                                                <Cigarette size={15} className="text-amber-600 flex-shrink-0" />
+                                            ) : selectedRoom.smokingStatus === 'Balcony Smoking Only' ? (
+                                                <Cigarette size={15} className="text-blue-600 flex-shrink-0" />
+                                            ) : (
+                                                <CigaretteOff size={15} className="text-emerald-700 flex-shrink-0" />
+                                            )}
+                                            <div>
+                                                <span className="text-[11px] font-bold block">
+                                                    {selectedRoom.smokingStatus === 'Smoking'
+                                                        ? 'Smoking Permitted Room'
+                                                        : (selectedRoom.smokingStatus === 'Balcony Smoking Only'
+                                                            ? 'Balcony Smoking Only'
+                                                            : 'Strict Non-Smoking Room')}
+                                                </span>
+                                                <span className="text-[9.5px] text-slate-600 block">
+                                                    {selectedRoom.smokingStatus === 'Smoking'
+                                                        ? 'Designated smoking accommodation.'
+                                                        : (selectedRoom.smokingStatus === 'Balcony Smoking Only'
+                                                            ? 'Smoking strictly restricted to balcony with door closed.'
+                                                            : '100% smoke-free. BDT 5,000 deep cleaning fine for violation.')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-white/80 border border-current/20">
+                                            Policy
+                                        </span>
                                     </div>
                                 </div>
                             </div>

@@ -17,7 +17,9 @@ import {
     Printer,
     Wallet,
     Link as LinkIcon,
-    Wrench
+    Wrench,
+    Cigarette,
+    CigaretteOff
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -130,6 +132,9 @@ export interface RoomNode {
     wing?: string;
     isConnecting?: boolean;
     connectedTo?: string;
+    smokingStatus?: string;
+    smokingAllowed?: boolean;
+    smokingPolicy?: string;
 }
 
 export interface FloorNode {
@@ -583,7 +588,10 @@ export const StayView: React.FC = () => {
                 building: buildingNames[bId] || `Building ${bId}`,
                 status: normalizedStatus,
                 isConnecting: isConn,
-                connectedTo: connTo
+                connectedTo: connTo,
+                smokingStatus: r.smokingStatus || 'Non-Smoking',
+                smokingAllowed: Boolean(r.smokingAllowed || r.smokingStatus === 'Smoking'),
+                smokingPolicy: r.smokingPolicy || r.smokingStatus || 'Non-Smoking'
             });
         });
 
@@ -2707,6 +2715,29 @@ export const StayView: React.FC = () => {
                                                                 <span className="text-[10px] text-gray-900 font-semibold font-mono">
                                                                     {room.roomNumber}
                                                                 </span>
+                                                                {/* Room Smoking Policy Icon */}
+                                                                {room.smokingStatus === 'Smoking' ? (
+                                                                    <span
+                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition-colors cursor-help flex-shrink-0"
+                                                                        title="Smoking Permitted in Room"
+                                                                    >
+                                                                        <Cigarette size={10} className="stroke-[2.2]" />
+                                                                    </span>
+                                                                ) : room.smokingStatus === 'Balcony Smoking Only' ? (
+                                                                    <span
+                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors cursor-help flex-shrink-0"
+                                                                        title="Balcony Smoking Only (No Indoor Smoking)"
+                                                                    >
+                                                                        <Cigarette size={10} className="stroke-[2.2]" />
+                                                                    </span>
+                                                                ) : (
+                                                                    <span
+                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-slate-300 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-help flex-shrink-0"
+                                                                        title="Strict Non-Smoking Room (BDT 5,000 deep cleaning violation fine)"
+                                                                    >
+                                                                        <CigaretteOff size={10} className="stroke-[2]" />
+                                                                    </span>
+                                                                )}
                                                                 {room.isConnecting && (
                                                                     <span
                                                                         className="inline-flex items-center justify-center p-0.5 rounded text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition-colors cursor-help flex-shrink-0"

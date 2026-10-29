@@ -20,8 +20,11 @@ import {
     Hand,
     GitFork,
     DoorOpen,
-    DoorClosed
+    DoorClosed,
+    Cigarette,
+    CigaretteOff
 } from 'lucide-react';
+import { getRoomSmokingPolicy } from '../../utils/roomInventoryEngine';
 import type { AmendBookingData } from './AmendStayModal';
 
 export interface ReservationDrawerActions {
@@ -351,6 +354,39 @@ export const ReservationDetailsDrawer: React.FC<ReservationDetailsDrawerProps> =
                             </div>
                         </div>
                     </div>
+
+                    {/* Smoking Policy Banner */}
+                    {(() => {
+                        const smoking = getRoomSmokingPolicy(booking.roomNumber);
+                        return (
+                            <div className={`rounded-xl p-2.5 border flex items-center justify-between gap-2 shadow-2xs ${
+                                smoking.smokingStatus === 'Smoking'
+                                    ? 'bg-amber-950/40 border-amber-400/30 text-amber-200'
+                                    : smoking.smokingStatus === 'Balcony Smoking Only'
+                                        ? 'bg-blue-950/40 border-blue-400/30 text-blue-200'
+                                        : 'bg-emerald-950/40 border-emerald-400/30 text-emerald-200'
+                            }`}>
+                                <div className="flex items-center gap-2 min-w-0">
+                                    {smoking.smokingStatus === 'Smoking' || smoking.smokingStatus === 'Balcony Smoking Only' ? (
+                                        <Cigarette size={15} className="text-amber-400 flex-shrink-0" />
+                                    ) : (
+                                        <CigaretteOff size={15} className="text-emerald-400 flex-shrink-0" />
+                                    )}
+                                    <div className="min-w-0">
+                                        <div className="text-[9.5px] uppercase tracking-wider font-bold">
+                                            {smoking.policyBadgeText}
+                                        </div>
+                                        <div className="text-[10px] text-blue-100 truncate">
+                                            {smoking.guestFacingClause}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span className="text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-white/10 border border-white/20 whitespace-nowrap">
+                                    Room Policy
+                                </span>
+                            </div>
+                        );
+                    })()}
 
                     {/* Row 4: Guests & Avg Daily Rate */}
                     <div className="grid grid-cols-2 gap-2">

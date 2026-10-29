@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
     Search, Plus, Edit2, Trash2, Save, ChevronLeft,
-    MapPin, Key, Layers, CheckCircle2, Building2, AlertTriangle, Sparkles, Wrench
+    MapPin, Key, Layers, CheckCircle2, Building2, AlertTriangle, Sparkles, Wrench,
+    Cigarette, CigaretteOff
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { getApiBaseUrl } from '../utils/apiUrl';
@@ -34,7 +35,7 @@ interface Room {
     isConnecting: boolean;
     connectedTo?: string;
     viewOverride?: string;
-    smokingStatus: 'Smoking' | 'Non-Smoking';
+    smokingStatus: 'Smoking' | 'Non-Smoking' | 'Balcony Smoking Only';
     nearElevator: boolean;
 
     // Status
@@ -623,15 +624,30 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-[10px]">
+                                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-[10px] gap-1 flex-wrap">
                                             <span className={`px-2 py-0.5 rounded-full ${getHousekeepingBadge(room.housekeepingStatus)}`}>
                                                 HK: {room.housekeepingStatus}
                                             </span>
-                                            {room.isConnecting && (
-                                                <span className="text-primary bg-primary-subtle px-2 py-0.5 rounded-md text-[10px] border border-primary-border/40">
-                                                    Connecting {room.connectedTo ? `(${room.connectedTo})` : ''}
-                                                </span>
-                                            )}
+                                            <div className="flex items-center gap-1">
+                                                {room.smokingStatus === 'Smoking' ? (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shadow-2xs" title="Smoking Permitted in Room">
+                                                        <Cigarette size={9} /> Smoking
+                                                    </span>
+                                                ) : room.smokingStatus === 'Balcony Smoking Only' ? (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 shadow-2xs" title="Balcony Smoking Only">
+                                                        <Cigarette size={9} /> Balcony
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1" title="Non-Smoking Room">
+                                                        <CigaretteOff size={9} /> Non-Smoking
+                                                    </span>
+                                                )}
+                                                {room.isConnecting && (
+                                                    <span className="text-primary bg-primary-subtle px-2 py-0.5 rounded-md text-[10px] border border-primary-border/40">
+                                                        Conn {room.connectedTo ? `(${room.connectedTo})` : ''}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -820,6 +836,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                                             >
                                                 <option value="Non-Smoking">Non-Smoking Throughout</option>
                                                 <option value="Smoking">Smoking Permitted</option>
+                                                <option value="Balcony Smoking Only">Balcony Smoking Only</option>
                                             </select>
                                         </div>
                                         <div className="space-y-1.5">

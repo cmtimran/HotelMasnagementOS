@@ -28,6 +28,7 @@ export interface CanonicalRoom {
     viewType?: string;
     smokingAllowed?: boolean;
     smokingStatus?: string;
+    smokingPolicy?: string;
     phoneExt?: string;
     lockId?: string;
     nearElevator?: boolean;
@@ -616,7 +617,7 @@ export const DEFAULT_CANONICAL_ROOMS: CanonicalRoom[] = [
     { id: 7, number: '107', name: 'Deluxe Courtyard 107', buildingId: '1', floorId: '1', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 8, number: '108', name: 'Superior King 108', buildingId: '1', floorId: '1', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     // Floor 2
-    { id: 9, number: '201', name: 'Superior Balcony 201', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 9, number: '201', name: 'Superior Balcony 201', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean', smokingStatus: 'Balcony Smoking Only', smokingAllowed: true },
     { id: 10, number: '202', name: 'Superior King 202', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 11, number: '203', name: 'Executive Suite 203', buildingId: '1', floorId: '2', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 12, number: '204', name: 'Deluxe King 204', buildingId: '1', floorId: '2', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
@@ -635,7 +636,7 @@ export const DEFAULT_CANONICAL_ROOMS: CanonicalRoom[] = [
     { id: 24, number: '308', name: 'Superior King 308', buildingId: '1', floorId: '3', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     // Floor 4
     { id: 25, number: '401', name: 'Executive Club 401', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 26, number: '402', name: 'Executive Club 402', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
+    { id: 26, number: '402', name: 'Executive Club 402', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean', smokingStatus: 'Smoking', smokingAllowed: true },
     { id: 27, number: '403', name: 'Deluxe Panoramic 403', buildingId: '2', floorId: '4', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 28, number: '404', name: 'Superior Sky 404', buildingId: '2', floorId: '4', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
     { id: 29, number: '405', name: 'Standard Single 405', buildingId: '2', floorId: '4', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
@@ -891,6 +892,9 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
                         housekeepingStatus: r.housekeepingStatus || 'Clean',
                         isConnecting,
                         connectedTo,
+                        smokingStatus: r.smokingStatus || r.smoking_status || matchedType?.smokingPolicy || 'Non-Smoking',
+                        smokingAllowed: Boolean(r.smokingAllowed ?? ((r.smokingStatus || r.smoking_status || matchedType?.smokingPolicy || '') === 'Smoking')),
+                        smokingPolicy: r.smokingPolicy || r.smokingStatus || matchedType?.smokingPolicy || 'Non-Smoking',
                         remarks: r.remarks
                     };
                 });
@@ -904,6 +908,9 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
                 const dynamicPartner = partnerMap.get(roomNum);
                 return {
                     ...r,
+                    smokingStatus: r.smokingStatus || 'Non-Smoking',
+                    smokingAllowed: Boolean(r.smokingAllowed ?? (r.smokingStatus === 'Smoking')),
+                    smokingPolicy: r.smokingPolicy || r.smokingStatus || 'Non-Smoking',
                     isConnecting: Boolean(dynamicPartner || r.isConnecting),
                     connectedTo: dynamicPartner || r.connectedTo || ''
                 };
@@ -915,6 +922,47 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
     // For all other properties (new tenants), start completely clean with 0 rooms!
     const activeProp = propertyId || getActivePropertyId();
     return activeProp === 1 ? DEFAULT_CANONICAL_ROOMS : [];
+};
+
+export interface RoomSmokingPolicyInfo {
+    roomNumber: string;
+    smokingStatus: 'Smoking' | 'Non-Smoking' | 'Balcony Smoking Only';
+    isSmokingAllowed: boolean;
+    policyBadgeText: string;
+    guestFacingClause: string;
+}
+
+export const getRoomSmokingPolicy = (roomNumber: string | number, propertyId?: number): RoomSmokingPolicyInfo => {
+    const rooms = getCanonicalRooms(propertyId);
+    const room = rooms.find(r => String(r.number).trim() === String(roomNumber).trim());
+    const dynamicTypes = getDynamicRoomTypes();
+    const roomType = dynamicTypes.find(t => String(t.id) === String(room?.roomTypeId) || t.name === room?.roomTypeName);
+
+    const rawStatus = String(room?.smokingStatus || room?.smokingPolicy || roomType?.smokingPolicy || 'Non-Smoking').trim();
+    const isSmokingAllowed = rawStatus.toLowerCase().includes('smoking') && !rawStatus.toLowerCase().includes('non');
+    const isBalconyOnly = rawStatus.toLowerCase().includes('balcony');
+
+    const smokingStatus: 'Smoking' | 'Non-Smoking' | 'Balcony Smoking Only' = isBalconyOnly
+        ? 'Balcony Smoking Only'
+        : (isSmokingAllowed ? 'Smoking' : 'Non-Smoking');
+
+    const policyBadgeText = isBalconyOnly
+        ? 'Balcony Smoking Only'
+        : (isSmokingAllowed ? 'Smoking Permitted' : 'Non-Smoking Room');
+
+    const guestFacingClause = isBalconyOnly
+        ? 'Balcony Smoking Only: Smoking is strictly prohibited inside the bedroom. Permitted exclusively on outdoor balconies with ashtray provided. BDT 5,000 ozone sanitization penalty for indoor smoking.'
+        : (isSmokingAllowed
+            ? 'Smoking Permitted Room: Designated smoking accommodation. Guest agrees to utilize safety ashtrays and adhere to hotel fire safety protocols.'
+            : 'Strict Non-Smoking Room Policy: This room is 100% smoke-free (including tobacco, e-cigarettes, vaping & shisha). An automatic BDT 5,000 deep cleaning and ozone sanitization fee will be charged to the folio for violations.');
+
+    return {
+        roomNumber: String(roomNumber),
+        smokingStatus,
+        isSmokingAllowed,
+        policyBadgeText,
+        guestFacingClause
+    };
 };
 
 // =========================================================================
@@ -2044,7 +2092,9 @@ export const syncRoomTypesAndRoomsFromDB = async (
                     lockId: r.lock_id || r.lockId || '',
                     isConnecting: Boolean(r.is_connecting || r.isConnecting),
                     connectedTo: r.connected_to || r.connectedTo || '',
-                    smokingStatus: r.smoking_status || r.smokingStatus || 'Non-Smoking',
+                    smokingStatus: r.smoking_status || r.smokingStatus || (mappedTypes.find(t => String(t.id) === String(r.room_type_id || r.roomTypeId))?.smokingPolicy) || 'Non-Smoking',
+                    smokingAllowed: (r.smoking_status || r.smokingStatus || '') === 'Smoking' || (mappedTypes.find(t => String(t.id) === String(r.room_type_id || r.roomTypeId))?.smokingPolicy) === 'Smoking',
+                    smokingPolicy: r.smoking_status || r.smokingStatus || (mappedTypes.find(t => String(t.id) === String(r.room_type_id || r.roomTypeId))?.smokingPolicy) || 'Non-Smoking',
                     nearElevator: Boolean(r.near_elevator || r.nearElevator),
                     remarks: r.remarks
                 }));

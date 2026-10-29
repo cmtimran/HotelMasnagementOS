@@ -18,7 +18,9 @@ import {
     Split,
     Ban,
     ShieldCheck,
-    FileText
+    FileText,
+    Cigarette,
+    CigaretteOff
 } from 'lucide-react';
 import { formatIdentityDisplay } from '../../utils/identityUtils';
 import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../../utils/geoData';
@@ -54,7 +56,8 @@ import {
     generateGroupCode,
     generateSubBookingNumber,
     generateRegistrationNumber,
-    generateFolioNumber
+    generateFolioNumber,
+    getRoomSmokingPolicy
 } from '../../utils/roomInventoryEngine';
 import {
     calculateReservationTaxes,
@@ -1122,15 +1125,21 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             });
         });
 
+        const primarySmokingPolicy = getRoomSmokingPolicy(primaryRoom);
+
         const subRoomsWithNumbers = assignedRoomsExpanded.map((rm, idx) => {
             const subBookingNum = isGroup ? generateSubBookingNumber(reservationNumber, idx + 1) : `${reservationNumber}-01`;
             const roomRegNo = (status === 'arrived' || (status as string) === 'in-house') ? generateRegistrationNumber(subBookingNum) : undefined;
             const roomFolioNo = generateFolioNumber(subBookingNum);
+            const rmPolicy = getRoomSmokingPolicy(rm.roomNumber);
             return {
                 ...rm,
                 subBookingNumber: subBookingNum,
                 registrationNumber: roomRegNo,
-                folioNumber: roomFolioNo
+                folioNumber: roomFolioNo,
+                smokingPolicy: rmPolicy.smokingStatus,
+                smokingPolicyText: rmPolicy.policyBadgeText,
+                smokingClause: rmPolicy.guestFacingClause
             };
         });
 
@@ -1168,6 +1177,14 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             idIssuePlace,
             roomNumber: primaryRoom,
             roomType: roomsList[0]?.roomType || 'Standard Room',
+            smokingPolicy: primarySmokingPolicy.smokingStatus,
+            smokingPolicyText: primarySmokingPolicy.policyBadgeText,
+            smokingClause: primarySmokingPolicy.guestFacingClause,
+            policies: [
+                primarySmokingPolicy.guestFacingClause,
+                'Standard Hotel Check-In: 14:00 | Check-Out: 12:00 PM',
+                'Government-issued Photo ID / Passport required upon arrival.'
+            ],
             allocatedRooms: allocatedRoomNumbers,
             roomsCount: totalRoomsAllocatedInForm,
             checkIn: checkInDate,
@@ -1765,50 +1782,72 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                     </span>
                                                                 </button>
                                                             ) : (
-                                                                <select
-                                                                    value={item.roomNumber}
-                                                                    onChange={e => {
-                                                                        const val = e.target.value;
-                                                                        handleRoomFieldChange(item.id, 'roomNumber', val);
-                                                                        handleRoomFieldChange(item.id, 'assignedRooms', [val]);
-                                                                    }}
-                                                                    className="w-24 h-7 px-1 border border-slate-200 rounded text-[11px] font-mono text-blue-700 bg-white outline-none text-center mx-auto block cursor-pointer"
-                                                                >
-                                                                    {(() => {
-                                                                        const otherRowsRooms = new Set<string>();
-                                                                        roomsList.forEach(other => {
-                                                                            if (other.id === item.id) return;
-                                                                            if (other.assignedRooms && other.assignedRooms.length > 0) {
-                                                                                other.assignedRooms.forEach(rn => otherRowsRooms.add(rn));
-                                                                            } else if (other.roomNumber) {
-                                                                                otherRowsRooms.add(other.roomNumber);
-                                                                            }
-                                                                        });
-                                                                        const matchingStatus = liveAvailabilityReport.allRoomsStatus.filter(st =>
-                                                                            st.room.roomTypeName.toLowerCase().includes(item.roomType.toLowerCase()) ||
-                                                                            item.roomType.toLowerCase().includes(st.room.roomTypeName.toLowerCase())
-                                                                        );
-                                                                        const listToDisplay = matchingStatus.length > 0 ? matchingStatus : liveAvailabilityReport.allRoomsStatus;
-
-                                                                        return listToDisplay.map(st => {
-                                                                            const isUsedInOther = otherRowsRooms.has(st.room.number);
-                                                                            const isAvail = st.isAvailable && !isUsedInOther;
-                                                                            let tag = 'Free';
-                                                                            if (isUsedInOther) tag = 'In Form';
-                                                                            else if (!st.isAvailable) tag = 'Booked';
-
-                                                                            return (
-                                                                                <option
-                                                                                    key={st.room.number}
-                                                                                    value={st.room.number}
-                                                                                    disabled={!isAvail && item.roomNumber !== st.room.number}
-                                                                                >
-                                                                                    {st.room.number} ({tag})
-                                                                                </option>
+                                                                <div className="flex flex-col items-center">
+                                                                    <select
+                                                                        value={item.roomNumber}
+                                                                        onChange={e => {
+                                                                            const val = e.target.value;
+                                                                            handleRoomFieldChange(item.id, 'roomNumber', val);
+                                                                            handleRoomFieldChange(item.id, 'assignedRooms', [val]);
+                                                                        }}
+                                                                        className="w-24 h-7 px-1 border border-slate-200 rounded text-[11px] font-mono text-blue-700 bg-white outline-none text-center mx-auto block cursor-pointer"
+                                                                    >
+                                                                        {(() => {
+                                                                            const otherRowsRooms = new Set<string>();
+                                                                            roomsList.forEach(other => {
+                                                                                if (other.id === item.id) return;
+                                                                                if (other.assignedRooms && other.assignedRooms.length > 0) {
+                                                                                    other.assignedRooms.forEach(rn => otherRowsRooms.add(rn));
+                                                                                } else if (other.roomNumber) {
+                                                                                    otherRowsRooms.add(other.roomNumber);
+                                                                                }
+                                                                            });
+                                                                            const matchingStatus = liveAvailabilityReport.allRoomsStatus.filter(st =>
+                                                                                st.room.roomTypeName.toLowerCase().includes(item.roomType.toLowerCase()) ||
+                                                                                item.roomType.toLowerCase().includes(st.room.roomTypeName.toLowerCase())
                                                                             );
-                                                                        });
+                                                                            const listToDisplay = matchingStatus.length > 0 ? matchingStatus : liveAvailabilityReport.allRoomsStatus;
+
+                                                                            return listToDisplay.map(st => {
+                                                                                const isUsedInOther = otherRowsRooms.has(st.room.number);
+                                                                                const isAvail = st.isAvailable && !isUsedInOther;
+                                                                                let tag = 'Free';
+                                                                                if (isUsedInOther) tag = 'In Form';
+                                                                                else if (!st.isAvailable) tag = 'Booked';
+
+                                                                                const pol = getRoomSmokingPolicy(st.room.number);
+                                                                                const smokeSymbol = pol.smokingStatus === 'Smoking' ? ' 🚬' : (pol.smokingStatus === 'Balcony Smoking Only' ? ' 🚬' : '');
+                                                                                return (
+                                                                                    <option
+                                                                                        key={st.room.number}
+                                                                                        value={st.room.number}
+                                                                                        disabled={!isAvail && item.roomNumber !== st.room.number}
+                                                                                    >
+                                                                                        {st.room.number}{smokeSymbol} ({tag})
+                                                                                    </option>
+                                                                                );
+                                                                            });
+                                                                        })()}
+                                                                    </select>
+                                                                    {(() => {
+                                                                        const pol = getRoomSmokingPolicy(item.roomNumber);
+                                                                        return (
+                                                                            <span
+                                                                                className={`inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[7.5px] font-bold mt-0.5 shadow-2xs ${
+                                                                                    pol.smokingStatus === 'Smoking'
+                                                                                        ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                                                                        : pol.smokingStatus === 'Balcony Smoking Only'
+                                                                                            ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                                                                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                                                                }`}
+                                                                                title={pol.guestFacingClause}
+                                                                            >
+                                                                                {pol.smokingStatus === 'Smoking' || pol.smokingStatus === 'Balcony Smoking Only' ? <Cigarette size={8} /> : <CigaretteOff size={8} />}
+                                                                                <span>{pol.policyBadgeText}</span>
+                                                                            </span>
+                                                                        );
                                                                     })()}
-                                                                </select>
+                                                                </div>
                                                             )}
                                                         </td>
                                                         {(() => {
@@ -2048,11 +2087,16 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </label>
                                         <input
                                             type="text"
-                                            name="quick_guest_full_name"
-                                            autoComplete="off"
+                                            name="pms_guest_search_query"
+                                            autoComplete="one-time-code"
                                             autoCorrect="off"
+                                            autoCapitalize="off"
                                             spellCheck={false}
+                                            role="combobox"
+                                            aria-autocomplete="list"
+                                            aria-expanded={isNameSuggestOpen && nameSuggestions.length > 0}
                                             data-lpignore="true"
+                                            data-1p-ignore="true"
                                             data-form-type="other"
                                             placeholder="Guest full name..."
                                             value={name}
@@ -2070,13 +2114,17 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
                                         {/* Inline Name Suggestions Dropdown (Spacious overlay width) */}
                                         {isNameSuggestOpen && nameSuggestions.length > 0 && (
-                                            <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                            <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                                <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                                                    <span>Returning Guests ({nameSuggestions.length})</span>
+                                                    <span className="text-[9px] text-blue-600 font-medium">Select to auto-fill</span>
+                                                </div>
                                                 {nameSuggestions.map(g => (
                                                     <div
                                                         key={g.id}
                                                         onMouseDown={(e) => {
-                                                            e.preventDefault();
-                                                            handleSelectGuestProfile(g);
+                                                             e.preventDefault();
+                                                             handleSelectGuestProfile(g);
                                                         }}
                                                         className="p-2.5 hover:bg-blue-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
                                                     >
@@ -2098,9 +2146,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5 whitespace-nowrap">
                                                                     <span className="text-slate-700 font-medium">📞 {g.phone}</span>
-                                                                    {g.email && <span className="truncate">✉️ {g.email}</span>}
+                                                                    {g.email && <span className="truncate max-w-[130px]">✉️ {g.email}</span>}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2123,11 +2171,16 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </label>
                                         <input
                                             type="text"
-                                            name="quick_guest_mobile_number"
-                                            autoComplete="off"
+                                            name="pms_guest_mobile_query"
+                                            autoComplete="one-time-code"
                                             autoCorrect="off"
+                                            autoCapitalize="off"
                                             spellCheck={false}
+                                            role="combobox"
+                                            aria-autocomplete="list"
+                                            aria-expanded={isMobileSuggestOpen && mobileSuggestions.length > 0}
                                             data-lpignore="true"
+                                            data-1p-ignore="true"
                                             data-form-type="other"
                                             placeholder="e.g. 01712-345678"
                                             value={mobile}
@@ -2142,7 +2195,11 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
                                         {/* Inline Mobile Suggestions Dropdown (Spacious overlay width) */}
                                         {isMobileSuggestOpen && mobileSuggestions.length > 0 && (
-                                            <div className="absolute left-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                            <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 w-[380px] max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-100">
+                                                <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                                                    <span>Matching Phone Profiles ({mobileSuggestions.length})</span>
+                                                    <span className="text-[9px] text-blue-600 font-medium">Select to auto-fill</span>
+                                                </div>
                                                 {mobileSuggestions.map(g => (
                                                     <div
                                                         key={g.id}
@@ -2170,9 +2227,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                                                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2 mt-0.5 whitespace-nowrap">
                                                                     <span className="text-slate-800 font-bold">📞 {g.phone}</span>
-                                                                    {g.email && <span className="truncate">✉️ {g.email}</span>}
+                                                                    {g.email && <span className="truncate max-w-[130px]">✉️ {g.email}</span>}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2189,6 +2246,13 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         <label className="text-[10px] font-semibold text-slate-600">Email</label>
                                         <input
                                             type="email"
+                                            name="pms_guest_email_query"
+                                            autoComplete="one-time-code"
+                                            autoCorrect="off"
+                                            spellCheck={false}
+                                            data-lpignore="true"
+                                            data-1p-ignore="true"
+                                            data-form-type="other"
                                             placeholder="guest@example.com"
                                             value={email}
                                             onChange={e => setEmail(e.target.value)}
