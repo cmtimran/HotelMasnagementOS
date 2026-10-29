@@ -2,12 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import {
     Search, Plus, Edit2, Trash2, Save, ChevronLeft,
     MapPin, Key, Layers, CheckCircle2, Building2, AlertTriangle, Sparkles, Wrench,
-    Cigarette, CigaretteOff
+    Cigarette, CigaretteOff, LayoutGrid, List
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import OutOfOrderModal from './modals/OutOfOrderModal';
 import { getStoredOOOBlocks } from '../utils/outOfOrderEngine';
+import { toast } from '../context/ToastContext';
 import {
     getCanonicalRooms,
     getDynamicRoomTypes,
@@ -86,6 +87,9 @@ const getStoredFloors = (): Floor[] => {
 export default function RoomManagement({ onBack, propertyId }: { onBack: () => void; propertyId?: number }) {
     const activePropId = propertyId || getActivePropertyId();
     const [view, setView] = useState<'list' | 'form'>('list');
+    const [displayMode, setDisplayMode] = useState<'cards' | 'dense'>(() => (localStorage.getItem('hotel_rooms_view_mode') as 'cards' | 'dense') || 'cards');
+    const [editingRoomId, setEditingRoomId] = useState<number | null>(null);
+    const [editingOriginalNumber, setEditingOriginalNumber] = useState<string>('');
     const [rooms, setRooms] = useState<Room[]>(() => {
         const can = getCanonicalRooms(activePropId);
         return can as unknown as Room[];
@@ -207,6 +211,8 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
     };
 
     const handleAddNew = () => {
+        setEditingRoomId(null);
+        setEditingOriginalNumber('');
         setFormData({
             id: 0,
             number: '',
@@ -229,36 +235,47 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
 
     const handleEdit = (room: Room) => {
         setFormData({ ...room });
+        setEditingRoomId(room.id);
+        setEditingOriginalNumber(room.number);
         setView('form');
         setActiveTab('location');
     };
 
     const handleDelete = async (id: number) => {
         const target = rooms.find(r => r.id === id);
-        if (window.confirm('Are you sure you want to delete this room from hotel inventory?')) {
-            const updated = rooms.filter(r => r.id !== id);
-            persistRooms(updated);
-            if (target?.number) {
-                try {
-                    await fetch(`${getApiBaseUrl()}/api/rooms/${encodeURIComponent(target.number)}?propertyId=${activePropId}`, {
-                        method: 'DELETE'
-                    });
-                } catch {}
-            }
+        if (!target) return;
+
+        if (window.confirm(`Are you sure you want to delete Room "${target.number}" from hotel inventory?`)) {
             try {
+                const targetKey = target.id || target.number;
+                const res = await fetch(`${getApiBaseUrl()}/api/rooms/${encodeURIComponent(targetKey)}?propertyId=${activePropId}`, {
+                    method: 'DELETE'
+                });
+                const json = await res.json();
+                if (!json.success) {
+                    toast.error(json.error || 'Failed to delete room.');
+                    return;
+                }
+
+                const updated = rooms.filter(r => r.id !== id);
+                persistRooms(updated);
+                toast.success(`Room ${target.number} removed from hotel inventory.`);
                 await syncRoomTypesAndRoomsFromDB(activePropId);
                 broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
-            } catch {}
+            } catch (err: any) {
+                toast.error(`Delete failed: ${err.message}`);
+            }
         }
     };
 
     const handleSave = async () => {
-        if (!formData.number.trim()) {
-            alert('Please specify a room number.');
+        const cleanNumber = formData.number.trim();
+        if (!cleanNumber) {
+            toast.error('Please specify a room number.');
             return;
         }
 
-        const isNew = formData.id === 0;
+        const isNew = !editingRoomId || formData.id === 0;
         const API_BASE = getApiBaseUrl();
 
         try {
@@ -266,8 +283,8 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                 // POST new room to API
                 const payload = {
                     propertyId: activePropId,
-                    number: formData.number,
-                    name: formData.name,
+                    number: cleanNumber,
+                    name: formData.name || undefined,
                     buildingId: formData.buildingId,
                     floorId: formData.floorId,
                     roomTypeId: formData.roomTypeId,
@@ -287,37 +304,50 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                     body: JSON.stringify(payload)
                 });
                 const json = await res.json();
+                if (!json.success) {
+                    toast.error(json.error || 'Failed to create room.');
+                    return;
+                }
                 const savedRoom: Room = json.data
-                    ? { ...formData, id: json.data.id || Date.now() }
-                    : { ...formData, id: Date.now() };
+                    ? { ...formData, id: json.data.id || Date.now(), number: cleanNumber }
+                    : { ...formData, id: Date.now(), number: cleanNumber };
                 const updated = [...rooms, savedRoom];
                 persistRooms(updated);
+                toast.success(`Room ${cleanNumber} created in hotel inventory!`);
             } else {
-                // Edit: PUT details + PATCH housekeeping status via API
-                try {
-                    await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(formData.number)}/details?propertyId=${activePropId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            propertyId: activePropId,
-                            name: formData.name,
-                            buildingId: formData.buildingId,
-                            floorId: formData.floorId,
-                            roomTypeId: formData.roomTypeId,
-                            status: formData.status,
-                            housekeepingStatus: formData.housekeepingStatus,
-                            phoneExt: formData.phoneExt,
-                            lockId: formData.lockId,
-                            isConnecting: formData.isConnecting,
-                            connectedTo: formData.connectedTo,
-                            smokingStatus: formData.smokingStatus,
-                            nearElevator: formData.nearElevator,
-                            remarks: formData.remarks
-                        })
-                    });
-                } catch {}
-                const updated = rooms.map(r => r.id === formData.id ? formData : r);
+                // Edit: Target by room ID or original room number
+                const targetKey = editingRoomId || editingOriginalNumber || formData.id || formData.number;
+                const res = await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(targetKey)}/details?propertyId=${activePropId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        propertyId: activePropId,
+                        number: cleanNumber,
+                        roomNumber: cleanNumber,
+                        name: formData.name || null,
+                        buildingId: formData.buildingId,
+                        floorId: formData.floorId,
+                        roomTypeId: formData.roomTypeId,
+                        status: formData.status,
+                        housekeepingStatus: formData.housekeepingStatus,
+                        phoneExt: formData.phoneExt,
+                        lockId: formData.lockId,
+                        isConnecting: formData.isConnecting,
+                        connectedTo: formData.connectedTo,
+                        smokingStatus: formData.smokingStatus,
+                        nearElevator: formData.nearElevator,
+                        remarks: formData.remarks
+                    })
+                });
+                const json = await res.json();
+                if (!json.success) {
+                    toast.error(json.error || 'Failed to update room.');
+                    return;
+                }
+                const updatedRoom: Room = { ...formData, number: cleanNumber };
+                const updated = rooms.map(r => (r.id === editingRoomId || r.number === editingOriginalNumber) ? updatedRoom : r);
                 persistRooms(updated);
+                toast.success(`Room ${cleanNumber} details updated successfully!`);
             }
 
             // Refresh rooms from DB after save and broadcast to other components
@@ -331,20 +361,11 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
             } catch {
                 // Keep the locally persisted state on network failure
             }
-        } catch (err) {
-            // On any API failure, at minimum persist to localStorage
-            console.warn('RoomManagement: API save failed, persisting to localStorage only', err);
-            let updated: Room[];
-            if (isNew) {
-                updated = [...rooms, { ...formData, id: Date.now() }];
-            } else {
-                updated = rooms.map(r => r.id === formData.id ? formData : r);
-            }
-            persistRooms(updated);
-            broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
-        }
 
-        setView('list');
+            setView('list');
+        } catch (err: any) {
+            toast.error(`Save error: ${err.message}`);
+        }
     };
 
     const updateField = (field: keyof Room, value: any) => {
@@ -496,8 +517,44 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                     className="input-standard pl-8.5 !h-8 !text-xs"
                                 />
                             </div>
-                            <div className="flex items-center gap-2 w-full md:w-auto justify-end text-[11px] text-slate-500 font-medium">
-                                Showing <strong className="text-slate-800">{filteredRooms.length}</strong> of {rooms.length} rooms
+                            <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                                <div className="text-[11px] text-slate-500 font-medium">
+                                    Showing <strong className="text-slate-800">{filteredRooms.length}</strong> of {rooms.length} rooms
+                                </div>
+                                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setDisplayMode('cards');
+                                            localStorage.setItem('hotel_rooms_view_mode', 'cards');
+                                        }}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                                            displayMode === 'cards'
+                                                ? 'bg-white text-slate-900 shadow-2xs'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                        title="Card View"
+                                    >
+                                        <LayoutGrid className="size-3.5" />
+                                        <span>Cards</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setDisplayMode('dense');
+                                            localStorage.setItem('hotel_rooms_view_mode', 'dense');
+                                        }}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                                            displayMode === 'dense'
+                                                ? 'bg-white text-slate-900 shadow-2xs'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                        title="Dense Table View"
+                                    >
+                                        <List className="size-3.5" />
+                                        <span>Dense</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -560,14 +617,128 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                         </div>
                     </div>
 
-                    {/* Room Grid */}
+                    {/* Room Grid or Dense Table */}
                     {filteredRooms.length === 0 ? (
                         <div className="card-container p-8 text-center text-slate-400 text-xs">
                             <Building2 className="size-7 mx-auto mb-2 text-slate-300" />
                             No rooms match the current search or filter criteria.
                         </div>
+                    ) : displayMode === 'dense' ? (
+                        <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                                        <tr>
+                                            <th className="py-2.5 px-3">Room #</th>
+                                            <th className="py-2.5 px-3">Room Type</th>
+                                            <th className="py-2.5 px-3">Floor / Loc</th>
+                                            <th className="py-2.5 px-3">Status</th>
+                                            <th className="py-2.5 px-3">Housekeeping</th>
+                                            <th className="py-2.5 px-3">Lock / Ext</th>
+                                            <th className="py-2.5 px-3">Features</th>
+                                            <th className="py-2.5 px-3 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredRooms.map(room => {
+                                            const roomType = availableRoomTypes.find(t => String(t.id) === room.roomTypeId);
+                                            const floor = availableFloors.find(f => String(f.id) === room.floorId);
+                                            const activeBlock = oooBlocks.find(b => b.roomNumber === room.number && (b.status === 'active' || b.status === 'extended'));
+
+                                            return (
+                                                <tr key={room.id} className="hover:bg-slate-50/80 transition-colors">
+                                                    <td className="py-2.5 px-3 whitespace-nowrap">
+                                                        <div className="font-mono font-bold text-slate-900 text-sm">
+                                                            {room.number}
+                                                        </div>
+                                                        {room.name && (
+                                                            <div className="text-[10px] text-slate-400 truncate max-w-[120px]">{room.name}</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap font-medium text-slate-700">
+                                                        <span className="text-primary font-semibold">{roomType?.name || 'Standard'}</span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap text-slate-600 text-[11px]">
+                                                        {floor?.name.split(' (')[0] || `Floor ${room.floorId}`}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] border ${getStatusColor(room.status)}`}>
+                                                            {room.status}
+                                                        </span>
+                                                        {activeBlock && (
+                                                            <span
+                                                                onClick={() => {
+                                                                    setSelectedOOORoom(room.number);
+                                                                    setIsOOOModalOpen(true);
+                                                                }}
+                                                                className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200 inline-flex items-center gap-1 cursor-pointer"
+                                                                title={`Active ${activeBlock.blockType}: ${activeBlock.startDate} to ${activeBlock.endDate}`}
+                                                            >
+                                                                <Wrench className="size-2.5 text-rose-600" />
+                                                                {activeBlock.blockType}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getHousekeepingBadge(room.housekeepingStatus)}`}>
+                                                            {room.housekeepingStatus}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                                                        <div><span className="text-slate-400">Lock:</span> {room.lockId || `KEY-${room.number}`}</div>
+                                                        <div><span className="text-slate-400">Ext:</span> {room.phoneExt || `2${room.number}`}</div>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap">
+                                                        <div className="flex items-center gap-1 text-[10px]">
+                                                            {room.smokingStatus === 'Smoking' ? (
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+                                                                    <Cigarette size={9} /> Smoking
+                                                                </span>
+                                                            ) : room.smokingStatus === 'Balcony Smoking Only' ? (
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+                                                                    <Cigarette size={9} /> Balcony
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                                                    <CigaretteOff size={9} /> Non-Smoking
+                                                                </span>
+                                                            )}
+                                                            {room.isConnecting && (
+                                                                <span className="text-primary bg-primary-subtle px-1.5 py-0.5 rounded text-[9px] border border-primary-border/40">
+                                                                    Conn {room.connectedTo ? `(${room.connectedTo})` : ''}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 whitespace-nowrap text-right">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedOOORoom(room.number);
+                                                                    setIsOOOModalOpen(true);
+                                                                }}
+                                                                className="btn-icon size-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                                                title="Set Out of Order / Out of Service"
+                                                            >
+                                                                <Wrench className="size-3 text-slate-600" />
+                                                            </button>
+                                                            <button onClick={() => handleEdit(room)} className="btn-icon size-7" title="Edit Room">
+                                                                <Edit2 className="size-3 text-slate-600" />
+                                                            </button>
+                                                            <button onClick={() => handleDelete(room.id)} className="btn-icon-danger size-7" title="Delete Room">
+                                                                <Trash2 className="size-3 text-rose-500" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5">
                             {filteredRooms.map(room => {
                                 const roomType = availableRoomTypes.find(t => String(t.id) === room.roomTypeId);
                                 const floor = availableFloors.find(f => String(f.id) === room.floorId);
@@ -577,14 +748,14 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                     <div key={room.id} className="card-container p-3 hover:shadow-xs transition relative flex flex-col justify-between group">
                                         <div>
                                             <div className="flex justify-between items-start mb-1.5">
-                                                <div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <h3 className="text-base text-slate-900 tracking-tight font-mono font-bold">{room.number}</h3>
-                                                        <span className={`px-1.5 py-0.5 rounded-md text-[9.5px] border ${getStatusColor(room.status)}`}>
+                                                <div className="min-w-0 pr-2">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <h3 className="text-base text-slate-900 tracking-tight font-mono font-bold truncate">{room.number}</h3>
+                                                        <span className={`px-1.5 py-0.5 rounded-md text-[9.5px] border shrink-0 ${getStatusColor(room.status)}`}>
                                                             {room.status}
                                                         </span>
                                                     </div>
-                                                    <p className="text-[11px] text-primary font-semibold mt-0.5">{roomType?.name || 'Standard'}</p>
+                                                    <p className="text-[11px] text-primary font-semibold mt-0.5 truncate">{roomType?.name || 'Standard'}</p>
                                                     {activeBlock && (
                                                         <div className="mt-1">
                                                             <span
@@ -596,13 +767,13 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                                 title={`Active ${activeBlock.blockType}: ${activeBlock.startDate} to ${activeBlock.endDate} (${activeBlock.reasonCategory})`}
                                                             >
                                                                 <Wrench className="size-2.5 text-rose-600" />
-                                                                {activeBlock.blockType}: {activeBlock.reasonCategory} ({activeBlock.endDate.slice(5)})
+                                                                {activeBlock.blockType}: {activeBlock.reasonCategory}
                                                             </span>
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                <div className="flex gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
+                                                <div className="flex gap-1 shrink-0">
                                                     <button
                                                         onClick={() => {
                                                             setSelectedOOORoom(room.number);
@@ -625,11 +796,11 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                             <div className="space-y-1 my-2 text-xs text-slate-600 bg-slate-50/80 p-2 rounded-lg border border-slate-200/80">
                                                 <div className="flex items-center justify-between text-[10px]">
                                                     <span className="text-slate-400">Location:</span>
-                                                    <span className="font-semibold text-slate-800">{floor?.name.split(' (')[0] || `Floor ${room.floorId}`}</span>
+                                                    <span className="font-semibold text-slate-800 truncate">{floor?.name.split(' (')[0] || `Floor ${room.floorId}`}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[10px]">
                                                     <span className="text-slate-400">Lock RFID:</span>
-                                                    <span className="font-mono text-slate-700">{room.lockId || `KEY-${room.number}`}</span>
+                                                    <span className="font-mono text-slate-700 truncate">{room.lockId || `KEY-${room.number}`}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[10px]">
                                                     <span className="text-slate-400">Phone Ext:</span>
@@ -639,10 +810,10 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                         </div>
 
                                         <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-[10px] gap-1 flex-wrap">
-                                            <span className={`px-2 py-0.5 rounded-full ${getHousekeepingBadge(room.housekeepingStatus)}`}>
+                                            <span className={`px-2 py-0.5 rounded-full shrink-0 ${getHousekeepingBadge(room.housekeepingStatus)}`}>
                                                 HK: {room.housekeepingStatus}
                                             </span>
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 flex-wrap">
                                                 {room.smokingStatus === 'Smoking' ? (
                                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shadow-2xs" title="Smoking Permitted in Room">
                                                         <Cigarette size={9} /> Smoking
@@ -657,7 +828,7 @@ export default function RoomManagement({ onBack, propertyId }: { onBack: () => v
                                                     </span>
                                                 )}
                                                 {room.isConnecting && (
-                                                    <span className="text-primary bg-primary-subtle px-2 py-0.5 rounded-md text-[10px] border border-primary-border/40">
+                                                    <span className="text-primary bg-primary-subtle px-1.5 py-0.5 rounded text-[9px] border border-primary-border/40">
                                                         Conn {room.connectedTo ? `(${room.connectedTo})` : ''}
                                                     </span>
                                                 )}

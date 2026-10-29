@@ -77,16 +77,40 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
     }
 });
 
-// PUT /api/rooms/:roomNo/details - Update room details
-router.put('/:roomNo/details', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
+// PUT /api/rooms/:roomNo/details and PUT /api/rooms/:roomNo - Update room details and settings
+const handleUpdateRoom = async (req: Request, res: Response) => {
     try {
-        const roomNo = String(req.params.roomNo || '');
+        const identifier = String(req.params.roomNo || req.params.id || '');
         const propertyId = getReqPropertyId(req);
         if (!propertyId) {
             return res.status(400).json({ success: false, error: 'Property ID is required' });
         }
+
+        const isNumeric = !isNaN(Number(identifier)) && Number(identifier) > 0;
+        const targetRoom = await db.prepare(`
+            SELECT id, room_number FROM rooms 
+            WHERE property_id = ? AND (id = ? OR room_number = ?)
+            LIMIT 1
+        `).get(propertyId, isNumeric ? Number(identifier) : -1, identifier) as any;
+
+        if (!targetRoom) {
+            return res.status(404).json({ success: false, error: `Room '${identifier}' not found in property inventory` });
+        }
+
         const body = req.body || {};
-        const name = body.name || null;
+        const newRoomNumber = (body.number || body.roomNumber || targetRoom.room_number).trim();
+
+        // If room number changed, verify it doesn't collide with another room in this property
+        if (newRoomNumber && newRoomNumber !== targetRoom.room_number) {
+            const conflict = await db.prepare(`
+                SELECT id FROM rooms WHERE property_id = ? AND room_number = ? AND id != ? LIMIT 1
+            `).get(propertyId, newRoomNumber, targetRoom.id) as any;
+            if (conflict) {
+                return res.status(400).json({ success: false, error: `Room number '${newRoomNumber}' already exists in this property.` });
+            }
+        }
+
+        const name = body.name !== undefined ? (body.name || null) : null;
         const buildingId = body.buildingId ? Number(body.buildingId) : null;
         const floorId = body.floorId ? Number(body.floorId) : null;
         const roomTypeId = body.roomTypeId ? Number(body.roomTypeId) : null;
@@ -99,7 +123,8 @@ router.put('/:roomNo/details', requirePermission('frontdesk.access'), async (req
 
         await db.prepare(`
             UPDATE rooms
-            SET name = COALESCE(?, name),
+            SET room_number = COALESCE(?, room_number),
+                name = COALESCE(?, name),
                 building_id = COALESCE(?, building_id),
                 floor_id = COALESCE(?, floor_id),
                 room_type_id = COALESCE(?, room_type_id),
@@ -113,8 +138,9 @@ router.put('/:roomNo/details', requirePermission('frontdesk.access'), async (req
                 smoking_status = COALESCE(?, smoking_status),
                 near_elevator = COALESCE(?, near_elevator),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE property_id = ? AND room_number = ?
+            WHERE id = ?
         `).run(
+            newRoomNumber || null,
             name,
             buildingId,
             floorId,
@@ -128,28 +154,72 @@ router.put('/:roomNo/details', requirePermission('frontdesk.access'), async (req
             body.connectedTo || body.connected_to || null,
             body.smokingStatus || body.smoking_status || null,
             body.nearElevator !== undefined ? Boolean(body.nearElevator) : null,
-            propertyId,
-            roomNo
+            targetRoom.id
         );
 
-        res.json({ success: true, message: `Room ${roomNo} updated successfully` });
+        const updatedRoom = await db.prepare('SELECT * FROM rooms WHERE id = ?').get(targetRoom.id);
+
+        res.json({ success: true, message: `Room ${newRoomNumber} updated successfully`, data: updatedRoom });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to update room' });
     }
-});
+};
+
+router.put('/:roomNo/details', requirePermission('frontdesk.access'), handleUpdateRoom);
+router.put('/:roomNo', requirePermission('frontdesk.access'), handleUpdateRoom);
 
 // DELETE /api/rooms/:roomNo - Delete a room from inventory
 router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
-        const roomNo = String(req.params.roomNo || '');
+        const identifier = String(req.params.roomNo || '');
         const propertyId = getReqPropertyId(req);
         if (!propertyId) {
             return res.status(400).json({ success: false, error: 'Property ID is required' });
         }
-        const info = await db.prepare('DELETE FROM rooms WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo);
+
+        const isNumeric = !isNaN(Number(identifier)) && Number(identifier) > 0;
+        const targetRoom = await db.prepare(`
+            SELECT id, room_number FROM rooms 
+            WHERE property_id = ? AND (id = ? OR room_number = ?)
+            LIMIT 1
+        `).get(propertyId, isNumeric ? Number(identifier) : -1, identifier) as any;
+
+        if (!targetRoom) {
+            return res.status(404).json({ success: false, error: `Room '${identifier}' not found in inventory` });
+        }
+
+        const roomId = targetRoom.id;
+        const roomNo = targetRoom.room_number;
+
+        // Check if there are active in-house reservations
+        const activeStays = await db.prepare(`
+            SELECT r.id, r.reservation_number 
+            FROM reservation_rooms rr
+            JOIN reservations r ON r.id = rr.reservation_id
+            WHERE rr.room_id = ? AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
+            LIMIT 1
+        `).get(roomId) as any;
+
+        if (activeStays) {
+            return res.status(400).json({
+                success: false,
+                error: `Cannot delete Room ${roomNo}: Guest is currently In-House (Reservation #${activeStays.reservation_number}). Please checkout or move guest before deleting.`
+            });
+        }
+
+        // Clean up dependent child records to prevent FK constraints from blocking deletion
+        await db.prepare('DELETE FROM keycard_logs WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo).catch(() => {});
+        await db.prepare('DELETE FROM room_maintenance_blocks WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo).catch(() => {});
+        await db.prepare('DELETE FROM housekeeping_tasks WHERE room_id = ?').run(roomId).catch(() => {});
+        await db.prepare('DELETE FROM room_amenities WHERE room_id = ?').run(roomId).catch(() => {});
+        await db.prepare('DELETE FROM reservation_rooms WHERE room_id = ?').run(roomId).catch(() => {});
+
+        // Delete room
+        const info = await db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
         if (info.rowCount === 0) {
             return res.status(404).json({ success: false, error: `Room ${roomNo} not found` });
         }
+
         res.json({ success: true, message: `Room ${roomNo} removed from inventory` });
     } catch (e: any) {
         res.status(400).json({ success: false, error: e?.message || 'Failed to delete room' });
