@@ -574,11 +574,13 @@ export const bookingService = {
           await client.query('UPDATE guests SET email = COALESCE(email, $1) WHERE id = $2', [cleanEmail, guestId]).catch(() => {});
         }
       } else {
+        const orgRes = await client.query('SELECT organization_id FROM properties WHERE id = $1 LIMIT 1', [propId]);
+        const orgId = orgRes.rows[0]?.organization_id || 1;
         const gIns = await client.query(`
           INSERT INTO guests (organization_id, salutation, first_name, last_name, email, phone, vip_status)
-          VALUES (1, $1, $2, $3, $4, $5, $6)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING id
-        `, [salutation, firstName, lastName, email, phone, vipStatus === 'None' ? 'NONE' : vipStatus]);
+        `, [orgId, salutation, firstName, lastName, email, phone, vipStatus === 'None' ? 'NONE' : vipStatus]);
         guestId = gIns.rows[0].id;
       }
 
@@ -636,8 +638,7 @@ export const bookingService = {
         if (roomLookup.rows.length > 0) {
           roomId = roomLookup.rows[0].id;
         } else {
-          const fallbackRoom = await client.query('SELECT id FROM rooms WHERE property_id = $1 LIMIT 1', [propId]);
-          roomId = fallbackRoom.rows[0]?.id || 1;
+          throw new Error(`Room '${roomNum}' does not exist in property #${propId}. Please configure or select an active room.`);
         }
 
         const roomIn = rm.checkIn || rm.checkInDate || checkIn;
@@ -745,91 +746,155 @@ export const bookingService = {
     if (!existing) return null;
 
     const resId = existing.id;
+    const client = await getPool().connect();
 
-    // 1. Update Guest Details if provided
-    if (payload.guestName || payload.phone || payload.email || payload.salutation || payload.vip) {
-      const rawName = (payload.guestName || existing.guestName).replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim();
-      const nameParts = rawName.split(' ');
-      const firstName = nameParts[0] || 'Valued';
-      const lastName = nameParts.slice(1).join(' ') || 'Guest';
-      const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr)\.?\s+/i)?.[1]) || 'Mr';
-      const phone = payload.phone || existing.phone;
-      const email = payload.email || existing.email;
-      const vip = payload.vip || existing.vip || 'NONE';
+    try {
+      await client.query('BEGIN');
 
-      await getPool().query(`
-        UPDATE guests
-        SET salutation = $1, first_name = $2, last_name = $3, email = $4, phone = $5, vip_status = $6, updated_at = CURRENT_TIMESTAMP
-        WHERE id = (SELECT booker_guest_id FROM reservations WHERE id = $7 LIMIT 1)
-      `, [salutation, firstName, lastName, email, phone, vip === 'None' ? 'NONE' : vip, resId]);
-    }
+      // 1. Update Guest Details if provided
+      if (payload.guestName || payload.phone || payload.email || payload.salutation || payload.vip) {
+        const rawName = (payload.guestName || existing.guestName).replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim();
+        const nameParts = rawName.split(' ');
+        const firstName = nameParts[0] || 'Valued';
+        const lastName = nameParts.slice(1).join(' ') || 'Guest';
+        const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr)\.?\s+/i)?.[1]) || 'Mr';
+        const phone = payload.phone || existing.phone;
+        const email = payload.email || existing.email;
+        const vip = payload.vip || existing.vip || 'NONE';
 
-    // 2. Update Reservation Master (Amounts, Status, Special Requests)
-    const newTotal = payload.totalAmount !== undefined ? Number(payload.totalAmount) : existing.totalAmount;
-    const newPaid = payload.paidAmount !== undefined ? Number(payload.paidAmount) : existing.paidAmount;
-    const newDue = payload.dueAmount !== undefined ? Number(payload.dueAmount) : Math.max(0, newTotal - newPaid);
-    const statusDb = payload.status ? (STATUS_UI_TO_DB[payload.status] || payload.status.toUpperCase()) : undefined;
+        await client.query(`
+          UPDATE guests
+          SET salutation = $1, first_name = $2, last_name = $3, email = $4, phone = $5, vip_status = $6, updated_at = CURRENT_TIMESTAMP
+          WHERE id = (SELECT booker_guest_id FROM reservations WHERE id = $7 LIMIT 1)
+        `, [salutation, firstName, lastName, email, phone, vip === 'None' ? 'NONE' : vip, resId]);
+      }
 
-    if (statusDb) {
-      await getPool().query(`
-        UPDATE reservations
-        SET total_amount = $1, paid_amount = $2, due_amount = $3, status = $4, special_requests = COALESCE($5, special_requests), updated_at = CURRENT_TIMESTAMP
-        WHERE id = $6
-      `, [newTotal, newPaid, newDue, statusDb, payload.specialRequests ?? null, resId]);
-    } else {
-      await getPool().query(`
-        UPDATE reservations
-        SET total_amount = $1, paid_amount = $2, due_amount = $3, special_requests = COALESCE($4, special_requests), updated_at = CURRENT_TIMESTAMP
-        WHERE id = $5
-      `, [newTotal, newPaid, newDue, payload.specialRequests ?? null, resId]);
-    }
+      // 2. Update Reservation Master (Amounts, Status, Special Requests)
+      const newTotal = payload.totalAmount !== undefined ? Number(payload.totalAmount) : existing.totalAmount;
+      const newPaid = payload.paidAmount !== undefined ? Number(payload.paidAmount) : existing.paidAmount;
+      const newDue = payload.dueAmount !== undefined ? Number(payload.dueAmount) : Math.max(0, newTotal - newPaid);
+      const statusDb = payload.status ? (STATUS_UI_TO_DB[payload.status] || payload.status.toUpperCase()) : undefined;
 
-    // Update Folio balance
-    await getPool().query(`
-      UPDATE folios
-      SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END
-      WHERE reservation_id = $2
-    `, [newDue, resId]);
+      if (statusDb) {
+        await client.query(`
+          UPDATE reservations
+          SET total_amount = $1, paid_amount = $2, due_amount = $3, status = $4, special_requests = COALESCE($5, special_requests), updated_at = CURRENT_TIMESTAMP
+          WHERE id = $6
+        `, [newTotal, newPaid, newDue, statusDb, payload.specialRequests ?? null, resId]);
+      } else {
+        await client.query(`
+          UPDATE reservations
+          SET total_amount = $1, paid_amount = $2, due_amount = $3, special_requests = COALESCE($4, special_requests), updated_at = CURRENT_TIMESTAMP
+          WHERE id = $5
+        `, [newTotal, newPaid, newDue, payload.specialRequests ?? null, resId]);
+      }
 
-    // 3. Update reservation_rooms (Dates, Nights, Room Assignment)
-    const newCheckIn = payload.checkIn || payload.arrivalDate || existing.checkIn;
-    const newCheckOut = payload.checkOut || payload.departureDate || existing.checkOut;
-    const newNights = Number(payload.nights) || Math.max(1, Math.round((new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime()) / (1000 * 3600 * 24)));
+      // Update Folio balance
+      await client.query(`
+        UPDATE folios
+        SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END
+        WHERE reservation_id = $2
+      `, [newDue, resId]);
 
-    if (payload.roomsList && Array.isArray(payload.roomsList) && payload.roomsList.length > 0) {
-      for (const r of payload.roomsList) {
-        const rNum = r.roomNumber || r.roomNo;
-        const rIn = r.checkInDate || r.checkIn || newCheckIn;
-        const rOut = r.checkOutDate || r.checkOut || newCheckOut;
-        const rNights = Number(r.nights) || newNights;
-        const rRate = Number(r.rate) || 0;
+      // 3. Update reservation_rooms (Dates, Nights, Room Assignment) with Concurrency Overlap Check
+      const newCheckIn = payload.checkIn || payload.arrivalDate || existing.checkIn;
+      const newCheckOut = payload.checkOut || payload.departureDate || existing.checkOut;
+      const newNights = Number(payload.nights) || Math.max(1, Math.round((new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime()) / (1000 * 3600 * 24)));
 
-        const roomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(rNum)]);
+      if (payload.roomsList && Array.isArray(payload.roomsList) && payload.roomsList.length > 0) {
+        for (const r of payload.roomsList) {
+          const rNum = r.roomNumber || r.roomNo;
+          const rIn = r.checkInDate || r.checkIn || newCheckIn;
+          const rOut = r.checkOutDate || r.checkOut || newCheckOut;
+          const rNights = Number(r.nights) || newNights;
+          const rRate = Number(r.rate) || 0;
+
+          const roomRes = await client.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(rNum)]);
+          if (roomRes.rows.length > 0) {
+            const physId = roomRes.rows[0].id;
+
+            // Overlap conflict check on target room
+            const conflictCheck = await client.query(`
+              SELECT r.room_number, rr.check_in_date, rr.check_out_date, res.reservation_number, g.first_name, g.last_name
+              FROM reservation_rooms rr
+              JOIN rooms r ON r.id = rr.room_id
+              JOIN reservations res ON res.id = rr.reservation_id
+              LEFT JOIN guests g ON g.id = res.booker_guest_id
+              WHERE r.property_id = $1
+                AND r.id = $2
+                AND res.id != $3
+                AND res.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
+                AND rr.check_in_date < $5
+                AND rr.check_out_date > $4
+              FOR UPDATE
+            `, [propId, physId, resId, rIn, rOut]);
+
+            if (conflictCheck.rows.length > 0) {
+              const c = conflictCheck.rows[0];
+              throw new Error(`Room ${rNum} is already booked by ${c.first_name || ''} ${c.last_name || ''} (${c.reservation_number}) from ${String(c.check_in_date).slice(0, 10)} to ${String(c.check_out_date).slice(0, 10)}!`);
+            }
+
+            if (r.id) {
+              await client.query(`
+                UPDATE reservation_rooms
+                SET room_id = $1, check_in_date = $2, check_out_date = $3, nights = $4, room_rate = CASE WHEN $5 > 0 THEN $5 ELSE room_rate END
+                WHERE reservation_id = $6 AND id = $7
+              `, [physId, rIn, rOut, rNights, rRate, resId, r.id]);
+            } else {
+              await client.query(`
+                UPDATE reservation_rooms
+                SET room_id = $1, check_in_date = $2, check_out_date = $3, nights = $4, room_rate = CASE WHEN $5 > 0 THEN $5 ELSE room_rate END
+                WHERE reservation_id = $6
+              `, [physId, rIn, rOut, rNights, rRate, resId]);
+            }
+          }
+        }
+      } else {
+        const targetRoomNum = payload.roomNumber || payload.roomNo || existing.roomNumber;
+        const roomRes = await client.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(targetRoomNum)]);
         if (roomRes.rows.length > 0) {
           const physId = roomRes.rows[0].id;
-          await getPool().query(`
+
+          const conflictCheck = await client.query(`
+            SELECT r.room_number, rr.check_in_date, rr.check_out_date, res.reservation_number, g.first_name, g.last_name
+            FROM reservation_rooms rr
+            JOIN rooms r ON r.id = rr.room_id
+            JOIN reservations res ON res.id = rr.reservation_id
+            LEFT JOIN guests g ON g.id = res.booker_guest_id
+            WHERE r.property_id = $1
+              AND r.id = $2
+              AND res.id != $3
+              AND res.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
+              AND rr.check_in_date < $5
+              AND rr.check_out_date > $4
+            FOR UPDATE
+          `, [propId, physId, resId, newCheckIn, newCheckOut]);
+
+          if (conflictCheck.rows.length > 0) {
+            const c = conflictCheck.rows[0];
+            throw new Error(`Room ${targetRoomNum} is already booked by ${c.first_name || ''} ${c.last_name || ''} (${c.reservation_number}) from ${String(c.check_in_date).slice(0, 10)} to ${String(c.check_out_date).slice(0, 10)}!`);
+          }
+
+          await client.query(`
             UPDATE reservation_rooms
-            SET room_id = $1, check_in_date = $2, check_out_date = $3, nights = $4, room_rate = CASE WHEN $5 > 0 THEN $5 ELSE room_rate END
-            WHERE reservation_id = $6 AND (room_id = $1 OR id = $7)
-          `, [physId, rIn, rOut, rNights, rRate, resId, r.id || 0]);
+            SET room_id = $1, check_in_date = $2, check_out_date = $3, nights = $4
+            WHERE reservation_id = $5
+          `, [physId, newCheckIn, newCheckOut, newNights, resId]);
+        } else {
+          await client.query(`
+            UPDATE reservation_rooms
+            SET check_in_date = $1, check_out_date = $2, nights = $3
+            WHERE reservation_id = $4
+          `, [newCheckIn, newCheckOut, newNights, resId]);
         }
       }
-    } else {
-      const targetRoomNum = payload.roomNumber || payload.roomNo || existing.roomNumber;
-      const roomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(targetRoomNum)]);
-      if (roomRes.rows.length > 0) {
-        await getPool().query(`
-          UPDATE reservation_rooms
-          SET room_id = $1, check_in_date = $2, check_out_date = $3, nights = $4
-          WHERE reservation_id = $5
-        `, [roomRes.rows[0].id, newCheckIn, newCheckOut, newNights, resId]);
-      } else {
-        await getPool().query(`
-          UPDATE reservation_rooms
-          SET check_in_date = $1, check_out_date = $2, nights = $3
-          WHERE reservation_id = $4
-        `, [newCheckIn, newCheckOut, newNights, resId]);
-      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     return bookingService.getBookingById(resId, propId);
@@ -1015,32 +1080,52 @@ export const bookingService = {
     const newPaid = Number(existing.paidAmount || 0) + amount;
     const newDue = Math.max(0, Number(existing.totalAmount || 0) - newPaid);
 
-    await getPool().query(`
-      UPDATE reservations
-      SET paid_amount = $1, due_amount = $2, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3
-    `, [newPaid, newDue, resId]);
-
-    // Update Folio balance
-    await getPool().query(`
-      UPDATE folios
-      SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END
-      WHERE reservation_id = $2
-    `, [newDue, resId]);
-
-    // Record Payment
-    const folioRes = await getPool().query('SELECT id FROM folios WHERE reservation_id = $1 LIMIT 1', [resId]);
-    const folioId = folioRes.rows[0]?.id || 1;
-    const paymentMethod = (payload.paymentMethod || 'CASH').toUpperCase();
-    const paymentNumber = `PAY-${Date.now()}`;
-
+    const client = await getPool().connect();
     try {
-      await getPool().query(`
+      await client.query('BEGIN');
+
+      await client.query(`
+        UPDATE reservations
+        SET paid_amount = $1, due_amount = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+      `, [newPaid, newDue, resId]);
+
+      // Resolve or dynamically create folio
+      let folioId: number;
+      const folioRes = await client.query('SELECT id FROM folios WHERE reservation_id = $1 LIMIT 1', [resId]);
+      if (folioRes.rows.length > 0) {
+        folioId = folioRes.rows[0].id;
+        await client.query(`
+          UPDATE folios
+          SET balance = $1, status = CASE WHEN $1 <= 0 THEN 'SETTLED' ELSE 'OPEN' END, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $2
+        `, [newDue, folioId]);
+      } else {
+        const guestRes = await client.query('SELECT booker_guest_id, folio_number FROM reservations WHERE id = $1', [resId]);
+        const gId = guestRes.rows[0]?.booker_guest_id || null;
+        const fNum = guestRes.rows[0]?.folio_number || `FOL-${existing.reservationNumber.replace(/^RES-/, '')}`;
+        const newFolio = await client.query(`
+          INSERT INTO folios (reservation_id, guest_id, folio_number, folio_type, status, balance)
+          VALUES ($1, $2, $3, 'GUEST', $4, $5)
+          RETURNING id
+        `, [resId, gId, fNum, newDue <= 0 ? 'SETTLED' : 'OPEN', newDue]);
+        folioId = newFolio.rows[0].id;
+      }
+
+      const paymentMethod = (payload.paymentMethod || 'CASH').toUpperCase();
+      const paymentNumber = `PAY-${Date.now()}`;
+
+      await client.query(`
         INSERT INTO payments (folio_id, property_id, payment_number, payment_method, amount, reference_code)
         VALUES ($1, $2, $3, $4, $5, $6)
       `, [folioId, propId, paymentNumber, paymentMethod, amount, payload.remarks || 'FRONT_DESK_PAYMENT']);
-    } catch (payErr) {
-      console.warn('Payment insert warning:', payErr);
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     return bookingService.getBookingById(resId, propId);
@@ -1075,24 +1160,72 @@ export const bookingService = {
     const nights1 = Math.max(1, Math.round((new Date(splitDate).getTime() - new Date(checkIn).getTime()) / 86400000));
     const nights2 = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(splitDate).getTime()) / 86400000));
 
-    // Update existing room stay to end at splitDate
-    await getPool().query(`
-      UPDATE reservation_rooms
-      SET check_out_date = $1, nights = $2
-      WHERE reservation_id = $3
-    `, [splitDate, nights1, resId]);
+    const targetRoomRes = await getPool().query(`
+      SELECT r.id, rt.base_rate 
+      FROM rooms r 
+      LEFT JOIN room_types rt ON rt.id = r.room_type_id 
+      WHERE r.property_id = $1 AND r.room_number = $2 
+      LIMIT 1
+    `, [propId, String(payload.targetRoomNumber)]);
 
-    // Insert second leg for targetRoomNumber
-    const targetRoomRes = await getPool().query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, String(payload.targetRoomNumber)]);
-    if (targetRoomRes.rows.length > 0) {
-      const guestRes = await getPool().query('SELECT booker_guest_id FROM reservations WHERE id = $1', [resId]);
-      await getPool().query(`
+    if (targetRoomRes.rows.length === 0) {
+      throw new Error(`Target room ${payload.targetRoomNumber} not found.`);
+    }
+
+    const targetRoomId = targetRoomRes.rows[0].id;
+
+    // Overlap conflict check on target room for second leg
+    const conflictCheck = await getPool().query(`
+      SELECT res.reservation_number, rr.check_in_date, rr.check_out_date
+      FROM reservation_rooms rr
+      JOIN reservations res ON res.id = rr.reservation_id
+      WHERE rr.room_id = $1
+        AND rr.reservation_id != $2
+        AND res.status NOT IN ('CANCELLED', 'VOIDED', 'COMPLETED')
+        AND rr.check_in_date < $4
+        AND rr.check_out_date > $3
+      LIMIT 1
+    `, [targetRoomId, resId, splitDate, checkOut]);
+
+    if (conflictCheck.rows.length > 0) {
+      const c = conflictCheck.rows[0];
+      throw new Error(`Room ${payload.targetRoomNumber} is already booked (${c.reservation_number}) from ${c.check_in_date} to ${c.check_out_date}!`);
+    }
+
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Update existing room stay to end at splitDate
+      await client.query(`
+        UPDATE reservation_rooms
+        SET check_out_date = $1, nights = $2
+        WHERE reservation_id = $3
+      `, [splitDate, nights1, resId]);
+
+      // Calculate dynamic proportional rate based on original booking rate
+      const nightlyRate = existing.nights > 0 
+        ? Number(existing.rateAmount || existing.totalAmount) / existing.nights 
+        : Number(targetRoomRes.rows[0]?.base_rate || 0);
+      const splitRate = Math.round(nightlyRate * nights2);
+
+      const guestRes = await client.query('SELECT booker_guest_id FROM reservations WHERE id = $1', [resId]);
+      const gId = guestRes.rows[0]?.booker_guest_id || null;
+
+      await client.query(`
         INSERT INTO reservation_rooms (
           reservation_id, room_id, guest_id, check_in_date, check_out_date, nights, room_rate, adults, children, status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1, 0, 'ASSIGNED')
-      `, [resId, targetRoomRes.rows[0].id, guestRes.rows[0]?.booker_guest_id || 1, splitDate, checkOut, nights2, 3000]);
+      `, [resId, targetRoomId, gId, splitDate, checkOut, nights2, splitRate]);
 
-      await getPool().query('UPDATE reservations SET is_group = true WHERE id = $1', [resId]);
+      await client.query('UPDATE reservations SET is_group = true WHERE id = $1', [resId]);
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     return bookingService.getBookingById(resId, propId);
@@ -1295,10 +1428,12 @@ export const bookingService = {
         try {
           const folioRow = await getPool().query('SELECT id FROM folios WHERE reservation_id = $1 LIMIT 1', [existing.id]);
           if (folioRow.rows.length === 0) {
+            const guestRes = await getPool().query('SELECT booker_guest_id FROM reservations WHERE id = $1', [existing.id]);
+            const gId = guestRes.rows[0]?.booker_guest_id || null;
             await getPool().query(`
               INSERT INTO folios (reservation_id, guest_id, folio_number, folio_type, status, balance)
-              VALUES ($1, 1, $2, 'GUEST', 'OPEN', $3)
-            `, [existing.id, autoFolioNum, existing.dueAmount || 0]);
+              VALUES ($1, $2, $3, 'GUEST', 'OPEN', $4)
+            `, [existing.id, gId, autoFolioNum, existing.dueAmount || 0]);
           }
         } catch (folErr) {
           console.warn('Folio auto-create check notice:', folErr);
@@ -1316,6 +1451,23 @@ export const bookingService = {
         SET status = $1
         WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $2 AND (id = $3 OR reservation_number = $4))
       `, [roomStayStatus, propId, numericId, String(id)]);
+
+      // Auto-set room to DIRTY on guest checkout (COMPLETED)
+      if (dbStatus === 'COMPLETED') {
+        try {
+          await getPool().query(`
+            UPDATE rooms
+            SET housekeeping_status = 'DIRTY', updated_at = CURRENT_TIMESTAMP
+            WHERE id IN (
+              SELECT room_id FROM reservation_rooms rr
+              JOIN reservations r ON r.id = rr.reservation_id
+              WHERE r.property_id = $1 AND (r.id = $2 OR r.reservation_number = $3)
+            )
+          `, [propId, numericId, String(id)]);
+        } catch (hkErr) {
+          console.warn('Housekeeping status update notice on checkout:', hkErr);
+        }
+      }
 
       if (dbStatus === 'CANCELLED' || dbStatus === 'VOIDED') {
         await getPool().query(`
@@ -1369,15 +1521,20 @@ export const bookingService = {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return false;
     try {
-      await getPool().query('DELETE FROM folio_charges');
-      await getPool().query('DELETE FROM payments');
-      await getPool().query('DELETE FROM folios');
-      await getPool().query('DELETE FROM reservation_rooms');
+      await getPool().query(`
+        DELETE FROM folio_charges 
+        WHERE folio_id IN (
+          SELECT f.id FROM folios f 
+          JOIN reservations r ON r.id = f.reservation_id 
+          WHERE r.property_id = $1
+        )
+      `, [propId]);
+      await getPool().query('DELETE FROM payments WHERE property_id = $1', [propId]);
+      await getPool().query('DELETE FROM folios WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1)', [propId]);
+      await getPool().query('DELETE FROM reservation_rooms WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1)', [propId]);
       await getPool().query('DELETE FROM reservations WHERE property_id = $1', [propId]);
-      await getPool().query('DELETE FROM daily_sequences');
       await getPool().query("UPDATE rooms SET status = 'ACTIVE', housekeeping_status = 'CLEAN', remarks = NULL WHERE property_id = $1", [propId]);
-      await getPool().query("UPDATE rooms SET room_type_id = 5 WHERE room_number IN ('105', '106', '205', '302', '405')");
-      console.log('✅ Successfully cleared reservations and reset inventory in PostgreSQL / TiDB');
+      console.log(`✅ Successfully cleared reservations and reset inventory for property #${propId} in PostgreSQL / TiDB`);
       return true;
     } catch (err: any) {
       console.warn('Postgres reset warning:', err.message);

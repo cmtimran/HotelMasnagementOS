@@ -49,7 +49,8 @@ import {
     generateGroupCode,
     generateSubBookingNumber,
     generateRegistrationNumber,
-    generateFolioNumber
+    generateFolioNumber,
+    getRoomSmokingPolicy
 } from '../../utils/roomInventoryEngine';
 import { getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
 import { getApiBaseUrl } from '../../utils/apiUrl';
@@ -1045,12 +1046,16 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                 ...rm,
                 subBookingNumber: subBookingNum,
                 registrationNumber: roomRegNo,
-                folioNumber: roomFolioNo
+                folioNumber: roomFolioNo,
+                smokingPolicy: getRoomSmokingPolicy(rm.roomNumber).smokingStatus,
+                smokingPolicyText: getRoomSmokingPolicy(rm.roomNumber).policyBadgeText,
+                smokingClause: getRoomSmokingPolicy(rm.roomNumber).guestFacingClause
             };
         });
 
         const mainRoom = roomsList[0] || { roomNumber: '101', roomType: 'Deluxe Double' };
         const primaryRoomNumber = allocatedRoomNumbers[0] || mainRoom.roomNumber;
+        const primarySmokingPolicy = getRoomSmokingPolicy(primaryRoomNumber);
 
         const newReservation = {
             id: reservationId,
@@ -1066,6 +1071,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             email: email || 'guest@hospitality.com',
             roomNumber: primaryRoomNumber,
             roomType: mainRoom.roomType,
+            smokingPolicy: primarySmokingPolicy.smokingStatus,
+            smokingPolicyText: primarySmokingPolicy.policyBadgeText,
+            smokingClause: primarySmokingPolicy.guestFacingClause,
             allocatedRooms: allocatedRoomNumbers,
             roomsCount: totalRoomsAllocatedInForm,
             checkIn,
@@ -1091,7 +1099,7 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
             agent: businessAgent,
             vip: vipStatus || 'None',
             purpose: purposeOfVisit,
-            specialRequests: remarksMap['Guest'] || '',
+            specialRequests: [remarksMap['Guest'] || '', primarySmokingPolicy.guestFacingClause ? `[Policy: ${primarySmokingPolicy.guestFacingClause}]` : ''].filter(Boolean).join(' | '),
             servicesBundle: mainRoom.servicesBundle || { extraBed: mainRoom.extraBed, pickup: mainRoom.pickup },
             extraBed: mainRoom.servicesBundle?.extraBed || mainRoom.extraBed || null,
             pickup: mainRoom.servicesBundle?.pickup || mainRoom.pickup || null,
@@ -1164,6 +1172,9 @@ export const AddReservationModal: React.FC<AddReservationModalProps> = ({
                     checkInDate: checkIn,
                     checkOutDate: checkOut,
                     roomType: mainRoom.roomType,
+            smokingPolicy: primarySmokingPolicy.smokingStatus,
+            smokingPolicyText: primarySmokingPolicy.policyBadgeText,
+            smokingClause: primarySmokingPolicy.guestFacingClause,
                     estimatedAmount: finalPayable
                 });
                 localStorage.setItem('hotel_holds_v2', JSON.stringify(holdsList));

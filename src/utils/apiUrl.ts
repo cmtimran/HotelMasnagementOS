@@ -106,6 +106,10 @@ if (typeof window !== 'undefined' && !(window as any).__hotelTenantFetchInstalle
         {}
       );
 
+      const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      if (authToken && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${authToken}`);
+      }
       if (tenantSlug && !headers.has('X-Tenant-Id')) {
         headers.set('X-Tenant-Id', tenantSlug);
       }

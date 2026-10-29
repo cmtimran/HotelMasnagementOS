@@ -73,7 +73,9 @@ export const roomService = {
       JOIN floors f ON f.id = r.floor_id
       JOIN room_types rt ON rt.id = r.room_type_id
       WHERE r.property_id = ?
-      ORDER BY f.floor_number ASC, CAST(r.room_number AS INTEGER) ASC, r.room_number ASC
+      ORDER BY f.floor_number ASC, 
+               CASE WHEN r.room_number ~ '^[0-9]+$' THEN CAST(r.room_number AS INTEGER) ELSE 99999 END ASC, 
+               r.room_number ASC
     `).all(propId, propId, propId) as any[];
 
     const result: RoomRecord[] = rows.map(row => {

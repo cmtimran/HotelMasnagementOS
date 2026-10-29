@@ -28,6 +28,28 @@ function getPostgresSchemaSql(): string {
     throw new Error('schema.postgres.sql file could not be located in source or distribution directories.');
 }
 
+function getMasterDbConfig() {
+    if (process.env.DATABASE_URL) {
+        try {
+            const parsed = new URL(process.env.DATABASE_URL);
+            return {
+                host: parsed.hostname,
+                port: parseInt(parsed.port || '5432', 10),
+                user: decodeURIComponent(parsed.username),
+                pass: decodeURIComponent(parsed.password),
+                database: parsed.pathname.replace(/^\//, '') || 'postgres'
+            };
+        } catch {}
+    }
+    return {
+        host: process.env.PGHOST || 'localhost',
+        port: parseInt(process.env.PGPORT || '5432', 10),
+        user: process.env.PGUSER || 'postgres',
+        pass: process.env.PGPASSWORD || '',
+        database: process.env.PGDATABASE || 'postgres'
+    };
+}
+
 interface CachedTenantPool {
     pool: Pool;
     lastAccessed: number;
@@ -248,11 +270,12 @@ export class TenantConnectionManager {
         }
 
         const tier = params.tier || 'STANDARD';
-        const masterHost = process.env.PGHOST || '2ee5ogtas24zphhs.gateway01.us-east-1.prod.aws.pg.tidbcloud.com';
-        const masterPort = parseInt(process.env.PGPORT || '5432', 10);
-        const masterUser = process.env.PGUSER || '2ee5ogtas24zphhs.postgres';
-        const masterPass = process.env.PGPASSWORD || 'eG15kbUDFmqKTqH6oig7B2dmh9ZruSCm';
-        const masterDbName = process.env.PGDATABASE || 'postgres';
+        const dbConfig = getMasterDbConfig();
+        const masterHost = dbConfig.host;
+        const masterPort = dbConfig.port;
+        const masterUser = dbConfig.user;
+        const masterPass = dbConfig.pass;
+        const masterDbName = dbConfig.database;
 
         // Physical inventory parameters
         const defaultRoomTypes = [
@@ -626,10 +649,11 @@ export class TenantConnectionManager {
             }
         }
 
-        const masterHost = process.env.PGHOST || '2ee5ogtas24zphhs.gateway01.us-east-1.prod.aws.pg.tidbcloud.com';
-        const masterPort = parseInt(process.env.PGPORT || '5432', 10);
-        const masterUser = process.env.PGUSER || '2ee5ogtas24zphhs.postgres';
-        const masterPass = process.env.PGPASSWORD || 'eG15kbUDFmqKTqH6oig7B2dmh9ZruSCm';
+        const dbConfig = getMasterDbConfig();
+        const masterHost = dbConfig.host;
+        const masterPort = dbConfig.port;
+        const masterUser = dbConfig.user;
+        const masterPass = dbConfig.pass;
 
         const newDbPool = new PoolClass({
             connectionString: `postgresql://${masterUser}:${encodeURIComponent(masterPass)}@${masterHost}:${masterPort}/${dbName}?sslmode=require`,

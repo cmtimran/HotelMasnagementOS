@@ -3,7 +3,10 @@ import pg from 'pg';
 const { Client } = pg;
 
 export async function seedCloudPostgres(connectionUrl?: string) {
-  const connectionString = connectionUrl || process.env.DATABASE_URL || 'postgresql://2ee5ogtas24zphhs.postgres:eG15kbUDFmqKTqH6oig7B2dmh9ZruSCm@2ee5ogtas24zphhs.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require';
+  const connectionString = connectionUrl || process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required.');
+  }
   
   const client = new Client({
     connectionString,

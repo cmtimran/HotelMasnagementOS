@@ -104,26 +104,6 @@ export async function ensureCentralSchema(pool: Pool): Promise<void> {
             );
         `);
 
-        // Seed Default Primary Tenant (Grand Palace Hotel HQ) if not exists
-        await client.query(`
-            INSERT INTO central_tenants (slug, name, db_name, db_host, db_port, db_user, db_pass, db_ssl, status, subscription_tier, admin_name, admin_email)
-            VALUES (
-                'grand-palace', 
-                'Grand Palace Hotel & Resort (HQ)', 
-                'postgres', 
-                '2ee5ogtas24zphhs.gateway01.us-east-1.prod.aws.pg.tidbcloud.com', 
-                5432, 
-                '2ee5ogtas24zphhs.postgres', 
-                'eG15kbUDFmqKTqH6oig7B2dmh9ZruSCm', 
-                TRUE, 
-                'ACTIVE', 
-                'ENTERPRISE',
-                'Alexander Vance',
-                'general.manager@grandpalace.com'
-            )
-            ON CONFLICT (slug) DO NOTHING;
-        `);
-
         // Seed Plugins Catalog
         const initialPlugins = [
             {

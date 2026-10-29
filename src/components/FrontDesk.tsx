@@ -35,6 +35,7 @@ import type {
     CustomAddonItem
 } from '../types/reservationServices';
 import { getRoomBundleTotal } from '../types/reservationServices';
+import { getActivePropertyId } from '../utils/apiUrl';
 import PageHeader from './common/PageHeader';
 
 export interface FrontDeskGuestRecord {
@@ -200,16 +201,11 @@ export const FrontDesk: React.FC = () => {
     // Data State (synced with localStorage & database)
     const [reservations, setReservations] = useState<FrontDeskGuestRecord[]>(() => {
         try {
-            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
-            const stored = getAllStoredReservations(activePropertyId);
-            if (Array.isArray(stored) && stored.length > 0) {
-                return mapToFrontDeskRecords(stored);
-            }
-            const localV2 = localStorage.getItem('hotel_reservations_v2');
-            if (localV2 !== null) {
-                const parsed = JSON.parse(localV2);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return mapToFrontDeskRecords(parsed);
+            const activePropertyId = getActivePropertyId();
+            if (activePropertyId > 0) {
+                const stored = getAllStoredReservations(activePropertyId);
+                if (Array.isArray(stored) && stored.length > 0) {
+                    return mapToFrontDeskRecords(stored);
                 }
             }
         } catch (e) {
@@ -221,21 +217,26 @@ export const FrontDesk: React.FC = () => {
     // Sync with PostgreSQL Database on Mount and on Real-Time Events
     const fetchDB = React.useCallback(async () => {
         try {
-            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
-            const dbList = await syncReservationsFromDB(activePropertyId);
-            if (Array.isArray(dbList) && dbList.length > 0) {
-                setReservations(mapToFrontDeskRecords(dbList));
-            } else {
-                const fallback = getAllStoredReservations(activePropertyId);
-                if (fallback.length > 0) {
+            const activePropertyId = getActivePropertyId();
+            if (activePropertyId > 0) {
+                const dbList = await syncReservationsFromDB(activePropertyId);
+                if (Array.isArray(dbList) && dbList.length > 0) {
+                    setReservations(mapToFrontDeskRecords(dbList));
+                } else {
+                    const fallback = getAllStoredReservations(activePropertyId);
                     setReservations(mapToFrontDeskRecords(fallback));
                 }
+            } else {
+                setReservations([]);
             }
         } catch (err) {
             console.warn('FrontDesk DB sync fallback:', err);
-            const fallback = getAllStoredReservations();
-            if (fallback.length > 0) {
+            const activePropertyId = getActivePropertyId();
+            if (activePropertyId > 0) {
+                const fallback = getAllStoredReservations(activePropertyId);
                 setReservations(mapToFrontDeskRecords(fallback));
+            } else {
+                setReservations([]);
             }
         }
     }, []);
@@ -258,9 +259,10 @@ export const FrontDesk: React.FC = () => {
     const persistReservations = (updated: FrontDeskGuestRecord[], changedItem?: { id: string | number; status: string }) => {
         setReservations(updated);
         try {
-            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
-            saveStoredReservations(updated as any, activePropertyId);
-            localStorage.setItem('hotel_reservations_v2', JSON.stringify(updated));
+            const activePropertyId = getActivePropertyId();
+            if (activePropertyId > 0) {
+                saveStoredReservations(updated as any, activePropertyId);
+            }
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             // Trigger database update only for the specific reservation that changed
             if (changedItem?.id && changedItem?.status) {

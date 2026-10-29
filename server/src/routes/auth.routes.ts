@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { pgPool } from '../database/postgres.js';
+import { signJwt } from '../utils/jwt.js';
 
 const router = Router();
 
@@ -36,15 +37,27 @@ router.post('/login', async (req: Request, res: Response) => {
             }
 
             const incomingHash = hashPassword(password);
-            const isValid = (incomingHash === user.password_hash) || (password === 'admin' && user.role === 'super_admin');
+            const isValid = (incomingHash === user.password_hash);
 
             if (!isValid) {
                 return res.status(401).json({ success: false, error: 'Invalid email or password' });
             }
 
-            // Return user details
+            // Issue cryptographic HS256 JWT
+            const token = signJwt({
+                sub: user.id,
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                organizationId: user.organization_id,
+                propertyId: user.property_id
+            });
+
+            // Return user details and authentication token
             res.json({
                 success: true,
+                token,
                 user: {
                     id: user.id,
                     organizationId: user.organization_id,
