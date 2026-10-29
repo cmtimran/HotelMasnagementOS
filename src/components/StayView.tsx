@@ -521,12 +521,11 @@ export const StayView: React.FC = () => {
                 // Position carousel so that 3 days before today are visible if available, or start at index 0
                 setModalDateStartIndex(Math.max(0, Math.min(days.length - 7, foundIdx - 3)));
             } else {
-                setStartDate(calculateStayViewStartDate(appDate));
-                setSelectedModalDateIndex(3);
+                setSelectedModalDateIndex(0);
                 setModalDateStartIndex(0);
             }
         }
-    }, [isAssignRoomsOpen, operatingDateStr, days]);
+    }, [isAssignRoomsOpen]);
 
     // =========================================================================
     // DYNAMIC TIMELINE GRID RESPONSIVENESS (15 DAYS FIT ON SCREEN WITHOUT SCROLL)
@@ -933,25 +932,29 @@ export const StayView: React.FC = () => {
         setBookings(syncedList);
     }, [days]);
 
+    // Keep ref to latest syncStoredReservations to avoid re-triggering subscriptions on date change
+    const syncStoredReservationsRef = useRef(syncStoredReservations);
+    syncStoredReservationsRef.current = syncStoredReservations;
+
+    // Automatically re-calculate booking bars whenever timeline days change
+    useEffect(() => {
+        syncStoredReservations();
+    }, [syncStoredReservations]);
+
     // Subscribe to cross-tab PMS real-time synchronization events
     useEffect(() => {
-        // Anchor to Application PMS Operating Date
-        const appDate = getOperatingSystemDate();
-        setOperatingDateStr(appDate);
-        setStartDate(calculateStayViewStartDate(appDate));
-
         // Refresh unassigned bookings dynamically from central PMS store
         setUnassignedList(deriveUnassignedFromStored(getAllStoredReservations()));
 
         // Sync initially on mount from local cache and live DB (PostgreSQL)
-        syncStoredReservations();
+        syncStoredReservationsRef.current();
         Promise.all([
             syncRoomTypesAndRoomsFromDB(),
             syncReservationsFromDB(),
             syncConnectingSuitesFromDB(activePropertyId)
         ]).then(() => {
             setRoomsVersion(v => v + 1);
-            syncStoredReservations();
+            syncStoredReservationsRef.current();
         });
 
         const unsubscribe = subscribeToPMSEvents((event) => {
@@ -965,7 +968,7 @@ export const StayView: React.FC = () => {
 
             if (event.type === 'RESERVATION_COMMITTED' || event.type === 'RESERVATION_UPDATED' || event.type === 'INVENTORY_REFRESH') {
                 setRoomsVersion(v => v + 1);
-                syncStoredReservations();
+                syncStoredReservationsRef.current();
             }
         });
 
@@ -996,7 +999,7 @@ export const StayView: React.FC = () => {
             window.removeEventListener('storage', handleStorage);
             clearInterval(timer);
         };
-    }, [syncStoredReservations, activePropertyId]);
+    }, [activePropertyId]);
 
     // O(1) Pre-calculated Bookings Lookup Map by Room Number
     const bookingsByRoom = useMemo(() => {
