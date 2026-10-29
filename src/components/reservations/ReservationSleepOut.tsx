@@ -22,39 +22,6 @@ export interface SleepOutItem {
     securityPassNo: string;
 }
 
-const INITIAL_SLEEPOUTS: SleepOutItem[] = [
-    { 
-        id: 1, 
-        reservationNumber: 'RES-892104', 
-        guestName: 'Zubair Ahmed', 
-        reason: 'Midnight executive board meeting in Chittagong, returning tomorrow morning.', 
-        roomType: 'Deluxe Double', 
-        roomNumber: '101', 
-        contact: '+880 1611-987654', 
-        startDate: '2026-07-01', 
-        endDate: '2026-07-02', 
-        expectedReturnTime: '09:00 AM', 
-        status: 'Sleeping Out',
-        keyCardLocation: 'Held at Front Desk',
-        securityPassNo: 'SO-2026-042'
-    },
-    { 
-        id: 2, 
-        reservationNumber: 'RES-892105', 
-        guestName: 'Mim Akter', 
-        reason: 'Emergency research consultation outside Dhaka division.', 
-        roomType: 'Executive Suite', 
-        roomNumber: '410', 
-        contact: '+880 1733-456789', 
-        startDate: '2026-06-30', 
-        endDate: '2026-07-01', 
-        expectedReturnTime: '12:00 PM', 
-        status: 'Sleeping Out',
-        keyCardLocation: 'With Guest',
-        securityPassNo: 'SO-2026-041'
-    }
-];
-
 export const ReservationSleepOut: React.FC = () => {
     const { setActivePage } = useNavigation();
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -68,23 +35,27 @@ export const ReservationSleepOut: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state
+    // Hydrate state - Zero Mock Fallback
     const [sleepOuts, setSleepOuts] = useState<SleepOutItem[]>(() => {
         try {
             const saved = localStorage.getItem('hotel_sleepouts_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const cleaned = parsed.filter((s: any) => !String(s.reservationNumber || '').startsWith('RES-8921'));
+                    if (cleaned.length > 0) return cleaned;
+                }
             }
         } catch (e) {
             console.error(e);
         }
-        return INITIAL_SLEEPOUTS;
+        return [];
     });
 
     useEffect(() => {
         try {
-            localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(sleepOuts));
+            const cleaned = sleepOuts.filter((s: any) => !String(s.reservationNumber || '').startsWith('RES-8921'));
+            localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(cleaned));
         } catch (e) {
             console.error(e);
         }
@@ -92,15 +63,15 @@ export const ReservationSleepOut: React.FC = () => {
 
     // Modal Form State
     const [form, setForm] = useState({
-        reservationNumber: 'RES-892101',
-        guestName: 'Mahmudul Hasan',
-        roomNumber: '102',
-        roomType: 'Deluxe Double',
-        contact: '+880 1711-234567',
+        reservationNumber: '',
+        guestName: '',
+        roomNumber: '',
+        roomType: '',
+        contact: '',
         startDate: '2026-07-01',
         endDate: '2026-07-02',
         expectedReturnTime: '10:00 AM',
-        reason: 'Out-of-town business trip. Room remains booked and billed.',
+        reason: '',
         keyCardLocation: 'Held at Front Desk' as const
     });
 

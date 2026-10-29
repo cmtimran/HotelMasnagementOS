@@ -829,10 +829,21 @@ export const setOperatingSystemDate = (newDateStr: string): void => {
     });
 };
 
-// Auto-purge any residual RES-202610290007 data from client browser localStorage
+// Auto-purge any residual RES-202610290007 and legacy mock data from client browser localStorage
 if (typeof window !== 'undefined' && window.localStorage) {
     try {
         const purgeResNo = 'RES-202610290007';
+        const isMockResNo = (no?: string) => {
+            const s = String(no || '');
+            return (
+                s === purgeResNo ||
+                s.includes('202610290007') ||
+                s.startsWith('RES-00929') ||
+                s.startsWith('RES-00918') ||
+                s.startsWith('RES-8921') ||
+                s.startsWith('HLD-2026-00')
+            );
+        };
 
         // 1. Purge from hotel_unassigned_v2
         const unassignedRaw = localStorage.getItem('hotel_unassigned_v2');
@@ -841,16 +852,51 @@ if (typeof window !== 'undefined' && window.localStorage) {
                 const parsed = JSON.parse(unassignedRaw);
                 if (Array.isArray(parsed)) {
                     const cleaned = parsed.filter((item: any) =>
-                        item?.reservationNumber !== purgeResNo &&
-                        String(item?.id || '') !== purgeResNo &&
-                        !String(item?.id || '').includes('202610290007')
+                        !isMockResNo(item?.reservationNumber) &&
+                        !isMockResNo(item?.id)
                     );
                     localStorage.setItem('hotel_unassigned_v2', JSON.stringify(cleaned));
                 }
             } catch {}
         }
 
-        // 2. Purge from all reservation storage collections
+        // 2. Purge from hotel_cancelled_v2
+        const cancelledRaw = localStorage.getItem('hotel_cancelled_v2');
+        if (cancelledRaw) {
+            try {
+                const parsed = JSON.parse(cancelledRaw);
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter((c: any) => !isMockResNo(c?.reservationNumber));
+                    localStorage.setItem('hotel_cancelled_v2', JSON.stringify(cleaned));
+                }
+            } catch {}
+        }
+
+        // 3. Purge from hotel_sleepouts_v2
+        const sleepoutsRaw = localStorage.getItem('hotel_sleepouts_v2');
+        if (sleepoutsRaw) {
+            try {
+                const parsed = JSON.parse(sleepoutsRaw);
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter((s: any) => !isMockResNo(s?.reservationNumber));
+                    localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(cleaned));
+                }
+            } catch {}
+        }
+
+        // 4. Purge from hotel_holds_v2
+        const holdsRaw = localStorage.getItem('hotel_holds_v2');
+        if (holdsRaw) {
+            try {
+                const parsed = JSON.parse(holdsRaw);
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter((h: any) => !isMockResNo(h?.reservationNumber));
+                    localStorage.setItem('hotel_holds_v2', JSON.stringify(cleaned));
+                }
+            } catch {}
+        }
+
+        // 5. Purge from all central reservation storage collections
         const storageKeys = [
             'hotel_reservations_v2',
             'hotel_reservations_v3',
@@ -866,9 +912,8 @@ if (typeof window !== 'undefined' && window.localStorage) {
                     const list = JSON.parse(raw);
                     if (Array.isArray(list)) {
                         const cleaned = list.filter((r: any) =>
-                            r?.reservationNumber !== purgeResNo &&
-                            String(r?.id || '') !== purgeResNo &&
-                            !String(r?.reservationNumber || '').includes('202610290007')
+                            !isMockResNo(r?.reservationNumber) &&
+                            !isMockResNo(r?.id)
                         );
                         localStorage.setItem(k, JSON.stringify(cleaned));
                     }
@@ -876,7 +921,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
             }
         }
 
-        // 3. Reset accidental October operating date to standard application date
+        // 6. Reset accidental October operating date to standard application date
         const sysIso = localStorage.getItem('hotel_system_date_iso');
         if (sysIso === '2026-10-29') {
             localStorage.setItem('hotel_system_date_iso', '2026-07-01');
@@ -1222,7 +1267,10 @@ export const getAllStoredReservations = (propertyId?: number): StoredReservation
                         r.reservationNumber !== 'RES-202610290007' &&
                         String(r.id) !== 'RES-202610290007' &&
                         !String(r.reservationNumber || '').includes('202610290007') &&
-                        !String(r.id || '').includes('202610290007')
+                        !String(r.id || '').includes('202610290007') &&
+                        !String(r.reservationNumber || '').startsWith('RES-00929') &&
+                        !String(r.reservationNumber || '').startsWith('RES-00918') &&
+                        !String(r.reservationNumber || '').startsWith('RES-8921')
                     );
                 }
             }

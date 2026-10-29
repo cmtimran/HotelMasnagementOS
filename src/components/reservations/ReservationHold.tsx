@@ -23,57 +23,6 @@ export interface HoldItem {
     depositRequiredBDT?: number;
 }
 
-const INITIAL_HOLDS: HoldItem[] = [
-    { 
-        id: 1, 
-        reservationNumber: 'HLD-2026-001', 
-        guestName: 'Brig. Gen. M. Haque', 
-        contact: '+880 1711-123456', 
-        status: 'Hold', 
-        holdStartDate: '2026-06-29', 
-        holdEndDate: '2026-07-02', 
-        reason: 'Awaiting official government defense delegation travel clearance letter.', 
-        reservationDate: '2026-06-29', 
-        checkInDate: '2026-07-10', 
-        checkOutDate: '2026-07-15', 
-        roomType: 'Executive Suite', 
-        estimatedAmount: 32500,
-        depositRequiredBDT: 10000
-    },
-    { 
-        id: 2, 
-        reservationNumber: 'HLD-2026-002', 
-        guestName: 'Beximco Pharma VIP Team', 
-        contact: '+880 1819-234567', 
-        status: 'Hold', 
-        holdStartDate: '2026-06-30', 
-        holdEndDate: '2026-07-01', 
-        reason: 'Corporate purchase order pending final regional finance director signature.', 
-        reservationDate: '2026-06-30', 
-        checkInDate: '2026-07-05', 
-        checkOutDate: '2026-07-08', 
-        roomType: 'Deluxe Double', 
-        estimatedAmount: 18000,
-        depositRequiredBDT: 6000
-    },
-    { 
-        id: 3, 
-        reservationNumber: 'HLD-2026-003', 
-        guestName: 'Mr. David Wilson (UK Embassy)', 
-        contact: '+44 7911-123456', 
-        status: 'Hold', 
-        holdStartDate: '2026-07-01', 
-        holdEndDate: '2026-07-03', 
-        reason: 'Connecting Emirates flight confirmation from Dubai pending arrival visa issue.', 
-        reservationDate: '2026-07-01', 
-        checkInDate: '2026-07-12', 
-        checkOutDate: '2026-07-16', 
-        roomType: 'Superior King', 
-        estimatedAmount: 18000,
-        depositRequiredBDT: 9000
-    }
-];
-
 export const ReservationHold: React.FC = () => {
     const { setActivePage } = useNavigation();
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -86,23 +35,27 @@ export const ReservationHold: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state
+    // Hydrate state - Zero Mock Fallback
     const [holds, setHolds] = useState<HoldItem[]>(() => {
         try {
             const saved = localStorage.getItem('hotel_holds_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const cleaned = parsed.filter((h: any) => !String(h.reservationNumber || '').startsWith('HLD-2026-00'));
+                    if (cleaned.length > 0) return cleaned;
+                }
             }
         } catch (e) {
             console.error(e);
         }
-        return INITIAL_HOLDS;
+        return [];
     });
 
     useEffect(() => {
         try {
-            localStorage.setItem('hotel_holds_v2', JSON.stringify(holds));
+            const cleaned = holds.filter((h: any) => !String(h.reservationNumber || '').startsWith('HLD-2026-00'));
+            localStorage.setItem('hotel_holds_v2', JSON.stringify(cleaned));
         } catch (e) {
             console.error(e);
         }

@@ -35,92 +35,6 @@ export interface CancelledItem {
     refundMethod: 'Original Payment' | 'City Ledger Credit' | 'Retained in GL-4501' | 'MFS bKash Refund';
 }
 
-const INITIAL_CANCELLED: CancelledItem[] = [
-    {
-        id: 1,
-        reservationNumber: 'RES-009180',
-        guestName: 'Kamrul Hasan',
-        phone: '+880 1712-345678',
-        email: 'kamrul.hasan@gmail.com',
-        roomType: 'Deluxe Double',
-        roomNumber: '204',
-        stayDates: '2026-06-25 → 2026-06-28',
-        checkIn: '2026-06-25',
-        checkOut: '2026-06-28',
-        nights: 3,
-        cancellationDate: '2026-06-24 14:30',
-        reason: 'Flight cancelled by airline due to adverse weather at DAC terminal.',
-        reasonCategory: 'Flight/Weather',
-        cancelledBy: 'FOM - Rafiqul Islam',
-        retentionFeeBDT: 0,
-        originalTotalBDT: 19500,
-        refundStatus: 'Full Refund Processed',
-        refundMethod: 'Original Payment'
-    },
-    {
-        id: 2,
-        reservationNumber: 'RES-009181',
-        guestName: 'Standard Chartered Corp Block',
-        phone: '+880 1819-998877',
-        email: 'travel@scb.com.bd',
-        roomType: 'Executive Suite',
-        roomNumber: '401',
-        stayDates: '2026-06-26 → 2026-06-29',
-        checkIn: '2026-06-26',
-        checkOut: '2026-06-29',
-        nights: 3,
-        cancellationDate: '2026-06-25 18:20',
-        reason: 'Executive quarterly strategy conference postponed by regional head office.',
-        reasonCategory: 'Corporate Postponement',
-        cancelledBy: 'Front Office Supervisor',
-        retentionFeeBDT: 7500,
-        originalTotalBDT: 36000,
-        refundStatus: 'Partial 50% Fee Applied',
-        refundMethod: 'City Ledger Credit'
-    },
-    {
-        id: 3,
-        reservationNumber: 'RES-009182',
-        guestName: 'Shahriar Kabir (Guaranteed No-Show)',
-        phone: '+880 1911-223344',
-        email: 'skabir@dhaka-tech.com',
-        roomType: 'Superior King',
-        roomNumber: '305',
-        stayDates: '2026-06-28 → 2026-06-30',
-        checkIn: '2026-06-28',
-        checkOut: '2026-06-30',
-        nights: 2,
-        cancellationDate: '2026-06-29 02:00',
-        reason: 'Guaranteed credit card booking failed to arrive by 02:00 AM audit cutoff.',
-        reasonCategory: 'No-Show Forfeiture',
-        cancelledBy: 'Night Auditor Pipeline',
-        retentionFeeBDT: 4500,
-        originalTotalBDT: 9000,
-        refundStatus: 'Non-Refundable Retained',
-        refundMethod: 'Retained in GL-4501'
-    },
-    {
-        id: 4,
-        reservationNumber: 'RES-009183',
-        guestName: 'Dr. Nusrat Jahan',
-        phone: '+880 1678-554433',
-        email: 'nusrat.jahan@squarehosp.com',
-        roomType: 'Deluxe Twin',
-        stayDates: '2026-06-30 → 2026-07-02',
-        checkIn: '2026-06-30',
-        checkOut: '2026-07-02',
-        nights: 2,
-        cancellationDate: '2026-06-28 11:15',
-        reason: 'Medical emergency surgery duty called at Dhaka hospital.',
-        reasonCategory: 'Guest Request',
-        cancelledBy: 'FOM - Rafiqul Islam',
-        retentionFeeBDT: 0,
-        originalTotalBDT: 13000,
-        refundStatus: 'Full Refund Processed',
-        refundMethod: 'MFS bKash Refund'
-    }
-];
-
 export const ReservationCancel: React.FC = () => {
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -133,40 +47,83 @@ export const ReservationCancel: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state with complete defensive mapping against legacy localStorage schemas
+    // Derive live cancellations from central database/store
+    const deriveLiveCancelled = (): CancelledItem[] => {
+        try {
+            const stored = getAllStoredReservations();
+            const list: CancelledItem[] = [];
+            stored.forEach((res: any, index: number) => {
+                const st = String(res?.status || '').toLowerCase();
+                if (st === 'cancelled' || st === 'voided') {
+                    list.push({
+                        id: Number(res?.id) || index + 1,
+                        reservationNumber: res?.reservationNumber || `RES-${res?.id}`,
+                        guestName: res?.guestName || res?.guest?.fullName || 'Valued Guest',
+                        phone: res?.phone || res?.guest?.phone || '',
+                        email: res?.email || res?.guest?.email || '',
+                        roomType: res?.roomType || 'Deluxe Room',
+                        roomNumber: res?.roomNumber,
+                        stayDates: `${res?.checkIn || '2026-07-01'} → ${res?.checkOut || '2026-07-02'}`,
+                        checkIn: res?.checkIn || '2026-07-01',
+                        checkOut: res?.checkOut || '2026-07-02',
+                        nights: Number(res?.nights) || 1,
+                        cancellationDate: res?.cancelledAt || res?.updatedAt || '2026-07-01 12:00',
+                        reason: res?.cancellationReason || 'Cancelled by guest request',
+                        reasonCategory: 'Guest Request',
+                        cancelledBy: res?.cancelledBy || 'Front Office Staff',
+                        retentionFeeBDT: Number(res?.retentionFee) || 0,
+                        originalTotalBDT: Number(res?.totalAmount) || 0,
+                        refundStatus: 'Full Refund Processed',
+                        refundMethod: 'Original Payment'
+                    });
+                }
+            });
+            return list;
+        } catch {
+            return [];
+        }
+    };
+
+    // Hydrate state from database and local storage - Zero Mock Fallback
     const [cancelledList, setCancelledList] = useState<CancelledItem[]>(() => {
+        const liveList = deriveLiveCancelled();
+        if (liveList.length > 0) return liveList;
+
         try {
             const saved = localStorage.getItem('hotel_cancelled_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed.map((c: any, index: number) => ({
-                        id: c.id || index + 1,
-                        reservationNumber: c.reservationNumber || `RES-00918${index}`,
-                        guestName: c.guestName || 'Valued Guest',
-                        phone: c.phone || '+880 1712-000000',
-                        email: c.email || 'guest@hospitality.com',
-                        roomType: c.roomType || 'Deluxe Room',
-                        roomNumber: c.roomNumber || undefined,
-                        stayDates: c.stayDates || '2026-06-25 → 2026-06-28',
-                        checkIn: c.checkIn || '2026-06-25',
-                        checkOut: c.checkOut || '2026-06-28',
-                        nights: typeof c.nights === 'number' ? c.nights : 2,
-                        cancellationDate: c.cancellationDate || '2026-06-24 14:30',
-                        reason: c.reason || 'Reservation cancelled by guest request.',
-                        reasonCategory: c.reasonCategory || 'Guest Request',
-                        cancelledBy: c.cancelledBy || 'Front Office Supervisor',
-                        retentionFeeBDT: typeof c.retentionFeeBDT === 'number' ? c.retentionFeeBDT : 0,
-                        originalTotalBDT: typeof c.originalTotalBDT === 'number' ? c.originalTotalBDT : ((typeof c.retentionFeeBDT === 'number' ? c.retentionFeeBDT : 0) + 12000),
-                        refundStatus: c.refundStatus || (c.retentionFeeBDT > 0 ? 'Partial 50% Fee Applied' : 'Full Refund Processed'),
-                        refundMethod: c.refundMethod || 'Original Payment'
-                    }));
+                    const cleaned = parsed
+                        .filter((c: any) => !String(c.reservationNumber || '').startsWith('RES-00918'))
+                        .map((c: any, index: number) => ({
+                            id: c.id || index + 1,
+                            reservationNumber: c.reservationNumber || `RES-${index}`,
+                            guestName: c.guestName || 'Valued Guest',
+                            phone: c.phone || '+880 1712-000000',
+                            email: c.email || 'guest@hospitality.com',
+                            roomType: c.roomType || 'Deluxe Room',
+                            roomNumber: c.roomNumber || undefined,
+                            stayDates: c.stayDates || '2026-07-01 → 2026-07-02',
+                            checkIn: c.checkIn || '2026-07-01',
+                            checkOut: c.checkOut || '2026-07-02',
+                            nights: typeof c.nights === 'number' ? c.nights : 1,
+                            cancellationDate: c.cancellationDate || '2026-07-01 12:00',
+                            reason: c.reason || 'Reservation cancelled by guest request.',
+                            reasonCategory: c.reasonCategory || 'Guest Request',
+                            cancelledBy: c.cancelledBy || 'Front Office Supervisor',
+                            retentionFeeBDT: typeof c.retentionFeeBDT === 'number' ? c.retentionFeeBDT : 0,
+                            originalTotalBDT: typeof c.originalTotalBDT === 'number' ? c.originalTotalBDT : 0,
+                            refundStatus: c.refundStatus || 'Full Refund Processed',
+                            refundMethod: c.refundMethod || 'Original Payment'
+                        }));
+                    if (cleaned.length > 0) return cleaned;
                 }
             }
         } catch (e) {
             console.error('Error hydrating hotel_cancelled_v2:', e);
         }
-        return INITIAL_CANCELLED;
+        return [];
     });
 
     useEffect(() => {

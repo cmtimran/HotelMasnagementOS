@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
 import PageHeader from '../common/PageHeader';
+import { getAllStoredReservations } from '../../utils/roomInventoryEngine';
 
 export interface UnassignedItem {
     id: string | number;
@@ -25,77 +26,6 @@ export interface UnassignedItem {
     assignedRoom?: string;
     specialRequests?: string;
 }
-
-const INITIAL_UNASSIGNED: UnassignedItem[] = [
-    { 
-        id: 'un-1', 
-        reservationNumber: 'RES-009290', 
-        guestName: 'Naimur Rahman', 
-        phone: '+880 1711-889900', 
-        roomType: 'Deluxe Double', 
-        checkIn: '2026-07-01', 
-        checkOut: '2026-07-04', 
-        nights: 3, 
-        adults: 2, 
-        children: 1, 
-        source: 'Booking.com', 
-        totalAmount: 9000, 
-        paidAmount: 9000,
-        vip: 'Gold VIP',
-        specialRequests: 'Quiet room on higher floor, extra pillows'
-    },
-    { 
-        id: 'un-2', 
-        reservationNumber: 'RES-009291', 
-        guestName: 'Tahmina Akter', 
-        phone: '+880 1819-776655', 
-        roomType: 'Superior King', 
-        checkIn: '2026-07-01', 
-        checkOut: '2026-07-03', 
-        nights: 2, 
-        adults: 2, 
-        children: 0, 
-        source: 'Agoda YCS', 
-        totalAmount: 9000, 
-        paidAmount: 9000,
-        vip: 'VIP',
-        specialRequests: 'Sea view preferred, anniversary celebration'
-    },
-    { 
-        id: 'un-3', 
-        reservationNumber: 'RES-009292', 
-        guestName: 'Standard Chartered Exec', 
-        phone: '+880 1912-334455', 
-        roomType: 'Executive Suite', 
-        checkIn: '2026-07-02', 
-        checkOut: '2026-07-05', 
-        nights: 3, 
-        adults: 1, 
-        children: 0, 
-        source: 'Corporate Account', 
-        totalAmount: 19500, 
-        paidAmount: 19500,
-        vip: 'Corporate Diamond',
-        specialRequests: 'Airport pickup arranged, early check-in requested'
-    },
-    { 
-        id: 'un-4', 
-        reservationNumber: 'RES-009293', 
-        guestName: 'Mahir Faisal', 
-        phone: '+880 1611-223344', 
-        roomType: 'Deluxe Double', 
-        checkIn: '2026-07-03', 
-        checkOut: '2026-07-05', 
-        nights: 2, 
-        adults: 2, 
-        children: 0, 
-        source: 'Direct Website', 
-        totalAmount: 6000, 
-        paidAmount: 3000,
-        vip: 'Regular',
-        specialRequests: 'Twin beds if available'
-    }
-];
 
 const AVAILABLE_CLEAN_ROOMS_MAP: Record<string, Array<{ number: string; floor: number; status: 'clean' | 'inspected'; bed: string }>> = {
     'Deluxe Double': [
@@ -142,40 +72,87 @@ export const ReservationUnassigned: React.FC = () => {
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state safely from localStorage
+    // Derive live unassigned reservations from database/central store
+    const deriveLiveUnassigned = (): UnassignedItem[] => {
+        try {
+            const stored = getAllStoredReservations();
+            const list: UnassignedItem[] = [];
+            stored.forEach((res: any) => {
+                const st = String(res?.status || '').toLowerCase();
+                if (st === 'cancelled' || st === 'checked out' || st === 'checked-out' || st === 'voided') return;
+                const rooms = Array.isArray(res?.rooms) ? res.rooms : Array.isArray(res?.roomsList) ? res.roomsList : [];
+                const flatRoomNo = res?.roomNumber ? String(res.roomNumber) : '';
+                const unassignedRooms = rooms.filter((rm: any) => {
+                    const rNo = rm?.roomNo || rm?.roomNumber || (Array.isArray(rm?.assignedRooms) ? rm.assignedRooms[0] : '');
+                    return !rNo || rNo === 'Unassigned' || rNo === 'TBA';
+                });
+                const isFlatUnassigned = !flatRoomNo || flatRoomNo === 'Unassigned' || flatRoomNo === 'TBA';
+                if (unassignedRooms.length > 0 || (rooms.length === 0 && isFlatUnassigned)) {
+                    const firstRm = unassignedRooms[0] || rooms[0] || {};
+                    list.push({
+                        id: res?.id || res?.reservationNumber,
+                        reservationNumber: res?.reservationNumber,
+                        guestName: res?.guestName || res?.guest?.fullName || 'Guest',
+                        phone: res?.phone || res?.guest?.phone || '',
+                        email: res?.email || res?.guest?.email || '',
+                        roomType: firstRm?.roomType || firstRm?.category || res?.roomType || 'Standard Room',
+                        checkIn: firstRm?.checkInDate || res?.checkIn || '2026-07-01',
+                        checkOut: firstRm?.checkOutDate || res?.checkOut || '2026-07-02',
+                        nights: Number(firstRm?.nights || res?.nights) || 1,
+                        adults: Number(res?.adults) || 1,
+                        children: Number(res?.children) || 0,
+                        source: res?.source || 'Direct',
+                        totalAmount: Number(res?.totalAmount) || 0,
+                        paidAmount: Number(res?.paidAmount) || 0,
+                        vip: res?.vip || 'Regular'
+                    });
+                }
+            });
+            return list;
+        } catch {
+            return [];
+        }
+    };
+
+    // Hydrate state safely from database and local storage - Zero Mock Fallback
     const [unassignedList, setUnassignedList] = useState<UnassignedItem[]>(() => {
         const purgeTarget = 'RES-202610290007';
-        const isNotPurged = (u: any) =>
+        const isNotPurgedOrMock = (u: any) =>
             u?.reservationNumber !== purgeTarget &&
             String(u?.id || '') !== purgeTarget &&
             !String(u?.id || '').includes('202610290007') &&
-            !String(u?.reservationNumber || '').includes('202610290007');
+            !String(u?.reservationNumber || '').includes('202610290007') &&
+            !String(u?.reservationNumber || '').startsWith('RES-00929');
+
+        const liveList = deriveLiveUnassigned().filter(isNotPurgedOrMock);
+        if (liveList.length > 0) return liveList;
 
         try {
             const saved = localStorage.getItem('hotel_unassigned_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    const cleaned = parsed.filter(isNotPurged);
+                    const cleaned = parsed.filter(isNotPurgedOrMock);
                     if (cleaned.length > 0) return cleaned;
                 }
             }
         } catch (e) {
             console.error('Failed to read unassigned bookings', e);
         }
-        return INITIAL_UNASSIGNED;
+        return [];
     });
 
     useEffect(() => {
         const purgeTarget = 'RES-202610290007';
-        const isNotPurged = (u: any) =>
+        const isNotPurgedOrMock = (u: any) =>
             u?.reservationNumber !== purgeTarget &&
             String(u?.id || '') !== purgeTarget &&
             !String(u?.id || '').includes('202610290007') &&
-            !String(u?.reservationNumber || '').includes('202610290007');
+            !String(u?.reservationNumber || '').includes('202610290007') &&
+            !String(u?.reservationNumber || '').startsWith('RES-00929');
 
         try {
-            const cleaned = unassignedList.filter(isNotPurged);
+            const cleaned = unassignedList.filter(isNotPurgedOrMock);
             localStorage.setItem('hotel_unassigned_v2', JSON.stringify(cleaned));
         } catch (e) {
             console.error('Failed to save unassigned bookings', e);
@@ -190,9 +167,9 @@ export const ReservationUnassigned: React.FC = () => {
                 u.reservationNumber !== purgeTarget &&
                 String(u.id || '') !== purgeTarget &&
                 !String(u.id || '').includes('202610290007') &&
-                !String(u.reservationNumber || '').includes('202610290007')
+                !String(u.reservationNumber || '').includes('202610290007') &&
+                !String(u.reservationNumber || '').startsWith('RES-00929')
             );
-            if (cleaned.length === 0) return INITIAL_UNASSIGNED;
             return cleaned;
         });
     }, []);
