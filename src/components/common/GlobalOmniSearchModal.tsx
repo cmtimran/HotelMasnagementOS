@@ -26,6 +26,7 @@ import {
     updateReservationStatusInDB,
     updateRoomHousekeepingInDB,
     syncReservationsFromDB,
+    isRoomUnassigned,
     type StoredReservation,
     type CanonicalRoom
 } from '../../utils/roomInventoryEngine';
@@ -99,6 +100,12 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
 
     const handleCheckIn = async (e: React.MouseEvent, res: StoredReservation) => {
         e.stopPropagation();
+        if (isRoomUnassigned(res.roomNumber, res.allocatedRooms)) {
+            toast.error(`Cannot check in guest "${res.guestName || 'Guest'}": Room is unassigned. Please assign a room first.`, {
+                title: 'Room Unassigned'
+            });
+            return;
+        }
         const resId = res.reservationNumber || res.id;
         const ok = await updateReservationStatusInDB(resId, 'in-house');
         if (ok) {
@@ -607,16 +614,32 @@ export const GlobalOmniSearchModal: React.FC<GlobalOmniSearchModalProps> = ({
                                                 </button>
 
                                                 {/* 2. Check-In Button (if confirmed or hold) */}
-                                                {isConfirmedOrHold && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => handleCheckIn(e, res)}
-                                                        className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
-                                                    >
-                                                        <Check size={12} className="stroke-[2.5]" />
-                                                        <span>Check In</span>
-                                                    </button>
-                                                )}
+                                                {isConfirmedOrHold && (() => {
+                                                    const unassigned = isRoomUnassigned(res.roomNumber, res.allocatedRooms);
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            disabled={unassigned}
+                                                            onClick={(e) => {
+                                                                if (unassigned) {
+                                                                    toast.error(`Cannot check in guest "${res.guestName || 'Guest'}": Room is unassigned. Please assign a room first.`);
+                                                                    return;
+                                                                }
+                                                                handleCheckIn(e, res);
+                                                            }}
+                                                            className={`px-2.5 py-1 text-xs font-bold rounded-lg border shadow-2xs flex items-center gap-1.5 transition ${
+                                                                unassigned
+                                                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
+                                                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 cursor-pointer'
+                                                            }`}
+                                                            title={unassigned ? 'Cannot check in: Room is unassigned. Assign a room first.' : 'Check In'}
+                                                        >
+                                                            <Check size={12} className="stroke-[2.5]" />
+                                                            <span>Check In</span>
+                                                            {unassigned && <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 ml-0.5 font-semibold">Unassigned</span>}
+                                                        </button>
+                                                    );
+                                                })()}
 
                                                 {/* 3. Check-Out Button (if in-house) */}
                                                 {isInHouse && (

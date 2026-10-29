@@ -44,7 +44,8 @@ import {
     linkBookingsInDB,
     unlinkBookingInDB,
     generateRegistrationNumber,
-    getConnectingPartnerMap
+    getConnectingPartnerMap,
+    isRoomUnassigned
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
 
@@ -437,6 +438,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     const isCurrentActiveConfirmed = activeStatus === 'CONFIRMED' || activeStatus === 'ARRIVING';
     const isCurrentActiveCheckedOut = activeStatus === 'CHECKED-OUT' || activeStatus === 'COMPLETED' || activeStatus === 'DEPARTED';
     const isCurrentActiveCancelled = activeStatus === 'CANCELLED' || activeStatus === 'VOID';
+    const isRoomUnassignedActive = isRoomUnassigned(activeRoom?.roomNumber || booking?.roomNumber, (booking as any)?.allocatedRooms);
     const activeRegNo = activeRoom.registrationNumber || (isCurrentActiveInHouse ? (booking.registrationNumber || generateRegistrationNumber(activeSubBookingNo)) : booking.registrationNumber);
     const activeGuestName = activeRoom.guestName || booking.guestName;
     const bookingAny = booking as any;
@@ -872,61 +874,8 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                         )}
                     </div>
 
-                    {/* Right: Top Action Buttons (Check In / Check Out + Edit + Dynamic Action Dropdown) */}
+                    {/* Right: Top Action Buttons (Edit + Dynamic Action Dropdown) */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {isCurrentActiveConfirmed && !booking?.isPast && onCheckIn && (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => onCheckIn(activeSubBookingNo || booking.reservationNumber)}
-                                    className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors"
-                                    title="Check In guest immediately"
-                                >
-                                    <DoorOpen size={10} />
-                                    <span>Check In</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    disabled={isIssuingKeycard}
-                                    onClick={async () => {
-                                        onCheckIn(activeSubBookingNo || booking.reservationNumber);
-                                        await handleIssueKeycard();
-                                    }}
-                                    className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-teal-600 hover:bg-teal-700 text-white cursor-pointer transition-colors"
-                                    title="Check In guest and encode RFID / Smart Lock room keycard"
-                                >
-                                    <Key size={10} />
-                                    <span>{isIssuingKeycard ? 'Encoding...' : 'Check In & Key'}</span>
-                                </button>
-                            </>
-                        )}
-
-                        {isCurrentActiveInHouse && !booking?.isPast && onCheckOut && (
-                            <button
-                                type="button"
-                                onClick={() => onCheckOut(activeSubBookingNo || booking.reservationNumber)}
-                                className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-amber-600 hover:bg-amber-700 text-white cursor-pointer transition-colors"
-                                title="Check Out guest"
-                            >
-                                <DoorClosed size={10} />
-                                <span>Check Out</span>
-                            </button>
-                        )}
-
-                        {isCurrentActiveInHouse && (
-                            <button
-                                type="button"
-                                disabled={isIssuingKeycard}
-                                onClick={handleIssueKeycard}
-                                className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer transition-colors"
-                                title="Issue & Encode RFID Keycard"
-                            >
-                                <Key size={10} />
-                                <span>{isIssuingKeycard ? 'Encoding...' : 'Keycard'}</span>
-                            </button>
-                        )}
-
                         <button
                             type="button"
                             disabled={Boolean(booking?.isPast)}
@@ -1596,12 +1545,24 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                             {isCurrentActiveConfirmed && !booking?.isPast && onCheckIn && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => onCheckIn(activeSubBookingNo || booking.reservationNumber)}
-                                                    className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
-                                                    title="Check In active room"
+                                                    disabled={isRoomUnassignedActive}
+                                                    onClick={() => {
+                                                        if (isRoomUnassignedActive) {
+                                                            toast.error('Cannot check in: Room is unassigned. Please assign a room first.');
+                                                            return;
+                                                        }
+                                                        onCheckIn(activeSubBookingNo || booking.reservationNumber);
+                                                    }}
+                                                    className={`h-8 px-3.5 rounded-md text-[9.5px] font-semibold flex items-center gap-1 transition-colors shadow-xs ${
+                                                        isRoomUnassignedActive
+                                                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
+                                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                                    }`}
+                                                    title={isRoomUnassignedActive ? 'Cannot check in: Room is unassigned. Assign a room first.' : 'Check In active room'}
                                                 >
                                                     <DoorOpen size={11} />
                                                     <span>Check In</span>
+                                                    {isRoomUnassignedActive && <span className="text-[8px] px-1 py-0.2 rounded bg-amber-100 text-amber-800">Unassigned</span>}
                                                 </button>
                                             )}
                                             {isCurrentActiveInHouse && !booking?.isPast && onCheckOut && (
@@ -1613,6 +1574,18 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                                                 >
                                                     <DoorClosed size={11} />
                                                     <span>Check Out</span>
+                                                </button>
+                                            )}
+                                            {isCurrentActiveInHouse && (
+                                                <button
+                                                    type="button"
+                                                    disabled={isIssuingKeycard}
+                                                    onClick={handleIssueKeycard}
+                                                    className="h-8 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-[9.5px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                                    title="Encode RFID Keycard"
+                                                >
+                                                    <Key size={11} />
+                                                    <span>{isIssuingKeycard ? 'Encoding...' : 'Keycard'}</span>
                                                 </button>
                                             )}
                                             <button

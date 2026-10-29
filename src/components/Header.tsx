@@ -35,8 +35,10 @@ import {
     getAllStoredReservations,
     updateReservationStatusInDB,
     syncReservationsFromDB,
+    isRoomUnassigned,
     type StoredReservation
 } from '../utils/roomInventoryEngine';
+import { toast } from '../context/ToastContext';
 
 interface HeaderProps {
     activePage: string;
@@ -814,7 +816,16 @@ const Header: React.FC<HeaderProps> = ({ activePage, setActivePage, onLogout, us
                 allRooms={allRoomsForDrawer}
                 systemDate={getOperatingSystemDate()}
                 onCheckIn={async (resNo) => {
-                    await updateReservationStatusInDB(resNo, 'in-house');
+                    const stored = getAllStoredReservations().find(r => r.reservationNumber === resNo || String(r.id) === resNo);
+                    if (stored && isRoomUnassigned(stored.roomNumber, stored.allocatedRooms)) {
+                        toast.error(`Cannot check in reservation ${resNo}: Room is unassigned. Please assign a room first.`);
+                        return;
+                    }
+                    const ok = await updateReservationStatusInDB(resNo, 'in-house');
+                    if (!ok) {
+                        toast.error(`Cannot check in reservation ${resNo}: Room is unassigned.`);
+                        return;
+                    }
                     await syncReservationsFromDB();
                 }}
                 onCheckOut={async (resNo) => {

@@ -22,8 +22,10 @@ import {
     saveStoredReservations,
     broadcastPMSEvent,
     subscribeToPMSEvents,
-    getRoomSmokingPolicy
+    getRoomSmokingPolicy,
+    isRoomUnassigned
 } from '../utils/roomInventoryEngine';
+import { toast } from '../context/ToastContext';
 import type {
     RoomServicesBundle,
     ExtraBedConfig,
@@ -443,6 +445,10 @@ export const FrontDesk: React.FC = () => {
 
     // Handlers
     const handleOpenCheckInModal = (record: FrontDeskGuestRecord) => {
+        if (isRoomUnassigned(record.roomNumber)) {
+            toast.error(`Cannot check in ${record.guestName}: Room is unassigned. Please assign a room number first.`);
+            return;
+        }
         setCheckInModalRecord(record);
         setCheckInKeyCard(`KC-${record.roomNumber}`);
         setCheckInDepositAmount(record.dueAmount > 0 ? record.dueAmount : 0);
@@ -452,6 +458,11 @@ export const FrontDesk: React.FC = () => {
 
     const handleConfirmCheckIn = () => {
         if (!checkInModalRecord) return;
+
+        if (isRoomUnassigned(checkInModalRecord.roomNumber)) {
+            toast.error('Cannot check in: Room is unassigned. Please assign a room first.');
+            return;
+        }
 
         const earlyPolicy = evaluateEarlyCheckIn(checkInModalRecord.eta || '12:00');
         const earlyFeeBDT = overrideEarlyFee ? 0 : (earlyPolicy.charge * 100);
@@ -1121,16 +1132,36 @@ export const FrontDesk: React.FC = () => {
                                                 {/* Actions */}
                                                 <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                                                     <div className="flex items-center justify-end gap-1.5">
-                                                        {(item.status === 'arriving' || item.status === 'confirmed') && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleOpenCheckInModal(item)}
-                                                                className="h-7 px-3 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
-                                                            >
-                                                                <LogIn size={11} className="stroke-[2.5]" />
-                                                                <span>Check In</span>
-                                                            </button>
-                                                        )}
+                                                        {(item.status === 'arriving' || item.status === 'confirmed') && (() => {
+                                                            const unassigned = isRoomUnassigned(item.roomNumber);
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={unassigned}
+                                                                    onClick={() => {
+                                                                        if (unassigned) {
+                                                                            toast.error(`Cannot check in ${item.guestName}: Room is unassigned. Please assign a room first.`);
+                                                                            return;
+                                                                        }
+                                                                        handleOpenCheckInModal(item);
+                                                                    }}
+                                                                    className={`h-7 px-3 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-2xs whitespace-nowrap ${
+                                                                        unassigned
+                                                                            ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+                                                                            : 'bg-primary hover:bg-primary-hover text-white cursor-pointer'
+                                                                    }`}
+                                                                    title={unassigned ? 'Cannot check in: Room is unassigned. Assign a room first.' : 'Check In'}
+                                                                >
+                                                                    <LogIn size={11} className="stroke-[2.5]" />
+                                                                    <span>Check In</span>
+                                                                    {unassigned && (
+                                                                        <span className="text-[8px] px-1 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold ml-0.5">
+                                                                            Unassigned
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })()}
 
                                                         {item.status === 'in-house' && (
                                                             <>

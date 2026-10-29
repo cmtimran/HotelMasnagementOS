@@ -29,6 +29,7 @@ import AddReservationModal from '../modals/AddReservationModal';
 import ReservationActionDrawer, { type DrawerMode } from '../modals/ReservationActionDrawer';
 import type { AmendBookingData } from '../modals/AmendStayModal';
 import { useNavigation } from '../../context/NavigationContext';
+import { toast } from '../../context/ToastContext';
 import {
     syncReservationsFromDB,
     updateReservationStatusInDB,
@@ -38,7 +39,8 @@ import {
     getCanonicalRooms,
     getOperatingSystemDate,
     subscribeToPMSEvents,
-    getConnectingPartnerMap
+    getConnectingPartnerMap,
+    isRoomUnassigned
 } from '../../utils/roomInventoryEngine';
 
 export interface ReservationItem {
@@ -347,6 +349,13 @@ export const ReservationsView: React.FC = () => {
 
     // Handle check in / check out actions with direct PostgreSQL DB persistence
     const handleStatusChange = (id: number, nextStatus: ReservationItem['status']) => {
+        if (nextStatus === 'in-house') {
+            const target = reservations.find(r => r.id === id);
+            if (target && isRoomUnassigned(target.roomNumber, target.allocatedRooms)) {
+                toast.error(`Cannot check in ${target.guestName}: Room is unassigned. Please assign a room number first.`);
+                return;
+            }
+        }
         setReservations(prev =>
             prev.map(r => r.id === id ? { ...r, status: nextStatus } : r)
         );
@@ -1244,19 +1253,39 @@ export const ReservationsView: React.FC = () => {
 
                                                                 <div className="h-px bg-gray-100 my-1" />
 
-                                                                {(r.status === 'arriving' || r.status === 'confirmed') && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setOpenActionMenuId(null);
-                                                                            handleStatusChange(r.id, 'in-house');
-                                                                        }}
-                                                                        className="w-full px-3 py-1.5 text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
-                                                                    >
-                                                                        <LogIn size={12} />
-                                                                        <span>Check In Guest</span>
-                                                                    </button>
-                                                                )}
+                                                                {(r.status === 'arriving' || r.status === 'confirmed') && (() => {
+                                                                    const unassigned = isRoomUnassigned(r.roomNumber, r.allocatedRooms);
+                                                                    return (
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={unassigned}
+                                                                            onClick={() => {
+                                                                                if (unassigned) {
+                                                                                    toast.error(`Cannot check in ${r.guestName}: Room is unassigned. Please assign a room first.`);
+                                                                                    return;
+                                                                                }
+                                                                                setOpenActionMenuId(null);
+                                                                                handleStatusChange(r.id, 'in-house');
+                                                                            }}
+                                                                            className={`w-full px-3 py-1.5 text-left flex items-center justify-between gap-2 transition-colors font-medium ${
+                                                                                unassigned
+                                                                                    ? 'text-gray-400 bg-gray-50/70 cursor-not-allowed opacity-60'
+                                                                                    : 'text-emerald-700 hover:bg-emerald-50 cursor-pointer'
+                                                                            }`}
+                                                                            title={unassigned ? 'Cannot check in: Room is unassigned. Please assign a room first.' : 'Check In Guest'}
+                                                                        >
+                                                                            <span className="flex items-center gap-2">
+                                                                                <LogIn size={12} />
+                                                                                <span>Check In Guest</span>
+                                                                            </span>
+                                                                            {unassigned && (
+                                                                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                                                                                    Unassigned
+                                                                                </span>
+                                                                            )}
+                                                                        </button>
+                                                                    );
+                                                                })()}
 
                                                                 {(r.status === 'in-house' || r.status === 'departing') && (
                                                                     <button
@@ -1480,19 +1509,39 @@ export const ReservationsView: React.FC = () => {
 
                                                         <div className="h-px bg-gray-100 my-1" />
 
-                                                        {(r.status === 'arriving' || r.status === 'confirmed') && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setOpenActionMenuId(null);
-                                                                    handleStatusChange(r.id, 'in-house');
-                                                                }}
-                                                                className="w-full px-3 py-1.5 text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
-                                                            >
-                                                                <LogIn size={12} />
-                                                                <span>Check In Guest</span>
-                                                            </button>
-                                                        )}
+                                                        {(r.status === 'arriving' || r.status === 'confirmed') && (() => {
+                                                            const unassigned = isRoomUnassigned(r.roomNumber, r.allocatedRooms);
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={unassigned}
+                                                                    onClick={() => {
+                                                                        if (unassigned) {
+                                                                            toast.error(`Cannot check in ${r.guestName}: Room is unassigned. Please assign a room first.`);
+                                                                            return;
+                                                                        }
+                                                                        setOpenActionMenuId(null);
+                                                                        handleStatusChange(r.id, 'in-house');
+                                                                    }}
+                                                                    className={`w-full px-3 py-1.5 text-left flex items-center justify-between gap-2 transition-colors font-medium ${
+                                                                        unassigned
+                                                                            ? 'text-gray-400 bg-gray-50/70 cursor-not-allowed opacity-60'
+                                                                            : 'text-emerald-700 hover:bg-emerald-50 cursor-pointer'
+                                                                    }`}
+                                                                    title={unassigned ? 'Cannot check in: Room is unassigned. Please assign a room first.' : 'Check In Guest'}
+                                                                >
+                                                                    <span className="flex items-center gap-2">
+                                                                        <LogIn size={12} />
+                                                                        <span>Check In Guest</span>
+                                                                    </span>
+                                                                    {unassigned && (
+                                                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                                                                            Unassigned
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })()}
 
                                                         {(r.status === 'in-house' || r.status === 'departing') && (
                                                             <button

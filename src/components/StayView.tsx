@@ -70,6 +70,7 @@ import {
     updateRoomHousekeepingInDB,
     generateRegistrationNumber,
     generateFolioNumber,
+    isRoomUnassigned,
     type RoomLock,
     type StoredReservation
 } from '../utils/roomInventoryEngine';
@@ -499,6 +500,21 @@ export const StayView: React.FC = () => {
         }
         return list;
     }, [startDate, daysWindow, operatingDateStr]);
+
+    // Anchor Assign Rooms drawer to Application Operating Date when opened
+    useEffect(() => {
+        if (isAssignRoomsOpen) {
+            const appDate = operatingDateStr || getOperatingSystemDate();
+            const foundIdx = days.findIndex(d => d.date === appDate);
+            if (foundIdx >= 0) {
+                setSelectedModalDateIndex(foundIdx);
+                setModalDateStartIndex(Math.max(0, Math.min(days.length - 7, foundIdx)));
+            } else {
+                setSelectedModalDateIndex(0);
+                setModalDateStartIndex(0);
+            }
+        }
+    }, [isAssignRoomsOpen, operatingDateStr, days]);
 
     // =========================================================================
     // DYNAMIC TIMELINE GRID RESPONSIVENESS (15 DAYS FIT ON SCREEN WITHOUT SCROLL)
@@ -2013,9 +2029,23 @@ export const StayView: React.FC = () => {
 
     const handleDrawerCheckIn = async (reservationNumber: string) => {
         try {
+            const targetB = actionDrawerBooking || bookings.find(b => b.reservationNumber === reservationNumber || b.id.includes(reservationNumber));
+            const storedTarget = getAllStoredReservations().find(r => r.reservationNumber === reservationNumber || String(r.id) === reservationNumber);
+            const rNo = (targetB as any)?.roomNumber || storedTarget?.roomNumber;
+            const alloc = (targetB as any)?.allocatedRooms || storedTarget?.allocatedRooms;
+
+            if (isRoomUnassigned(rNo, alloc)) {
+                toast.error(`Cannot check in reservation ${reservationNumber}: Room is unassigned. Please assign a room first.`);
+                return;
+            }
+
             const regNo = generateRegistrationNumber(reservationNumber);
             const folioNo = generateFolioNumber(reservationNumber);
-            await updateReservationStatusInDB(reservationNumber, 'in-house');
+            const ok = await updateReservationStatusInDB(reservationNumber, 'in-house');
+            if (!ok) {
+                toast.error(`Cannot check in reservation ${reservationNumber}: Room is unassigned. Please assign a room first.`);
+                return;
+            }
             // Direct optimistic in-memory booking update for 0-latency instant feedback
             setBookings(prev => prev.map(b => (b.reservationNumber === reservationNumber || b.id.includes(reservationNumber) || reservationNumber.startsWith(b.reservationNumber)) ? {
                 ...b,

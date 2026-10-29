@@ -1417,8 +1417,54 @@ export const bookingService = {
     const resNum = existing?.reservationNumber || String(id);
     let autoRegNum: string | null = existing?.registrationNumber || null;
     let autoFolioNum: string | null = existing?.folioNumber || null;
+    const numericId = isNaN(Number(id)) ? -1 : Number(id);
 
     if (dbStatus === 'IN_HOUSE') {
+      // Strict PMS Guard: Prevent check-in if room is unassigned
+      const isUnassignedString = (s?: string | null): boolean => {
+        if (!s) return true;
+        const clean = String(s).trim().toLowerCase();
+        return (
+          clean === '' ||
+          clean === 'unassigned' ||
+          clean === 'unassign' ||
+          clean === 'tba' ||
+          clean === 'tbd' ||
+          clean === 'none' ||
+          clean === 'null' ||
+          clean === 'undefined' ||
+          clean === '0' ||
+          clean === '-' ||
+          clean.includes('unassign')
+        );
+      };
+
+      let hasValidRoom = false;
+      if (existing) {
+        if (!isUnassignedString(existing.roomNumber)) {
+          hasValidRoom = true;
+        } else if (existing.allocatedRooms && existing.allocatedRooms.length > 0) {
+          hasValidRoom = existing.allocatedRooms.some(rNum => !isUnassignedString(rNum));
+        } else if (existing.roomsList && existing.roomsList.length > 0) {
+          hasValidRoom = existing.roomsList.some((rm: any) => !isUnassignedString(rm?.roomNumber || rm?.room_number));
+        }
+      }
+
+      if (!hasValidRoom) {
+        // Double check relational table reservation_rooms
+        const dbRooms = await getPool().query(
+          'SELECT room_number FROM reservation_rooms WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1 AND (id = $2 OR reservation_number = $3))',
+          [propId, numericId, String(id)]
+        );
+        if (dbRooms.rows.length > 0 && dbRooms.rows.some(r => !isUnassignedString(r.room_number))) {
+          hasValidRoom = true;
+        }
+      }
+
+      if (!hasValidRoom) {
+        throw new Error(`Cannot check in reservation ${resNum}: Room is unassigned. Please assign a room number first.`);
+      }
+
       if (!autoRegNum) {
         autoRegNum = `REG-${resNum.replace(/^RES-/, '')}`;
       }
@@ -1426,8 +1472,6 @@ export const bookingService = {
         autoFolioNum = `FOL-${resNum.replace(/^RES-/, '')}`;
       }
     }
-
-    const numericId = isNaN(Number(id)) ? -1 : Number(id);
 
     if (dbStatus === 'IN_HOUSE') {
       await getPool().query(`

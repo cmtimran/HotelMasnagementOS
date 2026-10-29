@@ -8,6 +8,7 @@ import {
     updateReservationStatusInDB,
     getOperatingSystemDate,
     subscribeToPMSEvents,
+    isRoomUnassigned,
     type StoredReservation
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
@@ -196,7 +197,15 @@ const ReservationList = () => {
     const handleActionClick = async (res: Reservation) => {
         const targetId = res.reservationNumber || res.id;
         if (res.status === 'arriving' || res.status === 'confirmed') {
-            await updateReservationStatusInDB(targetId, 'IN_HOUSE');
+            if (isRoomUnassigned(res.roomNumber)) {
+                toast.error(`Cannot check in ${res.guestName}: Room is unassigned. Please assign a room first.`);
+                return;
+            }
+            const ok = await updateReservationStatusInDB(targetId, 'IN_HOUSE');
+            if (!ok) {
+                toast.error(`Cannot check in ${res.guestName}: Room is unassigned.`);
+                return;
+            }
             toast.success(`Guest ${res.guestName} checked in to Room ${res.roomNumber}!`);
             loadData();
         } else if (res.status === 'departing' || res.status === 'in-house' || res.status === 'arrived') {
@@ -442,17 +451,35 @@ const ReservationList = () => {
                                                 <Edit3 size={13} />
                                                 <span>Edit</span>
                                             </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleActionClick(res)}
-                                                className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg text-xs font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-md opacity-90 group-hover:opacity-100 cursor-pointer"
-                                            >
-                                                {(res.status === 'arriving' || res.status === 'confirmed')
-                                                    ? 'Check-in'
-                                                    : (res.status === 'departing' || res.status === 'in-house' || res.status === 'arrived')
-                                                        ? 'Check-out'
-                                                        : 'View'}
-                                            </button>
+                                            {(() => {
+                                                const isArrivalOrConfirmed = res.status === 'arriving' || res.status === 'confirmed';
+                                                const unassigned = isArrivalOrConfirmed && isRoomUnassigned(res.roomNumber);
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        disabled={unassigned}
+                                                        onClick={() => {
+                                                            if (unassigned) {
+                                                                toast.error(`Cannot check in guest "${res.guestName}": Room is unassigned. Please assign a room first.`);
+                                                                return;
+                                                            }
+                                                            handleActionClick(res);
+                                                        }}
+                                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md ${
+                                                            unassigned
+                                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                                                : 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800 opacity-90 group-hover:opacity-100 cursor-pointer'
+                                                        }`}
+                                                        title={unassigned ? 'Cannot check in: Room is unassigned. Please assign a room first.' : 'Action'}
+                                                    >
+                                                        {isArrivalOrConfirmed
+                                                            ? (unassigned ? 'Unassigned' : 'Check-in')
+                                                            : (res.status === 'departing' || res.status === 'in-house' || res.status === 'arrived')
+                                                                ? 'Check-out'
+                                                                : 'View'}
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
                                     </td>
                                 </tr>
