@@ -2227,12 +2227,14 @@ export const syncRatesAndPlansFromDB = async (targetPropertyId?: number): Promis
     }
 };
 
-// Initial background sync with Database on boot
+// Initial background sync with Database on boot (only if authenticated session exists)
 if (typeof window !== 'undefined') {
     setTimeout(() => {
-        syncRoomTypesAndRoomsFromDB();
-        syncConnectingSuitesFromDB();
-        syncReservationsFromDB();
-        syncRatesAndPlansFromDB();
+        if (localStorage.getItem('auth_token')) {
+            syncRoomTypesAndRoomsFromDB();
+            syncConnectingSuitesFromDB();
+            syncReservationsFromDB();
+            syncRatesAndPlansFromDB();
+        }
     }, 500);
 }

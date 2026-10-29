@@ -28,8 +28,10 @@ import {
     Lock,
     ShieldCheck,
     Link as LinkIcon,
-    FileText
+    FileText,
+    Key
 } from 'lucide-react';
+import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 import type { AmendBookingData } from './AmendStayModal';
 import { calculateReservationTaxes } from '../../utils/taxCalculationEngine';
 import {
@@ -788,6 +790,35 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         ] : [])
     ];
 
+    const [isIssuingKeycard, setIsIssuingKeycard] = useState(false);
+
+    const handleIssueKeycard = async () => {
+        try {
+            setIsIssuingKeycard(true);
+            const targetRoom = activeRoomNumber || booking.roomNumber;
+            const res = await fetch(`${getApiBaseUrl()}/api/keycard/issue`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    propertyId: getActivePropertyId(),
+                    roomNumber: targetRoom,
+                    guestName: activeGuestName || booking.guestName || 'Guest',
+                    validUntil: booking.departureDate || (booking as any).checkOut
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(`RFID Keycard encoded for Room ${targetRoom}! Card UID: ${data.cardUid}`);
+            } else {
+                toast.error(data.error || 'Failed to issue keycard');
+            }
+        } catch (e: any) {
+            toast.error(`Keycard Error: ${e.message}`);
+        } finally {
+            setIsIssuingKeycard(false);
+        }
+    };
+
     return createPortal(
         <div className="fixed inset-0 z-[99999] overflow-hidden select-none font-sans">
             {/* Backdrop Overlay */}
@@ -865,6 +896,19 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                             >
                                 <DoorClosed size={10} />
                                 <span>Check Out</span>
+                            </button>
+                        )}
+
+                        {isCurrentActiveInHouse && (
+                            <button
+                                type="button"
+                                disabled={isIssuingKeycard}
+                                onClick={handleIssueKeycard}
+                                className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer transition-colors"
+                                title="Issue & Encode RFID Keycard"
+                            >
+                                <Key size={10} />
+                                <span>{isIssuingKeycard ? 'Encoding...' : 'Keycard'}</span>
                             </button>
                         )}
 

@@ -14,6 +14,8 @@ import tenantRoutes from './tenant.routes.js';
 import guestRoutes from './guest.routes.js';
 import lostAndFoundRoutes from './lostAndFound.routes.js';
 import authRoutes from './auth.routes.js';
+import keycardRoutes from './keycard.routes.js';
+import channelManagerRoutes from './channelManager.routes.js';
 
 const apiRouter = Router();
 
@@ -59,6 +61,8 @@ apiRouter.use('/rates', ratesRoutes);
 apiRouter.use('/connecting-rooms', connectingRoutes);
 apiRouter.use('/guests', guestRoutes);
 apiRouter.use('/lost-and-found', lostAndFoundRoutes);
+apiRouter.use('/keycard', keycardRoutes);
+apiRouter.use('/channel-manager', channelManagerRoutes);
 apiRouter.use('/central', tenantRoutes);
 apiRouter.use('/tenants', tenantRoutes);
 

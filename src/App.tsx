@@ -94,7 +94,9 @@ function App() {
   // Global Event-Driven Realtime Network Sync & PostgreSQL Database Hydration on Application Boot
   useEffect(() => {
     initNetworkSync();
-    syncReservationsFromDB().catch(console.error);
+    if (localStorage.getItem('auth_token')) {
+      syncReservationsFromDB().catch(console.error);
+    }
 
     // Auto-heal Devnotation toolbar position if dragged off-screen or corrupted in localStorage
     try {

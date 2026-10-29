@@ -232,6 +232,76 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             );
         `);
 
+        // 5b. Enterprise Operational System Settings
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                id BIGSERIAL PRIMARY KEY,
+                property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                operational_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                night_audit_status VARCHAR(32) NOT NULL DEFAULT 'IDLE',
+                last_night_audit_at TIMESTAMPTZ,
+                auto_dirty_on_checkout BOOLEAN NOT NULL DEFAULT TRUE,
+                auto_dirty_on_night_audit BOOLEAN NOT NULL DEFAULT TRUE,
+                strict_checkin_gate BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(property_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_system_settings_prop ON system_settings(property_id);
+        `);
+
+        // 5c. Night Audit Historical Execution Logs
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS night_audit_logs (
+                id BIGSERIAL PRIMARY KEY,
+                property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                audit_date DATE NOT NULL,
+                performed_by VARCHAR(128) NOT NULL DEFAULT 'System',
+                rooms_posted INT NOT NULL DEFAULT 0,
+                total_room_revenue NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+                total_tax_posted NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+                in_house_count INT NOT NULL DEFAULT 0,
+                arrivals_pending INT NOT NULL DEFAULT 0,
+                departures_pending INT NOT NULL DEFAULT 0,
+                status VARCHAR(32) NOT NULL DEFAULT 'SUCCESS',
+                details_json TEXT NOT NULL DEFAULT '{}',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_night_audit_logs_prop ON night_audit_logs(property_id, audit_date);
+        `);
+
+        // 5d. Smart Lock & Keycard Encoders Log
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS keycard_logs (
+                id BIGSERIAL PRIMARY KEY,
+                property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                room_number VARCHAR(32) NOT NULL,
+                card_uid VARCHAR(128) NOT NULL,
+                encoder_type VARCHAR(64) NOT NULL DEFAULT 'RFID_GENERIC',
+                operation VARCHAR(32) NOT NULL DEFAULT 'ISSUE',
+                issued_to VARCHAR(128),
+                valid_from TIMESTAMPTZ NOT NULL,
+                valid_until TIMESTAMPTZ NOT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_keycard_logs_room ON keycard_logs(property_id, room_number, status);
+        `);
+
+        // 5e. Two-Way Channel Manager (ARI) Sync Logs
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS channel_manager_logs (
+                id BIGSERIAL PRIMARY KEY,
+                property_id BIGINT NOT NULL DEFAULT 1 REFERENCES properties(id) ON DELETE CASCADE,
+                channel_name VARCHAR(64) NOT NULL,
+                event_type VARCHAR(64) NOT NULL,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                status VARCHAR(32) NOT NULL DEFAULT 'SUCCESS',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_channel_logs_prop ON channel_manager_logs(property_id, channel_name, created_at);
+        `);
+
         // 6. Safe Column Additions to Existing Tables in PostgreSQL
         const safeColumns = [
             'ALTER TABLE room_types ADD COLUMN IF NOT EXISTS size INT DEFAULT 350;',
@@ -249,6 +319,7 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
 
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS phone_ext VARCHAR(32);',
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_id VARCHAR(64);',
+            'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS keycard_rfid VARCHAR(128);',
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_connecting BOOLEAN DEFAULT FALSE;',
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS connected_to VARCHAR(64);',
             'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS smoking_status VARCHAR(64) DEFAULT \'Non-Smoking\';',
