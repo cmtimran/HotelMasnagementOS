@@ -566,12 +566,12 @@ export const ReservationsView: React.FC = () => {
                 }
             />
 
-            {/* Top Control Bar */}
-            <div className="card-container !p-4 flex flex-col gap-3 select-none">
-                {/* Row 1: Unified All 5 Status Tabs */}
-                <div className="flex items-center justify-between flex-wrap gap-3 pb-1 border-b border-slate-100">
+            {/* Top Control Bar - Organized 2-Row PMS Layout */}
+            <div className="card-container !p-3 flex flex-col gap-2.5 select-none">
+                {/* Row 1: Status Tabs (Left) + View Mode & Actions (Right) */}
+                <div className="flex items-center justify-between flex-wrap gap-2.5 pb-2 border-b border-slate-100">
                     {/* Status Tabs */}
-                    <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+                    <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
                         {[
                             { id: 'reservations', label: 'Reservations', count: countReservations },
                             { id: 'arrivals', label: 'Arrivals', count: countArrivals },
@@ -586,45 +586,127 @@ export const ReservationsView: React.FC = () => {
                                     key={t.id}
                                     type="button"
                                     onClick={() => handleTabChange(t.id as any)}
-                                    className={`py-2 text-[13px] transition-colors relative cursor-pointer flex items-center gap-1.5 font-medium ${
+                                    className={`py-1.5 text-[12px] sm:text-[12.5px] transition-colors relative cursor-pointer flex items-center gap-1.5 font-medium ${
                                         isActive ? 'text-[#6C5CE7] font-bold' : 'text-slate-500 hover:text-slate-900'
                                     }`}
                                 >
                                     <span>{t.label}</span>
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[11px] ${
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-bold ${
                                         isActive ? 'bg-purple-100 text-[#6C5CE7]' : 'bg-slate-100 text-slate-600'
                                     }`}>
                                         {t.count}
                                     </span>
                                     {isActive && (
-                                        <span className="absolute bottom-[-5px] left-0 right-0 h-[2.5px] bg-[#6C5CE7] rounded-full"></span>
+                                        <span className="absolute bottom-[-9px] left-0 right-0 h-[2px] bg-[#6C5CE7] rounded-full"></span>
                                     )}
                                 </button>
                             );
                         })}
                     </div>
+
+                    {/* Right: View Mode, Grouping, Export */}
+                    <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                        {/* View Mode: Card (Grid) vs Table (List) Toggle */}
+                        <div className="flex border border-gray-200 rounded-lg overflow-hidden h-7.5 shadow-2xs bg-white">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('grid')}
+                                className={`px-2 flex items-center justify-center cursor-pointer transition-colors ${
+                                    viewMode === 'grid'
+                                        ? 'bg-[#1e3a8a] text-white'
+                                        : 'bg-white text-gray-500 hover:bg-gray-50'
+                                }`}
+                                title="Switch to Card View"
+                            >
+                                <LayoutGrid size={13} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('list')}
+                                className={`px-2 border-l border-gray-200 flex items-center justify-center cursor-pointer transition-colors ${
+                                    viewMode === 'list'
+                                        ? 'bg-[#1e3a8a] text-white'
+                                        : 'bg-white text-gray-500 hover:bg-gray-50'
+                                }`}
+                                title="Switch to List View"
+                            >
+                                <List size={13} />
+                            </button>
+                        </div>
+
+                        {/* Make Group Action Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (filteredReservations.length === 0) {
+                                    setIsMakeGroupModalOpen(true);
+                                } else {
+                                    setIsGroupingMode(!isGroupingMode);
+                                }
+                            }}
+                            className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all h-7.5 cursor-pointer shadow-2xs ${
+                                isGroupingMode
+                                    ? 'bg-purple-700 text-white ring-2 ring-purple-300'
+                                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            title="Click to enter grouping selection mode"
+                        >
+                            <Users size={12} />
+                            <span>{isGroupingMode ? 'Grouping Active' : 'Make Group'}</span>
+                        </button>
+
+                        {/* Export Button */}
+                        <button
+                            type="button"
+                            onClick={exportCSV}
+                            className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors h-7.5 cursor-pointer shadow-2xs"
+                        >
+                            <Download size={12} className="text-gray-500" />
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
                 </div>
 
-                {/* Row 2: Secondary Toolbar (Date Presets, Single/Group, Search, View Mode, Grouping, Export) */}
-                <div className="flex items-center justify-between flex-wrap gap-2.5">
-                    {/* Left: Filter Controls */}
+                {/* Row 2: Unified Filter Toolbar in Single Line */}
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
+                        {/* Search Input */}
+                        <div className="relative">
+                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search guest, res #, room, group..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="h-7.5 pl-7 pr-2.5 text-[11px] border border-gray-200 rounded-lg bg-white outline-none w-48 sm:w-56 focus:border-blue-500 shadow-2xs transition-colors"
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                >
+                                    <X size={11} />
+                                </button>
+                            )}
+                        </div>
+
                         {/* Interactive Date Range Picker */}
                         <div className="relative">
-                            <div className="flex items-center border border-gray-200 rounded-lg px-2.5 py-0.5 gap-1.5 bg-white text-xs text-gray-700 h-8 shadow-2xs hover:border-blue-400 transition-colors">
+                            <div className="flex items-center border border-gray-200 rounded-lg px-2 py-0.5 gap-1 bg-white text-xs text-gray-700 h-7.5 shadow-2xs hover:border-blue-400 transition-colors">
                                 <input
                                     type="date"
                                     value={startDate}
                                     onChange={e => setStartDate(e.target.value)}
-                                    className="border-0 outline-none text-gray-700 text-[11px] bg-transparent cursor-pointer font-medium w-28"
+                                    className="border-0 outline-none text-gray-700 text-[10.5px] bg-transparent cursor-pointer font-medium w-25"
                                     title="From Date"
                                 />
-                                <span className="text-gray-400 font-bold">→</span>
+                                <span className="text-gray-400 font-bold text-[10px]">→</span>
                                 <input
                                     type="date"
                                     value={endDate}
                                     onChange={e => setEndDate(e.target.value)}
-                                    className="border-0 outline-none text-gray-700 text-[11px] bg-transparent cursor-pointer font-medium w-28"
+                                    className="border-0 outline-none text-gray-700 text-[10.5px] bg-transparent cursor-pointer font-medium w-25"
                                     title="To Date"
                                 />
                                 {(startDate || endDate) && (
@@ -634,7 +716,7 @@ export const ReservationsView: React.FC = () => {
                                         className="text-gray-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
                                         title="Clear Date Filter"
                                     >
-                                        <X size={12} />
+                                        <X size={11} />
                                     </button>
                                 )}
                                 <button
@@ -643,7 +725,7 @@ export const ReservationsView: React.FC = () => {
                                     className="text-gray-400 hover:text-blue-600 p-0.5 rounded cursor-pointer"
                                     title="Quick Date Presets"
                                 >
-                                    <CalendarIcon size={14} />
+                                    <CalendarIcon size={12} />
                                 </button>
                             </div>
 
@@ -651,8 +733,8 @@ export const ReservationsView: React.FC = () => {
                             {isDatePopoverOpen && (
                                 <>
                                     <div className="fixed inset-0 z-30" onClick={() => setIsDatePopoverOpen(false)}></div>
-                                    <div className="absolute left-0 top-9 z-40 bg-white border border-gray-200 shadow-xl rounded-lg p-2 w-44 space-y-1 animate-in fade-in zoom-in-95 duration-100 text-xs">
-                                        <div className="text-[10px] text-gray-400 uppercase px-2 py-0.5">Quick Presets</div>
+                                    <div className="absolute left-0 top-8.5 z-40 bg-white border border-gray-200 shadow-xl rounded-lg p-2 w-40 space-y-1 animate-in fade-in zoom-in-95 duration-100 text-[11px]">
+                                        <div className="text-[9.5px] text-gray-400 uppercase px-2 py-0.5 font-bold">Quick Presets</div>
                                         <button
                                             type="button"
                                             onClick={() => setDatePreset('today')}
@@ -686,62 +768,11 @@ export const ReservationsView: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Single Guest / Group Guest Mode Toggle */}
-                        <div className="flex border border-gray-200 rounded-lg overflow-hidden h-8 shadow-2xs bg-white">
-                            <button
-                                type="button"
-                                onClick={() => setGuestFilter(prev => prev === 'single' ? 'all' : 'single')}
-                                className={`px-2.5 flex items-center gap-1 cursor-pointer transition-colors text-[11px] font-semibold ${
-                                    guestFilter === 'single'
-                                        ? 'bg-[#1e3a8a] text-white'
-                                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                                }`}
-                                title={guestFilter === 'single' ? 'Showing Single Guests (Click to show all)' : 'Filter by Single Guests only'}
-                            >
-                                <User size={13} />
-                                <span className="hidden md:inline">Single</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setGuestFilter(prev => prev === 'group' ? 'all' : 'group')}
-                                className={`px-2.5 border-l border-gray-200 flex items-center gap-1 cursor-pointer transition-colors text-[11px] font-semibold ${
-                                    guestFilter === 'group'
-                                        ? 'bg-[#1e3a8a] text-white'
-                                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                                }`}
-                                title={guestFilter === 'group' ? 'Showing Group Bookings (Click to show all)' : 'Filter by Group Bookings only'}
-                            >
-                                <Users size={13} />
-                                <span className="hidden md:inline">Group</span>
-                            </button>
-                        </div>
-
-                        {/* Search Input */}
-                        <div className="relative">
-                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search guest, res #, room, group..."
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                className="h-8 pl-7 pr-2.5 text-xs border border-gray-200 rounded-lg bg-white outline-none w-52 sm:w-64 focus:border-blue-500 shadow-2xs transition-colors"
-                            />
-                            {searchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                                >
-                                    <X size={12} />
-                                </button>
-                            )}
-                        </div>
-
                         {/* Source Filter */}
                         <select
                             value={sourceFilter}
                             onChange={e => setSourceFilter(e.target.value)}
-                            className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 shadow-2xs font-medium cursor-pointer text-gray-700"
+                            className="h-7.5 px-2 text-[11px] border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 shadow-2xs font-medium cursor-pointer text-gray-700"
                         >
                             <option value="all">All Channels</option>
                             <option value="Direct">Direct</option>
@@ -756,83 +787,62 @@ export const ReservationsView: React.FC = () => {
                         <select
                             value={vipFilter}
                             onChange={e => setVipFilter(e.target.value)}
-                            className="h-8 px-2 text-xs border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 shadow-2xs font-medium cursor-pointer text-gray-700"
+                            className="h-7.5 px-2 text-[11px] border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 shadow-2xs font-medium cursor-pointer text-gray-700"
                         >
                             <option value="all">All Tiers</option>
                             <option value="vip">VIP Only</option>
                             <option value="regular">Standard</option>
                         </select>
 
-                        {guestFilter !== 'all' && (
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
-                                <span>Filter: {guestFilter === 'single' ? 'Single Guests' : 'Group Bookings'}</span>
-                                <button type="button" onClick={() => setGuestFilter('all')} className="hover:text-red-500 cursor-pointer">
-                                    <X size={11} />
-                                </button>
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Right: Actions */}
-                    <div className="flex items-center gap-2">
-                        {/* View Mode: Card (Grid) vs Table (List) Toggle */}
-                        <div className="flex border border-gray-200 rounded-lg overflow-hidden h-8 shadow-2xs bg-white">
+                        {/* Single Guest / Group Guest Mode Toggle */}
+                        <div className="flex border border-gray-200 rounded-lg overflow-hidden h-7.5 shadow-2xs bg-white">
                             <button
                                 type="button"
-                                onClick={() => setViewMode('grid')}
-                                className={`px-2.5 flex items-center justify-center cursor-pointer transition-colors ${
-                                    viewMode === 'grid'
+                                onClick={() => setGuestFilter(prev => prev === 'single' ? 'all' : 'single')}
+                                className={`px-2 flex items-center gap-1 cursor-pointer transition-colors text-[10.5px] font-semibold ${
+                                    guestFilter === 'single'
                                         ? 'bg-[#1e3a8a] text-white'
-                                        : 'bg-white text-gray-500 hover:bg-gray-50'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50'
                                 }`}
-                                title="Switch to Card View"
+                                title={guestFilter === 'single' ? 'Showing Single Guests (Click to show all)' : 'Filter by Single Guests only'}
                             >
-                                <LayoutGrid size={14} />
+                                <User size={12} />
+                                <span>Single</span>
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setViewMode('list')}
-                                className={`px-2.5 border-l border-gray-200 flex items-center justify-center cursor-pointer transition-colors ${
-                                    viewMode === 'list'
+                                onClick={() => setGuestFilter(prev => prev === 'group' ? 'all' : 'group')}
+                                className={`px-2 border-l border-gray-200 flex items-center gap-1 cursor-pointer transition-colors text-[10.5px] font-semibold ${
+                                    guestFilter === 'group'
                                         ? 'bg-[#1e3a8a] text-white'
-                                        : 'bg-white text-gray-500 hover:bg-gray-50'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50'
                                 }`}
-                                title="Switch to List View"
+                                title={guestFilter === 'group' ? 'Showing Group Bookings (Click to show all)' : 'Filter by Group Bookings only'}
                             >
-                                <List size={14} />
+                                <Users size={12} />
+                                <span>Group</span>
                             </button>
                         </div>
 
-                        {/* Make Group Action Button */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (filteredReservations.length === 0) {
-                                    setIsMakeGroupModalOpen(true);
-                                } else {
-                                    setIsGroupingMode(!isGroupingMode);
-                                }
-                            }}
-                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all h-8 cursor-pointer shadow-2xs ${
-                                isGroupingMode
-                                    ? 'bg-purple-700 text-white ring-2 ring-purple-300'
-                                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-                            }`}
-                            title="Click to enter grouping selection mode"
-                        >
-                            <Users size={14} />
-                            <span>{isGroupingMode ? 'Grouping Active' : 'Make Group'}</span>
-                        </button>
-
-                        {/* Export Button */}
-                        <button
-                            type="button"
-                            onClick={exportCSV}
-                            className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors h-8 cursor-pointer shadow-2xs"
-                        >
-                            <Download size={13} className="text-gray-500" />
-                            <span>Export CSV</span>
-                        </button>
+                        {/* Reset Filters Button if any active */}
+                        {(searchQuery || startDate || endDate || sourceFilter !== 'all' || vipFilter !== 'all' || guestFilter !== 'all') && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setStartDate('');
+                                    setEndDate('');
+                                    setSourceFilter('all');
+                                    setVipFilter('all');
+                                    setGuestFilter('all');
+                                }}
+                                className="h-7.5 px-2 text-[10.5px] text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg flex items-center gap-1 cursor-pointer transition-colors font-medium shadow-2xs"
+                                title="Reset all active filters"
+                            >
+                                <X size={11} />
+                                <span>Clear Filters</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
