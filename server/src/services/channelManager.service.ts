@@ -119,7 +119,7 @@ export class ChannelManagerService {
         }
 
         // 2. Find Room Type & Available Physical Room
-        const roomType = await db.prepare(`
+        let roomType = await db.prepare(`
             SELECT id, name, base_rate 
             FROM room_types 
             WHERE property_id = ? AND (LOWER(name) = LOWER(?) OR id = ?)
@@ -127,7 +127,26 @@ export class ChannelManagerService {
         `).get(propertyId, payload.roomTypeName, Number(payload.roomTypeName) || 0) as any;
 
         if (!roomType) {
-            throw new Error(`Room type '${payload.roomTypeName}' not recognized for property #${propertyId}`);
+            // Check if there is any default room type for this property
+            roomType = await db.prepare(`
+                SELECT id, name, base_rate FROM room_types WHERE property_id = ? LIMIT 1
+            `).get(propertyId) as any;
+        }
+
+        if (!roomType) {
+            // Auto-create room type for the property so OTA bookings are safely ingested
+            const rtRes = await db.prepare(`
+                INSERT INTO room_types (property_id, code, name, base_rate, max_adults, max_children)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `).run(
+                propertyId, 
+                payload.roomTypeName.slice(0, 4).toUpperCase().replace(/\s+/g, ''), 
+                payload.roomTypeName, 
+                payload.totalAmount || 5000, 
+                payload.adults || 2, 
+                payload.children || 0
+            );
+            roomType = { id: rtRes.lastInsertRowid, name: payload.roomTypeName, base_rate: payload.totalAmount || 5000 };
         }
 
         // Find clean available room of this type
@@ -157,17 +176,28 @@ export class ChannelManagerService {
         const notes = `[OTA Channel: ${channelName}] OTA-REF: ${otaBookingReference}. Commission: ${payload.commissionAmount || 0}. ${payload.specialRequests || ''}`;
 
         const created = await bookingService.createBooking({
+            propertyId,
             property_id: propertyId,
+            guestName: `${guest.firstName} ${guest.lastName}`,
             guest_name: `${guest.firstName} ${guest.lastName}`,
             email: guest.email,
             phone: guest.phone || '',
+            roomNumber: assignedRoomNumber || 'UNASSIGNED',
             room_number: assignedRoomNumber || 'UNASSIGNED',
+            roomType: roomType.name,
             room_type: roomType.name,
+            checkIn: checkInDate,
+            checkOut: checkOutDate,
             check_in_date: checkInDate,
             check_out_date: checkOutDate,
+            arrivalDate: checkInDate,
+            departureDate: checkOutDate,
+            totalAmount: Number(payload.totalAmount) || Number(roomType.base_rate),
             total_amount: Number(payload.totalAmount) || Number(roomType.base_rate),
+            specialRequests: notes,
             special_requests: notes,
-            source: channelName
+            source: channelName,
+            channel: channelName
         } as any);
 
         // 4. Log in Channel Manager Audit History

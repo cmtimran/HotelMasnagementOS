@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../database/db.js';
 import { broadcastServerEvent } from './realtime.routes.js';
+import { NightAuditService } from '../services/nightAudit.service.js';
 
 const router = Router();
 
@@ -423,36 +424,19 @@ router.get('/trial-balance', async (req: Request, res: Response) => {
 router.get('/night-audit/status', async (req: Request, res: Response) => {
     try {
         const rawPropId = req.query.propertyId || req.headers['x-property-id'] || (req as any).propertyId;
-        const propertyId = rawPropId ? Number(rawPropId) : null;
-        if (!propertyId) {
-            return res.json({ success: true, data: { status: 'PENDING', stepsCompleted: 0 } });
-        }
+        const propertyId = rawPropId ? Number(rawPropId) : 1;
 
-        // Count in-house folios
-        const inHouseCountRes = await db.prepare(`
-            SELECT COUNT(r.id) as count
-            FROM reservations r
-            WHERE r.property_id = ? AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
-        `).get(propertyId) as any;
-
-        // Count pending no-shows
-        const noShowCountRes = await db.prepare(`
-            SELECT COUNT(r.id) as count
-            FROM reservations r
-            JOIN reservation_rooms rr ON rr.reservation_id = r.id
-            WHERE r.property_id = ? 
-              AND r.status IN ('CONFIRMED', 'confirmed') 
-              AND rr.check_in_date < CURRENT_DATE
-        `).get(propertyId) as any;
-
+        const preflight = await NightAuditService.getPreFlightStatus(propertyId);
         res.json({
             success: true,
             data: {
                 propertyId,
-                inHouseReservationsCount: Number(inHouseCountRes?.count || 0),
-                pendingNoShowsCount: Number(noShowCountRes?.count || 0),
-                serverDate: new Date().toISOString().slice(0, 10),
-                isReadyForAudit: true
+                inHouseReservationsCount: preflight.inHouseCount,
+                pendingNoShowsCount: preflight.pendingArrivalsCount,
+                serverDate: preflight.operationalDate,
+                isReadyForAudit: preflight.isReady,
+                blockers: preflight.blockers,
+                preflight
             }
         });
     } catch (e: any) {
@@ -464,193 +448,22 @@ router.get('/night-audit/status', async (req: Request, res: Response) => {
 router.post('/night-audit/run', async (req: Request, res: Response) => {
     try {
         const rawPropId = req.body.propertyId || req.headers['x-property-id'] || (req as any).propertyId;
-        const propertyId = rawPropId ? Number(rawPropId) : null;
-        if (!propertyId) {
-            return res.status(400).json({ success: false, error: 'Property ID required for Night Audit execution' });
-        }
-        const currentBusinessDate = req.body.businessDate || new Date().toISOString().slice(0, 10);
+        const propertyId = rawPropId ? Number(rawPropId) : 1;
+        const forceOverride = req.body.forceOverride !== undefined ? Boolean(req.body.forceOverride) : true;
 
-        const logs: string[] = [];
-        const log = (msg: string) => {
-            const time = new Date().toLocaleTimeString('en-GB');
-            logs.push(`[${time}] ${msg}`);
-        };
-
-        log(`Starting Automated Night Audit sequence for Property #${propertyId} on business date ${currentBusinessDate}...`);
-
-        // Step 1: Reconcile Shift Cashiers
-        const openShifts = await db.prepare(`
-            SELECT COUNT(*) as count FROM shift_assignments 
-            WHERE shift_date = ? AND status = 'ACTIVE'
-        `).get(currentBusinessDate).catch(() => ({ count: 0 })) as any;
-        const shiftCount = Number(openShifts?.count || 0);
-        log(`Step 1: Front Office shift cashiers reconciled. ${shiftCount} cashier sessions closed with 0 variance.`);
-
-        // Step 2: Penalize / Release No-Show Reservations
-        const noShowRows = await db.prepare(`
-            SELECT r.id, r.reservation_number, g.first_name, g.last_name
-            FROM reservations r
-            JOIN reservation_rooms rr ON rr.reservation_id = r.id
-            LEFT JOIN guests g ON g.id = r.booker_guest_id
-            WHERE r.property_id = ? 
-              AND r.status IN ('CONFIRMED', 'confirmed') 
-              AND rr.check_in_date = ?
-        `).all(propertyId, currentBusinessDate) as any[];
-
-        let noShowsProcessed = 0;
-        for (const ns of noShowRows) {
-            await db.prepare(`UPDATE reservations SET status = 'NO_SHOW', special_requests = COALESCE(special_requests, '') || ' [Marked No-Show during Night Audit]' WHERE id = ?`).run(ns.id);
-            await db.prepare(`UPDATE reservation_rooms SET status = 'NO_SHOW' WHERE reservation_id = ?`).run(ns.id);
-            noShowsProcessed++;
-        }
-        log(`Step 2: No-show processing complete. ${noShowsProcessed} expired reservation(s) penalized & unheld inventory released.`);
-
-        // Step 3: Post Daily Room Rent + VAT + Service Charge to In-House Folios
-        const inHouseRes = await db.prepare(`
-            SELECT 
-                r.id as reservation_id,
-                r.reservation_number,
-                f.id as folio_id,
-                COALESCE(SUM(rr.room_rate), 0) as total_rate,
-                COUNT(rr.id) as room_count
-            FROM reservations r
-            JOIN folios f ON f.reservation_id = r.id
-            JOIN reservation_rooms rr ON rr.reservation_id = r.id
-            WHERE r.property_id = ?
-              AND r.status IN ('IN_HOUSE', 'in-house', 'arrived')
-            GROUP BY r.id, r.reservation_number, f.id
-        `).all(propertyId) as any[];
-
-        let totalRoomRentPosted = 0;
-        let totalVatPosted = 0;
-        let totalServiceChargePosted = 0;
-        let foliosChargedCount = 0;
-
-        for (const item of inHouseRes) {
-            const rent = Number(item.total_rate) || 5000;
-            const vat = Math.round(rent * 0.15);
-            const sc = Math.round(rent * 0.10);
-            const totalForFolio = rent + vat + sc;
-
-            // Insert daily room rent
-            await db.prepare(`
-                INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
-                VALUES (?, 'ROOM_TARIFF', ?, ?, ?, ?, ?)
-            `).run(item.folio_id, `Daily Room Accommodation Tariff - ${currentBusinessDate}`, rent, 0, rent, currentBusinessDate);
-
-            // Insert VAT
-            await db.prepare(`
-                INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
-                VALUES (?, 'GOVT_VAT', 'Govt VAT 15% (Mushak-6.3 Output Tax)', 0, vat, vat, currentBusinessDate)
-            `).run(item.folio_id);
-
-            // Insert Service Charge
-            await db.prepare(`
-                INSERT INTO folio_charges (folio_id, charge_code, description, amount, tax_amount, total_amount, charge_date)
-                VALUES (?, 'SERVICE_CHARGE', 'Hotel Service Charge 10% Pool', 0, sc, sc, currentBusinessDate)
-            `).run(item.folio_id);
-
-            // Increment folio balance
-            await db.prepare(`
-                UPDATE folios SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-            `).run(totalForFolio, item.folio_id);
-
-            totalRoomRentPosted += rent;
-            totalVatPosted += vat;
-            totalServiceChargePosted += sc;
-            foliosChargedCount++;
-        }
-        log(`Step 3: Daily charges posted. ৳${totalRoomRentPosted.toLocaleString()} room rent + ৳${totalVatPosted.toLocaleString()} VAT + ৳${totalServiceChargePosted.toLocaleString()} service charge across ${foliosChargedCount} active in-house folio(s).`);
-
-        // Step 4: Close Outlets & F&B Terminals
-        log('Step 4: Restaurant, Banquet & Cafe POS outlet batches closed and synchronized.');
-
-        // Step 5: Post General Ledger Journal Entry (Double Entry Balance)
-        const totalAR = totalRoomRentPosted + totalVatPosted + totalServiceChargePosted;
-        if (totalAR > 0) {
-            const entryNum = `JV-NA-${Date.now().toString().slice(-6)}`;
-            const jeResult = await db.prepare(`
-                INSERT INTO journal_entries (property_id, entry_number, entry_date, description, is_posted)
-                VALUES (?, ?, ?, 'Automated Night Audit EOD Posting & Revenue Realization', 1)
-            `).run(propertyId, entryNum, currentBusinessDate);
-            const jeId = jeResult.lastInsertRowid;
-
-            // Lookup account IDs
-            const getAccId = async (code: string) => {
-                const row = await db.prepare('SELECT id FROM chart_of_accounts WHERE account_code = ? LIMIT 1').get(code) as any;
-                return row?.id;
-            };
-
-            const arAccId = await getAccId('11010-01');
-            const revAccId = await getAccId('10010-01');
-            const vatAccId = await getAccId('22010-01');
-            const scAccId = await getAccId('22020-01');
-
-            if (arAccId) {
-                await db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (?, ?, ?, 0, 'Guest Ledger A/R Debit')`).run(jeId, arAccId, totalAR);
-            }
-            if (revAccId && totalRoomRentPosted > 0) {
-                await db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (?, ?, 0, ?, 'Master Room Rent Revenue')`).run(jeId, revAccId, totalRoomRentPosted);
-            }
-            if (vatAccId && totalVatPosted > 0) {
-                await db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (?, ?, 0, ?, 'Govt Output VAT (15%)')`).run(jeId, vatAccId, totalVatPosted);
-            }
-            if (scAccId && totalServiceChargePosted > 0) {
-                await db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (?, ?, 0, ?, 'Hotel Service Charge (10%)')`).run(jeId, scAccId, totalServiceChargePosted);
-            }
-            log(`Step 5: Balanced Double-Entry Journal Entry (${entryNum}) created in General Ledger. Total AR: ৳${totalAR.toLocaleString()}.`);
-        } else {
-            log('Step 5: General Ledger verified. No active in-house revenue charges to post.');
-        }
-
-        // Calculate next business date
-        const parts = currentBusinessDate.split('-').map(Number);
-        const d = new Date(parts[0], parts[1] - 1, parts[2] + 1, 12, 0, 0);
-        const nextBusinessDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        log(`System operating business date successfully advanced from ${currentBusinessDate} to ${nextBusinessDate}.`);
-
-        // Broadcast real-time SSE event to all terminals on this property
-        try {
-            broadcastServerEvent({
-                type: 'NIGHT_AUDIT_COMPLETED',
-                propertyId,
-                previousDate: currentBusinessDate,
-                newBusinessDate: nextBusinessDate,
-                totalRoomRentPosted,
-                totalVatPosted,
-                totalServiceChargePosted,
-                foliosChargedCount,
-                noShowsProcessed
-            });
-        } catch (bErr) {
-            console.warn('Night audit broadcast notice:', bErr);
-        }
+        const result = await NightAuditService.executeNightAudit(propertyId, {
+            forceOverride,
+            autoDirtyRooms: true,
+            performedBy: req.body.performedBy || 'System Admin'
+        });
 
         res.json({
             success: true,
-            data: {
-                propertyId,
-                previousBusinessDate: currentBusinessDate,
-                newBusinessDate: nextBusinessDate,
-                foliosChargedCount,
-                noShowsProcessed,
-                totalRoomRentPosted,
-                totalVatPosted,
-                totalServiceChargePosted,
-                totalARPosted: totalAR,
-                logs,
-                stepSummaries: {
-                    step1: 'Front Office shift cashiers reconciled with 0 variance.',
-                    step2: `${noShowsProcessed} no-show reservation(s) penalized & unheld inventory released.`,
-                    step3: `Posted ৳${totalRoomRentPosted.toLocaleString()} room rent + ৳${totalVatPosted.toLocaleString()} VAT + ৳${totalServiceChargePosted.toLocaleString()} service charge across ${foliosChargedCount} active in-house folio(s).`,
-                    step4: 'Restaurant, Banquet & Cafe POS outlet batches closed and synchronized.',
-                    step5: `System date rolled from ${currentBusinessDate} to ${nextBusinessDate}. General Ledger balanced.`
-                }
-            }
+            data: result
         });
     } catch (e: any) {
         console.error('Night audit failure:', e);
-        res.status(500).json({ success: false, error: e?.message || 'Night audit failed' });
+        res.status(400).json({ success: false, error: e?.message || 'Night audit failed' });
     }
 });
 

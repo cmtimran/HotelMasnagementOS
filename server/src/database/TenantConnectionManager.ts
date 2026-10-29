@@ -106,8 +106,8 @@ export class TenantConnectionManager {
         const cleanSlug = (tenantSlug || 'central').toLowerCase().trim();
         const masterDbName = process.env.PGDATABASE || 'postgres';
 
-        // 1. If central / master / default / hq-corp / corp / platform, return master pool
-        if (!cleanSlug || cleanSlug === 'default' || cleanSlug === 'central' || cleanSlug === 'master' || cleanSlug === 'hq' || cleanSlug === 'corp' || cleanSlug === 'hq-corp' || cleanSlug === 'grand-palace') {
+        // 1. If central / master / default / hq-corp / corp / platform / gpd, return master pool
+        if (!cleanSlug || cleanSlug === 'default' || cleanSlug === 'central' || cleanSlug === 'master' || cleanSlug === 'hq' || cleanSlug === 'corp' || cleanSlug === 'hq-corp' || cleanSlug === 'grand-palace' || cleanSlug === 'gpd') {
             return {
                 tenantSlug: cleanSlug || 'central',
                 tenantName: 'Primary Cluster / Central Control Plane',

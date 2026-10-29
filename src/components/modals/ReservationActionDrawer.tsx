@@ -876,15 +876,31 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
                     {/* Right: Top Action Buttons (Check In / Check Out + Edit + Dynamic Action Dropdown) */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         {isCurrentActiveConfirmed && !booking?.isPast && onCheckIn && (
-                            <button
-                                type="button"
-                                onClick={() => onCheckIn(activeSubBookingNo || booking.reservationNumber)}
-                                className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors"
-                                title="Check In guest immediately"
-                            >
-                                <DoorOpen size={10} />
-                                <span>Check In</span>
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => onCheckIn(activeSubBookingNo || booking.reservationNumber)}
+                                    className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors"
+                                    title="Check In guest immediately"
+                                >
+                                    <DoorOpen size={10} />
+                                    <span>Check In</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={isIssuingKeycard}
+                                    onClick={async () => {
+                                        onCheckIn(activeSubBookingNo || booking.reservationNumber);
+                                        await handleIssueKeycard();
+                                    }}
+                                    className="h-5 px-2 rounded text-[8px] font-semibold flex items-center gap-1 shadow-2xs bg-teal-600 hover:bg-teal-700 text-white cursor-pointer transition-colors"
+                                    title="Check In guest and encode RFID / Smart Lock room keycard"
+                                >
+                                    <Key size={10} />
+                                    <span>{isIssuingKeycard ? 'Encoding...' : 'Check In & Key'}</span>
+                                </button>
+                            </>
                         )}
 
                         {isCurrentActiveInHouse && !booking?.isPast && onCheckOut && (

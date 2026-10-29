@@ -182,6 +182,18 @@ function attachGroupRoomsList(records: BookingRecord[]) {
   }
 }
 
+/**
+ * Trigger Channel Manager ARI push hook asynchronously on booking lifecycle events
+ */
+async function notifyChannelManager(propertyId: number | string | undefined | null) {
+  try {
+    const propId = resolvePropertyId(propertyId || undefined);
+    if (!propId) return;
+    const { ChannelManagerService } = await import('./channelManager.service.js');
+    ChannelManagerService.broadcastARIPush(Number(propId)).catch(() => {});
+  } catch {}
+}
+
 export const bookingService = {
   /**
    * Fetch all bookings for a property directly from Cloud PostgreSQL
@@ -637,6 +649,22 @@ export const bookingService = {
         const roomLookup = await client.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, roomNum]);
         if (roomLookup.rows.length > 0) {
           roomId = roomLookup.rows[0].id;
+        } else if (roomNum === 'UNASSIGNED' || !roomNum) {
+          // Gracefully manage unassigned inventory holding room for OTA or pre-allocated bookings
+          let unassignedRm = await client.query('SELECT id FROM rooms WHERE property_id = $1 AND room_number = $2 LIMIT 1', [propId, 'UNASSIGNED']);
+          if (unassignedRm.rows.length === 0) {
+            let rtId = (await client.query('SELECT id FROM room_types WHERE property_id = $1 LIMIT 1', [propId])).rows[0]?.id;
+            if (!rtId) {
+              const newRt = await client.query('INSERT INTO room_types (property_id, code, name, base_rate) VALUES ($1, $2, $3, $4) RETURNING id', [propId, 'STD', 'Standard Room', 5000]);
+              rtId = newRt.rows[0].id;
+            }
+            let bId = (await client.query('SELECT id FROM buildings WHERE property_id = $1 LIMIT 1', [propId])).rows[0]?.id || 1;
+            let flId = (await client.query('SELECT id FROM floors WHERE building_id = $1 LIMIT 1', [bId])).rows[0]?.id || 1;
+            const insRm = await client.query('INSERT INTO rooms (property_id, building_id, floor_id, room_type_id, room_number, name, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id', [propId, bId, flId, rtId, 'UNASSIGNED', 'Unassigned OTA Buffer', 'ACTIVE']);
+            roomId = insRm.rows[0].id;
+          } else {
+            roomId = unassignedRm.rows[0].id;
+          }
         } else {
           throw new Error(`Room '${roomNum}' does not exist in property #${propId}. Please configure or select an active room.`);
         }
@@ -733,6 +761,7 @@ export const bookingService = {
     }
 
     const createdBooking = propId ? await bookingService.getBookingById(reservationNumber, propId) : null;
+    notifyChannelManager(propId);
     return createdBooking!;
   },
 
@@ -897,6 +926,7 @@ export const bookingService = {
       client.release();
     }
 
+    notifyChannelManager(propId);
     return bookingService.getBookingById(resId, propId);
   },
 
@@ -991,6 +1021,7 @@ export const bookingService = {
       `, [due, resId]);
     }
 
+    notifyChannelManager(propId);
     return bookingService.getBookingById(resId, propId);
   },
 
@@ -1059,6 +1090,7 @@ export const bookingService = {
       `, [targetRoomId, newFromDate || null, newToDate || null, resId]);
     }
 
+    notifyChannelManager(propId);
     return bookingService.getBookingById(resId, propId);
   },
 
@@ -1128,6 +1160,7 @@ export const bookingService = {
       client.release();
     }
 
+    notifyChannelManager(propId);
     return bookingService.getBookingById(resId, propId);
   },
 
@@ -1228,6 +1261,7 @@ export const bookingService = {
       client.release();
     }
 
+    notifyChannelManager(propId);
     return bookingService.getBookingById(resId, propId);
   },
 
@@ -1483,6 +1517,7 @@ export const bookingService = {
       }
     }
 
+    notifyChannelManager(propId);
     return bookingService.getBookingById(id, propId);
   },
 
@@ -1511,6 +1546,7 @@ export const bookingService = {
       WHERE folio_id IN (SELECT id FROM folios WHERE reservation_id IN (SELECT id FROM reservations WHERE property_id = $1 AND (id = $2 OR reservation_number = $3)))
     `, [propId, targetId, String(id)]).catch(() => {});
 
+    notifyChannelManager(propId);
     return true;
   },
 

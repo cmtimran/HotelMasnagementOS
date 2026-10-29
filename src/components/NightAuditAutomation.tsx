@@ -3,7 +3,7 @@ import PageHeader from './common/PageHeader';
 import {
     Moon, CheckCircle2,
     RefreshCw, Printer,
-    Landmark, Play
+    Landmark, Play, AlertTriangle, ShieldAlert, ShieldCheck
 } from 'lucide-react';
 import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB, getOperatingSystemDate, setOperatingSystemDate, subscribeToPMSEvents } from '../utils/roomInventoryEngine';
 import { getApiBaseUrl } from '../utils/apiUrl';
@@ -62,11 +62,50 @@ export const NightAuditAutomation: React.FC = () => {
     const [reservations, setReservations] = useState(() => getAllStoredReservations());
     const [rooms] = useState(() => getCanonicalRooms());
 
+    const [businessDate, setBusinessDate] = useState<string>(() => getOperatingSystemDate());
+    const [steps, setSteps] = useState<AuditStep[]>(INITIAL_STEPS);
+    const [isRunning, setIsRunning] = useState<boolean>(false);
+    const [auditCompleted, setAuditCompleted] = useState<boolean>(false);
+    const [preflight, setPreflight] = useState<{
+        operationalDate: string;
+        inHouseCount: number;
+        pendingArrivalsCount: number;
+        pendingArrivals: Array<{ id: number; reservationNumber: string; guestName: string; roomNumber: string }>;
+        pendingDeparturesCount: number;
+        openCashierSessionsCount: number;
+        isReady: boolean;
+        blockers: string[];
+    } | null>(null);
+    const [forceOverride, setForceOverride] = useState<boolean>(true);
+    const [auditLogs, setAuditLogs] = useState<string[]>(() => [
+        'System initialized in Standby Mode. Ready for End of Day (EOD) Night Audit sequence.',
+        `Total physical rooms: ${rooms.length} | Active reservations: ${reservations.length}.`,
+        'Pre-flight checking database status...'
+    ]);
+
+    const loadPreflight = async () => {
+        try {
+            const API_BASE = getApiBaseUrl();
+            const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
+            const res = await fetch(`${API_BASE}/api/night-audit/status?propertyId=${activePropertyId}`);
+            const json = await res.json();
+            if (json.success && json.data) {
+                setPreflight(json.data);
+                if (json.data.operationalDate) {
+                    setBusinessDate(json.data.operationalDate);
+                }
+            }
+        } catch (e: any) {
+            console.warn('Could not fetch night audit preflight status:', e);
+        }
+    };
+
     useEffect(() => {
         const reload = () => {
             syncReservationsFromDB().then(res => {
                 if (res.length > 0) setReservations(res);
             }).catch(() => {});
+            loadPreflight();
         };
         reload();
 
@@ -103,15 +142,6 @@ export const NightAuditAutomation: React.FC = () => {
         ];
     }, [reservations]);
 
-    const [businessDate, setBusinessDate] = useState<string>(() => getOperatingSystemDate());
-    const [steps, setSteps] = useState<AuditStep[]>(INITIAL_STEPS);
-    const [isRunning, setIsRunning] = useState<boolean>(false);
-    const [auditCompleted, setAuditCompleted] = useState<boolean>(false);
-    const [auditLogs, setAuditLogs] = useState<string[]>(() => [
-        'System initialized in Standby Mode. Ready for End of Day (EOD) Night Audit sequence.',
-        `Total physical rooms: ${rooms.length} | Active reservations: ${reservations.length}.`,
-        'Unposted cashier tickets: 0. System ready.'
-    ]);
     const [activeTab, setActiveTab] = useState<'pipeline' | 'gl-ledger' | 'report'>('pipeline');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -136,7 +166,7 @@ export const NightAuditAutomation: React.FC = () => {
             const API_BASE = getApiBaseUrl();
             const activePropertyId = Number(localStorage.getItem('hotel_active_property_id')) || 1;
 
-            const res = await fetch(`${API_BASE}/api/accounting/night-audit/run`, {
+            const res = await fetch(`${API_BASE}/api/night-audit/execute`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -144,7 +174,9 @@ export const NightAuditAutomation: React.FC = () => {
                 },
                 body: JSON.stringify({
                     propertyId: activePropertyId,
-                    businessDate
+                    forceOverride,
+                    autoDirtyRooms: true,
+                    performedBy: 'Front Desk / Night Auditor'
                 })
             });
 
@@ -198,10 +230,11 @@ export const NightAuditAutomation: React.FC = () => {
             } : s));
             addLog(`Step 5 complete: Business date rolled to ${nextDay}. General Ledger balanced.`);
 
-            // Refresh reservations from DB to reflect any status or folio balance changes
+            // Refresh reservations and pre-flight from DB
             syncReservationsFromDB().then(refreshed => {
                 if (refreshed.length > 0) setReservations(refreshed);
             }).catch(() => {});
+            loadPreflight();
 
             setAuditCompleted(true);
             showToast('Night Audit executed successfully! Business date rolled over.');
@@ -264,8 +297,9 @@ export const NightAuditAutomation: React.FC = () => {
                             ) : (
                                 <button
                                     onClick={handleRunFullAudit}
-                                    disabled={isRunning}
-                                    className="btn-primary"
+                                    disabled={Boolean(isRunning || (preflight && !preflight.isReady && !forceOverride))}
+                                    className={`btn-primary ${preflight && !preflight.isReady && !forceOverride ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title={preflight && !preflight.isReady && !forceOverride ? 'Enable Force Override or check in pending arrivals before running audit' : 'Execute authoritative Night Audit'}
                                 >
                                     {isRunning ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
                                     <span>{isRunning ? 'Running EOD Audit...' : 'Execute Night Audit'}</span>
@@ -283,6 +317,63 @@ export const NightAuditAutomation: React.FC = () => {
                     </div>
                 }
             />
+
+            {/* Pre-Flight Health & Readiness Control Panel */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs flex flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        {preflight?.isReady ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <ShieldCheck size={13} className="text-emerald-600" />
+                                <span>Pre-Flight Passed: Ready for Night Audit</span>
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                <ShieldAlert size={13} className="text-amber-600" />
+                                <span>Pre-Flight Attention Required ({preflight?.blockers?.length || 0} Alert)</span>
+                            </span>
+                        )}
+                        <span className="text-slate-400 text-xs">•</span>
+                        <span className="text-slate-600 text-xs">In-House Folios: <strong>{preflight?.inHouseCount ?? reservations.filter(r => r.status === 'IN_HOUSE').length}</strong></span>
+                        <span className="text-slate-400 text-xs">•</span>
+                        <span className="text-slate-600 text-xs">Pending Arrivals: <strong className={preflight && preflight.pendingArrivalsCount > 0 ? 'text-amber-600' : 'text-slate-900'}>{preflight?.pendingArrivalsCount ?? 0}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer select-none">
+                            <input 
+                                type="checkbox"
+                                checked={forceOverride}
+                                onChange={(e) => setForceOverride(e.target.checked)}
+                                className="w-3.5 h-3.5 text-[#6C5CE7] rounded border-slate-300 focus:ring-[#6C5CE7]"
+                            />
+                            <span>Force Override (Auto-penalize non-arrived bookings as No-Show)</span>
+                        </label>
+                        <button 
+                            type="button" 
+                            onClick={loadPreflight}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors"
+                            title="Refresh Pre-Flight Status"
+                        >
+                            <RefreshCw size={12} />
+                        </button>
+                    </div>
+                </div>
+
+                {preflight && !preflight.isReady && (
+                    <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2 text-xs text-amber-900 flex items-start gap-2">
+                        <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 space-y-1">
+                            <div className="font-semibold">Pre-Flight Blockers Detected:</div>
+                            <ul className="list-disc list-inside text-[11px] space-y-0.5 text-amber-800">
+                                {preflight.blockers.map((b, idx) => (
+                                    <li key={idx}>{b}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Navigation Tabs */}
             <div className="card-container !p-2 flex flex-wrap items-center justify-between gap-2">
