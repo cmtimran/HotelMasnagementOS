@@ -63,12 +63,13 @@ export const OccupancyHeatmap: React.FC = () => {
         return () => unsub();
     }, []);
 
+    const canonicalRooms = useMemo(() => getCanonicalRooms(), [refreshTrigger]);
+
     // Calculate real dynamic telemetry data for all days in month
     const monthDaysData: DayOccupancyData[] = useMemo(() => {
-        const canonicalRooms = getCanonicalRooms();
         const storedRes = getAllStoredReservations();
         const activeRooms = canonicalRooms.filter(r => r.status !== 'Out of Order');
-        const totalRooms = activeRooms.length > 0 ? activeRooms.length : (canonicalRooms.length || 34);
+        const totalRooms = activeRooms.length > 0 ? activeRooms.length : canonicalRooms.length;
 
         return Array.from({ length: daysInMonth }, (_, i) => {
             const day = i + 1;
@@ -104,7 +105,7 @@ export const OccupancyHeatmap: React.FC = () => {
 
                         if (rIn <= dateStr && rOut > dateStr) {
                             if (roomNum) bookedRoomsToday.add(roomNum);
-                            const rmRate = Number(rm.rate || rm.tariff || rm.totalAmount || (Number(res.rateAmount || res.totalAmount || 3500) / subRooms.length)) / rmNights;
+                            const rmRate = Number(rm.rate || rm.tariff || rm.totalAmount || (Number(res.rateAmount || res.totalAmount || 0) / subRooms.length)) / rmNights;
                             dailyRevenue += rmRate;
                         }
                     });
@@ -123,7 +124,7 @@ export const OccupancyHeatmap: React.FC = () => {
                         } else if (Array.isArray(res.allocatedRooms)) {
                             res.allocatedRooms.forEach((r: any) => bookedRoomsToday.add(String(r)));
                         }
-                        const dailyRate = (Number(res.rateAmount) || Number(res.totalAmount) || 3500) / nights;
+                        const dailyRate = (Number(res.rateAmount) || Number(res.totalAmount) || 0) / nights;
                         dailyRevenue += dailyRate;
                     }
                 }
@@ -131,7 +132,7 @@ export const OccupancyHeatmap: React.FC = () => {
 
             const occupiedCount = Math.min(totalRooms, bookedRoomsToday.size);
             const occupancyPct = totalRooms > 0 ? Math.round((occupiedCount / totalRooms) * 100) : 0;
-            const adrBDT = occupiedCount > 0 ? Math.round(dailyRevenue / occupiedCount) : 3500;
+            const adrBDT = occupiedCount > 0 ? Math.round(dailyRevenue / occupiedCount) : 0;
 
             return {
                 dateStr,
@@ -254,7 +255,7 @@ export const OccupancyHeatmap: React.FC = () => {
     const occupiedDays = monthDaysData.filter(d => d.occupiedRooms > 0);
     const avgADR = occupiedDays.length > 0
         ? Math.round(occupiedDays.reduce((acc, d) => acc + d.adrBDT, 0) / occupiedDays.length)
-        : 3500;
+        : 0;
     const revPAR = totalAvailableRoomNights > 0
         ? Math.round(totalMonthRevenue / totalAvailableRoomNights)
         : 0;
@@ -263,14 +264,16 @@ export const OccupancyHeatmap: React.FC = () => {
         if (pct >= 90) return 'bg-rose-50 border-rose-300 text-rose-900';
         if (pct >= 75) return 'bg-amber-50 border-amber-300 text-amber-900';
         if (pct >= 50) return 'bg-emerald-50 border-emerald-300 text-emerald-900';
-        return 'bg-blue-50 border-blue-200 text-blue-900';
+        if (pct > 0) return 'bg-blue-50 border-blue-200 text-blue-900';
+        return 'bg-white border-slate-200 text-slate-700';
     };
 
     const getBadgeStyle = (pct: number) => {
         if (pct >= 90) return 'bg-rose-600 text-white';
         if (pct >= 75) return 'bg-amber-500 text-white';
         if (pct >= 50) return 'bg-emerald-600 text-white';
-        return 'bg-blue-500 text-white';
+        if (pct > 0) return 'bg-blue-500 text-white';
+        return 'bg-slate-100 text-slate-500';
     };
 
     return (
@@ -386,6 +389,21 @@ export const OccupancyHeatmap: React.FC = () => {
                 </span>
             </div>
 
+            {canonicalRooms.length === 0 && (
+                <div className="mx-3 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900">
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold">⚠️ Room Inventory Empty:</span>
+                        <span>0 active rooms currently configured in Property #1. Heatmap density, room counts, and RevPAR require configured physical rooms.</span>
+                    </div>
+                    <button
+                        onClick={() => setActivePage('room-management')}
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors shadow-2xs"
+                    >
+                        + Add Rooms in Room Management
+                    </button>
+                </div>
+            )}
+
             {/* Main Heatmap Grid & Inspection Drawer */}
             <div className="flex-1 p-3 flex gap-3 overflow-hidden">
                 {/* 7-column Calendar Matrix */}
@@ -478,7 +496,7 @@ export const OccupancyHeatmap: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-gray-500">Unsold Rooms:</span>
-                                    <span className="font-mono text-rose-700">{selectedDayData.totalRooms - selectedDayData.occupiedRooms} Available</span>
+                                    <span className="font-mono text-rose-700">{Math.max(0, selectedDayData.totalRooms - selectedDayData.occupiedRooms)} Available</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-gray-500">Arrivals Due:</span>

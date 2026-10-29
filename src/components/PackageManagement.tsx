@@ -225,86 +225,109 @@ const defaultPackage = (): Omit<HotelPackage, 'id'> => ({
     finance: { baseSurcharge: 0, totalCost: 0, dateBasedSurcharges: [], autoPost: true, revenueAllocations: [] }
 });
 
+export const normalizePackage = (raw: any): HotelPackage => {
+    const base = defaultPackage();
+    if (!raw || typeof raw !== 'object') return { ...base, id: Date.now() };
+    return {
+        ...base,
+        ...raw,
+        id: raw.id || Date.now(),
+        roomConfig: { ...base.roomConfig, ...(raw.roomConfig || {}) },
+        mealInclusions: { ...base.mealInclusions, ...(raw.mealInclusions || {}) },
+        poolConfig: { ...base.poolConfig, ...(raw.poolConfig || {}) },
+        transportConfig: { ...base.transportConfig, ...(raw.transportConfig || {}) },
+        laundryConfig: { ...base.laundryConfig, ...(raw.laundryConfig || {}) },
+        minibarConfig: { ...base.minibarConfig, ...(raw.minibarConfig || {}) },
+        recreationConfig: { ...base.recreationConfig, ...(raw.recreationConfig || {}) },
+        outletCredits: Array.isArray(raw.outletCredits) ? raw.outletCredits : [],
+        validity: { ...base.validity, ...(raw.validity || {}) },
+        finance: { ...base.finance, ...(raw.finance || {}) }
+    };
+};
 
 // ============================================================
 // ALLOWANCE ENGINE PREVIEW
 // ============================================================
 
 const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
+    const safePkg = normalizePackage(pkg);
     const rules: { icon: React.ReactNode; label: string; detail: string; code: string; dept: string }[] = [];
 
-    if (pkg.mealInclusions.hasBreakfast) rules.push({
+    if (safePkg.mealInclusions?.hasBreakfast) rules.push({
         icon: <Utensils size={14} />,
-        label: `Breakfast (${pkg.mealInclusions.breakfastStyle})`,
-        detail: `${pkg.mealInclusions.breakfastMenu} · ${pkg.mealInclusions.breakfastCuisine} · ${pkg.mealInclusions.breakfastVenue}`,
+        label: `Breakfast (${safePkg.mealInclusions.breakfastStyle || 'Buffet'})`,
+        detail: `${safePkg.mealInclusions.breakfastMenu || 'Standard'} · ${safePkg.mealInclusions.breakfastCuisine || 'Continental'} · ${safePkg.mealInclusions.breakfastVenue || 'Restaurant'}`,
         code: 'REV-FB-BRKFST', dept: 'DEPT-02 F&B'
     });
-    if (pkg.mealInclusions.hasLunch) rules.push({
+    if (safePkg.mealInclusions?.hasLunch) rules.push({
         icon: <Utensils size={14} />,
-        label: `Lunch (${pkg.mealInclusions.lunchStyle})`,
-        detail: `${pkg.mealInclusions.lunchMenu} · ${pkg.mealInclusions.lunchCuisine} · ${pkg.mealInclusions.lunchVenue}`,
+        label: `Lunch (${safePkg.mealInclusions.lunchStyle || 'Buffet'})`,
+        detail: `${safePkg.mealInclusions.lunchMenu || 'Standard'} · ${safePkg.mealInclusions.lunchCuisine || 'Multi-Cuisine'} · ${safePkg.mealInclusions.lunchVenue || 'Restaurant'}`,
         code: 'REV-FB-LUNCH', dept: 'DEPT-02 F&B'
     });
-    if (pkg.mealInclusions.hasDinner) rules.push({
+    if (safePkg.mealInclusions?.hasDinner) rules.push({
         icon: <Utensils size={14} />,
-        label: `Dinner (${pkg.mealInclusions.dinnerStyle})`,
-        detail: pkg.mealInclusions.dinnerStyle === 'Credit' ? `৳${pkg.mealInclusions.dinnerCredit} limit · ${pkg.mealInclusions.dinnerMenu} · ${pkg.mealInclusions.dinnerVenue}` : `${pkg.mealInclusions.dinnerMenu} · ${pkg.mealInclusions.dinnerCuisine} · ${pkg.mealInclusions.dinnerVenue}`,
+        label: `Dinner (${safePkg.mealInclusions.dinnerStyle || 'Buffet'})`,
+        detail: safePkg.mealInclusions.dinnerStyle === 'Credit' ? `৳${safePkg.mealInclusions.dinnerCredit || 0} limit · ${safePkg.mealInclusions.dinnerMenu || 'Standard'} · ${safePkg.mealInclusions.dinnerVenue || 'Restaurant'}` : `${safePkg.mealInclusions.dinnerMenu || 'Standard'} · ${safePkg.mealInclusions.dinnerCuisine || 'Multi-Cuisine'} · ${safePkg.mealInclusions.dinnerVenue || 'Restaurant'}`,
         code: 'REV-FB-DINNER', dept: 'DEPT-02 F&B'
     });
-    if (pkg.mealInclusions.hasCupole) rules.push({
+    if (safePkg.mealInclusions?.hasCupole) rules.push({
         icon: <Star size={14} />,
         label: 'Cupole Rooftop Dinner',
-        detail: `৳${pkg.mealInclusions.cupoleCredit} limit · ${pkg.mealInclusions.cupoleMenu} · ${pkg.mealInclusions.cupoleVenue}`,
+        detail: `৳${safePkg.mealInclusions.cupoleCredit || 0} limit · ${safePkg.mealInclusions.cupoleMenu || 'Special'} · ${safePkg.mealInclusions.cupoleVenue || 'Rooftop'}`,
         code: 'REV-FB-CUPOLE', dept: 'DEPT-02 F&B'
     });
-    if (pkg.roomConfig.welcomeAmenity) rules.push({
+    if (safePkg.roomConfig?.welcomeAmenity) rules.push({
         icon: <Gift size={14} />,
         label: 'Welcome Experience',
-        detail: `${pkg.roomConfig.welcomeAmenity}${pkg.roomConfig.priorityCheckin ? ' · Priority Check-in' : ''}${pkg.roomConfig.lateCheckoutAllowed ? ' · Late Checkout (2PM)' : ''}`,
+        detail: `${safePkg.roomConfig.welcomeAmenity}${safePkg.roomConfig.priorityCheckin ? ' · Priority Check-in' : ''}${safePkg.roomConfig.lateCheckoutAllowed ? ' · Late Checkout (2PM)' : ''}`,
         code: 'REV-RM-AMENITY', dept: 'DEPT-01 Rooms'
     });
-    if (pkg.roomConfig.wifiIncluded) rules.push({
+    if (safePkg.roomConfig?.wifiIncluded) rules.push({
         icon: <Zap size={14} />,
         label: 'Connectivity',
         detail: 'High-speed Fiber WiFi included for all devices',
         code: 'REV-RM-WIFI', dept: 'DEPT-01 Rooms'
     });
-    if (pkg.poolConfig.included) rules.push({
+    if (safePkg.poolConfig?.included) rules.push({
         icon: <Waves size={14} />,
         label: 'Swimming Pool',
-        detail: `${pkg.poolConfig.complimentaryAdults} Adults + ${pkg.poolConfig.complimentaryChildren} Children complimentary · Extra Adult ৳${pkg.poolConfig.extraAdultRate}`,
+        detail: `${safePkg.poolConfig.complimentaryAdults || 0} Adults + ${safePkg.poolConfig.complimentaryChildren || 0} Children complimentary · Extra Adult ৳${safePkg.poolConfig.extraAdultRate || 0}`,
         code: 'REV-REC-POOL', dept: 'DEPT-04 Recreation'
     });
-    if (pkg.transportConfig.type !== 'None') rules.push({
+    if (safePkg.transportConfig?.type && safePkg.transportConfig.type !== 'None') rules.push({
         icon: <Car size={14} />,
-        label: `Airport Transfer (${pkg.transportConfig.type})`,
-        detail: `${pkg.transportConfig.vehicleType} · Pickup ৳${pkg.transportConfig.pickupRate} · Drop ৳${pkg.transportConfig.dropRate}`,
+        label: `Airport Transfer (${safePkg.transportConfig.type})`,
+        detail: `${safePkg.transportConfig.vehicleType || 'Sedan'} · Pickup ৳${safePkg.transportConfig.pickupRate || 0} · Drop ৳${safePkg.transportConfig.dropRate || 0}`,
         code: 'REV-TRN-PCKU', dept: 'DEPT-05 Transport'
     });
-    if (pkg.laundryConfig.included) rules.push({
+    if (safePkg.laundryConfig?.included) rules.push({
         icon: <Shirt size={14} />,
         label: 'Laundry Allowance',
-        detail: `${pkg.laundryConfig.itemsAllowance} items ${pkg.laundryConfig.allowanceType} · Extra ৳${pkg.laundryConfig.extraItemRate}/item`,
+        detail: `${safePkg.laundryConfig.itemsAllowance || 0} items ${safePkg.laundryConfig.allowanceType || 'Per Stay'} · Extra ৳${safePkg.laundryConfig.extraItemRate || 0}/item`,
         code: 'REV-LAUN-STD', dept: 'DEPT-06 Minor'
     });
-    if (pkg.minibarConfig.included) rules.push({
+    if (safePkg.minibarConfig?.included) rules.push({
         icon: <Wine size={14} />,
         label: 'Minibar Credit',
-        detail: `৳${pkg.minibarConfig.dailyCredit}/day credit · ${pkg.minibarConfig.replenishment} replenishment · Extra charged to folio`,
+        detail: `৳${safePkg.minibarConfig.dailyCredit || 0}/day credit · ${safePkg.minibarConfig.replenishment || 'Daily'} replenishment · Extra charged to folio`,
         code: 'REV-MINI-BAR', dept: 'DEPT-02 Minibar'
     });
-    if (pkg.recreationConfig.included) pkg.recreationConfig.activities.forEach((act: RecreationActivity) => rules.push({
+    if (safePkg.recreationConfig?.included && Array.isArray(safePkg.recreationConfig.activities)) safePkg.recreationConfig.activities.forEach((act: RecreationActivity) => rules.push({
         icon: <Dumbbell size={14} />,
         label: act.name,
-        detail: `${act.includedSessions} session(s) included · Extra Adult ৳${act.adultRate} · Child ৳${act.childRate}`,
+        detail: `${act.includedSessions || 1} session(s) included · Extra Adult ৳${act.adultRate || 0} · Child ৳${act.childRate || 0}`,
         code: 'REV-REC-SPORT', dept: 'DEPT-04 Recreation'
     }));
-    pkg.outletCredits.forEach((oc: OutletCredit) => rules.push({
+    if (Array.isArray(safePkg.outletCredits)) safePkg.outletCredits.forEach((oc: OutletCredit) => rules.push({
         icon: <Gift size={14} />,
         label: `${oc.outletName} Credit`,
-        detail: `৳${oc.creditAmount} ${oc.creditType} · Extra usage charged to folio`,
-        code: oc.revenueCode, dept: 'DEPT-03 Spa/Other'
+        detail: `৳${oc.creditAmount || 0} ${oc.creditType || 'Fixed'} · Extra usage charged to folio`,
+        code: oc.revenueCode || 'REV-OTHER', dept: 'DEPT-03 Spa/Other'
     }));
+
+    const allocations = Array.isArray(safePkg.finance?.revenueAllocations) ? safePkg.finance.revenueAllocations : [];
+    const surcharges = Array.isArray(safePkg.finance?.dateBasedSurcharges) ? safePkg.finance.dateBasedSurcharges : [];
 
     return (
         <div className="space-y-4">
@@ -316,7 +339,7 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
                     <div className="text-[10px] bg-primary-subtle text-primary px-2.5 py-0.5 rounded-full border border-primary-border font-bold">FINANCE V1.2</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                    {pkg.finance.revenueAllocations.map((alloc, i) => (
+                    {allocations.map((alloc, i) => (
                         <div key={i} className="flex flex-col gap-1 p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
                             <span className="text-[10px] text-primary uppercase tracking-wider">{alloc.department}</span>
                             <div className="flex items-center justify-between">
@@ -330,10 +353,10 @@ const AllowanceEngineViewer = ({ pkg }: { pkg: HotelPackage }) => {
                         </div>
                     ))}
                 </div>
-                {pkg.finance.dateBasedSurcharges.length > 0 && (
+                {surcharges.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-2">
                         <div className="text-[10px] text-amber-700 uppercase tracking-wider text-center">Seasonal Peak Rules Applied</div>
-                        {pkg.finance.dateBasedSurcharges.map((s, i) => (
+                        {surcharges.map((s, i) => (
                             <div key={i} className="flex justify-between items-center bg-amber-50/60 p-2.5 rounded-xl border border-amber-200">
                                 <span className="text-xs text-amber-900 font-medium">{s.reason}</span>
                                 <span className="text-xs font-black text-amber-800 font-mono">+৳{s.surchargeAmount.toLocaleString()}</span>
@@ -415,7 +438,10 @@ const PackageManagement = () => {
     const [packages, setPackages] = useState<HotelPackage[]>(() => {
         try {
             const saved = localStorage.getItem(PKG_STORAGE_KEY);
-            if (saved) return JSON.parse(saved);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) return parsed.map(normalizePackage);
+            }
         } catch {
             // fallback
         }
@@ -430,9 +456,10 @@ const PackageManagement = () => {
     const [previewMode, setPreviewMode] = useState(false);
 
     const persistPackages = (updated: HotelPackage[]) => {
-        setPackages(updated);
+        const normalized = updated.map(normalizePackage);
+        setPackages(normalized);
         try {
-            localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(updated));
+            localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(normalized));
         } catch {
             // fallback
         }
@@ -450,9 +477,10 @@ const PackageManagement = () => {
         fetch(`${getApiBaseUrl()}/api/rates/packages?propertyId=1`)
             .then(res => res.json())
             .then(json => {
-                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                    setPackages(json.data);
-                    localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(json.data));
+                if (json.success && Array.isArray(json.data)) {
+                    const normalized = json.data.map(normalizePackage);
+                    setPackages(normalized);
+                    localStorage.setItem(PKG_STORAGE_KEY, JSON.stringify(normalized));
                 }
             })
             .catch(() => {});
@@ -467,8 +495,9 @@ const PackageManagement = () => {
     };
 
     const openEdit = (pkg: HotelPackage) => {
-        setFormData({ ...pkg });
-        setEditingPackage(pkg);
+        const safe = normalizePackage(pkg);
+        setFormData({ ...safe });
+        setEditingPackage(safe);
         setIsCodeManual(true);
         setActiveTab('basic');
         setView('form');
@@ -714,18 +743,19 @@ const PackageManagement = () => {
 
             {/* Package Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {filtered.map(pkg => {
+                {filtered.map(rawPkg => {
+                    const pkg = normalizePackage(rawPkg);
                     const inclusions = [
-                        pkg.mealInclusions.hasBreakfast && '🍳 Breakfast',
-                        pkg.mealInclusions.hasLunch && '🥗 Lunch',
-                        pkg.mealInclusions.hasDinner && '🍽️ Dinner',
-                        pkg.mealInclusions.hasCupole && '⭐ Cupole Dinner',
-                        pkg.poolConfig.included && '🏊 Pool',
-                        pkg.transportConfig.type !== 'None' && `✈️ Transfer (${pkg.transportConfig.type})`,
-                        pkg.laundryConfig.included && `👕 Laundry (${pkg.laundryConfig.itemsAllowance} items)`,
-                        pkg.minibarConfig.included && `🍾 Minibar (৳${pkg.minibarConfig.dailyCredit}/day)`,
-                        pkg.recreationConfig.included && '🎯 Recreation',
-                        pkg.outletCredits.length > 0 && `💆 ${pkg.outletCredits.map(o => o.outletName).join(', ')}`,
+                        pkg.mealInclusions?.hasBreakfast && '🍳 Breakfast',
+                        pkg.mealInclusions?.hasLunch && '🥗 Lunch',
+                        pkg.mealInclusions?.hasDinner && '🍽️ Dinner',
+                        pkg.mealInclusions?.hasCupole && '⭐ Cupole Dinner',
+                        pkg.poolConfig?.included && '🏊 Pool',
+                        pkg.transportConfig?.type !== 'None' && `✈️ Transfer (${pkg.transportConfig?.type})`,
+                        pkg.laundryConfig?.included && `👕 Laundry (${pkg.laundryConfig?.itemsAllowance || 0} items)`,
+                        pkg.minibarConfig?.included && `🍾 Minibar (৳${pkg.minibarConfig?.dailyCredit || 0}/day)`,
+                        pkg.recreationConfig?.included && '🎯 Recreation',
+                        (pkg.outletCredits?.length || 0) > 0 && `💆 ${pkg.outletCredits.map(o => o.outletName).join(', ')}`,
                     ].filter(Boolean);
 
                     return (
@@ -795,12 +825,12 @@ const PackageManagement = () => {
                                 {/* Footer info */}
                                 <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-2">
                                     <div className="flex items-center gap-3 text-xs text-slate-500">
-                                        <span className="flex items-center gap-1"><BedDouble size={12} className="text-slate-400" />{pkg.roomConfig.applicableRoomTypes.length || 'All'} Room Types</span>
-                                        <span className="flex items-center gap-1"><Calendar size={12} className="text-slate-400" />Min {pkg.validity.minNights}N</span>
+                                        <span className="flex items-center gap-1"><BedDouble size={12} className="text-slate-400" />{pkg.roomConfig?.applicableRoomTypes?.length || 'All'} Room Types</span>
+                                        <span className="flex items-center gap-1"><Calendar size={12} className="text-slate-400" />Min {pkg.validity?.minNights || 1}N</span>
                                     </div>
                                     <div className="text-right">
                                         <span className="text-[10px] text-slate-400 uppercase font-semibold block">Surcharge</span>
-                                        <span className="text-base text-slate-900 font-mono">৳{pkg.finance.baseSurcharge.toLocaleString()}<span className="text-xs font-normal text-slate-400">/night</span></span>
+                                        <span className="text-base text-slate-900 font-mono">৳{(pkg.finance?.baseSurcharge || 0).toLocaleString()}<span className="text-xs font-normal text-slate-400">/night</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -824,7 +854,7 @@ const PackageManagement = () => {
     );
 
     // ── FORM VIEW ──
-    const fm = formData;
+    const fm = normalizePackage(formData);
 
     return (
         <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
@@ -872,11 +902,11 @@ const PackageManagement = () => {
                             <span className="text-[10px] text-yellow-400 font-semibold">Allowance Engine</span>
                         </div>
                         <div className="space-y-1">
-                            {fm.mealInclusions.hasBreakfast && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Breakfast routed</div>}
-                            {fm.poolConfig.included && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Pool routed</div>}
-                            {fm.laundryConfig.included && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Laundry limit set</div>}
-                            {fm.minibarConfig.included && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Minibar credit set</div>}
-                            {fm.transportConfig.type !== 'None' && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Transport routed</div>}
+                            {fm.mealInclusions?.hasBreakfast && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Breakfast routed</div>}
+                            {fm.poolConfig?.included && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Pool routed</div>}
+                            {fm.laundryConfig?.included && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Laundry limit set</div>}
+                            {fm.minibarConfig?.included && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Minibar credit set</div>}
+                            {fm.transportConfig?.type !== 'None' && <div className="text-[9px] text-emerald-400 flex items-center gap-1"><Check size={8} /> Transport routed</div>}
                         </div>
                     </div>
                 </div>

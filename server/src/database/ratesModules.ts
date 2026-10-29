@@ -283,8 +283,8 @@ export async function ensureRatesAndExtendedTablesPostgres(pool: Pool): Promise<
             }
         }
 
-        // 7. Seed Initial Data if Tables are Empty
-        await seedRatesAndModulesIfEmpty(client);
+        // 7. Dynamic schema verification completed
+        // (Automatic re-seeding disabled to ensure clean single-property architecture)
     } finally {
         client.release();
     }

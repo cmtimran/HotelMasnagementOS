@@ -395,8 +395,8 @@ export const FrontDesk: React.FC = () => {
 
     const canonicalRooms = useMemo(() => getCanonicalRooms(), [reservations]);
     const totalOccupied = inHouseList.length;
-    const totalCapacity = Math.max(1, canonicalRooms.length || 34);
-    const occupancyRate = Math.round((totalOccupied / totalCapacity) * 100);
+    const totalCapacity = canonicalRooms.length;
+    const occupancyRate = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0;
     const cleanVacantCount = useMemo(
         () => canonicalRooms.filter(r => r.status === 'Active' && r.housekeepingStatus !== 'Dirty').length,
         [canonicalRooms]

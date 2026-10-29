@@ -2083,9 +2083,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             )}
                                         </label>
                                         <input
-                                            type="text"
-                                            name="quick_guest_lookup_q"
-                                            autoComplete="off"
+                                            type="search"
+                                            name="quick_gst_name_srch"
+                                            autoComplete="one-time-code"
                                             autoCorrect="off"
                                             autoCapitalize="off"
                                             spellCheck={false}
@@ -2113,7 +2113,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                 }
                                             }}
                                             onBlur={() => setTimeout(() => setIsNameSuggestOpen(false), 250)}
-                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-medium"
+                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-medium [&::-webkit-search-decoration]:hidden [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden"
                                         />
 
                                         {/* Inline Name Suggestions Dropdown (Spacious overlay width) */}
@@ -2174,9 +2174,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             )}
                                         </label>
                                         <input
-                                            type="text"
-                                            name="quick_phone_lookup_q"
-                                            autoComplete="off"
+                                            type="search"
+                                            name="quick_gst_phone_srch"
+                                            autoComplete="one-time-code"
                                             autoCorrect="off"
                                             autoCapitalize="off"
                                             spellCheck={false}
@@ -2201,7 +2201,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                 setIsMobileSuggestOpen(true);
                                             }}
                                             onBlur={() => setTimeout(() => setIsMobileSuggestOpen(false), 250)}
-                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono"
+                                            className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono [&::-webkit-search-decoration]:hidden [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden"
                                         />
 
                                         {/* Inline Mobile Suggestions Dropdown (Spacious overlay width) */}

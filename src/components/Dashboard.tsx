@@ -75,7 +75,7 @@ const Dashboard: React.FC = () => {
 
     // Dynamic Calculations based on Central DB
     const metrics = useMemo(() => {
-        const totalRooms = rooms.length || 34;
+        const totalRooms = rooms.length;
 
         const activeReservations = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'voided');
 
@@ -185,11 +185,11 @@ const Dashboard: React.FC = () => {
         const totalPaid = activeReservations.reduce((sum, r) => sum + (Number(r.paidAmount) || 0), 0);
         const totalDue = activeReservations.reduce((sum, r) => sum + (Number(r.dueAmount) || 0), 0);
 
-        const adr = occupiedCount > 0 ? Math.round(totalRevenue / (activeReservations.reduce((sum, r) => sum + (Number(r.nights) || 1), 0) || 1)) : 4500;
-        const revPar = totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 3150;
+        const adr = occupiedCount > 0 ? Math.round(totalRevenue / (activeReservations.reduce((sum, r) => sum + (Number(r.nights) || 1), 0) || 1)) : 0;
+        const revPar = totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0;
         const avgNights = activeReservations.length > 0
             ? (activeReservations.reduce((sum, r) => sum + (Number(r.nights) || 1), 0) / activeReservations.length).toFixed(1)
-            : '2.5';
+            : '0';
 
         const cancellationsToday = reservations.filter(r => r.status === 'cancelled').length;
 

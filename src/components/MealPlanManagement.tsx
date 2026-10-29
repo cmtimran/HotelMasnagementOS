@@ -96,7 +96,7 @@ export default function MealPlanManagement() {
         fetch(`${getApiBaseUrl()}/api/rates/meal-plans?propertyId=1`)
             .then(res => res.json())
             .then(json => {
-                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                if (json.success && Array.isArray(json.data)) {
                     setMealPlans(json.data);
                     localStorage.setItem(MEAL_STORAGE_KEY, JSON.stringify(json.data));
                 }

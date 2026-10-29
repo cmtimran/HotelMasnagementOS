@@ -263,7 +263,7 @@ export const HotelInfoView: React.FC<HotelInfoViewProps> = ({ property, currentU
     const propGrade = serverProperty?.star_rating
         ? `${serverProperty.star_rating} Star Luxury`
         : (targetProperty?.grade || `${targetProperty?.star_rating || 5} Star Luxury`);
-    const propRooms = propertyStats.totalRooms || 34;
+    const propRooms = propertyStats.totalRooms || 0;
     const propCity = serverProperty?.city || targetProperty?.city || 'Dhaka';
     const propCountry = serverProperty?.country || targetProperty?.country || 'Bangladesh';
     const propAddress = serverProperty?.address || targetProperty?.address || 'Plot 12, Road 45, Gulshan-2, Dhaka';

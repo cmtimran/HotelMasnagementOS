@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { getApiBaseUrl } from '../utils/apiUrl';
-import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
+import { broadcastPMSEvent, getDynamicRoomTypes, getCanonicalRooms } from '../utils/roomInventoryEngine';
 
 interface DayRate {
     date: string;
@@ -19,9 +19,10 @@ interface DayRate {
 const STORAGE_KEY = 'hotel_rate_calendar_v2';
 
 const getDynamicRoomTypeRate = (typeName: string) => {
+    if (!typeName) return { weekday: 0, weekend: 0 };
     const types = getDynamicRoomTypes();
     const match = types.find(t => t.name.toLowerCase() === typeName.toLowerCase() || t.code.toLowerCase() === typeName.toLowerCase());
-    const base = match ? Number(match.baseRate) : 3000;
+    const base = match ? Number(match.baseRate) : 0;
     return {
         weekday: base,
         weekend: Math.round(base * 1.25)
@@ -45,9 +46,10 @@ export default function RateCalendar() {
     const [currentMonth, setCurrentMonth] = useState(() => new Date(2026, 6, 1));
     const dynamicTypes = useMemo(() => getDynamicRoomTypes(), []);
     const availableRoomTypes = useMemo(() => {
-        return dynamicTypes.length > 0 ? dynamicTypes.map(t => t.name) : ['Deluxe Double'];
+        return dynamicTypes.length > 0 ? dynamicTypes.map(t => t.name) : [];
     }, [dynamicTypes]);
-    const [selectedRoomType, setSelectedRoomType] = useState(() => availableRoomTypes[0] || 'Deluxe Double');
+    const [selectedRoomType, setSelectedRoomType] = useState(() => availableRoomTypes[0] || '');
+    const [bookings, setBookings] = useState<any[]>([]);
     const [editingDate, setEditingDate] = useState<string | null>(null);
     const [tempRate, setTempRate] = useState('');
 
@@ -70,6 +72,18 @@ export default function RateCalendar() {
     });
 
     const currentRates = ratesByRoomType[selectedRoomType] || {};
+
+    // Load actual bookings to compute dynamic occupancy
+    useEffect(() => {
+        fetch(`${getApiBaseUrl()}/api/bookings?propertyId=1`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.success && Array.isArray(json.data)) {
+                    setBookings(json.data);
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         fetch(`${getApiBaseUrl()}/api/rates/calendar?propertyId=1`)
@@ -126,16 +140,45 @@ export default function RateCalendar() {
         return isWeekend ? defaults.weekend : defaults.weekday;
     };
 
+    const getDynamicOccupancyForDate = (dateStr: string, roomTypeName: string): number => {
+        if (!roomTypeName) return 0;
+        const canonicalRooms = getCanonicalRooms();
+        const totalRoomsOfType = canonicalRooms.filter(r => 
+            r.roomTypeName?.toLowerCase() === roomTypeName.toLowerCase() ||
+            r.roomTypeId === dynamicTypes.find(t => t.name.toLowerCase() === roomTypeName.toLowerCase())?.id?.toString()
+        ).length;
+
+        if (totalRoomsOfType === 0) return 0;
+
+        const bookedCount = bookings.filter(b => {
+            if (b.status === 'Cancelled' || b.status === 'No-Show') return false;
+            const isSameType = b.roomType?.toLowerCase() === roomTypeName.toLowerCase() ||
+                               b.roomTypeName?.toLowerCase() === roomTypeName.toLowerCase();
+            if (!isSameType) return false;
+            const checkIn = (b.checkInDate || b.checkIn || '').slice(0, 10);
+            const checkOut = (b.checkOutDate || b.checkOut || '').slice(0, 10);
+            return dateStr >= checkIn && dateStr < checkOut;
+        }).length;
+
+        return Math.min(100, Math.round((bookedCount / totalRoomsOfType) * 100));
+    };
+
     const getRateForDate = (date: Date): DayRate => {
         const dateStr = formatDate(date);
+        const dynamicOcc = getDynamicOccupancyForDate(dateStr, selectedRoomType);
         if (currentRates[dateStr]) {
-            return currentRates[dateStr];
+            return {
+                ...currentRates[dateStr],
+                occupancy: currentRates[dateStr].occupancy !== undefined && currentRates[dateStr].occupancy > 0
+                    ? currentRates[dateStr].occupancy
+                    : dynamicOcc
+            };
         }
         const dayOfWeek = date.getDay();
         return {
             date: dateStr,
             rate: getDefaultRate(date),
-            occupancy: 0,
+            occupancy: dynamicOcc,
             isWeekend: dayOfWeek === 5 || dayOfWeek === 6,
             isHoliday: false,
         };
@@ -321,200 +364,224 @@ export default function RateCalendar() {
                 }
             />
 
-            {/* KPI Metric Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-slate-500">Selected Room</span>
-                        <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
-                            <BedDouble className="size-4" />
-                        </div>
+            {availableRoomTypes.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-12 text-center max-w-xl mx-auto space-y-4">
+                    <div className="size-16 rounded-2xl bg-primary-subtle text-primary flex items-center justify-center mx-auto">
+                        <BedDouble className="size-8" />
                     </div>
-                    <div className="text-base text-slate-900 truncate tracking-tight">{selectedRoomType}</div>
-                    <div className="text-[11px] text-slate-500 font-medium mt-1">
-                        WD: ৳{getDynamicRoomTypeRate(selectedRoomType).weekday.toLocaleString()} | WE: ৳{getDynamicRoomTypeRate(selectedRoomType).weekend.toLocaleString()}
+                    <div className="space-y-1">
+                        <h3 className="text-lg font-bold text-slate-800">No Room Types Configured</h3>
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                            The dynamic ARI & Rate Distribution calendar requires at least one room category to configure seasonal tariffs and yield management.
+                        </p>
                     </div>
-                </div>
-
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-slate-500">Avg Monthly Tariff</span>
-                        <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                            <DollarSign className="size-4" />
-                        </div>
-                    </div>
-                    <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{avgRate.toLocaleString()}</div>
-                    <div className="text-[11px] text-emerald-600 font-semibold mt-1">Dynamic ARI average</div>
-                </div>
-
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-slate-500">Peak Yield Rate</span>
-                        <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                            <Flame className="size-4" />
-                        </div>
-                    </div>
-                    <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{maxRate.toLocaleString()}</div>
-                    <div className="text-[11px] text-slate-500 font-medium mt-1">Maximum surge rate</div>
-                </div>
-
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-slate-500">Peak Occupancy Days</span>
-                        <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                            <TrendingUp className="size-4" />
-                        </div>
-                    </div>
-                    <div className="text-2xl font-black text-slate-900 tracking-tight">{highOccupancyDays} Days</div>
-                    <div className="text-[11px] text-indigo-600 font-semibold mt-1">&ge;80% occupancy threshold</div>
-                </div>
-            </div>
-
-            {/* Controls & Category Toolbar */}
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-500">Room Category:</span>
-                        <select
-                            value={selectedRoomType}
-                            onChange={(e) => setSelectedRoomType(e.target.value)}
-                            className="select-standard text-xs py-1.5 px-3 min-w-[180px]"
+                    <div className="pt-2">
+                        <a
+                            href="/room-types"
+                            className="btn-primary inline-flex items-center gap-2"
                         >
-                            {availableRoomTypes.map(rt => (
-                                <option key={rt} value={rt}>{rt}</option>
-                            ))}
-                        </select>
+                            <span>+ Configure Room Types</span>
+                        </a>
                     </div>
                 </div>
-
-                {/* Month Navigator */}
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-slate-50 border border-slate-200/90 rounded-xl p-0.5 shadow-2xs">
-                        <button
-                            onClick={previousMonth}
-                            className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
-                            title="Previous Month"
-                        >
-                            <ChevronLeft className="size-4" />
-                        </button>
-                        <span className="text-xs text-slate-800 px-3 min-w-[130px] text-center">{monthName}</span>
-                        <button
-                            onClick={nextMonth}
-                            className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
-                            title="Next Month"
-                        >
-                            <ChevronRight className="size-4" />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Compact Legend Bar */}
-            <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
-                <div className="flex flex-wrap items-center gap-4">
-                    <span className="text-slate-700 text-[10px] uppercase tracking-wider">Tariff Legend:</span>
-                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-purple-600"></span> Suite / VIP (৳10k+)</span>
-                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-primary"></span> Premium (৳5k-10k)</span>
-                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-emerald-600"></span> Standard (৳3k-5k)</span>
-                    <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-slate-500"></span> Base (&lt;৳3k)</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary-subtle px-2.5 py-1 rounded-lg border border-primary-border/40">
-                    <TrendingUp className="size-3.5" />
-                    <span>Dynamic ARI Engine Synchronized with Channels</span>
-                </div>
-            </div>
-
-            {/* Calendar Grid */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                <div className="overflow-x-auto">
-                    <div className="min-w-[760px]">
-                        <div className="grid grid-cols-7 bg-slate-50/80 border-b border-slate-200/80 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider py-2.5">
-                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri (Weekend)', 'Sat (Weekend)'].map(day => (
-                                <div key={day}>{day}</div>
-                            ))}
+            ) : (
+                <>
+                    {/* KPI Metric Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Selected Room</span>
+                                <div className="size-8 rounded-xl bg-primary-subtle text-primary flex items-center justify-center font-bold">
+                                    <BedDouble className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-base text-slate-900 truncate tracking-tight">{selectedRoomType}</div>
+                            <div className="text-[11px] text-slate-500 font-medium mt-1">
+                                WD: ৳{getDynamicRoomTypeRate(selectedRoomType).weekday.toLocaleString()} | WE: ৳{getDynamicRoomTypeRate(selectedRoomType).weekend.toLocaleString()}
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
-                            {days.map((day, index) => {
-                                if (!day) {
-                                    return <div key={`empty-${index}`} className="h-24 bg-slate-50/40" />;
-                                }
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Avg Monthly Tariff</span>
+                                <div className="size-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                    <DollarSign className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{avgRate.toLocaleString()}</div>
+                            <div className="text-[11px] text-emerald-600 font-semibold mt-1">Dynamic ARI average</div>
+                        </div>
 
-                                const dayRate = getRateForDate(day);
-                                const dateStr = formatDate(day);
-                                const isEditing = editingDate === dateStr;
-                                const isToday = '2026-07-01' === dateStr;
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Peak Yield Rate</span>
+                                <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                                    <Flame className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{maxRate.toLocaleString()}</div>
+                            <div className="text-[11px] text-slate-500 font-medium mt-1">Maximum surge rate</div>
+                        </div>
 
-                                return (
-                                    <div
-                                        key={dateStr}
-                                        onClick={() => !isEditing && handleCellClick(day)}
-                                        className={`h-24 p-2.5 cursor-pointer transition hover:bg-slate-50/80 ${
-                                            isToday ? 'bg-primary-subtle/30 ring-1 ring-primary inset-0' : 'bg-white'
-                                        }`}
-                                    >
-                                        <div className="h-full flex flex-col justify-between">
-                                            <div className="flex items-center justify-between leading-none">
-                                                <span className={`text-xs ${isToday ? 'text-primary' : 'text-slate-800'}`}>
-                                                    {day.getDate()}
-                                                </span>
-                                                {dayRate.occupancy > 0 && (
-                                                    <span className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
-                                                        <span className={`size-1.5 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
-                                                        {dayRate.occupancy}%
-                                                    </span>
-                                                )}
-                                            </div>
+                        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-500">Peak Occupancy Days</span>
+                                <div className="size-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                                    <TrendingUp className="size-4" />
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight">{highOccupancyDays} Days</div>
+                            <div className="text-[11px] text-indigo-600 font-semibold mt-1">&ge;80% occupancy threshold</div>
+                        </div>
+                    </div>
 
-                                            {isEditing ? (
-                                                <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1 text-[11px] text-slate-400 font-bold">৳</span>
-                                                        <input
-                                                            type="number"
-                                                            value={tempRate}
-                                                            onChange={(e) => setTempRate(e.target.value)}
-                                                            className="w-full pl-5 pr-1 py-1 border border-primary rounded-lg text-xs outline-none"
-                                                            autoFocus
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') handleSaveRate();
-                                                                if (e.key === 'Escape') setEditingDate(null);
-                                                            }}
-                                                        />
+                    {/* Controls & Category Toolbar */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-500">Room Category:</span>
+                                <select
+                                    value={selectedRoomType}
+                                    onChange={(e) => setSelectedRoomType(e.target.value)}
+                                    className="select-standard text-xs py-1.5 px-3 min-w-[180px]"
+                                >
+                                    {availableRoomTypes.map(rt => (
+                                        <option key={rt} value={rt}>{rt}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Month Navigator */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center bg-slate-50 border border-slate-200/90 rounded-xl p-0.5 shadow-2xs">
+                                <button
+                                    onClick={previousMonth}
+                                    className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
+                                    title="Previous Month"
+                                >
+                                    <ChevronLeft className="size-4" />
+                                </button>
+                                <span className="text-xs text-slate-800 px-3 min-w-[130px] text-center">{monthName}</span>
+                                <button
+                                    onClick={nextMonth}
+                                    className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
+                                    title="Next Month"
+                                >
+                                    <ChevronRight className="size-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Compact Legend Bar */}
+                    <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
+                        <div className="flex flex-wrap items-center gap-4">
+                            <span className="text-slate-700 text-[10px] uppercase tracking-wider">Tariff Legend:</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-purple-600"></span> Suite / VIP (৳10k+)</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-primary"></span> Premium (৳5k-10k)</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-emerald-600"></span> Standard (৳3k-5k)</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-slate-500"></span> Base (&lt;৳3k)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary-subtle px-2.5 py-1 rounded-lg border border-primary-border/40">
+                            <TrendingUp className="size-3.5" />
+                            <span>Dynamic ARI Engine Synchronized with Channels</span>
+                        </div>
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <div className="min-w-[760px]">
+                                <div className="grid grid-cols-7 bg-slate-50/80 border-b border-slate-200/80 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider py-2.5">
+                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri (Weekend)', 'Sat (Weekend)'].map(day => (
+                                        <div key={day}>{day}</div>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
+                                    {days.map((day, index) => {
+                                        if (!day) {
+                                            return <div key={`empty-${index}`} className="h-24 bg-slate-50/40" />;
+                                        }
+
+                                        const dayRate = getRateForDate(day);
+                                        const dateStr = formatDate(day);
+                                        const isEditing = editingDate === dateStr;
+                                        const isToday = '2026-07-01' === dateStr;
+
+                                        return (
+                                            <div
+                                                key={dateStr}
+                                                onClick={() => !isEditing && handleCellClick(day)}
+                                                className={`h-24 p-2.5 cursor-pointer transition hover:bg-slate-50/80 ${
+                                                    isToday ? 'bg-primary-subtle/30 ring-1 ring-primary inset-0' : 'bg-white'
+                                                }`}
+                                            >
+                                                <div className="h-full flex flex-col justify-between">
+                                                    <div className="flex items-center justify-between leading-none">
+                                                        <span className={`text-xs ${isToday ? 'text-primary' : 'text-slate-800'}`}>
+                                                            {day.getDate()}
+                                                        </span>
+                                                        {dayRate.occupancy > 0 && (
+                                                            <span className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                                                                <span className={`size-1.5 rounded-full ${getOccupancyColor(dayRate.occupancy)}`} />
+                                                                {dayRate.occupancy}%
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    <div className="flex gap-1">
-                                                        <button
-                                                            onClick={handleSaveRate}
-                                                            className="flex-1 py-1 bg-emerald-600 text-white rounded-lg text-[10px] hover:bg-emerald-700 transition"
-                                                        >
-                                                            <Save className="size-3 mx-auto" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setEditingDate(null)}
-                                                            className="flex-1 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] hover:bg-slate-200 transition"
-                                                        >
-                                                            <RotateCcw className="size-3 mx-auto" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-1">
-                                                    <div className={`px-2 py-1 ${getRateColor(dayRate.rate)} rounded-lg text-center shadow-2xs`}>
-                                                        <p className="text-xs leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
-                                                    </div>
-                                                    {dayRate.eventName && (
-                                                        <p className="text-[10px] text-rose-600 font-semibold truncate leading-none mt-1">{dayRate.eventName}</p>
+
+                                                    {isEditing ? (
+                                                        <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="relative">
+                                                                <span className="absolute left-2 top-1 text-[11px] text-slate-400 font-bold">৳</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={tempRate}
+                                                                    onChange={(e) => setTempRate(e.target.value)}
+                                                                    className="w-full pl-5 pr-1 py-1 border border-primary rounded-lg text-xs outline-none"
+                                                                    autoFocus
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') handleSaveRate();
+                                                                        if (e.key === 'Escape') setEditingDate(null);
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex gap-1">
+                                                                <button
+                                                                    onClick={handleSaveRate}
+                                                                    className="flex-1 py-1 bg-emerald-600 text-white rounded-lg text-[10px] hover:bg-emerald-700 transition"
+                                                                >
+                                                                    <Save className="size-3 mx-auto" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setEditingDate(null)}
+                                                                    className="flex-1 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] hover:bg-slate-200 transition"
+                                                                >
+                                                                    <RotateCcw className="size-3 mx-auto" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-1">
+                                                            <div className={`px-2 py-1 ${getRateColor(dayRate.rate)} rounded-lg text-center shadow-2xs`}>
+                                                                <p className="text-xs leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
+                                                            </div>
+                                                            {dayRate.eventName && (
+                                                                <p className="text-[10px] text-rose-600 font-semibold truncate leading-none mt-1">{dayRate.eventName}</p>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </>
+            )}
 
             {/* Bulk Update Modal */}
             {isBulkOpen && (

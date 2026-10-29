@@ -143,7 +143,7 @@ export const STORAGE_KEY_CONNECTING_SUITES = 'hotel_connecting_rooms_v1';
 
 // One-time clean baseline purge of legacy mock demo data
 if (typeof window !== 'undefined') {
-    const PURGE_KEY = 'hotel_baseline_purged_v1';
+    const PURGE_KEY = 'hotel_baseline_purged_v2';
     if (!localStorage.getItem(PURGE_KEY)) {
         try {
             [
@@ -164,7 +164,10 @@ if (typeof window !== 'undefined') {
                 'hotel_maintenance_tasks_v2',
                 'hotel_housekeeping_discrepancies_v1',
                 'hotel_housekeepers_roster_v1',
-                'hotel_lost_and_found_v1'
+                'hotel_lost_and_found_v1',
+                'hotel_rate_calendar_v2',
+                'hotel_packages_v2',
+                'hotel_meal_plans_v1'
             ].forEach(k => localStorage.removeItem(k));
             localStorage.setItem(PURGE_KEY, 'true');
         } catch {}

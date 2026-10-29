@@ -325,7 +325,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
         targetProperty?.star_rating ? `${targetProperty.star_rating} Star` : (targetProperty?.grade || '5 Star')
     );
     const [propRooms, setPropRooms] = useState<number>(
-        Number(targetProperty?.total_rooms ?? targetProperty?.rooms ?? 34)
+        Number(targetProperty?.total_rooms ?? targetProperty?.rooms ?? 0)
     );
     const liveRoomsCount = useMemo(() => {
         try {
@@ -419,7 +419,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
             setPropCode(p.code || 'GPD');
             setPropType(p.property_type || p.type || 'Hotel');
             setPropGrade(p.star_rating ? `${p.star_rating} Star` : (p.grade || '5 Star'));
-            setPropRooms(Number(p.total_rooms ?? p.rooms ?? 34));
+            setPropRooms(Number(p.total_rooms ?? p.rooms ?? 0));
             setPropCity(p.city || 'Dhaka');
             setPropCountry(p.country || 'Bangladesh');
             setPropAddress(p.address || 'Plot 12, Road 45, Gulshan-2, Dhaka');
@@ -533,7 +533,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                         code: propCode.trim() || propName.slice(0, 3).toUpperCase(),
                         propertyType: propType.toUpperCase(),
                         starRating: starRatingNum,
-                        totalRooms: Number(propRooms) || 34,
+                        totalRooms: Number(propRooms) || 0,
                         city: propCity.trim(),
                         country: propCountry.trim(),
                         address: propAddress.trim(),
