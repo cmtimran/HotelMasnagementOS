@@ -186,21 +186,7 @@ export const FolioHub: React.FC = () => {
 
     const buildFoliosFromDB = useCallback((): FolioAccount[] => {
         const canonical = getAllStoredReservations();
-        const purgeTarget = 'RES-202610290007';
-
-        const filtered = canonical.filter(r => {
-            const no = String(r.reservationNumber || r.id || '');
-            const guest = String(r.guestName || r.guest?.fullName || '').toLowerCase();
-            return (
-                no !== purgeTarget &&
-                !no.includes('202610290007') &&
-                !no.startsWith('RES-0092') &&
-                !no.startsWith('RES-0091') &&
-                !guest.includes('robert langdon') &&
-                !guest.includes('naimur') &&
-                !guest.includes('tahmina')
-            );
-        });
+        const filtered = canonical.filter(r => Boolean(r && (r.reservationNumber || r.id)));
 
         if (filtered.length === 0) {
             return [];

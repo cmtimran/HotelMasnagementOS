@@ -277,17 +277,33 @@ export const isMatchingRoomType = (typeA?: string, typeB?: string): boolean => {
     const a = typeA.trim().toLowerCase();
     const b = typeB.trim().toLowerCase();
     if (a === b) return true;
+
     const aIsConnecting = a.includes('connecting') || a.includes('interconnecting');
     const bIsConnecting = b.includes('connecting') || b.includes('interconnecting');
     if (aIsConnecting || bIsConnecting) {
         return aIsConnecting && bIsConnecting && (a.includes(b) || b.includes(a));
     }
+
     if (a.includes(b) || b.includes(a)) return true;
-    if (a.includes('presidential') && b.includes('presidential')) return true;
-    if (a.includes('executive') && b.includes('executive')) return true;
-    if (a.includes('superior') && b.includes('superior')) return true;
-    if (a.includes('deluxe') && b.includes('deluxe')) return true;
-    if (a.includes('standard') && b.includes('standard')) return true;
+
+    // Dynamically match against the hotel's registered room types
+    const dynamicTypes = getDynamicRoomTypes();
+    for (const rt of dynamicTypes) {
+        const rtName = (rt.name || '').trim().toLowerCase();
+        const rtCode = (rt.code || '').trim().toLowerCase();
+        const matchesA = (rtName && (a === rtName || a.includes(rtName) || rtName.includes(a))) || (rtCode && a === rtCode);
+        const matchesB = (rtName && (b === rtName || b.includes(rtName) || rtName.includes(b))) || (rtCode && b === rtCode);
+        if (matchesA && matchesB) return true;
+
+        // Check significant unique token match of the registered room type
+        const tokens = rtName.split(/\s+/).filter(t => t.length >= 3 && !['room', 'suite', 'floor', 'bed', 'view'].includes(t));
+        for (const token of tokens) {
+            if (a.includes(token) && b.includes(token)) {
+                return true;
+            }
+        }
+    }
+
     return false;
 };
 
@@ -353,16 +369,17 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
             const unified = localStorage.getItem(`hotel_unified_settings_prop_${propId}`);
             if (unified) {
                 const parsed = JSON.parse(unified);
-                if (parsed.settings) {
+                const s = parsed.settings || parsed;
+                if (s) {
                     return {
-                        checkInTime: parsed.settings.checkInTime || '14:00',
-                        checkOutTime: parsed.settings.checkOutTime || '12:00',
-                        visitorIdentityRule: parsed.settings.visitorIdentityRule || 'Government-issued Photo ID / Passport required upon arrival.',
-                        cancellationText: parsed.settings.cancellationText || 'Free cancellation up to 48 hours prior to standard check-in time.',
-                        childStayPolicy: parsed.settings.childStayPolicy,
-                        petPolicyText: parsed.settings.petPolicyText,
-                        smokingPolicyText: parsed.settings.smokingPolicyText,
-                        noShowPolicy: parsed.settings.noShowPolicy
+                        checkInTime: s.checkInTime || '',
+                        checkOutTime: s.checkOutTime || '',
+                        visitorIdentityRule: s.visitorIdentityRule || '',
+                        cancellationText: s.cancellationText || '',
+                        childStayPolicy: s.childStayPolicy,
+                        petPolicyText: s.petPolicyText,
+                        smokingPolicyText: s.smokingPolicyText,
+                        noShowPolicy: s.noShowPolicy
                     };
                 }
             }
@@ -370,10 +387,10 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
             if (general) {
                 const parsed = JSON.parse(general);
                 return {
-                    checkInTime: parsed.checkInTime || '14:00',
-                    checkOutTime: parsed.checkOutTime || '12:00',
-                    visitorIdentityRule: parsed.visitorIdentityRule || 'Government-issued Photo ID / Passport required upon arrival.',
-                    cancellationText: parsed.cancellationText || 'Free cancellation up to 48 hours prior to standard check-in time.',
+                    checkInTime: parsed.checkInTime || '',
+                    checkOutTime: parsed.checkOutTime || '',
+                    visitorIdentityRule: parsed.visitorIdentityRule || '',
+                    cancellationText: parsed.cancellationText || '',
                     childStayPolicy: parsed.childStayPolicy,
                     petPolicyText: parsed.petPolicyText,
                     smokingPolicyText: parsed.smokingPolicyText,
@@ -383,10 +400,10 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
         }
     } catch {}
     return {
-        checkInTime: '14:00',
-        checkOutTime: '12:00',
-        visitorIdentityRule: 'Government-issued Photo ID / Passport required upon arrival.',
-        cancellationText: 'Free cancellation up to 48 hours prior to standard check-in time.'
+        checkInTime: '',
+        checkOutTime: '',
+        visitorIdentityRule: '',
+        cancellationText: ''
     };
 };
 
@@ -396,11 +413,18 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
 export const getHotelReservationPolicies = (roomNumber?: string, propertyId?: number): string[] => {
     const settings = getHotelGeneralSettings(propertyId);
     const smoking = getRoomSmokingPolicy(roomNumber || '', propertyId);
-    const policies: string[] = [
-        smoking.guestFacingClause,
-        `Standard Hotel Check-In: ${settings.checkInTime} | Check-Out: ${settings.checkOutTime}`,
-        settings.visitorIdentityRule
-    ];
+    const policies: string[] = [];
+    if (smoking.guestFacingClause) {
+        policies.push(smoking.guestFacingClause);
+    }
+    if (settings.checkInTime && settings.checkOutTime) {
+        policies.push(`Standard Hotel Check-In: ${settings.checkInTime} | Check-Out: ${settings.checkOutTime}`);
+    } else if (settings.checkInTime) {
+        policies.push(`Standard Hotel Check-In: ${settings.checkInTime}`);
+    }
+    if (settings.visitorIdentityRule) {
+        policies.push(settings.visitorIdentityRule);
+    }
     if (settings.cancellationText) {
         policies.push(settings.cancellationText);
     }
@@ -516,14 +540,32 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
             const foundSuite = suites.find(s => s.name.trim().toLowerCase() === queryStr || queryStr.includes(s.name.trim().toLowerCase()));
             const numRooms = foundSuite ? foundSuite.componentRooms.flatMap(c => c.roomNumbers || []).length : 2;
             const multiplier = Math.max(2, numRooms);
+
+            const suiteCompTypes = (foundSuite?.componentRooms || []).map(c => 
+                dynamicTypes.find(t => String(t.id) === String(c.roomTypeId))
+            ).filter(Boolean);
+
+            const suiteExtraAdult = suiteCompTypes.length > 0 
+                ? Math.round(suiteCompTypes.reduce((acc, t) => acc + (Number(t?.extraAdultPrice || t?.extraBedRate) || 0), 0) / suiteCompTypes.length)
+                : (Number(dynamicTypes[0]?.extraAdultPrice || dynamicTypes[0]?.extraBedRate) || 0);
+
+            const suiteExtraChild = suiteCompTypes.length > 0
+                ? Math.round(suiteCompTypes.reduce((acc, t) => acc + (Number(t?.extraChildPrice) || Math.round((Number(t?.extraAdultPrice || t?.extraBedRate) || 0) * 0.5)), 0) / suiteCompTypes.length)
+                : (Number(dynamicTypes[0]?.extraChildPrice) || Math.round(suiteExtraAdult * 0.5));
+
+            const suiteBaseRate = Number(foundSuite?.fixedPrice) || 
+                (suiteCompTypes.length > 0 
+                    ? suiteCompTypes.reduce((acc, t) => acc + (Number(t?.baseRate) || 0), 0)
+                    : (multiplier * (Number(dynamicTypes[0]?.baseRate) || 0)));
+
             return {
                 baseOccupancy: multiplier * 2,
                 maxAdults: multiplier * 2,
                 maxChildren: multiplier * 1,
                 maxOccupancy: multiplier * 3,
-                extraAdultPrice: 1000,
-                extraChildPrice: 500,
-                baseRate: Number(foundSuite?.fixedPrice) || (multiplier * 3000)
+                extraAdultPrice: suiteExtraAdult,
+                extraChildPrice: suiteExtraChild,
+                baseRate: suiteBaseRate
             };
         }
         matched = dynamicTypes.find(t => 
@@ -552,9 +594,9 @@ export const getRoomTypeCapacity = (roomTypeNameOrId?: string | number): RoomTyp
     const maxChildren = matched?.maxChildren !== undefined ? Number(matched.maxChildren) : defaultMaxChildren;
     const maxOccupancy = Math.max(maxAdults + maxChildren, baseOccupancy);
 
-    const extraAdultPrice = Number(matched?.extraAdultPrice || matched?.extraBedRate || 1000);
-    const extraChildPrice = Number(matched?.extraChildPrice || Math.round(extraAdultPrice * 0.5));
-    const baseRate = Number(matched?.baseRate || 3000);
+    const extraAdultPrice = Number(matched?.extraAdultPrice || matched?.extraBedRate || 0);
+    const extraChildPrice = Number(matched?.extraChildPrice ?? (extraAdultPrice > 0 ? Math.round(extraAdultPrice * 0.5) : 0));
+    const baseRate = Number(matched?.baseRate || 0);
 
     return {
         baseOccupancy,
@@ -719,15 +761,8 @@ export const calculateTariffForRatePlan = (
             const adultMealRate = Number(matchedMeal.sellingPriceAdult) || 0;
             const childMealRate = Number(matchedMeal.sellingPriceChild) || 0;
             base += (adultMealRate * safeAdults) + (childMealRate * safeChildren);
-        } else {
-            // Baseline fallback only if database meal plan table has not yet been seeded
-            if (mealQuery === 'CP') {
-                base += 500 * safeAdults + 300 * safeChildren;
-            } else if (mealQuery === 'MAP') {
-                base += 1200 * safeAdults + 700 * safeChildren;
-            } else if (mealQuery === 'AP') {
-                base += 2000 * safeAdults + 1200 * safeChildren;
-            }
+        } else if (Number((plan as any).mealPlanPrice) > 0) {
+            base += Number((plan as any).mealPlanPrice);
         }
     }
 
@@ -829,93 +864,11 @@ export const setOperatingSystemDate = (newDateStr: string): void => {
     });
 };
 
-// Auto-purge any residual RES-202610290007 and legacy mock data from client browser localStorage
+// Clean up any legacy unassigned cache so Stay View strictly derives from live DB/storage
 if (typeof window !== 'undefined' && window.localStorage) {
     try {
-        const purgeResNo = 'RES-202610290007';
-        const isMockResOrGuest = (item: any) => {
-            const no = String(item?.reservationNumber || item?.id || '');
-            const guest = String(item?.guestName || item?.guest?.fullName || '').toLowerCase();
-            return (
-                no === purgeResNo ||
-                no.includes('202610290007') ||
-                no.startsWith('RES-0092') ||
-                no.startsWith('RES-0091') ||
-                no.startsWith('RES-8921') ||
-                no.startsWith('HLD-2026-00') ||
-                guest.includes('robert langdon') ||
-                guest.includes('naimur') ||
-                guest.includes('tahmina')
-            );
-        };
-
-        // 1. Completely remove unassigned caches so Stay View only derives from real bookings
         localStorage.removeItem('hotel_unassigned_v2');
         localStorage.removeItem('hotel_unassigned_queue');
-
-        // 2. Purge from hotel_cancelled_v2
-        const cancelledRaw = localStorage.getItem('hotel_cancelled_v2');
-        if (cancelledRaw) {
-            try {
-                const parsed = JSON.parse(cancelledRaw);
-                if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter((c: any) => !isMockResOrGuest(c));
-                    localStorage.setItem('hotel_cancelled_v2', JSON.stringify(cleaned));
-                }
-            } catch {}
-        }
-
-        // 3. Purge from hotel_sleepouts_v2
-        const sleepoutsRaw = localStorage.getItem('hotel_sleepouts_v2');
-        if (sleepoutsRaw) {
-            try {
-                const parsed = JSON.parse(sleepoutsRaw);
-                if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter((s: any) => !isMockResOrGuest(s));
-                    localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(cleaned));
-                }
-            } catch {}
-        }
-
-        // 4. Purge from hotel_holds_v2
-        const holdsRaw = localStorage.getItem('hotel_holds_v2');
-        if (holdsRaw) {
-            try {
-                const parsed = JSON.parse(holdsRaw);
-                if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter((h: any) => !isMockResOrGuest(h));
-                    localStorage.setItem('hotel_holds_v2', JSON.stringify(cleaned));
-                }
-            } catch {}
-        }
-
-        // 5. Purge from all central reservation storage collections
-        const storageKeys = [
-            'hotel_reservations_v2',
-            'hotel_reservations_v3',
-            'hotel_reservations_prop_1',
-            'hotel_reservations_prop_2',
-            'pms_reservations_master',
-            'hotel_unassigned_queue'
-        ];
-        for (const k of storageKeys) {
-            const raw = localStorage.getItem(k);
-            if (raw) {
-                try {
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed)) {
-                        const cleaned = parsed.filter((item: any) => !isMockResOrGuest(item));
-                        localStorage.setItem(k, JSON.stringify(cleaned));
-                    }
-                } catch {}
-            }
-        }
-        // 6. Reset accidental October operating date to standard application date
-        const sysIso = localStorage.getItem('hotel_system_date_iso');
-        if (sysIso === '2026-10-29') {
-            localStorage.setItem('hotel_system_date_iso', '2026-07-01');
-            localStorage.setItem('hotel_system_date', '01 Jul 2026');
-        }
     } catch {}
 }
 
@@ -1069,10 +1022,10 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
                         id: r.id,
                         number: roomNum,
                         name: r.name || `Room ${r.number}`,
-                        buildingId: String(r.buildingId || '1'),
-                        floorId: String(r.floorId || '1'),
-                        roomTypeId: String(r.roomTypeId || '1'),
-                        roomTypeName: r.roomTypeName || matchedType?.name || ROOM_TYPE_MAP[String(r.roomTypeId)] || 'Deluxe Double',
+                        buildingId: String(r.buildingId ?? ''),
+                        floorId: String(r.floorId ?? ''),
+                        roomTypeId: String(r.roomTypeId ?? ''),
+                        roomTypeName: r.roomTypeName || matchedType?.name || (dynamicTypes[0]?.name || ''),
                         status: r.status || 'Active',
                         housekeepingStatus: r.housekeepingStatus || 'Clean',
                         isConnecting,
@@ -1252,20 +1205,7 @@ export const getAllStoredReservations = (propertyId?: number): StoredReservation
             if (saved !== null) {
                 const list = JSON.parse(saved);
                 if (Array.isArray(list)) {
-                    return list.filter(r => {
-                        const guest = String(r?.guestName || r?.guest?.fullName || '').toLowerCase();
-                        const no = String(r?.reservationNumber || r?.id || '');
-                        return (
-                            no !== 'RES-202610290007' &&
-                            !no.includes('202610290007') &&
-                            !no.startsWith('RES-0092') &&
-                            !no.startsWith('RES-0091') &&
-                            !no.startsWith('RES-8921') &&
-                            !guest.includes('robert langdon') &&
-                            !guest.includes('naimur') &&
-                            !guest.includes('tahmina')
-                        );
-                    });
+                    return list.filter(r => Boolean(r && (r.reservationNumber || r.id)));
                 }
             }
         }
@@ -1535,7 +1475,7 @@ export const validateAndCommitReservation = (
 
     for (const roomNum of targetRooms) {
         const canonical = canonicalRooms.find(r => r.number === roomNum);
-        const roomType = canonical?.roomTypeName || reservationData.roomType || 'Deluxe Double';
+        const roomType = canonical?.roomTypeName || reservationData.roomType || (getDynamicRoomTypes()[0]?.name || '');
 
         // Check if there is a specific sub-stay date range for this room (Group Staggered Stay)
         const rowData = reservationData.roomsList?.find((r: any) => r.roomNumber === roomNum || (r.assignedRooms && r.assignedRooms.includes(roomNum)));
@@ -2333,10 +2273,10 @@ export const syncRoomTypesAndRoomsFromDB = async (
                     id: r.id,
                     number: String(r.room_number || r.number || r.roomNo || ''),
                     name: r.name || `Room ${r.room_number || r.number || r.roomNo || ''}`,
-                    buildingId: String(r.building_id || r.buildingId || '1'),
-                    floorId: String(r.floor_id || r.floorId || '1'),
-                    roomTypeId: String(r.room_type_id || r.roomTypeId || '1'),
-                    roomTypeName: r.room_type_name || (mappedTypes.find(t => String(t.id) === String(r.room_type_id || r.roomTypeId))?.name) || 'Deluxe Double',
+                    buildingId: String(r.building_id ?? r.buildingId ?? ''),
+                    floorId: String(r.floor_id ?? r.floorId ?? ''),
+                    roomTypeId: String(r.room_type_id ?? r.roomTypeId ?? ''),
+                    roomTypeName: r.room_type_name || (mappedTypes.find(t => String(t.id) === String(r.room_type_id || r.roomTypeId))?.name) || (mappedTypes[0]?.name || ''),
                     status: r.status === 'ACTIVE' || r.status === 'Active' ? 'Active' : (r.status === 'OUT_OF_ORDER' || r.status === 'Out of Order' ? 'Out of Order' : 'Maintenance'),
                     housekeepingStatus: r.housekeeping_status === 'CLEAN' || r.housekeepingStatus === 'Clean' ? 'Clean' : (r.housekeeping_status === 'DIRTY' || r.housekeepingStatus === 'Dirty' ? 'Dirty' : 'Inspected'),
                     phoneExt: r.phone_ext || r.phoneExt || '',

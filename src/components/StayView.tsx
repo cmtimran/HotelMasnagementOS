@@ -171,22 +171,7 @@ export interface UnassignedBooking {
 
 const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBooking[] => {
     const list: UnassignedBooking[] = [];
-    const purgeTarget = 'RES-202610290007';
     stored.forEach((res: any) => {
-        const guestName = String(res?.guestName || res?.guest?.fullName || '').toLowerCase();
-        if (
-            res?.reservationNumber === purgeTarget ||
-            String(res?.id || '') === purgeTarget ||
-            String(res?.reservationNumber || '').includes('202610290007') ||
-            String(res?.id || '').includes('202610290007') ||
-            String(res?.reservationNumber || '').startsWith('RES-0092') ||
-            String(res?.reservationNumber || '').startsWith('RES-0091') ||
-            guestName.includes('robert langdon') ||
-            guestName.includes('naimur') ||
-            guestName.includes('tahmina')
-        ) {
-            return;
-        }
         const st = String(res?.status || '').toLowerCase();
         if (st === 'cancelled' || st === 'checked out' || st === 'checked-out' || st === 'voided') return;
         const rooms = Array.isArray(res?.rooms) ? res.rooms : Array.isArray(res?.roomsList) ? res.roomsList : [];
@@ -450,30 +435,13 @@ export const StayView: React.FC = () => {
 
     // Hydrate Unassigned Bookings dynamically from stored reservations - Zero Mock Fallback
     const [unassignedList, setUnassignedList] = useState<UnassignedBooking[]>(() => {
-        const purgeTarget = 'RES-202610290007';
-        const isNotPurgedOrMock = (u: any) => {
-            const guestName = String(u?.guestName || '').toLowerCase();
-            return (
-                u?.reservationNumber !== purgeTarget &&
-                String(u?.id || '') !== purgeTarget &&
-                !String(u?.id || '').includes('202610290007') &&
-                !String(u?.reservationNumber || '').includes('202610290007') &&
-                !String(u?.reservationNumber || '').startsWith('RES-0092') &&
-                !String(u?.reservationNumber || '').startsWith('RES-0091') &&
-                !guestName.includes('robert langdon') &&
-                !guestName.includes('naimur') &&
-                !guestName.includes('tahmina')
-            );
-        };
-
         if (typeof window !== 'undefined') {
             try {
                 localStorage.removeItem('hotel_unassigned_v2');
                 localStorage.removeItem('hotel_unassigned_queue');
             } catch {}
         }
-
-        return deriveUnassignedFromStored(getAllStoredReservations()).filter(isNotPurgedOrMock);
+        return deriveUnassignedFromStored(getAllStoredReservations());
     });
 
     useEffect(() => {
@@ -964,18 +932,8 @@ export const StayView: React.FC = () => {
         setOperatingDateStr(appDate);
         setStartDate(calculateStayViewStartDate(appDate));
 
-        // Purge residual RES-202610290007 and mock RES-00929x from active state if present
-        const purgeTarget = 'RES-202610290007';
-        setUnassignedList(prev => {
-            const cleaned = prev.filter(u =>
-                u.reservationNumber !== purgeTarget &&
-                String(u.id || '') !== purgeTarget &&
-                !String(u.id || '').includes('202610290007') &&
-                !String(u.reservationNumber || '').includes('202610290007') &&
-                !String(u.reservationNumber || '').startsWith('RES-00929')
-            );
-            return cleaned;
-        });
+        // Refresh unassigned bookings dynamically from central PMS store
+        setUnassignedList(deriveUnassignedFromStored(getAllStoredReservations()));
 
         // Sync initially on mount from local cache and live DB (PostgreSQL)
         syncStoredReservations();
