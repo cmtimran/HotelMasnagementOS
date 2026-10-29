@@ -216,6 +216,7 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
     // 13. Link to Group Form States
     const [linkTargetResNo, setLinkTargetResNo] = useState<string>('');
     const [isLinking, setIsLinking] = useState(false);
+    const [isIssuingKeycard, setIsIssuingKeycard] = useState(false);
 
     // Hydrate form states when booking loads
     useEffect(() => {
@@ -789,8 +790,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             { key: 'change_owner', label: 'Change Group Owner', icon: Crown }
         ] : [])
     ];
-
-    const [isIssuingKeycard, setIsIssuingKeycard] = useState(false);
 
     const handleIssueKeycard = async () => {
         try {

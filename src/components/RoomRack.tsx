@@ -237,6 +237,7 @@ export const RoomRack: React.FC = () => {
     const [selectedRoom, setSelectedRoom] = useState<RoomRackItem | null>(null);
     const [isQuickReserveOpen, setIsQuickReserveOpen] = useState(false);
     const [prefilledRoomNumber, setPrefilledRoomNumber] = useState<string>('');
+    const [activeBedPopoverRoomId, setActiveBedPopoverRoomId] = useState<number | null>(null);
 
     // Metrics & Counts
     const stats = useMemo(() => {
@@ -475,21 +476,6 @@ export const RoomRack: React.FC = () => {
 
                 {/* Header Actions */}
                 <div className="flex items-center gap-2 flex-wrap shrink-0">
-                    {/* Operating Date Selector */}
-                    <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg border border-slate-200 px-2.5 h-8 text-xs font-semibold text-slate-700 shadow-2xs">
-                        <Calendar size={13} className="text-blue-700" />
-                        <span className="text-[11px] text-slate-500">Date:</span>
-                        <input
-                            type="date"
-                            value={rackDate}
-                            onChange={(e) => {
-                                if (e.target.value) setRackDate(e.target.value);
-                            }}
-                            className="bg-transparent text-xs font-mono font-bold text-slate-900 outline-none cursor-pointer"
-                            title="Select date to inspect room rack occupancy"
-                        />
-                    </div>
-
                     {/* View Switcher */}
                     <div className="flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 h-8 items-center">
                         <button
@@ -778,27 +764,27 @@ export const RoomRack: React.FC = () => {
                                                             <h3 className="text-base font-black text-slate-900 leading-tight font-mono tracking-tight">
                                                                 {room.roomNumber}
                                                             </h3>
-                                                            {/* Smoking Policy Pill */}
+                                                            {/* Smoking Policy Icon Only */}
                                                             {room.smokingStatus === 'Smoking' ? (
                                                                 <span
-                                                                    className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-bold flex items-center gap-1 shadow-2xs"
+                                                                    className="p-1 rounded bg-amber-50 border border-amber-200 text-amber-700 flex items-center shadow-2xs"
                                                                     title="Smoking Permitted in Room"
                                                                 >
-                                                                    <Cigarette size={9} /> Smoking
+                                                                    <Cigarette size={11} />
                                                                 </span>
                                                             ) : room.smokingStatus === 'Balcony Smoking Only' ? (
                                                                 <span
-                                                                    className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 text-[9px] font-bold flex items-center gap-1 shadow-2xs"
-                                                                    title="Balcony Smoking Only"
+                                                                    className="p-1 rounded bg-blue-50 border border-blue-200 text-blue-700 flex items-center shadow-2xs"
+                                                                    title="Balcony Smoking Only (No Indoor Smoking)"
                                                                 >
-                                                                    <Cigarette size={9} /> Balcony
+                                                                    <Cigarette size={11} />
                                                                 </span>
                                                             ) : (
                                                                 <span
-                                                                    className="px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-500 text-[9px] font-medium flex items-center gap-1"
-                                                                    title="Non-Smoking Room"
+                                                                    className="p-1 rounded bg-slate-50 border border-slate-200 text-slate-400 flex items-center"
+                                                                    title="Strict Non-Smoking Room"
                                                                 >
-                                                                    <CigaretteOff size={9} /> Non-Smoking
+                                                                    <CigaretteOff size={11} />
                                                                 </span>
                                                             )}
                                                             {room.isConnecting && (
@@ -818,15 +804,33 @@ export const RoomRack: React.FC = () => {
                                                     </span>
                                                 </div>
 
-                                                {/* Room Type & Bed */}
+                                                {/* Room Type & Interactive Bed Type */}
                                                 <div>
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-[10.5px] text-slate-800">
+                                                        <span className="text-[10.5px] text-slate-800 truncate pr-1">
                                                             {room.roomType}
                                                         </span>
-                                                        <span className="text-[9.5px] font-medium text-slate-500">
-                                                            {room.bedType} Bed
-                                                        </span>
+                                                        <div className="relative flex-shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveBedPopoverRoomId(prev => prev === room.id ? null : room.id);
+                                                                }}
+                                                                className="px-1.5 py-0.5 rounded hover:bg-blue-50 border border-transparent hover:border-blue-200 text-slate-500 hover:text-blue-700 transition-all flex items-center gap-1 cursor-pointer"
+                                                                title={`Bed Type: ${room.bedType} Bed (Click to view)`}
+                                                            >
+                                                                <BedDouble size={13} className="text-slate-600 hover:text-blue-700" />
+                                                            </button>
+                                                            {activeBedPopoverRoomId === room.id && (
+                                                                <div
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="absolute right-0 bottom-full mb-1 z-30 px-2 py-1 bg-slate-900 text-white text-[10px] font-semibold rounded-md shadow-xl whitespace-nowrap animate-in fade-in"
+                                                                >
+                                                                    🛏️ {room.bedType} Bed
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     {/* Features */}

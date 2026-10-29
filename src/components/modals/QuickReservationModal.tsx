@@ -1659,7 +1659,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                     const isSoldOut = availForRow <= 0;
                                                                     return (
                                                                         <option key={typeOpt} value={typeOpt} disabled={isSoldOut && typeOpt !== item.roomType}>
-                                                                            {typeOpt} {isSoldOut ? '[Sold Out]' : `[${availForRow} Available]`}
+                                                                            {typeOpt} [{Math.max(0, availForRow)}]
                                                                         </option>
                                                                     );
                                                                 })}

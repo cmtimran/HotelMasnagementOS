@@ -7,6 +7,7 @@ import {
     ChevronLeft,
     Building2,
     BedDouble,
+    BedSingle,
     X,
     Crown,
     Users,
@@ -19,7 +20,9 @@ import {
     Link as LinkIcon,
     Wrench,
     Cigarette,
-    CigaretteOff
+    CigaretteOff,
+    Search,
+    ArrowRight
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -135,6 +138,8 @@ export interface RoomNode {
     smokingStatus?: string;
     smokingAllowed?: boolean;
     smokingPolicy?: string;
+    bedType?: string;
+    bedCount?: number;
 }
 
 export interface FloorNode {
@@ -200,16 +205,54 @@ const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBook
  * using local midday date objects to avoid timezone shifts.
  */
 const calculateStayViewStartDate = (sysDateISO: string): string => {
-    const iso = formatToISODate(sysDateISO);
-    const parts = iso.split('-').map(Number);
-    if (parts.length === 3) {
-        const d = new Date(parts[0], parts[1] - 1, parts[2] - 3, 12, 0, 0);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
+    return formatToISODate(sysDateISO);
+};
+
+/**
+ * Dynamically renders the correct Bed Type Icon to the left of the room number:
+ * - Single Bed -> BedSingle
+ * - Double Bed -> BedDouble
+ * - King Bed   -> BedDouble with Crown
+ * - Queen Bed  -> BedDouble in Queen purple
+ * - Twin Bed   -> Dual BedSingle
+ */
+const renderRoomBedIcon = (bedType?: string, roomType?: string) => {
+    const raw = `${bedType || ''} ${roomType || ''}`.toLowerCase();
+    if (raw.includes('single')) {
+        return (
+            <span className="flex-shrink-0" title={`Single Bed (${bedType || 'Single'})`}>
+                <BedSingle size={12} className="text-sky-600" />
+            </span>
+        );
     }
-    return '2026-06-28';
+    if (raw.includes('twin')) {
+        return (
+            <span className="inline-flex items-center -space-x-1 flex-shrink-0" title={`Twin Bed (${bedType || 'Twin'})`}>
+                <BedSingle size={10} className="text-teal-600" />
+                <BedSingle size={10} className="text-teal-600" />
+            </span>
+        );
+    }
+    if (raw.includes('king')) {
+        return (
+            <span className="relative inline-flex items-center justify-center flex-shrink-0" title={`King Bed (${bedType || 'King'})`}>
+                <BedDouble size={12} className="text-indigo-600" />
+                <Crown size={6} className="absolute -top-1 -right-1 text-amber-500 fill-amber-400" />
+            </span>
+        );
+    }
+    if (raw.includes('queen')) {
+        return (
+            <span className="flex-shrink-0" title={`Queen Bed (${bedType || 'Queen'})`}>
+                <BedDouble size={12} className="text-purple-600" />
+            </span>
+        );
+    }
+    return (
+        <span className="flex-shrink-0" title={`Double Bed (${bedType || 'Double'})`}>
+            <BedDouble size={12} className="text-gray-400" />
+        </span>
+    );
 };
 
 export const StayView: React.FC = () => {
@@ -378,6 +421,7 @@ export const StayView: React.FC = () => {
     });
     const [activeAssigningId, setActiveAssigningId] = useState<string | null>(null);
     const [selectedRoomNumber, setSelectedRoomNumber] = useState<string>('');
+    const [assignDrawerSearch, setAssignDrawerSearch] = useState('');
 
     const showToast = (msg: string) => {
         if (msg.includes('🔒') || msg.toLowerCase().includes('cannot') || msg.toLowerCase().includes('locked')) {
@@ -591,7 +635,9 @@ export const StayView: React.FC = () => {
                 connectedTo: connTo,
                 smokingStatus: r.smokingStatus || 'Non-Smoking',
                 smokingAllowed: Boolean(r.smokingAllowed || r.smokingStatus === 'Smoking'),
-                smokingPolicy: r.smokingPolicy || r.smokingStatus || 'Non-Smoking'
+                smokingPolicy: r.smokingPolicy || r.smokingStatus || 'Non-Smoking',
+                bedType: (r as any).bedType || (r.roomTypeName?.includes('King') ? 'King' : r.roomTypeName?.includes('Queen') ? 'Queen' : r.roomTypeName?.includes('Twin') ? 'Twin' : 'King'),
+                bedCount: (r as any).bedCount || 1
             });
         });
 
@@ -1123,6 +1169,37 @@ export const StayView: React.FC = () => {
         if (!selectedDateObj) return [];
         return unassignedList.filter(u => u.checkIn === selectedDateObj.date);
     }, [unassignedList, selectedDateObj]);
+
+    const handleJumpToBooking = (booking: UnassignedBooking) => {
+        if (!booking) return;
+        const targetDate = booking.checkIn;
+        const targetIdx = modalDays.findIndex(d => d.date === targetDate);
+        if (targetIdx >= 0) {
+            setSelectedModalDateIndex(targetIdx);
+            setModalDateStartIndex(Math.max(0, Math.min(modalDays.length - 7, targetIdx)));
+        } else {
+            setStartDate(targetDate);
+            setSelectedModalDateIndex(0);
+            setModalDateStartIndex(0);
+        }
+        setExpandedAccordions(prev => ({ ...prev, [booking.id]: true }));
+        setActiveAssigningId(booking.id);
+        const freeRooms = getAvailableRoomsForBooking(booking);
+        if (freeRooms.length > 0) {
+            setSelectedRoomNumber(freeRooms[0].roomNumber);
+        }
+    };
+
+    const searchMatchingUnassigned = useMemo(() => {
+        if (!assignDrawerSearch.trim()) return [];
+        const q = assignDrawerSearch.toLowerCase().trim();
+        return unassignedList.filter(u =>
+            (u.reservationNumber && u.reservationNumber.toLowerCase().includes(q)) ||
+            (u.guestName && u.guestName.toLowerCase().includes(q)) ||
+            (u.roomType && u.roomType.toLowerCase().includes(q)) ||
+            (u.checkIn && u.checkIn.includes(q))
+        );
+    }, [unassignedList, assignDrawerSearch]);
 
     // Date formatting helpers
     const formatDayNum = (dateStr: string) => {
@@ -2707,12 +2784,12 @@ export const StayView: React.FC = () => {
                                                             }`}
                                                     >
                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                            <BedDouble size={12} className="text-gray-400 flex-shrink-0" />
+                                                            {renderRoomBedIcon(room.bedType, room.type)}
                                                             <div className="truncate flex items-center gap-1 min-w-0">
                                                                 <span className="text-[10px] text-gray-900 font-semibold font-mono">
                                                                     {room.roomNumber}
                                                                 </span>
-                                                                <span className="text-[9.5px] text-gray-500 truncate ml-0.5">
+                                                                <span className="text-[9.5px] text-gray-500 truncate ml-0.5" title={`${room.type} • Bed: ${room.bedType || 'Double'}`}>
                                                                     {room.type}
                                                                 </span>
                                                             </div>
@@ -3249,14 +3326,31 @@ export const StayView: React.FC = () => {
                         {/* Drawer Header - Compact & Slim */}
                         <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
-                                <h2 className="text-[13.5px] text-gray-900 tracking-tight">Assign Rooms</h2>
-                                <button
-                                    type="button"
-                                    className="w-6 h-6 rounded border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-2xs"
-                                    title="System Calendar Date"
+                                <h2 className="text-[13.5px] text-gray-900 tracking-tight font-semibold">Assign Rooms</h2>
+                                <label
+                                    className="w-6 h-6 rounded border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer relative"
+                                    title="Pick Date to Jump"
                                 >
                                     <CalendarIcon size={12} />
-                                </button>
+                                    <input
+                                        type="date"
+                                        value={modalDays[selectedModalDateIndex]?.date || startDate}
+                                        onChange={(e) => {
+                                            const pickedDate = e.target.value;
+                                            if (!pickedDate) return;
+                                            const foundIdx = modalDays.findIndex(d => d.date === pickedDate);
+                                            if (foundIdx >= 0) {
+                                                setSelectedModalDateIndex(foundIdx);
+                                                setModalDateStartIndex(Math.max(0, Math.min(modalDays.length - 7, foundIdx)));
+                                            } else {
+                                                setStartDate(pickedDate);
+                                                setSelectedModalDateIndex(0);
+                                                setModalDateStartIndex(0);
+                                            }
+                                        }}
+                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    />
+                                </label>
                             </div>
                             <button
                                 type="button"
@@ -3266,6 +3360,69 @@ export const StayView: React.FC = () => {
                             >
                                 <X size={16} />
                             </button>
+                        </div>
+
+                        {/* Quick Reservation Search in Assign Drawer */}
+                        <div className="p-2.5 bg-slate-50 border-b border-gray-200 relative flex-shrink-0">
+                            <div className="relative flex items-center">
+                                <Search size={12} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Search reservation #, guest name..."
+                                    value={assignDrawerSearch}
+                                    onChange={(e) => setAssignDrawerSearch(e.target.value)}
+                                    className="w-full h-7 pl-7 pr-6 bg-white border border-slate-200 rounded-md text-[11px] text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                                />
+                                {assignDrawerSearch && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssignDrawerSearch('')}
+                                        className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                                    >
+                                        <X size={11} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Dropdown of search matches */}
+                            {assignDrawerSearch.trim() && (
+                                <div className="absolute left-2.5 right-2.5 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-[220px] overflow-y-auto divide-y divide-slate-100 animate-in fade-in">
+                                    {searchMatchingUnassigned.length > 0 ? (
+                                        searchMatchingUnassigned.map(match => (
+                                            <div
+                                                key={match.id}
+                                                onClick={() => {
+                                                    handleJumpToBooking(match);
+                                                    setAssignDrawerSearch('');
+                                                }}
+                                                className="p-2 hover:bg-blue-50/70 cursor-pointer transition-colors flex items-center justify-between text-left group"
+                                            >
+                                                <div className="min-w-0 flex-1 pr-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[11px] font-bold text-blue-700 font-mono">
+                                                            {match.reservationNumber}
+                                                        </span>
+                                                        <span className="text-[9px] px-1 py-0.2 bg-slate-100 text-slate-600 rounded">
+                                                            {match.checkIn}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[10.5px] text-slate-800 font-medium truncate mt-0.5">
+                                                        {match.guestName} • <span className="text-slate-500">{match.roomType}</span>
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-[9.5px] font-semibold text-blue-600 group-hover:text-blue-800 shrink-0">
+                                                    <span>Assign</span>
+                                                    <ArrowRight size={11} />
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-3 text-center text-[10.5px] text-slate-400">
+                                            No unassigned reservations match "{assignDrawerSearch}"
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Date Carousel Bar - Slim Height 52px */}
@@ -3482,14 +3639,9 @@ export const StayView: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                const firstUnassigned = unassignedList[0];
-                                                const targetIdx = modalDays.findIndex(d => d.date === firstUnassigned.checkIn);
-                                                if (targetIdx >= 0) {
-                                                    setSelectedModalDateIndex(targetIdx);
-                                                    setModalDateStartIndex(Math.max(0, Math.min(modalDays.length - 7, targetIdx)));
-                                                }
+                                                handleJumpToBooking(unassignedList[0]);
                                             }}
-                                            className="mt-2.5 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[10px] rounded transition-colors border border-blue-200 cursor-pointer"
+                                            className="mt-2.5 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[10px] font-medium rounded transition-colors border border-blue-200 cursor-pointer"
                                         >
                                             Jump to next ({unassignedList[0]?.reservationNumber})
                                         </button>

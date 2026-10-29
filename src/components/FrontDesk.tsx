@@ -4,7 +4,7 @@ import {
     DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, Monitor,
     BedDouble, Key, Printer, Calendar,
     Plus, RefreshCw, CreditCard, Wallet, Check,
-    AlertTriangle, Sparkles, Car, Plane, Utensils, Gift, Edit3
+    AlertTriangle, Sparkles, Car, Plane, Utensils, Gift, Edit3, MoreVertical
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
 import { evaluateEarlyCheckIn } from '../utils/policyEvaluator';
@@ -281,6 +281,7 @@ export const FrontDesk: React.FC = () => {
 
     // Modals & Panels
     const [isQuickReserveOpen, setIsQuickReserveOpen] = useState(false);
+    const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
     const [checkInModalRecord, setCheckInModalRecord] = useState<FrontDeskGuestRecord | null>(null);
     const [checkOutModalRecord, setCheckOutModalRecord] = useState<FrontDeskGuestRecord | null>(null);
     const [regCardRecord, setRegCardRecord] = useState<FrontDeskGuestRecord | null>(null);
@@ -583,7 +584,7 @@ export const FrontDesk: React.FC = () => {
                 title="Front Desk Overview"
                 icon={<Monitor size={20} />}
                 actions={
-                    <>
+                    <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={() => setIsQuickReserveOpen(true)}
@@ -593,35 +594,58 @@ export const FrontDesk: React.FC = () => {
                             <span>Walk-In Booking</span>
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={() => setActivePage('add-reservation')}
-                            className="btn-secondary text-primary font-semibold border-primary/30 hover:bg-primary-subtle"
-                        >
-                            <Calendar size={13} className="text-primary" />
-                            <span>Add Reservation</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setActivePage('room-rack')}
-                            className="btn-secondary"
-                            title="Open Interactive Room Rack Grid"
-                        >
-                            <BedDouble size={13} className="text-slate-500" />
-                            <span>Room Rack</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setActivePage('stay-view')}
-                            className="btn-secondary"
-                            title="Open Stay View Tape Chart"
-                        >
-                            <Calendar size={13} className="text-slate-500" />
-                            <span>Stay View</span>
-                        </button>
-                    </>
+                        {/* 3-Dot Action Menu for Secondary PMS Operations */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setIsActionMenuOpen(prev => !prev)}
+                                className="w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
+                                title="More Front Desk Actions"
+                            >
+                                <MoreVertical size={16} />
+                            </button>
+                            {isActionMenuOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsActionMenuOpen(false)} />
+                                    <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 animate-in fade-in">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsActionMenuOpen(false);
+                                                setActivePage('add-reservation');
+                                            }}
+                                            className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
+                                        >
+                                            <Calendar size={14} className="text-primary" />
+                                            <span>Add Reservation</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsActionMenuOpen(false);
+                                                setActivePage('room-rack');
+                                            }}
+                                            className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
+                                        >
+                                            <BedDouble size={14} className="text-slate-500" />
+                                            <span>Room Rack</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsActionMenuOpen(false);
+                                                setActivePage('stay-view');
+                                            }}
+                                            className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
+                                        >
+                                            <Calendar size={14} className="text-slate-500" />
+                                            <span>Stay View</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 }
             />
 

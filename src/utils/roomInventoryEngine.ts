@@ -34,6 +34,8 @@ export interface CanonicalRoom {
     nearElevator?: boolean;
     baseRate?: number;
     bedConfiguration?: string;
+    bedType?: string;
+    bedCount?: number;
 }
 
 export interface RoomLock {
@@ -798,9 +800,20 @@ export const formatToDisplayDate = (isoOrText: string | null | undefined): strin
 export const getOperatingSystemDate = (): string => {
     try {
         const sys = typeof window !== 'undefined' ? (localStorage.getItem('hotel_system_date_iso') || localStorage.getItem('hotel_system_date')) : null;
-        return formatToISODate(sys);
+        if (sys) {
+            return formatToISODate(sys);
+        }
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     } catch {
-        return '2026-07-01';
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
 };
 
@@ -982,6 +995,8 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
                         smokingStatus: r.smokingStatus || r.smoking_status || matchedType?.smokingPolicy || 'Non-Smoking',
                         smokingAllowed: Boolean(r.smokingAllowed ?? ((r.smokingStatus || r.smoking_status || matchedType?.smokingPolicy || '') === 'Smoking')),
                         smokingPolicy: r.smokingPolicy || r.smokingStatus || matchedType?.smokingPolicy || 'Non-Smoking',
+                        bedType: r.bedType || r.bed_type || matchedType?.bedType || (r.roomTypeName?.includes('Single') ? 'Single' : r.roomTypeName?.includes('King') ? 'King' : r.roomTypeName?.includes('Queen') ? 'Queen' : r.roomTypeName?.includes('Twin') ? 'Twin' : 'Double'),
+                        bedCount: Number(r.bedCount || r.bed_count || (matchedType as any)?.bedCount) || 1,
                         remarks: r.remarks
                     };
                 });
