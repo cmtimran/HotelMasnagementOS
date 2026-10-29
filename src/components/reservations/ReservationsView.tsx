@@ -19,7 +19,11 @@ import {
     ChevronDown,
     ArrowUpDown,
     ExternalLink,
-    Edit3
+    Edit3,
+    MoreVertical,
+    LogIn,
+    LogOut,
+    Ban
 } from 'lucide-react';
 import AddReservationModal from '../modals/AddReservationModal';
 import ReservationActionDrawer, { type DrawerMode } from '../modals/ReservationActionDrawer';
@@ -106,6 +110,7 @@ export const ReservationsView: React.FC = () => {
     const [isActionDrawerOpen, setIsActionDrawerOpen] = useState(false);
     const [actionDrawerBooking, setActionDrawerBooking] = useState<AmendBookingData | null>(null);
     const [actionDrawerMode, setActionDrawerMode] = useState<DrawerMode>('overview');
+    const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
 
     const handleOpenEditReservation = (r: ReservationItem | AmendBookingData | any) => {
         const resNum = r.reservationNumber || String(r.id);
@@ -337,6 +342,7 @@ export const ReservationsView: React.FC = () => {
         setActiveTab(nextTab);
         setSelectedIds([]);
         setIsGroupingMode(false);
+        setOpenActionMenuId(null);
     };
 
     // Handle check in / check out actions with direct PostgreSQL DB persistence
@@ -1032,7 +1038,7 @@ export const ReservationsView: React.FC = () => {
                                             )}
                                         </div>
                                     </th>
-                                    <th className="px-3.5 py-2.5 w-44 text-right pr-4">Actions</th>
+                                    <th className="px-3.5 py-2.5 w-16 text-right pr-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-[11.5px]">
@@ -1174,56 +1180,117 @@ export const ReservationsView: React.FC = () => {
                                                 </span>
                                             </td>
 
-                                            {/* Actions */}
-                                            <td className="px-3.5 py-2.5 text-right whitespace-nowrap pr-4" onClick={e => e.stopPropagation()}>
-                                                <div className="flex items-center justify-end gap-1.5">
+                                            {/* Actions Kebab Menu */}
+                                            <td className="px-3.5 py-2.5 text-right whitespace-nowrap pr-4 relative" onClick={e => e.stopPropagation()}>
+                                                <div className="relative inline-block text-left">
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleOpenEditReservation(r)}
-                                                        className="h-6 px-2 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                                        title="Edit Complete Reservation"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setOpenActionMenuId(prev => prev === r.id ? null : r.id);
+                                                        }}
+                                                        className="w-7 h-7 rounded-md border border-gray-200/90 bg-white hover:bg-slate-100 text-gray-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer ml-auto"
+                                                        title="More actions"
                                                     >
-                                                        <Edit3 size={10} />
-                                                        <span>Edit</span>
+                                                        <MoreVertical size={13} />
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openDrawerForReservation(r)}
-                                                        className="h-6 px-2 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                                        title="Open Action Drawer & Guest Folio"
-                                                    >
-                                                        <span>Manage</span>
-                                                        <ExternalLink size={10} />
-                                                    </button>
-                                                    {(r.status === 'arriving' || r.status === 'confirmed') && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleStatusChange(r.id, 'in-house')}
-                                                            className="h-6 px-2.5 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer shadow-2xs transition-colors font-semibold"
-                                                            title="Check In Guest"
-                                                        >
-                                                            Check In
-                                                        </button>
-                                                    )}
-                                                    {(r.status === 'in-house' || r.status === 'departing') && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleStatusChange(r.id, 'checked-out')}
-                                                            className="h-6 px-2.5 text-[10px] bg-blue-700 hover:bg-blue-800 text-white rounded cursor-pointer shadow-2xs transition-colors font-semibold"
-                                                            title="Check Out Guest"
-                                                        >
-                                                            Check Out
-                                                        </button>
-                                                    )}
-                                                    {r.status === 'hold' && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleStatusChange(r.id, 'confirmed')}
-                                                            className="h-6 px-2 text-[10px] font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded cursor-pointer shadow-2xs"
-                                                            title="Confirm Hold"
-                                                        >
-                                                            Confirm
-                                                        </button>
+
+                                                    {openActionMenuId === r.id && (
+                                                        <>
+                                                            <div 
+                                                                className="fixed inset-0 z-40" 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenActionMenuId(null);
+                                                                }} 
+                                                            />
+                                                            <div 
+                                                                onClick={e => e.stopPropagation()}
+                                                                className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-xl border border-gray-200/90 py-1 z-50 animate-in fade-in zoom-in-95 text-[11px]"
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setOpenActionMenuId(null);
+                                                                        handleOpenEditReservation(r);
+                                                                    }}
+                                                                    className="w-full px-3 py-1.5 text-left text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                                                >
+                                                                    <Edit3 size={12} className="text-blue-600" />
+                                                                    <span>Edit Reservation</span>
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setOpenActionMenuId(null);
+                                                                        openDrawerForReservation(r);
+                                                                    }}
+                                                                    className="w-full px-3 py-1.5 text-left text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                                                >
+                                                                    <ExternalLink size={12} className="text-slate-600" />
+                                                                    <span>Manage &amp; Folio</span>
+                                                                </button>
+
+                                                                <div className="h-px bg-gray-100 my-1" />
+
+                                                                {(r.status === 'arriving' || r.status === 'confirmed') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenActionMenuId(null);
+                                                                            handleStatusChange(r.id, 'in-house');
+                                                                        }}
+                                                                        className="w-full px-3 py-1.5 text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
+                                                                    >
+                                                                        <LogIn size={12} />
+                                                                        <span>Check In Guest</span>
+                                                                    </button>
+                                                                )}
+
+                                                                {(r.status === 'in-house' || r.status === 'departing') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenActionMenuId(null);
+                                                                            handleStatusChange(r.id, 'checked-out');
+                                                                        }}
+                                                                        className="w-full px-3 py-1.5 text-left text-blue-700 hover:bg-blue-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
+                                                                    >
+                                                                        <LogOut size={12} />
+                                                                        <span>Check Out Guest</span>
+                                                                    </button>
+                                                                )}
+
+                                                                {r.status === 'hold' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenActionMenuId(null);
+                                                                            handleStatusChange(r.id, 'confirmed');
+                                                                        }}
+                                                                        className="w-full px-3 py-1.5 text-left text-purple-700 hover:bg-purple-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
+                                                                    >
+                                                                        <Check size={12} />
+                                                                        <span>Confirm Hold</span>
+                                                                    </button>
+                                                                )}
+
+                                                                {r.status !== 'cancelled' && r.status !== 'checked-out' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenActionMenuId(null);
+                                                                            handleStatusChange(r.id, 'cancelled');
+                                                                        }}
+                                                                        className="w-full px-3 py-1.5 text-left text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
+                                                                    >
+                                                                        <Ban size={12} />
+                                                                        <span>Cancel Reservation</span>
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </>
                                                     )}
                                                 </div>
                                             </td>
@@ -1351,42 +1418,115 @@ export const ReservationsView: React.FC = () => {
                                             {r.status}
                                         </span>
 
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="relative inline-block text-left">
                                             <button
                                                 type="button"
-                                                onClick={() => handleOpenEditReservation(r)}
-                                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                                title="Edit Complete Reservation"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setOpenActionMenuId(prev => prev === r.id ? null : r.id);
+                                                }}
+                                                className="w-7 h-7 rounded-md border border-gray-200/90 bg-white hover:bg-slate-100 text-gray-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer ml-auto"
+                                                title="More actions"
                                             >
-                                                <Edit3 size={10} />
-                                                <span>Edit</span>
+                                                <MoreVertical size={13} />
                                             </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => openDrawerForReservation(r)}
-                                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                                title="Open Action Drawer & Guest Folio"
-                                            >
-                                                <span>Manage</span>
-                                                <ExternalLink size={10} />
-                                            </button>
-                                            {(r.status === 'arriving' || r.status === 'confirmed') && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleStatusChange(r.id, 'in-house')}
-                                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] cursor-pointer shadow-2xs font-semibold"
-                                                >
-                                                    Check In
-                                                </button>
-                                            )}
-                                            {(r.status === 'in-house' || r.status === 'departing') && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleStatusChange(r.id, 'checked-out')}
-                                                    className="px-2.5 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded text-[10px] cursor-pointer shadow-2xs font-semibold"
-                                                >
-                                                    Check Out
-                                                </button>
+
+                                            {openActionMenuId === r.id && (
+                                                <>
+                                                    <div 
+                                                        className="fixed inset-0 z-40" 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setOpenActionMenuId(null);
+                                                        }} 
+                                                    />
+                                                    <div 
+                                                        onClick={e => e.stopPropagation()}
+                                                        className="absolute right-0 bottom-full mb-1 w-44 bg-white rounded-lg shadow-xl border border-gray-200/90 py-1 z-50 animate-in fade-in zoom-in-95 text-[11px]"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setOpenActionMenuId(null);
+                                                                handleOpenEditReservation(r);
+                                                            }}
+                                                            className="w-full px-3 py-1.5 text-left text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                                        >
+                                                            <Edit3 size={12} className="text-blue-600" />
+                                                            <span>Edit Reservation</span>
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setOpenActionMenuId(null);
+                                                                openDrawerForReservation(r);
+                                                            }}
+                                                            className="w-full px-3 py-1.5 text-left text-gray-700 hover:bg-blue-50/80 hover:text-blue-700 flex items-center gap-2 cursor-pointer transition-colors"
+                                                        >
+                                                            <ExternalLink size={12} className="text-slate-600" />
+                                                            <span>Manage &amp; Folio</span>
+                                                        </button>
+
+                                                        <div className="h-px bg-gray-100 my-1" />
+
+                                                        {(r.status === 'arriving' || r.status === 'confirmed') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setOpenActionMenuId(null);
+                                                                    handleStatusChange(r.id, 'in-house');
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
+                                                            >
+                                                                <LogIn size={12} />
+                                                                <span>Check In Guest</span>
+                                                            </button>
+                                                        )}
+
+                                                        {(r.status === 'in-house' || r.status === 'departing') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setOpenActionMenuId(null);
+                                                                    handleStatusChange(r.id, 'checked-out');
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-blue-700 hover:bg-blue-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
+                                                            >
+                                                                <LogOut size={12} />
+                                                                <span>Check Out Guest</span>
+                                                            </button>
+                                                        )}
+
+                                                        {r.status === 'hold' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setOpenActionMenuId(null);
+                                                                    handleStatusChange(r.id, 'confirmed');
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-purple-700 hover:bg-purple-50 flex items-center gap-2 cursor-pointer transition-colors font-medium"
+                                                            >
+                                                                <Check size={12} />
+                                                                <span>Confirm Hold</span>
+                                                            </button>
+                                                        )}
+
+                                                        {r.status !== 'cancelled' && r.status !== 'checked-out' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setOpenActionMenuId(null);
+                                                                    handleStatusChange(r.id, 'cancelled');
+                                                                }}
+                                                                className="w-full px-3 py-1.5 text-left text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
+                                                            >
+                                                                <Ban size={12} />
+                                                                <span>Cancel Reservation</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
                                     </div>
