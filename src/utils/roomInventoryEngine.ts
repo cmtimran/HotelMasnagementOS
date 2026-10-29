@@ -837,7 +837,7 @@ export const getOperatingSystemDate = (): string => {
         const sys = typeof window !== 'undefined' ? (localStorage.getItem('hotel_system_date_iso') || localStorage.getItem('hotel_system_date')) : null;
         if (sys) {
             const iso = formatToISODate(sys);
-            if (iso && iso !== '2026-10-29' && !iso.startsWith('1970') && !iso.startsWith('Invalid')) {
+            if (iso && !iso.startsWith('1970') && !iso.startsWith('Invalid')) {
                 return iso;
             }
         }

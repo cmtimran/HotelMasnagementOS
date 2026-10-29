@@ -202,11 +202,27 @@ const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBook
 };
 
 /**
- * Calculates start date of Stay View grid (exactly 3 days before system operating date)
+ * Calculates start date of Stay View grid (always exactly 3 days before PMS operating date)
  * using local midday date objects to avoid timezone shifts.
  */
-const calculateStayViewStartDate = (sysDateISO: string): string => {
-    return formatToISODate(sysDateISO);
+const calculateStayViewStartDate = (sysDateISO?: string): string => {
+    const rawDate = sysDateISO || getOperatingSystemDate();
+    const iso = formatToISODate(rawDate);
+    const parts = (iso || '').split('-').map(Number);
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2] - 3, 12, 0, 0);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    const fallbackSys = getOperatingSystemDate();
+    const fallbackParts = fallbackSys.split('-').map(Number);
+    const d = new Date(fallbackParts[0] || 2026, (fallbackParts[1] || 7) - 1, (fallbackParts[2] || 1) - 3, 12, 0, 0);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 };
 
 /**
@@ -452,15 +468,6 @@ export const StayView: React.FC = () => {
         }
     }, [unassignedList]);
 
-    // Safety guard to auto-recover if view inadvertently drifted to client machine date
-    useEffect(() => {
-        if (startDate === '2026-10-29') {
-            const appDate = getOperatingSystemDate();
-            setStartDate(calculateStayViewStartDate(appDate));
-            setOperatingDateStr(appDate);
-        }
-    }, [startDate]);
-
     // Generate days array based on startDate and daysWindow with full Holiday awareness
     const days = useMemo(() => {
         const list = [];
@@ -511,10 +518,11 @@ export const StayView: React.FC = () => {
             const foundIdx = days.findIndex(d => d.date === appDate);
             if (foundIdx >= 0) {
                 setSelectedModalDateIndex(foundIdx);
-                setModalDateStartIndex(Math.max(0, Math.min(days.length - 7, foundIdx)));
+                // Position carousel so that 3 days before today are visible if available, or start at index 0
+                setModalDateStartIndex(Math.max(0, Math.min(days.length - 7, foundIdx - 3)));
             } else {
                 setStartDate(calculateStayViewStartDate(appDate));
-                setSelectedModalDateIndex(0);
+                setSelectedModalDateIndex(3);
                 setModalDateStartIndex(0);
             }
         }
@@ -3472,9 +3480,28 @@ export const StayView: React.FC = () => {
                             {/* Left Carousel Arrow */}
                             <button
                                 type="button"
-                                onClick={() => setModalDateStartIndex(prev => Math.max(0, prev - 1))}
-                                disabled={modalDateStartIndex === 0}
-                                className="w-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-r border-gray-100 transition-colors"
+                                onClick={() => {
+                                    if (modalDateStartIndex > 0) {
+                                        const nextStart = modalDateStartIndex - 1;
+                                        setModalDateStartIndex(nextStart);
+                                        if (selectedModalDateIndex > nextStart + 6) {
+                                            setSelectedModalDateIndex(nextStart + 6);
+                                        } else if (selectedModalDateIndex < nextStart) {
+                                            setSelectedModalDateIndex(nextStart);
+                                        }
+                                    } else {
+                                        const parts = startDate.split('-').map(Number);
+                                        const cur = new Date(parts[0], parts[1] - 1, parts[2] - 1, 12, 0, 0);
+                                        const y = cur.getFullYear();
+                                        const m = String(cur.getMonth() + 1).padStart(2, '0');
+                                        const day = String(cur.getDate()).padStart(2, '0');
+                                        setStartDate(`${y}-${m}-${day}`);
+                                        setSelectedModalDateIndex(0);
+                                        setModalDateStartIndex(0);
+                                    }
+                                }}
+                                className="w-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-blue-600 active:bg-gray-200 cursor-pointer border-r border-gray-100 transition-colors"
+                                title="Previous Date"
                             >
                                 <ChevronLeft size={14} />
                             </button>
@@ -3516,9 +3543,26 @@ export const StayView: React.FC = () => {
                             {/* Right Carousel Arrow */}
                             <button
                                 type="button"
-                                onClick={() => setModalDateStartIndex(prev => Math.min(modalDays.length - 7, prev + 1))}
-                                disabled={modalDateStartIndex >= modalDays.length - 7}
-                                className="w-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer border-l border-gray-100 transition-colors"
+                                onClick={() => {
+                                    if (modalDateStartIndex < modalDays.length - 7) {
+                                        const nextStart = modalDateStartIndex + 1;
+                                        setModalDateStartIndex(nextStart);
+                                        if (selectedModalDateIndex < nextStart) {
+                                            setSelectedModalDateIndex(nextStart);
+                                        } else if (selectedModalDateIndex > nextStart + 6) {
+                                            setSelectedModalDateIndex(nextStart + 6);
+                                        }
+                                    } else {
+                                        const parts = startDate.split('-').map(Number);
+                                        const cur = new Date(parts[0], parts[1] - 1, parts[2] + 1, 12, 0, 0);
+                                        const y = cur.getFullYear();
+                                        const m = String(cur.getMonth() + 1).padStart(2, '0');
+                                        const day = String(cur.getDate()).padStart(2, '0');
+                                        setStartDate(`${y}-${m}-${day}`);
+                                    }
+                                }}
+                                className="w-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-blue-600 active:bg-gray-200 cursor-pointer border-l border-gray-100 transition-colors"
+                                title="Next Date"
                             >
                                 <ChevronRight size={14} />
                             </button>
