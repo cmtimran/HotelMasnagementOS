@@ -2708,47 +2708,47 @@ export const StayView: React.FC = () => {
                                                     >
                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                             <BedDouble size={12} className="text-gray-400 flex-shrink-0" />
-                                                            <div className="truncate flex items-center gap-1">
+                                                            <div className="truncate flex items-center gap-1 min-w-0">
                                                                 <span className="text-[10px] text-gray-900 font-semibold font-mono">
                                                                     {room.roomNumber}
                                                                 </span>
-                                                                {/* Room Smoking Policy Icon */}
-                                                                {room.smokingStatus === 'Smoking' ? (
-                                                                    <span
-                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition-colors cursor-help flex-shrink-0"
-                                                                        title="Smoking Permitted in Room"
-                                                                    >
-                                                                        <Cigarette size={10} className="stroke-[2.2]" />
-                                                                    </span>
-                                                                ) : room.smokingStatus === 'Balcony Smoking Only' ? (
-                                                                    <span
-                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors cursor-help flex-shrink-0"
-                                                                        title="Balcony Smoking Only (No Indoor Smoking)"
-                                                                    >
-                                                                        <Cigarette size={10} className="stroke-[2.2]" />
-                                                                    </span>
-                                                                ) : (
-                                                                    <span
-                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-slate-300 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-help flex-shrink-0"
-                                                                        title="Strict Non-Smoking Room (BDT 5,000 deep cleaning violation fine)"
-                                                                    >
-                                                                        <CigaretteOff size={10} className="stroke-[2]" />
-                                                                    </span>
-                                                                )}
-                                                                {room.isConnecting && (
-                                                                    <span
-                                                                        className="inline-flex items-center justify-center p-0.5 rounded text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition-colors cursor-help flex-shrink-0"
-                                                                        title={`Connecting Room: Connected with Room ${room.connectedTo || 'Adjoining Room'} (Soundproof Interconnecting Door)`}
-                                                                    >
-                                                                        <LinkIcon size={10} className="stroke-[2.5]" />
-                                                                    </span>
-                                                                )}
                                                                 <span className="text-[9.5px] text-gray-500 truncate ml-0.5">
                                                                     {room.type}
                                                                 </span>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            {/* Room Smoking Policy Icon */}
+                                                            {room.smokingStatus === 'Smoking' ? (
+                                                                <span
+                                                                    className="inline-flex items-center justify-center p-0.5 rounded text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition-colors cursor-help flex-shrink-0"
+                                                                    title="Smoking Permitted in Room"
+                                                                >
+                                                                    <Cigarette size={10} className="stroke-[2.2]" />
+                                                                </span>
+                                                            ) : room.smokingStatus === 'Balcony Smoking Only' ? (
+                                                                <span
+                                                                    className="inline-flex items-center justify-center p-0.5 rounded text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors cursor-help flex-shrink-0"
+                                                                    title="Balcony Smoking Only (No Indoor Smoking)"
+                                                                >
+                                                                    <Cigarette size={10} className="stroke-[2.2]" />
+                                                                </span>
+                                                            ) : (
+                                                                <span
+                                                                    className="inline-flex items-center justify-center p-0.5 rounded text-slate-300 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-help flex-shrink-0"
+                                                                    title="Strict Non-Smoking Room (BDT 5,000 deep cleaning violation fine)"
+                                                                >
+                                                                    <CigaretteOff size={10} className="stroke-[2]" />
+                                                                </span>
+                                                            )}
+                                                            {room.isConnecting && (
+                                                                <span
+                                                                    className="inline-flex items-center justify-center p-0.5 rounded text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition-colors cursor-help flex-shrink-0"
+                                                                    title={`Connecting Room: Connected with Room ${room.connectedTo || 'Adjoining Room'} (Soundproof Interconnecting Door)`}
+                                                                >
+                                                                    <LinkIcon size={10} className="stroke-[2.5]" />
+                                                                </span>
+                                                            )}
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
