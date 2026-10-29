@@ -4,7 +4,7 @@ import {
     ShieldCheck, Search, Filter, Building2, Info
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import {
     getCanonicalRooms,
     getDynamicRoomTypes,
@@ -31,11 +31,15 @@ export interface ConnectingRoom {
     status: string;
 }
 
+interface ConnectingRoomManagementProps {
+    propertyId?: number;
+}
+
 const STORAGE_KEY = 'hotel_connecting_rooms_v1';
 
-const ConnectingRoomManagement = () => {
+const ConnectingRoomManagement: React.FC<ConnectingRoomManagementProps> = ({ propertyId }) => {
     const { activeProperty } = useProperty();
-    const activePropertyId = activeProperty?.id || 1;
+    const activePropertyId = propertyId || activeProperty?.id || getActivePropertyId() || 0;
 
     // Dynamic Currency Symbol based on active property configuration
     const currencySymbol = useMemo(() => {
@@ -112,9 +116,15 @@ const ConnectingRoomManagement = () => {
 
     // Fetch and Sync rooms & connecting suites on mount or property change
     useEffect(() => {
+        if (!activePropertyId) {
+            setRoomTypes([]);
+            setPhysicalRoomsState([]);
+            setConnectingRooms([]);
+            return;
+        }
         syncRoomTypesAndRoomsFromDB(activePropertyId).then(({ roomTypes: rt, rooms: r }) => {
-            if (rt && rt.length > 0) setRoomTypes(rt);
-            if (r && r.length > 0) setPhysicalRoomsState(r);
+            if (rt) setRoomTypes(rt);
+            if (r) setPhysicalRoomsState(r);
         }).catch(() => {});
 
         fetch(`${getApiBaseUrl()}/api/connecting-rooms?propertyId=${activePropertyId}`)
@@ -122,7 +132,9 @@ const ConnectingRoomManagement = () => {
             .then(json => {
                 if (json.success && Array.isArray(json.data)) {
                     setConnectingRooms(json.data);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(json.data));
+                    localStorage.setItem(`hotel_connecting_rooms_prop_${activePropertyId}`, JSON.stringify(json.data));
+                } else {
+                    setConnectingRooms([]);
                 }
             })
             .catch(() => {});

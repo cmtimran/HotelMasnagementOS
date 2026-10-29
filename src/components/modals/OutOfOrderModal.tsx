@@ -39,10 +39,12 @@ import {
     moveRoomInDB
 } from '../../utils/roomInventoryEngine';
 import { toast } from '../../context/ToastContext';
+import { getActivePropertyId } from '../../utils/apiUrl';
 
 interface OutOfOrderModalProps {
     isOpen: boolean;
     onClose: () => void;
+    propertyId?: number;
     initialRoomNumber?: string;
     initialStartDate?: string;
     initialEndDate?: string;
@@ -69,12 +71,14 @@ const REASON_CATEGORIES: MaintenanceReasonCategory[] = [
 export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
     isOpen,
     onClose,
+    propertyId,
     initialRoomNumber,
     initialStartDate,
     initialEndDate,
     initialBlockType = 'OOO',
     onBlockUpdated
 }) => {
+    const activePropId = propertyId || getActivePropertyId();
     const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
     const [rooms, setRooms] = useState<CanonicalRoom[]>([]);
     const [blocks, setBlocks] = useState<OutOfOrderBlock[]>([]);
@@ -115,13 +119,18 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
 
     // Load initial data
     const refreshData = async () => {
-        const canonical = getCanonicalRooms();
+        if (!activePropId) {
+            setRooms([]);
+            setBlocks([]);
+            return;
+        }
+        const canonical = getCanonicalRooms(activePropId);
         setRooms(canonical);
-        const stored = getStoredOOOBlocks();
+        const stored = getStoredOOOBlocks(activePropId);
         setBlocks(stored);
 
         try {
-            const synced = await syncOOOBlocksFromBackend();
+            const synced = await syncOOOBlocksFromBackend(activePropId);
             setBlocks(synced);
         } catch {
             // fallback to stored
@@ -274,7 +283,7 @@ export const OutOfOrderModal: React.FC<OutOfOrderModalProps> = ({
             for (const rn of targets) {
                 const roomObj = rooms.find(r => String(r.number).trim() === rn);
                 const res = await createOOOBlock({
-                    propertyId: 1,
+                    propertyId: activePropId,
                     roomNumber: rn,
                     roomType: roomObj?.roomTypeName || 'Standard Room',
                     blockType,

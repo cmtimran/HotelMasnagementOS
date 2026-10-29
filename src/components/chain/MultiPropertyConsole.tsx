@@ -23,6 +23,7 @@ import { useProperty, type Property } from '../../context/PropertyContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { useToast } from '../../context/ToastContext';
 import { usePortal } from '../../context/PortalContext';
+import { getCurrencySymbol } from '../../utils/currencyUtils';
 import TenantIsolationHub from './TenantIsolationHub';
 
 export const MultiPropertyConsole: React.FC = () => {
@@ -280,7 +281,7 @@ export const MultiPropertyConsole: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="mt-1 flex items-baseline gap-1">
-                                    <span className="text-xs font-bold text-amber-600">৳</span>
+                                    <span className="text-xs font-bold text-amber-600">{getCurrencySymbol(activeProperty?.currency || properties[0]?.currency || 'USD')}</span>
                                     <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-mono">
                                         {chainOverview ? Number(chainOverview.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0'}
                                     </span>
@@ -341,20 +342,40 @@ export const MultiPropertyConsole: React.FC = () => {
                         </div>
 
                         {/* HOTEL PROPERTIES GRID */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {filteredProperties.map(property => {
-                                const isSelected = property.id === activePropertyId;
-                                const starCount = property.star_rating || 5;
+                        {filteredProperties.length === 0 ? (
+                            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-3">
+                                <div className="size-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                                    <Building2 size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900">No Hotel Properties Found</h3>
+                                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                                        You are logged in as Super Admin. Get started by creating your first hotel property to configure buildings, room types, and inventory.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setActivePage('add-property')}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-sm cursor-pointer transition-colors"
+                                >
+                                    <Plus size={14} />
+                                    <span>Create Your First Property</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {filteredProperties.map(property => {
+                                    const isSelected = property.id === activePropertyId;
+                                    const starCount = property.star_rating || 5;
 
-                                return (
-                                    <div 
-                                        key={property.id}
-                                        className={`rounded-xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative ${
-                                            isSelected 
-                                                ? 'bg-white border-blue-600 shadow-md ring-2 ring-blue-500/10' 
-                                                : 'bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300'
-                                        }`}
-                                    >
+                                    return (
+                                        <div 
+                                            key={property.id}
+                                            className={`rounded-xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative ${
+                                                isSelected 
+                                                    ? 'bg-white border-blue-600 shadow-md ring-2 ring-blue-500/10' 
+                                                    : 'bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300'
+                                            }`}
+                                        >
                                         {/* Top Accent Strip */}
                                         <div className={`h-1 w-full ${
                                             isSelected 
@@ -526,6 +547,7 @@ export const MultiPropertyConsole: React.FC = () => {
                                 );
                             })}
                         </div>
+                    )}
 
                         {/* CHAIN COMPARISON MATRIX TABLE */}
                         <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs space-y-3">

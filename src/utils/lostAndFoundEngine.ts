@@ -12,7 +12,7 @@
  * 6. Dual-mode Data Sync (PostgreSQL API with offline localStorage fallback).
  */
 
-import { getApiBaseUrl } from './apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from './apiUrl';
 import { getAllStoredReservations } from './roomInventoryEngine';
 
 export type LostAndFoundCategory = 
@@ -93,9 +93,11 @@ export const DEFAULT_SEED_ITEMS: LostAndFoundItem[] = [];
 /**
  * Retrieve all Lost & Found items from localStorage
  */
-export const getStoredLostAndFoundItems = (propertyId: number = 1): LostAndFoundItem[] => {
+export const getStoredLostAndFoundItems = (propertyId?: number): LostAndFoundItem[] => {
     if (typeof window === 'undefined') return [];
     try {
+        const propId = propertyId || getActivePropertyId();
+        if (!propId) return [];
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
             return [];
@@ -104,7 +106,7 @@ export const getStoredLostAndFoundItems = (propertyId: number = 1): LostAndFound
         if (!Array.isArray(parsed)) {
             return [];
         }
-        return parsed.filter((i: LostAndFoundItem) => (i.propertyId || 1) === propertyId);
+        return parsed.filter((i: LostAndFoundItem) => Number(i.propertyId) === propId);
     } catch (e) {
         console.warn('Error reading lost and found storage:', e);
         return [];

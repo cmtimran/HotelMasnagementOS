@@ -3,6 +3,15 @@ import { db } from '../database/db.js';
 
 const router = Router();
 
+export const getReqPropertyId = (req: Request): number | null => {
+    const raw = req.query.propertyId || req.headers['x-property-id'] || req.body?.propertyId;
+    if (raw !== undefined && raw !== null && raw !== '') {
+        const num = Number(raw);
+        if (!isNaN(num) && num > 0) return num;
+    }
+    return null;
+};
+
 // ============================================================================
 // 1. RATE PLANS CRUD (/api/rates/plans)
 // ============================================================================
@@ -10,7 +19,10 @@ const router = Router();
 // GET /api/rates/plans
 router.get('/plans', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const rows = await db.prepare(`
             SELECT * FROM rate_plans WHERE property_id = ? ORDER BY id ASC
         `).all(propertyId) as any[];
@@ -81,7 +93,10 @@ router.get('/plans', async (req: Request, res: Response) => {
 router.post('/plans', async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const propertyId = Number(body.propertyId || req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Valid Property ID is required' });
+        }
         const name = body.name || 'New Rate Plan';
         const shortCode = (body.shortCode || `RP-${Date.now().toString().slice(-4)}`).toUpperCase();
 
@@ -198,7 +213,10 @@ router.delete('/plans/:id', async (req: Request, res: Response) => {
 // GET /api/rates/meal-plans
 router.get('/meal-plans', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const rows = await db.prepare(`
             SELECT * FROM meal_plans WHERE property_id = ? ORDER BY id ASC
         `).all(propertyId) as any[];
@@ -280,7 +298,10 @@ router.get('/meal-plans', async (req: Request, res: Response) => {
 router.post('/meal-plans', async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const propertyId = Number(body.propertyId || req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Valid Property ID is required' });
+        }
         const name = body.name || 'New Meal Plan';
         const shortCode = (body.shortCode || `MP-${Date.now().toString().slice(-4)}`).toUpperCase();
 
@@ -399,7 +420,10 @@ router.delete('/meal-plans/:id', async (req: Request, res: Response) => {
 // GET /api/rates/packages
 router.get('/packages', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const rows = await db.prepare(`
             SELECT * FROM hotel_packages WHERE property_id = ? ORDER BY id ASC
         `).all(propertyId) as any[];
@@ -441,7 +465,10 @@ router.get('/packages', async (req: Request, res: Response) => {
 router.post('/packages', async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const propertyId = Number(body.propertyId || req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Valid Property ID is required' });
+        }
         const name = body.name || 'New Package';
         const shortCode = (body.shortCode || `PKG-${Date.now().toString().slice(-4)}`).toUpperCase();
 
@@ -522,7 +549,10 @@ router.delete('/packages/:id', async (req: Request, res: Response) => {
 // GET /api/rates/calendar
 router.get('/calendar', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: {} });
+        }
         const roomType = req.query.roomType as string | undefined;
 
         let query = 'SELECT * FROM rate_calendar_overrides WHERE property_id = ?';
@@ -561,7 +591,10 @@ router.get('/calendar', async (req: Request, res: Response) => {
 // POST /api/rates/calendar/override - Single Day Override
 router.post('/calendar/override', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.body.propertyId || req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Valid Property ID is required' });
+        }
         const { roomType, date, rate, occupancy, isWeekend, isHoliday, eventName } = req.body;
 
         if (!roomType || !date || rate === undefined) {
@@ -589,7 +622,10 @@ router.post('/calendar/override', async (req: Request, res: Response) => {
 // POST /api/rates/calendar/bulk-override - Date Range Bulk Override
 router.post('/calendar/bulk-override', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.body.propertyId || req.query.propertyId) || 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Valid Property ID is required' });
+        }
         const { roomType, startDate, endDate, rate, dayFilter } = req.body;
 
         if (!roomType || !startDate || !endDate || rate === undefined) {

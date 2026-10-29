@@ -4,10 +4,20 @@ import { requirePermission } from '../middleware/rbacGuard.js';
 
 const router = Router();
 
+const getReqPropertyId = (req: Request): number | null => {
+    const raw = (req as any).propertyId || req.query?.propertyId || req.headers?.['x-property-id'] || req.body?.propertyId;
+    if (!raw || raw === 'all' || raw === 'prop_grand_palace') return null;
+    const num = Number(raw);
+    return isNaN(num) ? null : num;
+};
+
 // GET /api/lost-and-found - List all items with search & status filters
 router.get('/', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const status = req.query.status ? String(req.query.status) : 'all';
         const search = req.query.search ? String(req.query.search).trim() : '';
 
@@ -59,7 +69,10 @@ router.get('/', requirePermission('frontdesk.access'), async (req: Request, res:
 // POST /api/lost-and-found - Register a new found item
 router.post('/', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const b = req.body || {};
 
         const year = new Date().getFullYear();
@@ -125,7 +138,7 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
 router.put('/:id/claim', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
         const b = req.body || {};
 
         const claimedBy = String(b.claimedBy || '').trim();
@@ -163,13 +176,16 @@ router.put('/:id/claim', requirePermission('frontdesk.access'), async (req: Requ
 router.put('/:id/ship', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
         const b = req.body || {};
 
         const tracking = String(b.shippingTrackingNumber || '').trim();
         const carrier = b.shippingCarrier || 'DHL / Courier';
         const releasedBy = b.releasedBy || 'Front Desk Manager';
         const notes = b.releaseNotes || `Dispatched via ${carrier} (Tracking: ${tracking})`;
+
+        const whereSql = propertyId ? 'WHERE id = ? AND property_id = ?' : 'WHERE id = ?';
+        const params = propertyId ? [tracking, carrier, releasedBy, notes, id, propertyId] : [tracking, carrier, releasedBy, notes, id];
 
         await db.prepare(`
             UPDATE lost_and_found_items
@@ -180,8 +196,8 @@ router.put('/:id/ship', requirePermission('frontdesk.access'), async (req: Reque
                 released_at = CURRENT_TIMESTAMP,
                 release_notes = ?,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND property_id = ?
-        `).run(tracking, carrier, releasedBy, notes, id, propertyId);
+            ${whereSql}
+        `).run(...params);
 
         res.json({ success: true, message: `Item dispatched via ${carrier}. Tracking: ${tracking}` });
     } catch (e: any) {
@@ -193,12 +209,15 @@ router.put('/:id/ship', requirePermission('frontdesk.access'), async (req: Reque
 router.put('/:id/dispose', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
         const b = req.body || {};
 
         const targetStatus = b.status === 'returned_to_finder' ? 'returned_to_finder' : (b.status === 'donated' ? 'donated' : 'disposed');
         const reason = b.disposalReason || 'Expired holding period without claim';
         const disposedBy = b.disposedBy || 'Housekeeping Executive';
+
+        const whereSql = propertyId ? 'WHERE id = ? AND property_id = ?' : 'WHERE id = ?';
+        const params = propertyId ? [targetStatus, reason, disposedBy, id, propertyId] : [targetStatus, reason, disposedBy, id];
 
         await db.prepare(`
             UPDATE lost_and_found_items
@@ -207,8 +226,8 @@ router.put('/:id/dispose', requirePermission('frontdesk.access'), async (req: Re
                 disposed_at = CURRENT_TIMESTAMP,
                 disposed_by = ?,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND property_id = ?
-        `).run(targetStatus, reason, disposedBy, id, propertyId);
+            ${whereSql}
+        `).run(...params);
 
         res.json({ success: true, message: `Item marked as ${targetStatus}` });
     } catch (e: any) {

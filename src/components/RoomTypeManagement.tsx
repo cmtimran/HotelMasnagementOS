@@ -4,9 +4,13 @@ import {
     RefreshCw, AlertTriangle, CheckCircle2, DollarSign, Layers
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { getDynamicRoomTypes, syncRoomTypesAndRoomsFromDB, broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
+
+interface RoomTypeManagementProps {
+    propertyId?: number;
+}
 
 interface RoomType {
     id: number;
@@ -68,13 +72,15 @@ const mapDynamicToRoomType = (rt: any, idx: number): RoomType => ({
     showOnWebsite: rt.showOnWebsite ?? true
 });
 
-const RoomTypeManagement = () => {
+const RoomTypeManagement: React.FC<RoomTypeManagementProps> = ({ propertyId }) => {
+    const activePropId = propertyId || getActivePropertyId();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [searchTerm, setSearchTerm] = useState('');
 
     const [roomTypes, setRoomTypes] = useState<RoomType[]>(() => {
         try {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            const key = activePropId ? `hotel_room_types_prop_${activePropId}` : STORAGE_KEY;
+            const saved = localStorage.getItem(key);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].shortCode) {
@@ -84,13 +90,17 @@ const RoomTypeManagement = () => {
         } catch {
             // fallback
         }
-        return getDynamicRoomTypes().map(mapDynamicToRoomType);
+        return getDynamicRoomTypes(activePropId).map(mapDynamicToRoomType);
     });
 
     useEffect(() => {
         const loadRoomTypesFromDB = async () => {
+            if (!activePropId) {
+                setRoomTypes([]);
+                return;
+            }
             try {
-                const res = await fetch(`${getApiBaseUrl()}/api/properties/1`);
+                const res = await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}`);
                 const json = await res.json();
                 if (json.success && json.data?.roomTypes && Array.isArray(json.data.roomTypes)) {
                     const mapped: RoomType[] = json.data.roomTypes.map((rt: any, idx: number) => ({
@@ -122,15 +132,16 @@ const RoomTypeManagement = () => {
                         showOnWebsite: Boolean(rt.show_on_website ?? true)
                     }));
                     setRoomTypes(mapped);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
-                    localStorage.setItem('hotel_room_types_prop_1', JSON.stringify(mapped));
+                    localStorage.setItem(`hotel_room_types_prop_${activePropId}`, JSON.stringify(mapped));
+                } else {
+                    setRoomTypes([]);
                 }
             } catch (err) {
                 console.warn('Could not load room types from DB, using dynamic cached engine:', err);
             }
         };
         loadRoomTypesFromDB();
-    }, []);
+    }, [activePropId]);
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [formData, setFormData] = useState<RoomType | null>(null);
@@ -140,8 +151,10 @@ const RoomTypeManagement = () => {
     const persistRoomTypes = (updated: RoomType[]) => {
         setRoomTypes(updated);
         try {
+            if (activePropId) {
+                localStorage.setItem(`hotel_room_types_prop_${activePropId}`, JSON.stringify(updated));
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-            localStorage.setItem('hotel_room_types_prop_1', JSON.stringify(updated));
         } catch {
             // fallback
         }
@@ -218,67 +231,71 @@ const RoomTypeManagement = () => {
         let updated: RoomType[];
         if (editingId) {
             try {
-                await fetch(`${getApiBaseUrl()}/api/properties/1/room-types/${editingId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        code: formData.shortCode,
-                        name: formData.name,
-                        baseOccupancy: formData.baseAdult,
-                        maxOccupancy: formData.maxAdult,
-                        maxChild: formData.maxChild,
-                        baseRate: formData.basePrice,
-                        extraAdultPrice: formData.extraAdultPrice,
-                        extraChildPrice: formData.extraChildPrice,
-                        size: formData.size,
-                        bedType: formData.bedType,
-                        viewType: formData.viewType,
-                        smokingPolicy: formData.smokingPolicy,
-                        amenities: formData.amenities,
-                        photos: formData.photos,
-                        isConnecting: formData.isConnecting,
-                        showOnWebsite: formData.showOnWebsite,
-                        status: formData.status,
-                        description: formData.description
-                    })
-                });
+                if (activePropId) {
+                    await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/room-types/${editingId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            code: formData.shortCode,
+                            name: formData.name,
+                            baseOccupancy: formData.baseAdult,
+                            maxOccupancy: formData.maxAdult,
+                            maxChild: formData.maxChild,
+                            baseRate: formData.basePrice,
+                            extraAdultPrice: formData.extraAdultPrice,
+                            extraChildPrice: formData.extraChildPrice,
+                            size: formData.size,
+                            bedType: formData.bedType,
+                            viewType: formData.viewType,
+                            smokingPolicy: formData.smokingPolicy,
+                            amenities: formData.amenities,
+                            photos: formData.photos,
+                            isConnecting: formData.isConnecting,
+                            showOnWebsite: formData.showOnWebsite,
+                            status: formData.status,
+                            description: formData.description
+                        })
+                    });
+                }
             } catch {}
             updated = roomTypes.map(rt => rt.id === editingId ? formData : rt);
         } else {
             let newId = formData.id;
             try {
-                const res = await fetch(`${getApiBaseUrl()}/api/properties/1/room-types`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        code: formData.shortCode,
-                        name: formData.name,
-                        baseOccupancy: formData.baseAdult,
-                        maxOccupancy: formData.maxAdult,
-                        maxChild: formData.maxChild,
-                        baseRate: formData.basePrice,
-                        extraAdultPrice: formData.extraAdultPrice,
-                        extraChildPrice: formData.extraChildPrice,
-                        size: formData.size,
-                        bedType: formData.bedType,
-                        viewType: formData.viewType,
-                        smokingPolicy: formData.smokingPolicy,
-                        amenities: formData.amenities,
-                        photos: formData.photos,
-                        isConnecting: formData.isConnecting,
-                        showOnWebsite: formData.showOnWebsite,
-                        status: formData.status,
-                        description: formData.description
-                    })
-                });
-                const json = await res.json();
-                if (json.success && json.data?.id) newId = Number(json.data.id);
+                if (activePropId) {
+                    const res = await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/room-types`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            code: formData.shortCode,
+                            name: formData.name,
+                            baseOccupancy: formData.baseAdult,
+                            maxOccupancy: formData.maxAdult,
+                            maxChild: formData.maxChild,
+                            baseRate: formData.basePrice,
+                            extraAdultPrice: formData.extraAdultPrice,
+                            extraChildPrice: formData.extraChildPrice,
+                            size: formData.size,
+                            bedType: formData.bedType,
+                            viewType: formData.viewType,
+                            smokingPolicy: formData.smokingPolicy,
+                            amenities: formData.amenities,
+                            photos: formData.photos,
+                            isConnecting: formData.isConnecting,
+                            showOnWebsite: formData.showOnWebsite,
+                            status: formData.status,
+                            description: formData.description
+                        })
+                    });
+                    const json = await res.json();
+                    if (json.success && json.data?.id) newId = Number(json.data.id);
+                }
             } catch {}
             updated = [...roomTypes, { ...formData, id: newId }];
         }
         persistRoomTypes(updated);
         try {
-            await syncRoomTypesAndRoomsFromDB(1);
+            await syncRoomTypesAndRoomsFromDB(activePropId);
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         } catch {}
         setView('list');
@@ -287,12 +304,14 @@ const RoomTypeManagement = () => {
     const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this room type? Rooms assigned to it will need to be reallocated.')) {
             try {
-                await fetch(`${getApiBaseUrl()}/api/properties/1/room-types/${id}`, { method: 'DELETE' });
+                if (activePropId) {
+                    await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/room-types/${id}`, { method: 'DELETE' });
+                }
             } catch {}
             const updated = roomTypes.filter(rt => rt.id !== id);
             persistRoomTypes(updated);
             try {
-                await syncRoomTypesAndRoomsFromDB(1);
+                await syncRoomTypesAndRoomsFromDB(activePropId);
                 broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             } catch {}
         }

@@ -1484,10 +1484,14 @@ export const validateAndCommitReservation = (
         // Direct Real-Time PostgreSQL Database Persistence
         if (typeof window !== 'undefined') {
             const API_BASE = getApiBaseUrl();
+            const activePropId = getActivePropertyId();
             fetch(`${API_BASE}/api/bookings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(reservationData)
+                body: JSON.stringify({
+                    ...reservationData,
+                    propertyId: reservationData.propertyId || activePropId
+                })
             }).then(res => res.json()).then(resp => {
                 if (resp.success && resp.data?.id) {
                     console.log(`✅ Reservation ${reservationData.reservationNumber} successfully persisted into relational PostgreSQL DB! (ID: ${resp.data.id})`);

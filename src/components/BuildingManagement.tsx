@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { getCanonicalRooms, syncRoomTypesAndRoomsFromDB, broadcastPMSEvent } from '../utils/roomInventoryEngine';
 
 // ============================================================================
@@ -258,9 +258,11 @@ const STORAGE_KEY_ROOMS = 'hotel_rooms_inventory_v1';
 interface BuildingManagementProps {
     initialTab?: 'buildings' | 'floors' | 'amenities' | 'matrix';
     allowedTabs?: ('buildings' | 'floors' | 'amenities' | 'matrix')[];
+    propertyId?: number;
 }
 
-const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'buildings', allowedTabs }) => {
+const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'buildings', allowedTabs, propertyId }) => {
+    const activePropId = propertyId || getActivePropertyId();
     // Navigation / View Tabs
     const [mainTab, setMainTab] = useState<'buildings' | 'floors' | 'amenities' | 'matrix'>(initialTab);
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -329,8 +331,9 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
     // Fetch buildings, floors, and rooms from backend API on mount
     useEffect(() => {
         const loadArchitectureFromDB = async () => {
+            if (!activePropId) return;
             try {
-                const res = await fetch(`${getApiBaseUrl()}/api/properties/1`);
+                const res = await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}`);
                 const json = await res.json();
                 if (json.success && json.data) {
                     if (Array.isArray(json.data.buildings) && json.data.buildings.length > 0) {
@@ -683,23 +686,27 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         if (exists) {
             updated = buildings.map(b => b.id === editingBuilding.id ? editingBuilding : b);
             try {
-                await fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${editingBuilding.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                if (activePropId) {
+                    await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/buildings/${editingBuilding.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
             } catch {}
             showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) updated!`);
         } else {
             let newId = editingBuilding.id;
             try {
-                const res = await fetch(`${getApiBaseUrl()}/api/properties/1/buildings`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const json = await res.json();
-                if (json.success && json.data?.id) newId = String(json.data.id);
+                if (activePropId) {
+                    const res = await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/buildings`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const json = await res.json();
+                    if (json.success && json.data?.id) newId = String(json.data.id);
+                }
             } catch {}
             updated = [...buildings, { ...editingBuilding, id: newId }];
             showToast(`Building "${editingBuilding.title}" (${editingBuilding.shortCode}) created!`);
@@ -732,7 +739,9 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         const updatedBuildings = buildings.filter(b => b.id !== building.id);
         saveBuildings(updatedBuildings);
         try {
-            await fetch(`${getApiBaseUrl()}/api/properties/1/buildings/${building.id}`, { method: 'DELETE' });
+            if (activePropId) {
+                await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/buildings/${building.id}`, { method: 'DELETE' });
+            }
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         } catch {}
         showToast(`Building "${building.title}" removed.`);
@@ -819,23 +828,27 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         if (exists) {
             updated = floors.map(f => f.id === editingFloor.id ? editingFloor : f);
             try {
-                await fetch(`${getApiBaseUrl()}/api/properties/1/floors/${editingFloor.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(floorPayload)
-                });
+                if (activePropId) {
+                    await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/floors/${editingFloor.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(floorPayload)
+                    });
+                }
             } catch {}
             showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) updated!`);
         } else {
             let newId = editingFloor.id;
             try {
-                const res = await fetch(`${getApiBaseUrl()}/api/properties/1/floors`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(floorPayload)
-                });
-                const json = await res.json();
-                if (json.success && json.data?.id) newId = String(json.data.id);
+                if (activePropId) {
+                    const res = await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/floors`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(floorPayload)
+                    });
+                    const json = await res.json();
+                    if (json.success && json.data?.id) newId = String(json.data.id);
+                }
             } catch {}
             updated = [...floors, { ...editingFloor, id: newId }];
             showToast(`Floor "${editingFloor.name}" (${editingFloor.code}) created!`);
@@ -862,7 +875,9 @@ const BuildingManagement: React.FC<BuildingManagementProps> = ({ initialTab = 'b
         const updatedFloors = floors.filter(f => f.id !== floor.id);
         saveFloors(updatedFloors);
         try {
-            await fetch(`${getApiBaseUrl()}/api/properties/1/floors/${floor.id}`, { method: 'DELETE' });
+            if (activePropId) {
+                await fetch(`${getApiBaseUrl()}/api/properties/${activePropId}/floors/${floor.id}`, { method: 'DELETE' });
+            }
             broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
         } catch {}
         showToast(`Floor "${floor.name}" deleted.`);

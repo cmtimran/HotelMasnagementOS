@@ -3,7 +3,7 @@ import {
     TrendingUp, AlertTriangle, Package, Star, Briefcase, CalendarCheck
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { getAllStoredReservations, getCanonicalRooms, syncReservationsFromDB } from '../utils/roomInventoryEngine';
 
 const ManagerDashboard: React.FC = () => {
@@ -16,7 +16,8 @@ const ManagerDashboard: React.FC = () => {
             if (res.length > 0) setReservations(res);
         }).catch(() => {});
 
-        fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=1`)
+        const propId = getActivePropertyId();
+        fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=${propId}`)
             .then(r => r.json())
             .then(j => {
                 if (j.success && Array.isArray(j.data)) setEmployees(j.data);

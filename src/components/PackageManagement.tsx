@@ -8,7 +8,7 @@ import {
     RefreshCw, AlertTriangle, CheckCircle2, Sparkles, Clock
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { broadcastPMSEvent, getDynamicRoomTypes } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
@@ -474,7 +474,8 @@ const PackageManagement = () => {
     const existingCodes = useMemo(() => packages.map(p => p.shortCode), [packages]);
 
     useEffect(() => {
-        fetch(`${getApiBaseUrl()}/api/rates/packages?propertyId=1`)
+        const propId = getActivePropertyId();
+        fetch(`${getApiBaseUrl()}/api/rates/packages?propertyId=${propId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && Array.isArray(json.data)) {

@@ -5,7 +5,7 @@ import {
     Cigarette, CigaretteOff
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import OutOfOrderModal from './modals/OutOfOrderModal';
 import { getStoredOOOBlocks } from '../utils/outOfOrderEngine';
 import {
@@ -83,13 +83,17 @@ const getStoredFloors = (): Floor[] => {
     return [];
 };
 
-export default function RoomManagement({ onBack }: { onBack: () => void }) {
+export default function RoomManagement({ onBack, propertyId }: { onBack: () => void; propertyId?: number }) {
+    const activePropId = propertyId || getActivePropertyId();
     const [view, setView] = useState<'list' | 'form'>('list');
-    const [rooms, setRooms] = useState<Room[]>(() => getCanonicalRooms() as unknown as Room[]);
+    const [rooms, setRooms] = useState<Room[]>(() => {
+        const can = getCanonicalRooms(activePropId);
+        return can as unknown as Room[];
+    });
 
     const [availableBuildings, setAvailableBuildings] = useState<Building[]>(() => getStoredBuildings());
     const [availableFloors, setAvailableFloors] = useState<Floor[]>(() => getStoredFloors());
-    const [availableRoomTypes, setAvailableRoomTypes] = useState<DynamicRoomType[]>(() => getDynamicRoomTypes());
+    const [availableRoomTypes, setAvailableRoomTypes] = useState<DynamicRoomType[]>(() => getDynamicRoomTypes(activePropId));
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedFloor, setSelectedFloor] = useState<string>('all');
@@ -102,8 +106,8 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
     const [oooVersion, setOooVersion] = useState(0);
 
     const oooBlocks = useMemo(() => {
-        return getStoredOOOBlocks(1);
-    }, [oooVersion]);
+        return getStoredOOOBlocks(activePropId);
+    }, [oooVersion, activePropId]);
 
     useEffect(() => {
         const handleUpdate = () => setOooVersion(v => v + 1);
@@ -126,34 +130,38 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
         housekeepingStatus: 'Clean'
     });
 
-    // On mount: sync from DB and fetch property buildings/floors
+    // On mount or property change: sync from DB and fetch property buildings/floors
     useEffect(() => {
         const syncData = async () => {
+            if (!activePropId) {
+                setRooms([]);
+                setAvailableBuildings([]);
+                setAvailableFloors([]);
+                setAvailableRoomTypes([]);
+                return;
+            }
             try {
                 // 1. Sync room types and rooms from DB
-                const { roomTypes, rooms: dbRooms } = await syncRoomTypesAndRoomsFromDB(1);
+                const { roomTypes, rooms: dbRooms } = await syncRoomTypesAndRoomsFromDB(activePropId);
                 if (roomTypes && roomTypes.length > 0) {
                     setAvailableRoomTypes(roomTypes);
+                } else {
+                    setAvailableRoomTypes([]);
                 }
                 if (dbRooms && dbRooms.length > 0) {
                     setRooms(dbRooms as unknown as Room[]);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dbRooms));
-                    localStorage.setItem('hotel_rooms_prop_1', JSON.stringify(dbRooms));
+                    localStorage.setItem(`hotel_rooms_prop_${activePropId}`, JSON.stringify(dbRooms));
                 } else {
-                    // Fall back to canonical rooms from localStorage
-                    const canonical = getCanonicalRooms();
-                    if (canonical.length > 0) {
-                        setRooms(canonical as unknown as Room[]);
-                    }
+                    setRooms([]);
                 }
 
                 // 2. Fetch property details for buildings and floors
                 const API_BASE = getApiBaseUrl();
-                const propRes = await fetch(`${API_BASE}/api/properties/1`);
+                const propRes = await fetch(`${API_BASE}/api/properties/${activePropId}`);
                 const propJson = await propRes.json();
                 if (propJson.success && propJson.data) {
                     const { buildings, floors } = propJson.data;
-                    if (Array.isArray(buildings) && buildings.length > 0) {
+                    if (Array.isArray(buildings)) {
                         const mappedBuildings: Building[] = buildings.map((b: any) => ({
                             id: String(b.id),
                             name: b.title || b.name
@@ -161,7 +169,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                         setAvailableBuildings(mappedBuildings);
                         localStorage.setItem('hotel_buildings_v2', JSON.stringify(buildings));
                     }
-                    if (Array.isArray(floors) && floors.length > 0) {
+                    if (Array.isArray(floors)) {
                         const mappedFloors: Floor[] = floors.map((f: any) => ({
                             id: String(f.id),
                             name: f.name,
@@ -178,19 +186,21 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
                 const cachedFloors = getStoredFloors();
                 if (cachedBuildings.length > 0) setAvailableBuildings(cachedBuildings);
                 if (cachedFloors.length > 0) setAvailableFloors(cachedFloors);
-                const canonical = getCanonicalRooms();
-                if (canonical.length > 0) setRooms(canonical as unknown as Room[]);
+                const canonical = getCanonicalRooms(activePropId);
+                setRooms(canonical as unknown as Room[]);
             }
         };
 
         syncData();
-    }, []);
+    }, [activePropId]);
 
     const persistRooms = (updated: Room[]) => {
         setRooms(updated);
         try {
+            if (activePropId) {
+                localStorage.setItem(`hotel_rooms_prop_${activePropId}`, JSON.stringify(updated));
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-            localStorage.setItem('hotel_rooms_prop_1', JSON.stringify(updated));
         } catch {
             // fallback
         }
@@ -230,13 +240,13 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
             persistRooms(updated);
             if (target?.number) {
                 try {
-                    await fetch(`${getApiBaseUrl()}/api/rooms/${encodeURIComponent(target.number)}`, {
+                    await fetch(`${getApiBaseUrl()}/api/rooms/${encodeURIComponent(target.number)}?propertyId=${activePropId}`, {
                         method: 'DELETE'
                     });
                 } catch {}
             }
             try {
-                await syncRoomTypesAndRoomsFromDB(1);
+                await syncRoomTypesAndRoomsFromDB(activePropId);
                 broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             } catch {}
         }
@@ -255,6 +265,7 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
             if (isNew) {
                 // POST new room to API
                 const payload = {
+                    propertyId: activePropId,
                     number: formData.number,
                     name: formData.name,
                     buildingId: formData.buildingId,
@@ -284,10 +295,11 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
             } else {
                 // Edit: PUT details + PATCH housekeeping status via API
                 try {
-                    await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(formData.number)}/details`, {
+                    await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(formData.number)}/details?propertyId=${activePropId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            propertyId: activePropId,
                             name: formData.name,
                             buildingId: formData.buildingId,
                             floorId: formData.floorId,
@@ -310,11 +322,10 @@ export default function RoomManagement({ onBack }: { onBack: () => void }) {
 
             // Refresh rooms from DB after save and broadcast to other components
             try {
-                const { rooms: dbRooms } = await syncRoomTypesAndRoomsFromDB(1);
+                const { rooms: dbRooms } = await syncRoomTypesAndRoomsFromDB(activePropId);
                 if (dbRooms && dbRooms.length > 0) {
                     setRooms(dbRooms as unknown as Room[]);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dbRooms));
-                    localStorage.setItem('hotel_rooms_prop_1', JSON.stringify(dbRooms));
+                    localStorage.setItem(`hotel_rooms_prop_${activePropId}`, JSON.stringify(dbRooms));
                 }
                 broadcastPMSEvent({ type: 'INVENTORY_REFRESH' });
             } catch {

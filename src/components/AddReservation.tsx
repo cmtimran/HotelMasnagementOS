@@ -72,7 +72,7 @@ import {
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
 import { useProperty } from '../context/PropertyContext';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import {
     calculateReservationTaxes,
     getActiveTaxConfiguration,
@@ -855,24 +855,28 @@ export const AddReservation: React.FC = () => {
     });
 
     useEffect(() => {
-        fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=1`)
-            .then(res => res.json())
-            .then(json => {
-                if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                    setDbRatePlans(json.data);
-                    localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
-                }
-            })
-            .catch(() => { });
+        const propId = getActivePropertyId();
+        if (propId > 0) {
+            fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=${propId}`)
+                .then(res => res.json())
+                .then(json => {
+                    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                        setDbRatePlans(json.data);
+                        localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
+                    }
+                })
+                .catch(() => { });
+        }
     }, [pmsSyncVersion]);
 
     const availableRatePlans = dbRatePlans;
 
     // Connecting Suites from connecting_rooms table and localStorage
-    const [connectingSuites, setConnectingSuites] = useState<ConnectingSuite[]>(() => getStoredConnectingSuites());
+    const [connectingSuites, setConnectingSuites] = useState<ConnectingSuite[]>(() => getStoredConnectingSuites(getActivePropertyId()));
 
     useEffect(() => {
-        syncConnectingSuitesFromDB(1).then(suites => {
+        const propId = getActivePropertyId();
+        syncConnectingSuitesFromDB(propId).then(suites => {
             if (suites && suites.length > 0) {
                 setConnectingSuites(suites);
             }

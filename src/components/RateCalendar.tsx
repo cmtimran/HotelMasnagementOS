@@ -4,7 +4,9 @@ import {
     BedDouble, DollarSign, Flame
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
+import { useProperty } from '../context/PropertyContext';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { broadcastPMSEvent, getDynamicRoomTypes, getCanonicalRooms } from '../utils/roomInventoryEngine';
 
 interface DayRate {
@@ -18,9 +20,9 @@ interface DayRate {
 
 const STORAGE_KEY = 'hotel_rate_calendar_v2';
 
-const getDynamicRoomTypeRate = (typeName: string) => {
+const getDynamicRoomTypeRate = (typeName: string, propertyId?: number) => {
     if (!typeName) return { weekday: 0, weekend: 0 };
-    const types = getDynamicRoomTypes();
+    const types = getDynamicRoomTypes(propertyId);
     const match = types.find(t => t.name.toLowerCase() === typeName.toLowerCase() || t.code.toLowerCase() === typeName.toLowerCase());
     const base = match ? Number(match.baseRate) : 0;
     return {
@@ -42,13 +44,25 @@ const parseDateString = (dateStr: string): Date => {
 };
 
 export default function RateCalendar() {
+    const { activeProperty } = useProperty();
+    const activePropId = activeProperty?.id || getActivePropertyId();
+    const currency = activeProperty?.currency || 'USD';
+    const currSym = getCurrencySymbol(currency);
+
     // Hotel operational date is July 2026
     const [currentMonth, setCurrentMonth] = useState(() => new Date(2026, 6, 1));
-    const dynamicTypes = useMemo(() => getDynamicRoomTypes(), []);
+    const dynamicTypes = useMemo(() => getDynamicRoomTypes(activePropId), [activePropId]);
     const availableRoomTypes = useMemo(() => {
         return dynamicTypes.length > 0 ? dynamicTypes.map(t => t.name) : [];
     }, [dynamicTypes]);
     const [selectedRoomType, setSelectedRoomType] = useState(() => availableRoomTypes[0] || '');
+
+    useEffect(() => {
+        if (availableRoomTypes.length > 0 && (!selectedRoomType || !availableRoomTypes.includes(selectedRoomType))) {
+            setSelectedRoomType(availableRoomTypes[0]);
+        }
+    }, [availableRoomTypes]);
+
     const [bookings, setBookings] = useState<any[]>([]);
     const [editingDate, setEditingDate] = useState<string | null>(null);
     const [tempRate, setTempRate] = useState('');
@@ -63,7 +77,8 @@ export default function RateCalendar() {
     // Room-type scoped rates state
     const [ratesByRoomType, setRatesByRoomType] = useState<Record<string, Record<string, DayRate>>>(() => {
         try {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            const key = activePropId ? `hotel_rate_calendar_prop_${activePropId}` : STORAGE_KEY;
+            const saved = localStorage.getItem(key);
             if (saved) return JSON.parse(saved);
         } catch {
             // fallback
@@ -75,18 +90,23 @@ export default function RateCalendar() {
 
     // Load actual bookings to compute dynamic occupancy
     useEffect(() => {
-        fetch(`${getApiBaseUrl()}/api/bookings?propertyId=1`)
+        if (!activePropId) {
+            setBookings([]);
+            setRatesByRoomType({});
+            return;
+        }
+        fetch(`${getApiBaseUrl()}/api/bookings?propertyId=${activePropId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && Array.isArray(json.data)) {
                     setBookings(json.data);
+                } else {
+                    setBookings([]);
                 }
             })
             .catch(() => {});
-    }, []);
 
-    useEffect(() => {
-        fetch(`${getApiBaseUrl()}/api/rates/calendar?propertyId=1`)
+        fetch(`${getApiBaseUrl()}/api/rates/calendar?propertyId=${activePropId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && json.data) {
@@ -95,17 +115,22 @@ export default function RateCalendar() {
                         for (const [rt, days] of Object.entries(json.data as Record<string, Record<string, DayRate>>)) {
                             merged[rt] = { ...(merged[rt] || {}), ...days };
                         }
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+                        localStorage.setItem(`hotel_rate_calendar_prop_${activePropId}`, JSON.stringify(merged));
                         return merged;
                     });
+                } else {
+                    setRatesByRoomType({});
                 }
             })
             .catch(() => {});
-    }, []);
+    }, [activePropId]);
 
     const persistRates = (updated: Record<string, Record<string, DayRate>>) => {
         setRatesByRoomType(updated);
         try {
+            if (activePropId) {
+                localStorage.setItem(`hotel_rate_calendar_prop_${activePropId}`, JSON.stringify(updated));
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
         } catch {
             // fallback
@@ -135,14 +160,14 @@ export default function RateCalendar() {
 
     const getDefaultRate = (date: Date) => {
         const dayOfWeek = date.getDay();
-        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday/Saturday weekend in BD
-        const defaults = getDynamicRoomTypeRate(selectedRoomType);
+        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday/Saturday weekend
+        const defaults = getDynamicRoomTypeRate(selectedRoomType, activePropId);
         return isWeekend ? defaults.weekend : defaults.weekday;
     };
 
     const getDynamicOccupancyForDate = (dateStr: string, roomTypeName: string): number => {
-        if (!roomTypeName) return 0;
-        const canonicalRooms = getCanonicalRooms();
+        if (!roomTypeName || !activePropId) return 0;
+        const canonicalRooms = getCanonicalRooms(activePropId);
         const totalRoomsOfType = canonicalRooms.filter(r => 
             r.roomTypeName?.toLowerCase() === roomTypeName.toLowerCase() ||
             r.roomTypeId === dynamicTypes.find(t => t.name.toLowerCase() === roomTypeName.toLowerCase())?.id?.toString()
@@ -169,9 +194,7 @@ export default function RateCalendar() {
         if (currentRates[dateStr]) {
             return {
                 ...currentRates[dateStr],
-                occupancy: currentRates[dateStr].occupancy !== undefined && currentRates[dateStr].occupancy > 0
-                    ? currentRates[dateStr].occupancy
-                    : dynamicOcc
+                occupancy: dynamicOcc
             };
         }
         const dayOfWeek = date.getDay();
@@ -230,11 +253,12 @@ export default function RateCalendar() {
             });
 
             try {
+                const propId = getActivePropertyId();
                 await fetch(`${getApiBaseUrl()}/api/rates/calendar/override`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        propertyId: 1,
+                        propertyId: propId,
                         roomType: selectedRoomType,
                         date: editingDate,
                         rate: newRate,
@@ -255,7 +279,7 @@ export default function RateCalendar() {
     const handleBulkApply = async () => {
         const rateVal = parseInt(bulkRate, 10);
         if (isNaN(rateVal) || rateVal <= 0) {
-            alert('Please enter a valid rate in BDT.');
+            alert(`Please enter a valid rate in ${currency}.`);
             return;
         }
 
@@ -298,11 +322,12 @@ export default function RateCalendar() {
         });
 
         try {
+            const propId = getActivePropertyId();
             await fetch(`${getApiBaseUrl()}/api/rates/calendar/bulk-override`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    propertyId: 1,
+                    propertyId: propId,
                     roomType: selectedRoomType,
                     startDate: bulkStartDate,
                     endDate: bulkEndDate,
@@ -397,7 +422,7 @@ export default function RateCalendar() {
                             </div>
                             <div className="text-base text-slate-900 truncate tracking-tight">{selectedRoomType}</div>
                             <div className="text-[11px] text-slate-500 font-medium mt-1">
-                                WD: ৳{getDynamicRoomTypeRate(selectedRoomType).weekday.toLocaleString()} | WE: ৳{getDynamicRoomTypeRate(selectedRoomType).weekend.toLocaleString()}
+                                WD: {currSym}{getDynamicRoomTypeRate(selectedRoomType, activePropId).weekday.toLocaleString()} | WE: {currSym}{getDynamicRoomTypeRate(selectedRoomType, activePropId).weekend.toLocaleString()}
                             </div>
                         </div>
 
@@ -408,7 +433,7 @@ export default function RateCalendar() {
                                     <DollarSign className="size-4" />
                                 </div>
                             </div>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{avgRate.toLocaleString()}</div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">{currSym}{avgRate.toLocaleString()}</div>
                             <div className="text-[11px] text-emerald-600 font-semibold mt-1">Dynamic ARI average</div>
                         </div>
 
@@ -419,7 +444,7 @@ export default function RateCalendar() {
                                     <Flame className="size-4" />
                                 </div>
                             </div>
-                            <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">৳{maxRate.toLocaleString()}</div>
+                            <div className="text-2xl font-black text-slate-900 tracking-tight font-mono">{currSym}{maxRate.toLocaleString()}</div>
                             <div className="text-[11px] text-slate-500 font-medium mt-1">Maximum surge rate</div>
                         </div>
 
@@ -478,10 +503,10 @@ export default function RateCalendar() {
                     <div className="bg-white px-4 py-2.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
                         <div className="flex flex-wrap items-center gap-4">
                             <span className="text-slate-700 text-[10px] uppercase tracking-wider">Tariff Legend:</span>
-                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-purple-600"></span> Suite / VIP (৳10k+)</span>
-                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-primary"></span> Premium (৳5k-10k)</span>
-                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-emerald-600"></span> Standard (৳3k-5k)</span>
-                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-slate-500"></span> Base (&lt;৳3k)</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-purple-600"></span> Suite / VIP ({currSym}10k+)</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-primary"></span> Premium ({currSym}5k-10k)</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-emerald-600"></span> Standard ({currSym}3k-5k)</span>
+                            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded bg-slate-500"></span> Base (&lt;{currSym}3k)</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary-subtle px-2.5 py-1 rounded-lg border border-primary-border/40">
                             <TrendingUp className="size-3.5" />
@@ -534,7 +559,7 @@ export default function RateCalendar() {
                                                     {isEditing ? (
                                                         <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
                                                             <div className="relative">
-                                                                <span className="absolute left-2 top-1 text-[11px] text-slate-400 font-bold">৳</span>
+                                                                <span className="absolute left-2 top-1 text-[11px] text-slate-400 font-bold">{currSym}</span>
                                                                 <input
                                                                     type="number"
                                                                     value={tempRate}
@@ -565,7 +590,7 @@ export default function RateCalendar() {
                                                     ) : (
                                                         <div className="space-y-1">
                                                             <div className={`px-2 py-1 ${getRateColor(dayRate.rate)} rounded-lg text-center shadow-2xs`}>
-                                                                <p className="text-xs leading-none font-mono">৳{dayRate.rate.toLocaleString()}</p>
+                                                                <p className="text-xs leading-none font-mono">{currSym}{dayRate.rate.toLocaleString()}</p>
                                                             </div>
                                                             {dayRate.eventName && (
                                                                 <p className="text-[10px] text-rose-600 font-semibold truncate leading-none mt-1">{dayRate.eventName}</p>
@@ -628,9 +653,9 @@ export default function RateCalendar() {
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-700">Target Rate (BDT)</label>
+                                <label className="text-xs font-semibold text-slate-700">Target Rate ({currency})</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2 text-slate-400 text-xs">৳</span>
+                                    <span className="absolute left-3 top-2 text-slate-400 text-xs">{currSym}</span>
                                     <input
                                         type="number"
                                         value={bulkRate}

@@ -2,12 +2,16 @@ import type { Response } from 'express';
 import type { AuthenticatedRequest, ApiResponse } from '../types/index.js';
 import { roomService, type RoomRecord } from '../services/room.service.js';
 
+const getReqPropertyId = (req: AuthenticatedRequest): string | number | undefined => {
+  return (req.query?.propertyId as string) || (req.headers?.['x-property-id'] as string) || (req.body?.propertyId as string) || req.propertyId;
+};
+
 export const roomController = {
   getAllRooms: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const { hkStatus, foStatus } = req.query as { hkStatus?: string; foStatus?: string };
-      const rooms = await roomService.getAllRooms(propertyId, { hkStatus, foStatus });
+      const rooms = propertyId ? await roomService.getAllRooms(propertyId, { hkStatus, foStatus }) : [];
 
       const response: ApiResponse<RoomRecord[]> = {
         success: true,
@@ -25,7 +29,11 @@ export const roomController = {
 
   updateHousekeeping: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
+      if (!propertyId) {
+        res.status(400).json({ success: false, error: 'Property ID is required' });
+        return;
+      }
       const rawRoomNo = Array.isArray(req.params.roomNo) ? req.params.roomNo[0] : req.params.roomNo;
       const roomNo = rawRoomNo || '';
       const { status } = req.body;

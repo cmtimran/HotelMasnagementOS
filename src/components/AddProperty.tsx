@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useToast } from '../context/ToastContext';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { getCanonicalRooms } from '../utils/roomInventoryEngine';
 import BuildingManagement from './BuildingManagement';
 import RoomTypeManagement from './RoomTypeManagement';
@@ -250,7 +250,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
     const { showToast } = useToast();
 
     const targetProperty = isCreateMode ? null : (initialData?.raw || initialData || activeProperty);
-    const propStorageKey = `hotel_unified_settings_prop_${targetProperty?.id || 1}`;
+    const propStorageKey = `hotel_unified_settings_prop_${targetProperty?.id || activeProperty?.id || getActivePropertyId() || 0}`;
 
     const getInitialTabFromUrl = (): string => {
         try {
@@ -548,22 +548,27 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                 });
                 const data = await res.json();
                 if (data.success) {
-                    const createdId = data.data?.id || 1;
-                    localStorage.setItem(
-                        `hotel_unified_settings_prop_${createdId}`,
-                        JSON.stringify({ settings: mergedSettings, bankAccounts, posOutlets, contacts, emergencyLines, amenities, socialLinks })
-                    );
+                    const createdId = data.data?.id;
+                    if (createdId) {
+                        localStorage.setItem(
+                            `hotel_unified_settings_prop_${createdId}`,
+                            JSON.stringify({ settings: mergedSettings, bankAccounts, posOutlets, contacts, emergencyLines, amenities, socialLinks })
+                        );
+                        setActivePropertyId(createdId);
+                    }
                     showToast(`Property "${propName}" created successfully!`, { type: 'success' });
                     await refreshProperties();
-                    if (data.data?.id) {
-                        setActivePropertyId(data.data.id);
-                    }
                     if (onBack) setTimeout(() => onBack(), 400);
                     setIsSaving(false);
                     return;
                 }
             } else {
-                const propId = targetProperty?.id || 1;
+                const propId = targetProperty?.id || activeProperty?.id || getActivePropertyId();
+                if (!propId) {
+                    showToast('No active property selected to update.', { type: 'error' });
+                    setIsSaving(false);
+                    return;
+                }
                 const res = await fetch(`${baseUrl}/api/properties/${propId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -1154,7 +1159,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                        ======================================================================== */}
                     {activeTab === 'floors-wings' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
-                            <BuildingManagement initialTab="floors" allowedTabs={['floors', 'buildings', 'matrix']} />
+                            <BuildingManagement propertyId={targetProperty?.id} initialTab="floors" allowedTabs={['floors', 'buildings', 'matrix']} />
                         </div>
                     )}
 
@@ -1163,7 +1168,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                        ======================================================================== */}
                     {activeTab === 'room-types' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
-                            <RoomTypeManagement />
+                            <RoomTypeManagement propertyId={targetProperty?.id} />
                         </div>
                     )}
 
@@ -1172,7 +1177,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                        ======================================================================== */}
                     {activeTab === 'rooms' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
-                            <RoomManagement onBack={() => setActiveTab('identity')} />
+                            <RoomManagement propertyId={targetProperty?.id} onBack={() => setActiveTab('identity')} />
                         </div>
                     )}
 
@@ -1181,7 +1186,7 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                        ======================================================================== */}
                     {activeTab === 'connecting-rooms' && (
                         <div className="p-1 sm:p-2 animate-in fade-in duration-150">
-                            <ConnectingRoomManagement />
+                            <ConnectingRoomManagement propertyId={targetProperty?.id} />
                         </div>
                     )}
 

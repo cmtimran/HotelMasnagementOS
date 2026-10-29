@@ -10,7 +10,7 @@
  * 6. Release to Housekeeping: Repairs return room to 'Dirty' (requires inspection) before entering sellable pool.
  */
 
-import { getApiBaseUrl } from './apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from './apiUrl';
 import { getAllStoredReservations, broadcastPMSEvent, getCanonicalRooms, type StoredReservation } from './roomInventoryEngine';
 
 export type MaintenanceBlockType = 'OOO' | 'OOS';
@@ -89,17 +89,19 @@ export const isDateRangeOverlapping = (
 /**
  * Get all stored OOO/OOS blocks from localStorage
  */
-export const getStoredOOOBlocks = (propertyId: number = 1): OutOfOrderBlock[] => {
+export const getStoredOOOBlocks = (propertyId?: number): OutOfOrderBlock[] => {
     try {
         if (typeof window === 'undefined') return [];
-        const raw = localStorage.getItem(`${STORAGE_KEY_OOO_BLOCKS}_prop_${propertyId}`) || localStorage.getItem(STORAGE_KEY_OOO_BLOCKS);
+        const propId = propertyId || getActivePropertyId();
+        if (!propId) return [];
+        const raw = localStorage.getItem(`${STORAGE_KEY_OOO_BLOCKS}_prop_${propId}`) || (propId === 1 ? localStorage.getItem(STORAGE_KEY_OOO_BLOCKS) : null);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
             return parsed.map((item: any) => ({
                 ...item,
                 id: String(item.id),
-                propertyId: Number(item.propertyId || propertyId),
+                propertyId: Number(item.propertyId || propId),
                 startDate: normalizeDateStr(item.startDate),
                 endDate: normalizeDateStr(item.endDate)
             }));
@@ -114,13 +116,17 @@ export const getStoredOOOBlocks = (propertyId: number = 1): OutOfOrderBlock[] =>
 /**
  * Save OOO blocks to localStorage and broadcast sync event
  */
-export const saveStoredOOOBlocks = (blocks: OutOfOrderBlock[], propertyId: number = 1): void => {
+export const saveStoredOOOBlocks = (blocks: OutOfOrderBlock[], propertyId?: number): void => {
     try {
         if (typeof window === 'undefined') return;
-        localStorage.setItem(`${STORAGE_KEY_OOO_BLOCKS}_prop_${propertyId}`, JSON.stringify(blocks));
-        localStorage.setItem(STORAGE_KEY_OOO_BLOCKS, JSON.stringify(blocks));
-        window.dispatchEvent(new CustomEvent('hotel_ooo_blocks_updated', { detail: { propertyId, blocks } }));
-        broadcastPMSEvent({ type: 'INVENTORY_REFRESH', propertyId });
+        const propId = propertyId || getActivePropertyId();
+        if (!propId) return;
+        localStorage.setItem(`${STORAGE_KEY_OOO_BLOCKS}_prop_${propId}`, JSON.stringify(blocks));
+        if (propId === 1) {
+            localStorage.setItem(STORAGE_KEY_OOO_BLOCKS, JSON.stringify(blocks));
+        }
+        window.dispatchEvent(new CustomEvent('hotel_ooo_blocks_updated', { detail: { propertyId: propId, blocks } }));
+        broadcastPMSEvent({ type: 'INVENTORY_REFRESH', propertyId: propId });
     } catch (e) {
         console.warn('Failed to save OOO blocks to localStorage', e);
     }
@@ -313,7 +319,7 @@ export const createOOOBlock = async (
     conflicts?: StoredReservation[];
     message?: string;
 }> => {
-    const propertyId = blockData.propertyId || 1;
+    const propertyId = blockData.propertyId || getActivePropertyId();
     const startDate = normalizeDateStr(blockData.startDate);
     const endDate = normalizeDateStr(blockData.endDate);
 
@@ -403,7 +409,7 @@ export const extendOOOBlock = async (
     }
 
     const target = existing[index];
-    const propertyId = target.propertyId || 1;
+    const propertyId = target.propertyId || getActivePropertyId();
     const noteEntry = `[${new Date().toISOString().slice(0, 16).replace('T', ' ')}] Extended from ${target.endDate} to ${normEndDate} by ${extendedBy}. Reason: ${reason || 'Work delayed'}`;
     const updatedNotes = target.extensionNotes ? `${target.extensionNotes}\n${noteEntry}` : noteEntry;
 
@@ -461,7 +467,7 @@ export const releaseOOOBlock = async (
     }
 
     const target = existing[index];
-    const propertyId = target.propertyId || 1;
+    const propertyId = target.propertyId || getActivePropertyId();
     const releaseEntry = `[${new Date().toISOString().slice(0, 16).replace('T', ' ')}] Released by ${releasedBy} with status ${returnStatus}. Note: ${notes || 'Work completed'}`;
     const updatedNotes = target.extensionNotes ? `${target.extensionNotes}\n${releaseEntry}` : releaseEntry;
 
@@ -536,7 +542,7 @@ export const cancelOOOBlock = async (
     }
 
     const target = existing[index];
-    const propertyId = target.propertyId || 1;
+    const propertyId = target.propertyId || getActivePropertyId();
     const cancelEntry = `[${new Date().toISOString().slice(0, 16).replace('T', ' ')}] Cancelled. Reason: ${reason}`;
     const updatedNotes = target.extensionNotes ? `${target.extensionNotes}\n${cancelEntry}` : cancelEntry;
 

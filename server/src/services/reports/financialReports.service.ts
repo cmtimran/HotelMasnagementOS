@@ -1,11 +1,11 @@
 import { db } from '../../database/db.js';
 import type { ReportFilterQuery } from '../../types/index.js';
 
-const resolvePropertyId = (propertyId: string | number | undefined): number => {
+const resolvePropertyId = (propertyId: string | number | undefined): number | null => {
   if (typeof propertyId === 'number') return propertyId;
-  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === '1') return 1;
+  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === 'all') return null;
   const num = Number(propertyId);
-  return isNaN(num) ? 1 : num;
+  return isNaN(num) ? null : num;
 };
 
 export const financialReportsService = {
@@ -14,10 +14,22 @@ export const financialReportsService = {
    */
   getManagerReport: async (propertyId: string, _query: ReportFilterQuery) => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) {
+      return [
+        { kpi: 'Total Rooms Available', today: 0, mtd: 0, ytd: 0 },
+        { kpi: 'Rooms Sold / Occupied', today: 0, mtd: 0, ytd: 0 },
+        { kpi: 'Occupancy Percentage (%)', today: 0, mtd: 0, ytd: 0 },
+        { kpi: 'Total Room Revenue', today: 0, mtd: 0, ytd: 0 },
+        { kpi: 'Average Daily Rate - ADR', today: 0, mtd: 0, ytd: 0 },
+        { kpi: 'RevPAR', today: 0, mtd: 0, ytd: 0 },
+        { kpi: 'F&B POS Revenue', today: 0, mtd: 0, ytd: 0 },
+        { kpi: 'Total Hotel Gross Revenue', today: 0, mtd: 0, ytd: 0 },
+      ];
+    }
 
     // 1. Total Rooms
     const totalRoomsRow = await db.prepare(`SELECT count(*) as count FROM rooms WHERE property_id = ? AND status = 'ACTIVE'`).get(propId) as any;
-    const totalRooms = Number(totalRoomsRow?.count || 34);
+    const totalRooms = Number(totalRoomsRow?.count || 0);
 
     // 2. Occupied Rooms
     const occupiedRow = await db.prepare(`
@@ -26,7 +38,7 @@ export const financialReportsService = {
       JOIN reservations r ON r.id = rr.reservation_id 
       WHERE r.property_id = ? AND r.status = 'IN_HOUSE'
     `).get(propId) as any;
-    const occupied = Number(occupiedRow?.count || 6);
+    const occupied = Number(occupiedRow?.count || 0);
 
     const occupancyRate = totalRooms > 0 ? ((occupied / totalRooms) * 100).toFixed(2) : '0.00';
 
@@ -36,40 +48,40 @@ export const financialReportsService = {
       FROM reservations 
       WHERE property_id = ? AND status IN ('CONFIRMED', 'IN_HOUSE', 'COMPLETED')
     `).get(propId) as any;
-    const totalRoomRev = Number(revRow?.total || 45000);
+    const totalRoomRev = Number(revRow?.total || 0);
 
     // 4. Average Daily Rate (ADR)
-    const adr = occupied > 0 ? (totalRoomRev / occupied).toFixed(2) : '3500.00';
+    const adr = occupied > 0 ? (totalRoomRev / occupied).toFixed(2) : '0.00';
 
     // 5. RevPAR
-    const revPar = totalRooms > 0 ? (totalRoomRev / totalRooms).toFixed(2) : '1500.00';
+    const revPar = totalRooms > 0 ? (totalRoomRev / totalRooms).toFixed(2) : '0.00';
 
     // 6. F&B Revenue
     const fbRow = await db.prepare(`
       SELECT COALESCE(SUM(total_amount), 0) as total 
       FROM folio_charges 
-      WHERE charge_code LIKE '%FB%' OR charge_code LIKE '%REST%' OR charge_code LIKE '%MEAL%'
+      WHERE (charge_code LIKE '%FB%' OR charge_code LIKE '%REST%' OR charge_code LIKE '%MEAL%')
     `).get() as any;
-    const fbRev = Number(fbRow?.total || 12500);
+    const fbRev = Number(fbRow?.total || 0);
 
     const totalGross = totalRoomRev + fbRev;
 
     return [
       { kpi: 'Total Rooms Available', today: totalRooms, mtd: totalRooms * 30, ytd: totalRooms * 365 },
       { kpi: 'Rooms Sold / Occupied', today: occupied, mtd: occupied * 28, ytd: occupied * 320 },
-      { kpi: 'Occupancy Percentage (%)', today: Number(occupancyRate), mtd: Number(occupancyRate), ytd: 78.50 },
-      { kpi: 'Total Room Revenue (৳)', today: totalRoomRev, mtd: totalRoomRev * 25, ytd: totalRoomRev * 300 },
-      { kpi: 'Average Daily Rate - ADR (৳)', today: Number(adr), mtd: Number(adr), ytd: 4200.00 },
-      { kpi: 'RevPAR (৳)', today: Number(revPar), mtd: Number(revPar), ytd: 3250.00 },
-      { kpi: 'F&B POS Revenue (৳)', today: fbRev, mtd: fbRev * 25, ytd: fbRev * 300 },
-      { kpi: 'Total Hotel Gross Revenue (৳)', today: totalGross, mtd: totalGross * 25, ytd: totalGross * 300 },
+      { kpi: 'Occupancy Percentage (%)', today: Number(occupancyRate), mtd: Number(occupancyRate), ytd: Number(occupancyRate) },
+      { kpi: 'Total Room Revenue', today: totalRoomRev, mtd: totalRoomRev * 25, ytd: totalRoomRev * 300 },
+      { kpi: 'Average Daily Rate - ADR', today: Number(adr), mtd: Number(adr), ytd: Number(adr) },
+      { kpi: 'RevPAR', today: Number(revPar), mtd: Number(revPar), ytd: Number(revPar) },
+      { kpi: 'F&B POS Revenue', today: fbRev, mtd: fbRev * 25, ytd: fbRev * 300 },
+      { kpi: 'Total Hotel Gross Revenue', today: totalGross, mtd: totalGross * 25, ytd: totalGross * 300 },
     ];
   },
 
   /**
    * Trial Balance directly from General Ledger & Chart of Accounts in PostgreSQL
    */
-  getTrialBalance: async (propertyId: string, _query: ReportFilterQuery) => {
+  getTrialBalance: async (_propertyId: string, _query: ReportFilterQuery) => {
     try {
       const rows = await db.prepare(`
         SELECT 
@@ -99,14 +111,7 @@ export const financialReportsService = {
       console.warn('Failed to query trial balance directly from PostgreSQL', err);
     }
 
-    return [
-      { accountCode: 'GL-1010', accountName: 'Cash in Hand (Front Desk)', debit: 45000.0, credit: 0.0, balance: 45000.0 },
-      { accountCode: 'GL-1020', accountName: 'Guest Ledger (In-House Folios)', debit: 128450.0, credit: 0.0, balance: 128450.0 },
-      { accountCode: 'GL-1030', accountName: 'City Ledger (B2B / Corporate Receivables)', debit: 85200.0, credit: 0.0, balance: 85200.0 },
-      { accountCode: 'GL-2010', accountName: 'Advance Deposit Ledger', debit: 0.0, credit: 35000.0, balance: -35000.0 },
-      { accountCode: 'GL-4010', accountName: 'Room Revenue', debit: 0.0, credit: 185000.0, balance: -185000.0 },
-      { accountCode: 'GL-4020', accountName: 'F&B Revenue', debit: 0.0, credit: 38650.0, balance: -38650.0 },
-    ];
+    return [];
   },
 
   /**
@@ -114,6 +119,7 @@ export const financialReportsService = {
    */
   getAdvanceDepositLedger: async (propertyId: string, _query: ReportFilterQuery) => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return [];
 
     const rows = await db.prepare(`
       SELECT 
@@ -132,13 +138,6 @@ export const financialReportsService = {
       LIMIT 20
     `).all(propId) as any[];
 
-    if (rows && rows.length > 0) {
-      return rows;
-    }
-
-    return [
-      { resNo: 'RES-9201', guestName: 'Global Tech Summit Group', depositDate: '2026-10-15', paymentMethod: 'Bank Wire', arrivalDate: '2026-11-01', depositAmount: 50000.0 },
-      { resNo: 'RES-9214', guestName: 'Square Pharma Corporate Block', depositDate: '2026-10-16', paymentMethod: 'Corporate Card', arrivalDate: '2026-11-12', depositAmount: 35000.0 },
-    ];
+    return rows || [];
   },
 };

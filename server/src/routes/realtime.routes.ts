@@ -31,7 +31,7 @@ setInterval(() => {
  */
 router.get('/stream', (req: Request, res: Response) => {
     const terminalName = (req.query.terminal as string) || `Terminal-${Math.random().toString(36).substring(2, 6)}`;
-    const propertyId = (req.query.propertyId as string) || 'prop_grand_palace';
+    const propertyId = (req.query.propertyId as string) || (req.headers['x-property-id'] as string) || '';
     const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     res.writeHead(200, {

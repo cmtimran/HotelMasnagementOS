@@ -11,7 +11,7 @@ import {
     Layers, 
     Calendar 
 } from 'lucide-react';
-import { getApiBaseUrl } from '../../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 
 
 interface Account {
@@ -92,15 +92,16 @@ export const AdvanceAccountingDashboard: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
+            const propId = getActivePropertyId();
             // 1. Fetch Trial Balance
-            const tbRes = await fetch(`${getApiBaseUrl()}/api/accounting/trial-balance?propertyId=1`);
+            const tbRes = await fetch(`${getApiBaseUrl()}/api/accounting/trial-balance?propertyId=${propId}`);
             const tbData = await tbRes.json();
             if (tbData.success) {
                 setTrialBalance({ items: tbData.data, summary: tbData.summary });
             }
 
             // 2. Fetch Chart of Accounts
-            const coaRes = await fetch(`${getApiBaseUrl()}/api/accounting/chart-of-accounts?propertyId=1`);
+            const coaRes = await fetch(`${getApiBaseUrl()}/api/accounting/chart-of-accounts?propertyId=${propId}`);
             const coaData = await coaRes.json();
             if (coaData.success) {
                 setAccounts(coaData.data);
@@ -113,14 +114,14 @@ export const AdvanceAccountingDashboard: React.FC = () => {
             }
 
             // 3. Fetch Journal Entries
-            const jvRes = await fetch(`${getApiBaseUrl()}/api/accounting/journal-entries?propertyId=1`);
+            const jvRes = await fetch(`${getApiBaseUrl()}/api/accounting/journal-entries?propertyId=${propId}`);
             const jvData = await jvRes.json();
             if (jvData.success) {
                 setJournalEntries(jvData.data);
             }
 
             // 4. Fetch Folios
-            const foliosRes = await fetch(`${getApiBaseUrl()}/api/accounting/folios?propertyId=1`);
+            const foliosRes = await fetch(`${getApiBaseUrl()}/api/accounting/folios?propertyId=${propId}`);
             const foliosData = await foliosRes.json();
             if (foliosData.success) {
                 setFolios(foliosData.data);
@@ -174,7 +175,7 @@ export const AdvanceAccountingDashboard: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    propertyId: 1,
+                    propertyId: getActivePropertyId(),
                     entryDate,
                     description: entryDescription || 'General Journal Adjustment Voucher',
                     lines: entryLines.map(l => ({

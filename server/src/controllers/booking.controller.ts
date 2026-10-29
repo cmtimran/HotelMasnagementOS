@@ -3,10 +3,15 @@ import type { AuthenticatedRequest, ApiResponse } from '../types/index.js';
 import { bookingService } from '../services/booking.service.js';
 import { broadcastServerEvent } from '../routes/realtime.routes.js';
 
+const getReqPropertyId = (req: AuthenticatedRequest): string | number => {
+  const raw = req.query.propertyId || req.headers['x-property-id'] || req.body?.propertyId || req.propertyId;
+  return raw !== undefined && raw !== null && raw !== '' ? raw : '';
+};
+
 export const bookingController = {
   getAllBookings: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const status = req.query.status as string;
       const data = await bookingService.getAllBookings(propertyId, status);
       
@@ -26,7 +31,7 @@ export const bookingController = {
 
   getBookingById: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const booking = await bookingService.getBookingById(id, propertyId);
       if (!booking) {
@@ -41,7 +46,7 @@ export const bookingController = {
 
   createBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const newBooking = await bookingService.createBooking({
         ...req.body,
         propertyId,
@@ -70,7 +75,7 @@ export const bookingController = {
 
   updateStatus: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.updateBookingStatus(
         id,
@@ -106,7 +111,7 @@ export const bookingController = {
 
   updateBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.updateBooking(id, propertyId, req.body);
       if (!updated) {
@@ -136,7 +141,7 @@ export const bookingController = {
 
   amendBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.amendStay(id, propertyId, req.body);
       if (!updated) {
@@ -166,7 +171,7 @@ export const bookingController = {
 
   moveRoom: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.moveRoom(id, propertyId, req.body);
       if (!updated) {
@@ -196,7 +201,7 @@ export const bookingController = {
 
   addPayment: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.recordPayment(id, propertyId, req.body);
       if (!updated) {
@@ -222,7 +227,7 @@ export const bookingController = {
 
   splitBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.splitStay(id, propertyId, req.body);
       if (!updated) {
@@ -252,7 +257,7 @@ export const bookingController = {
 
   holdBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.holdReservation(id, propertyId, req.body);
       if (!updated) {
@@ -283,7 +288,7 @@ export const bookingController = {
 
   voidBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.voidReservation(id, propertyId, req.body);
       if (!updated) {
@@ -308,7 +313,7 @@ export const bookingController = {
 
   unassignRoom: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.unassignRoom(id, propertyId, req.body);
       if (!updated) {
@@ -333,7 +338,7 @@ export const bookingController = {
 
   ungroupBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.ungroupReservation(id, propertyId, req.body);
       res.json({ success: true, data: updated, message: 'Reservation ungrouped successfully' });
@@ -344,7 +349,7 @@ export const bookingController = {
 
   linkGroup: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const targetResNo = req.body.targetReservationNumber || req.params.id;
       const toLinkResNo = req.body.reservationToLink || req.body.reservationToLinkNumber;
       if (!targetResNo || !toLinkResNo) {
@@ -359,7 +364,7 @@ export const bookingController = {
 
   unlinkGroup: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const resNo = req.body.reservationNumber || req.params.id;
       if (!resNo) {
         return res.status(400).json({ success: false, error: 'reservationNumber is required.' });
@@ -373,7 +378,7 @@ export const bookingController = {
 
   changeOwner: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const updated = await bookingService.changeGroupOwner(id, propertyId, req.body);
       res.json({ success: true, data: updated, message: 'Group owner updated successfully' });
@@ -384,7 +389,7 @@ export const bookingController = {
 
   deleteBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       await bookingService.deleteBooking(id, propertyId);
 
@@ -407,7 +412,7 @@ export const bookingController = {
 
   resetInventory: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       await bookingService.resetAllBookingsAndInventory(propertyId);
       try {
         broadcastServerEvent({
@@ -423,3 +428,4 @@ export const bookingController = {
     }
   },
 };
+

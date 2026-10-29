@@ -7,7 +7,7 @@ import {
     RefreshCw, AlertTriangle, CheckCircle2, Tags
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
@@ -85,8 +85,9 @@ export default function RatePlanManagement() {
 
     useEffect(() => {
         const API_BASE = getApiBaseUrl();
+        const propId = getActivePropertyId();
         // Load rate plans from database
-        fetch(`${API_BASE}/api/rates/plans?propertyId=1`)
+        fetch(`${API_BASE}/api/rates/plans?propertyId=${propId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && Array.isArray(json.data) && json.data.length > 0) {
@@ -97,7 +98,7 @@ export default function RatePlanManagement() {
             .catch(() => {});
 
         // Load packages dynamically from database
-        fetch(`${API_BASE}/api/rates/packages?propertyId=1`)
+        fetch(`${API_BASE}/api/rates/packages?propertyId=${propId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && Array.isArray(json.data)) {
@@ -107,7 +108,7 @@ export default function RatePlanManagement() {
             .catch(() => {});
 
         // Load meal plans dynamically from database
-        fetch(`${API_BASE}/api/rates/meal-plans?propertyId=1`)
+        fetch(`${API_BASE}/api/rates/meal-plans?propertyId=${propId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && Array.isArray(json.data)) {

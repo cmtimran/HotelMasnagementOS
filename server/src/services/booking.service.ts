@@ -70,11 +70,11 @@ const STATUS_UI_TO_DB: Record<string, string> = {
   voided: 'VOIDED'
 };
 
-const resolvePropertyId = (propertyId: string | number | undefined): number => {
+const resolvePropertyId = (propertyId: string | number | undefined): number | null => {
   if (typeof propertyId === 'number') return propertyId;
-  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === '1') return 1;
+  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === 'all') return null;
   const num = Number(propertyId);
-  return isNaN(num) ? 1 : num;
+  return isNaN(num) ? null : num;
 };
 
 /**
@@ -188,6 +188,9 @@ export const bookingService = {
    */
   getAllBookings: async (propertyId: string | number, status?: string): Promise<BookingRecord[]> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) {
+      return [];
+    }
 
     const reservationsRes = await getPool().query(`
       SELECT 
@@ -413,6 +416,7 @@ export const bookingService = {
    */
   getBookingById: async (id: string | number, propertyId: string | number): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const all = await bookingService.getAllBookings(propId);
     return all.find(b => String(b.id) === String(id) || b.reservationNumber === String(id)) || null;
   },
@@ -422,6 +426,9 @@ export const bookingService = {
    */
   createBooking: async (payload: any): Promise<BookingRecord> => {
     const propId = resolvePropertyId(payload.propertyId);
+    if (!propId) {
+      throw new Error('Property ID is required to create a booking');
+    }
 
     const checkIn = payload.checkIn || payload.arrivalDate || new Date().toISOString().slice(0, 10);
     const checkOut = payload.checkOut || payload.departureDate || new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
@@ -434,7 +441,7 @@ export const bookingService = {
         ? payload.rooms
         : (payload.allocatedRooms && payload.allocatedRooms.length > 0) 
           ? payload.allocatedRooms.map((rNum: string) => ({ roomNumber: rNum }))
-          : [{ roomNumber: payload.roomNumber || payload.roomNo || '101' }];
+          : [{ roomNumber: payload.roomNumber || payload.roomNo || '' }];
 
     const isConnectingSuite = Boolean(
       payload.isConnectingSuite ||
@@ -461,8 +468,8 @@ export const bookingService = {
       expandedRooms.length = 0;
       payload.allocatedRooms.forEach((p: string) => expandedRooms.push({ roomNumber: String(p).trim() }));
     }
-    if (expandedRooms.length === 0) {
-      expandedRooms.push({ roomNumber: payload.roomNumber || payload.roomNo || '101' });
+    if (expandedRooms.length === 0 && (payload.roomNumber || payload.roomNo)) {
+      expandedRooms.push({ roomNumber: payload.roomNumber || payload.roomNo });
     }
     const finalRooms = expandedRooms;
 
@@ -510,12 +517,12 @@ export const bookingService = {
       }
 
       // 1. Resolve or Create Guest in PostgreSQL `guests` table
-      const phone = payload.phone || payload.mobile || '+880 1711-000000';
-      const email = payload.email || 'guest@hospitality.com';
-      const rawName = (payload.guestName || 'Valued Guest').replace(/^(Mr|Mrs|Ms|Dr|Engr|Prof)\.?\s+/i, '').trim();
+      const phone = payload.phone || payload.mobile || '';
+      const email = payload.email || '';
+      const rawName = (payload.guestName || 'Guest').replace(/^(Mr|Mrs|Ms|Dr|Engr|Prof)\.?\s+/i, '').trim();
       const nameParts = rawName.split(' ');
-      const firstName = nameParts[0] || 'Valued';
-      const lastName = nameParts.slice(1).join(' ') || 'Guest';
+      const firstName = nameParts[0] || 'Guest';
+      const lastName = nameParts.slice(1).join(' ') || '';
       const salutation = payload.salutation || (payload.guestName?.match(/^(Mr|Mrs|Ms|Dr|Engr|Prof)\.?\s+/i)?.[1]) || 'Mr';
       const vipStatus = payload.vip || payload.vipStatus || 'NONE';
 
@@ -533,13 +540,13 @@ export const bookingService = {
         }
       }
 
-      if (!resolvedExistingGuest) {
+      if (!resolvedExistingGuest && (pureDigits || cleanEmail)) {
         const guestLookup = await client.query(`
           SELECT id, first_name, last_name, phone, email FROM guests 
           WHERE (
-            regexp_replace(phone, '\\D', '', 'g') = $1
+            ($1 != '' AND regexp_replace(phone, '\\D', '', 'g') = $1)
             OR ($2 != '' AND length($2) >= 8 AND regexp_replace(phone, '\\D', '', 'g') LIKE '%' || $2)
-            OR ($3 != '' AND $3 != 'guest@hospitality.com' AND LOWER(email) = $3)
+            OR ($3 != '' AND LOWER(email) = $3)
           )
           ORDER BY id ASC
         `, [pureDigits, subscriberSuffix, cleanEmail]);
@@ -724,7 +731,7 @@ export const bookingService = {
       client.release();
     }
 
-    const createdBooking = await bookingService.getBookingById(reservationNumber, propId);
+    const createdBooking = propId ? await bookingService.getBookingById(reservationNumber, propId) : null;
     return createdBooking!;
   },
 
@@ -733,6 +740,7 @@ export const bookingService = {
    */
   updateBooking: async (id: string | number, propertyId: string | number, payload: any): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -840,6 +848,7 @@ export const bookingService = {
     taxDetails?: any;
   }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -930,6 +939,7 @@ export const bookingService = {
     newToDate?: string;
   }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -996,6 +1006,7 @@ export const bookingService = {
     remarks?: string;
   }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -1045,6 +1056,7 @@ export const bookingService = {
     toDate?: string;
   }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -1091,6 +1103,7 @@ export const bookingService = {
    */
   voidReservation: async (id: string | number, propertyId: string | number, payload: { reason?: string }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -1110,6 +1123,7 @@ export const bookingService = {
    */
   holdReservation: async (id: string | number, propertyId: string | number, payload: { startDate?: string; endDate?: string; reason?: string }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -1127,6 +1141,7 @@ export const bookingService = {
    */
   unassignRoom: async (id: string | number, propertyId: string | number, payload: { roomNumber?: string }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -1147,6 +1162,7 @@ export const bookingService = {
    */
   linkBookingsToGroup: async (targetReservationNumber: string, reservationToLinkNumber: string, propertyId: string | number): Promise<{ success: boolean; groupCode: string; message: string }> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) throw new Error('Property ID is required.');
     const target = await bookingService.getBookingById(targetReservationNumber, propId);
     const toLink = await bookingService.getBookingById(reservationToLinkNumber, propId);
 
@@ -1173,6 +1189,7 @@ export const bookingService = {
    */
   unlinkBookingFromGroup: async (reservationNumber: string, propertyId: string | number): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(reservationNumber, propId);
     if (!existing) return null;
 
@@ -1190,6 +1207,7 @@ export const bookingService = {
    */
   ungroupReservation: async (id: string | number, propertyId: string | number, _payload: any): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -1201,6 +1219,7 @@ export const bookingService = {
    */
   changeGroupOwner: async (id: string | number, propertyId: string | number, payload: { newOwner?: string }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
     if (!existing) return null;
 
@@ -1222,6 +1241,7 @@ export const bookingService = {
    */
   updateBookingStatus: async (id: string | number, propertyId: string | number, status: string): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const normalizedKey = (status || '').toLowerCase().replace(/_/g, '-');
     const dbStatus = STATUS_UI_TO_DB[normalizedKey] || status.toUpperCase().replace(/-/g, '_');
     const roomStayStatus = dbStatus === 'IN_HOUSE' ? 'CHECKED_IN' : dbStatus === 'COMPLETED' ? 'CHECKED_OUT' : dbStatus === 'CANCELLED' ? 'CANCELLED' : 'ASSIGNED';
@@ -1319,6 +1339,7 @@ export const bookingService = {
    */
   deleteBooking: async (id: string | number, propertyId: string | number): Promise<boolean> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return false;
     const targetId = isNaN(Number(id)) ? -1 : Number(id);
     await getPool().query(`
       UPDATE reservations
@@ -1346,6 +1367,7 @@ export const bookingService = {
    */
   resetAllBookingsAndInventory: async (propertyId: string | number): Promise<boolean> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return false;
     try {
       await getPool().query('DELETE FROM folio_charges');
       await getPool().query('DELETE FROM payments');

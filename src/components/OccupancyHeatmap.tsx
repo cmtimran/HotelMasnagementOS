@@ -5,6 +5,9 @@ import {
     Sparkles, ExternalLink, Plus
 } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext';
+import { useProperty } from '../context/PropertyContext';
+import { getActivePropertyId } from '../utils/apiUrl';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { 
     getCanonicalRooms, 
     getAllStoredReservations, 
@@ -20,8 +23,8 @@ interface DayOccupancyData {
     occupancyPct: number;
     occupiedRooms: number;
     totalRooms: number;
-    revenueBDT: number;
-    adrBDT: number;
+    revenue: number;
+    adr: number;
     arrivals: number;
     departures: number;
     pricingSurge: string;
@@ -29,6 +32,11 @@ interface DayOccupancyData {
 
 export const OccupancyHeatmap: React.FC = () => {
     const { setActivePage } = useNavigation();
+    const { activeProperty } = useProperty();
+    const activePropId = activeProperty?.id || getActivePropertyId();
+    const currency = activeProperty?.currency || 'USD';
+    const currSym = getCurrencySymbol(currency);
+
     const opDate = getOperatingSystemDate();
     const opYear = parseInt(opDate.slice(0, 4), 10) || 2026;
     const opMonth = (parseInt(opDate.slice(5, 7), 10) || 7) - 1;
@@ -50,24 +58,25 @@ export const OccupancyHeatmap: React.FC = () => {
 
     // Fetch latest rooms and reservations from PostgreSQL on mount & subscribe to PMS events
     useEffect(() => {
-        Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+        if (!activePropId) return;
+        Promise.all([syncRoomTypesAndRoomsFromDB(activePropId), syncReservationsFromDB(activePropId)]).then(() => {
             setRefreshTrigger(prev => prev + 1);
         });
 
         const unsub = subscribeToPMSEvents(() => {
-            Promise.all([syncRoomTypesAndRoomsFromDB(), syncReservationsFromDB()]).then(() => {
+            Promise.all([syncRoomTypesAndRoomsFromDB(activePropId), syncReservationsFromDB(activePropId)]).then(() => {
                 setRefreshTrigger(prev => prev + 1);
             });
         });
 
         return () => unsub();
-    }, []);
+    }, [activePropId]);
 
-    const canonicalRooms = useMemo(() => getCanonicalRooms(), [refreshTrigger]);
+    const canonicalRooms = useMemo(() => getCanonicalRooms(activePropId), [refreshTrigger, activePropId]);
 
     // Calculate real dynamic telemetry data for all days in month
     const monthDaysData: DayOccupancyData[] = useMemo(() => {
-        const storedRes = getAllStoredReservations();
+        const storedRes = getAllStoredReservations(activePropId);
         const activeRooms = canonicalRooms.filter(r => r.status !== 'Out of Order');
         const totalRooms = activeRooms.length > 0 ? activeRooms.length : canonicalRooms.length;
 
@@ -132,7 +141,7 @@ export const OccupancyHeatmap: React.FC = () => {
 
             const occupiedCount = Math.min(totalRooms, bookedRoomsToday.size);
             const occupancyPct = totalRooms > 0 ? Math.round((occupiedCount / totalRooms) * 100) : 0;
-            const adrBDT = occupiedCount > 0 ? Math.round(dailyRevenue / occupiedCount) : 0;
+            const adr = occupiedCount > 0 ? Math.round(dailyRevenue / occupiedCount) : 0;
 
             return {
                 dateStr,
@@ -140,19 +149,19 @@ export const OccupancyHeatmap: React.FC = () => {
                 occupancyPct,
                 occupiedRooms: occupiedCount,
                 totalRooms,
-                revenueBDT: Math.round(dailyRevenue),
-                adrBDT,
+                revenue: Math.round(dailyRevenue),
+                adr,
                 arrivals: arrivalsCount,
                 departures: departuresCount,
                 pricingSurge: occupancyPct >= 90 ? '+20% Peak Demand Surge' : occupancyPct >= 75 ? '+10% Dynamic Yield' : occupancyPct > 0 ? 'Standard Rate Yield' : 'Base Rate Available'
             };
         });
-    }, [year, month, daysInMonth, refreshTrigger]);
+    }, [year, month, daysInMonth, refreshTrigger, activePropId, canonicalRooms]);
 
     // Active reservations overlapping the selected day (expanded room-by-room)
     const selectedDayReservations = useMemo(() => {
         if (!selectedDayData) return [];
-        const allRes = getAllStoredReservations();
+        const allRes = getAllStoredReservations(activePropId);
         const dStr = selectedDayData.dateStr;
         const list: Array<{
             id: string | number;
@@ -190,7 +199,7 @@ export const OccupancyHeatmap: React.FC = () => {
                             guestName: rm.guestName || res.guestName || 'Valued Guest',
                             roomNumber: roomNum,
                             roomType: rm.roomType || res.roomType || 'Standard Room',
-                            rate: Number(rm.rate || (Number(res.rateAmount || res.totalAmount || 3500) / subRooms.length)),
+                            rate: Number(rm.rate || (Number(res.rateAmount || res.totalAmount || 0) / subRooms.length)),
                             status: rmStatus,
                             isArrival: rIn === dStr,
                             isDeparture: rOut === dStr
@@ -206,7 +215,7 @@ export const OccupancyHeatmap: React.FC = () => {
                         guestName: res.guestName || 'Valued Guest',
                         roomNumber: String(res.roomNumber || (Array.isArray(res.allocatedRooms) && res.allocatedRooms[0]) || 'Auto'),
                         roomType: res.roomType || 'Standard Room',
-                        rate: Number(res.rateAmount || res.totalAmount || 3500) / Math.max(1, Number(res.nights) || 1),
+                        rate: Number(res.rateAmount || res.totalAmount || 0) / Math.max(1, Number(res.nights) || 1),
                         status: rawStatus,
                         isArrival: checkIn === dStr,
                         isDeparture: checkOut === dStr
@@ -216,7 +225,7 @@ export const OccupancyHeatmap: React.FC = () => {
         });
 
         return list;
-    }, [selectedDayData, refreshTrigger]);
+    }, [selectedDayData, refreshTrigger, activePropId]);
 
     // Auto-select operating date on mount or data refresh
     useEffect(() => {
@@ -251,10 +260,10 @@ export const OccupancyHeatmap: React.FC = () => {
             ? `${preciseAvgOccupancy.toFixed(1)}%`
             : `${Math.round(preciseAvgOccupancy)}%`;
 
-    const totalMonthRevenue = monthDaysData.reduce((acc, d) => acc + d.revenueBDT, 0);
+    const totalMonthRevenue = monthDaysData.reduce((acc, d) => acc + d.revenue, 0);
     const occupiedDays = monthDaysData.filter(d => d.occupiedRooms > 0);
     const avgADR = occupiedDays.length > 0
-        ? Math.round(occupiedDays.reduce((acc, d) => acc + d.adrBDT, 0) / occupiedDays.length)
+        ? Math.round(occupiedDays.reduce((acc, d) => acc + d.adr, 0) / occupiedDays.length)
         : 0;
     const revPAR = totalAvailableRoomNights > 0
         ? Math.round(totalMonthRevenue / totalAvailableRoomNights)
@@ -329,14 +338,14 @@ export const OccupancyHeatmap: React.FC = () => {
                         <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{displayAvgOccupancy}</p>
                     </div>
                     <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        {preciseAvgOccupancy > 0 ? '+4.2% vs May' : 'Pacing Track'}
+                        {preciseAvgOccupancy > 0 ? '+4.2% vs Prior' : 'Pacing Track'}
                     </span>
                 </div>
 
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider">Forecast Revenue</span>
-                        <p className="text-lg font-black text-primary font-mono mt-0.5">৳ {(totalMonthRevenue / 100000).toFixed(2)}L</p>
+                        <p className="text-lg font-black text-primary font-mono mt-0.5">{currSym} {totalMonthRevenue.toLocaleString()}</p>
                     </div>
                     <span className="text-[10.5px] font-mono font-semibold text-slate-500">
                         {daysInMonth} Days
@@ -346,7 +355,7 @@ export const OccupancyHeatmap: React.FC = () => {
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider">Avg Daily Rate (ADR)</span>
-                        <p className="text-lg font-black text-slate-900 font-mono mt-0.5">৳ {avgADR.toLocaleString()}</p>
+                        <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{currSym} {avgADR.toLocaleString()}</p>
                     </div>
                     <span className="text-[10px] text-slate-400 uppercase font-semibold">Per Room</span>
                 </div>
@@ -354,7 +363,7 @@ export const OccupancyHeatmap: React.FC = () => {
                 <div className="card-container p-3 flex justify-between items-center">
                     <div>
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider">RevPAR</span>
-                        <p className="text-lg font-black text-emerald-700 font-mono mt-0.5">৳ {revPAR.toLocaleString()}</p>
+                        <p className="text-lg font-black text-emerald-700 font-mono mt-0.5">{currSym} {revPAR.toLocaleString()}</p>
                     </div>
                     <span className="text-[10.5px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         Optimal Yield
@@ -393,7 +402,7 @@ export const OccupancyHeatmap: React.FC = () => {
                 <div className="mx-3 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900">
                     <div className="flex items-center gap-2">
                         <span className="font-bold">⚠️ Room Inventory Empty:</span>
-                        <span>0 active rooms currently configured in Property #1. Heatmap density, room counts, and RevPAR require configured physical rooms.</span>
+                        <span>0 active rooms currently configured in {activeProperty?.name || 'Active Property'}. Heatmap density, room counts, and RevPAR require configured physical rooms.</span>
                     </div>
                     <button
                         onClick={() => setActivePage('room-management')}
@@ -464,7 +473,7 @@ export const OccupancyHeatmap: React.FC = () => {
                                         </div>
                                         <div className="flex justify-between items-center text-[10px] text-gray-600">
                                             <span>Revenue:</span>
-                                            <span className="font-mono text-gray-900 font-semibold">৳ {day.revenueBDT > 0 ? `${(day.revenueBDT / 1000).toFixed(0)}k` : '0'}</span>
+                                            <span className="font-mono text-gray-900 font-semibold">{currSym} {day.revenue > 0 ? (day.revenue >= 1000 ? `${(day.revenue / 1000).toFixed(0)}k` : day.revenue.toLocaleString()) : '0'}</span>
                                         </div>
                                     </div>
                                 </button>
@@ -511,9 +520,9 @@ export const OccupancyHeatmap: React.FC = () => {
                             <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 space-y-1">
                                 <span className="text-[9.5px] text-blue-800 uppercase">Daily Revenue Yield</span>
                                 <p className="text-lg font-mono text-blue-900">
-                                    ৳ {selectedDayData.revenueBDT.toLocaleString()}
+                                    {currSym} {selectedDayData.revenue.toLocaleString()}
                                 </p>
-                                <p className="text-[10px] text-blue-700">Average Daily Rate (ADR): ৳ {selectedDayData.adrBDT.toLocaleString()}</p>
+                                <p className="text-[10px] text-blue-700">Average Daily Rate (ADR): {currSym} {selectedDayData.adr.toLocaleString()}</p>
                             </div>
 
                             <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200 flex items-start gap-2">

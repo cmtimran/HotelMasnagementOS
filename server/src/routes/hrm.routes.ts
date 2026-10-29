@@ -3,6 +3,13 @@ import { db } from '../database/db.js';
 
 const router = Router();
 
+const getReqPropertyId = (req: Request): number | null => {
+    const raw = req.query?.propertyId || req.headers?.['x-property-id'] || req.body?.propertyId;
+    if (!raw || raw === 'all' || raw === 'prop_grand_palace') return null;
+    const num = Number(raw);
+    return isNaN(num) ? null : num;
+};
+
 // ==========================================
 // 1. DEPARTMENTS & DESIGNATIONS
 // ==========================================
@@ -10,7 +17,10 @@ const router = Router();
 // GET /api/hrm/departments - List all departments with stats
 router.get('/departments', async (req: Request, res: Response) => {
     try {
-        const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const departments = await db.prepare(`
             SELECT 
                 d.*,
@@ -32,7 +42,11 @@ router.get('/departments', async (req: Request, res: Response) => {
 // POST /api/hrm/departments - Create department
 router.post('/departments', async (req: Request, res: Response) => {
     try {
-        const { propertyId = 1, code, name, costCenterCode } = req.body;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
+        const { code, name, costCenterCode } = req.body;
         if (!code || !name) {
             return res.status(400).json({ success: false, error: 'code and name are required' });
         }
@@ -103,7 +117,10 @@ router.get('/designations', async (req: Request, res: Response) => {
 // GET /api/hrm/employees - List employees
 router.get('/employees', async (req: Request, res: Response) => {
     try {
-        const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [], count: 0 });
+        }
         const status = req.query.status as string;
 
         let query = `
@@ -144,8 +161,11 @@ router.get('/employees', async (req: Request, res: Response) => {
 // POST /api/hrm/employees - Add new employee
 router.post('/employees', async (req: Request, res: Response) => {
     try {
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const {
-            propertyId = 1,
             departmentId,
             designationId,
             employeeCode,
@@ -261,7 +281,10 @@ router.delete('/employees/:id', async (req: Request, res: Response) => {
 // GET /api/hrm/shifts - List hotel work shifts
 router.get('/shifts', async (req: Request, res: Response) => {
     try {
-        const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const shifts = await db.prepare(`
             SELECT 
                 s.*,
@@ -280,7 +303,11 @@ router.get('/shifts', async (req: Request, res: Response) => {
 // POST /api/hrm/shifts - Create shift
 router.post('/shifts', async (req: Request, res: Response) => {
     try {
-        const { propertyId = 1, name, startTime, endTime, gracePeriodMinutes = 15 } = req.body;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
+        const { name, startTime, endTime, gracePeriodMinutes = 15 } = req.body;
         if (!name || !startTime || !endTime) {
             return res.status(400).json({ success: false, error: 'name, startTime, and endTime are required' });
         }
@@ -333,8 +360,11 @@ router.delete('/shifts/:id', async (req: Request, res: Response) => {
 // GET /api/hrm/attendance - List attendance records
 router.get('/attendance', async (req: Request, res: Response) => {
     try {
-        const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
-        const date = req.query.date as string || '2026-07-01'; // Default to active seeded date
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [], date: new Date().toISOString().slice(0, 10) });
+        }
+        const date = req.query.date as string || new Date().toISOString().slice(0, 10);
 
         const attendance = await db.prepare(`
             SELECT 
@@ -429,7 +459,10 @@ router.post('/attendance/clock', async (req: Request, res: Response) => {
 // GET /api/hrm/payroll - List payroll runs
 router.get('/payroll', async (req: Request, res: Response) => {
     try {
-        const propertyId = req.query.propertyId ? Number(req.query.propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const runs = await db.prepare(`
             SELECT 
                 pr.*,
@@ -473,7 +506,11 @@ router.get('/payroll/:id/items', async (req: Request, res: Response) => {
 // POST /api/hrm/payroll/process - Run Monthly Payroll & Post to General Ledger
 router.post('/payroll/process', async (req: Request, res: Response) => {
     try {
-        const { propertyId = 1, month, year } = req.body;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
+        const { month, year } = req.body;
 
         if (!month || !year) {
             return res.status(400).json({ success: false, error: 'month and year are required' });

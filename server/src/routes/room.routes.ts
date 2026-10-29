@@ -6,6 +6,13 @@ import { db } from '../database/db.js';
 
 const router = Router();
 
+const getReqPropertyId = (req: Request): number | null => {
+    const raw = (req as any).propertyId || req.query?.propertyId || req.headers?.['x-property-id'] || req.body?.propertyId;
+    if (!raw || raw === 'all' || raw === 'prop_grand_palace') return null;
+    const num = Number(raw);
+    return isNaN(num) ? null : num;
+};
+
 router.use(requirePropertyScope);
 
 router.get('/', requirePermission('frontdesk.access'), roomController.getAllRooms);
@@ -15,12 +22,15 @@ router.patch('/:roomNo/housekeeping', requirePermission('frontdesk.access'), roo
 router.post('/', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const roomNumber = body.number || body.room_number;
         const name = body.name || `Room ${roomNumber}`;
-        const buildingId = Number(body.buildingId || body.building_id || 1);
-        const floorId = Number(body.floorId || body.floor_id || 1);
-        const roomTypeId = Number(body.roomTypeId || body.room_type_id || 1);
+        const buildingId = Number(body.buildingId || body.building_id);
+        const floorId = Number(body.floorId || body.floor_id);
+        const roomTypeId = Number(body.roomTypeId || body.room_type_id);
         const status = (body.status === 'Out of Order' || body.status === 'OUT_OF_ORDER') ? 'OUT_OF_ORDER'
             : (body.status === 'Maintenance' || body.status === 'MAINTENANCE') ? 'MAINTENANCE' : 'ACTIVE';
         const hkStatus = (body.housekeepingStatus || body.housekeeping_status || 'Clean').toUpperCase() === 'DIRTY' ? 'DIRTY'
@@ -28,6 +38,9 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
 
         if (!roomNumber) {
             return res.status(400).json({ success: false, error: 'room number is required' });
+        }
+        if (!buildingId || !floorId || !roomTypeId) {
+            return res.status(400).json({ success: false, error: 'buildingId, floorId, and roomTypeId are required' });
         }
 
         const result = await db.prepare(`
@@ -68,7 +81,10 @@ router.post('/', requirePermission('frontdesk.access'), async (req: Request, res
 router.put('/:roomNo/details', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const roomNo = String(req.params.roomNo || '');
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const body = req.body || {};
         const name = body.name || null;
         const buildingId = body.buildingId ? Number(body.buildingId) : null;
@@ -126,7 +142,10 @@ router.put('/:roomNo/details', requirePermission('frontdesk.access'), async (req
 router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const roomNo = String(req.params.roomNo || '');
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const info = await db.prepare('DELETE FROM rooms WHERE property_id = ? AND room_number = ?').run(propertyId, roomNo);
         if (info.rowCount === 0) {
             return res.status(404).json({ success: false, error: `Room ${roomNo} not found` });
@@ -144,7 +163,10 @@ router.delete('/:roomNo', requirePermission('frontdesk.access'), async (req: Req
 // GET /api/rooms/ooo-blocks - List all OOO/OOS blocks
 router.get('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.json({ success: true, data: [] });
+        }
         const status = String(req.query.status || 'all');
         const roomNo = req.query.roomNo ? String(req.query.roomNo) : null;
 
@@ -180,7 +202,10 @@ router.get('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Req
 // POST /api/rooms/ooo-blocks - Create a new OOO/OOS block
 router.post('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const body = req.body || {};
         const roomNumber = String(body.roomNumber || body.room_number || '').trim();
         const roomType = String(body.roomType || body.room_type || 'Room').trim();
@@ -286,7 +311,10 @@ router.post('/ooo-blocks', requirePermission('frontdesk.access'), async (req: Re
 router.put('/ooo-blocks/:id/extend', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const body = req.body || {};
         const newEndDate = String(body.newEndDate || body.endDate || '').trim();
         const reason = String(body.reason || '').trim();
@@ -324,7 +352,10 @@ router.put('/ooo-blocks/:id/extend', requirePermission('frontdesk.access'), asyn
 router.put('/ooo-blocks/:id/release', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
         const body = req.body || {};
         const returnStatus = body.returnStatus === 'Clean' || body.returnStatus === 'Inspected' ? body.returnStatus : 'Dirty';
         const releasedBy = String(body.releasedBy || 'Manager').trim();
@@ -366,7 +397,10 @@ router.put('/ooo-blocks/:id/release', requirePermission('frontdesk.access'), asy
 router.delete('/ooo-blocks/:id', requirePermission('frontdesk.access'), async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
-        const propertyId = (req as any).propertyId ? Number((req as any).propertyId) : 1;
+        const propertyId = getReqPropertyId(req);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
 
         const block = await db.prepare('SELECT * FROM room_maintenance_blocks WHERE id = ? AND property_id = ?').get(id, propertyId);
         if (!block) {

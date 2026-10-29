@@ -5,7 +5,7 @@ import {
     Coffee, Pizza
 } from 'lucide-react';
 import { generateUniqueShortCode, isShortCodeDuplicate } from '../utils/codeGenerator';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import { broadcastPMSEvent } from '../utils/roomInventoryEngine';
 import PageHeader from './common/PageHeader';
 
@@ -93,7 +93,8 @@ export default function MealPlanManagement() {
     const [isCodeManual, setIsCodeManual] = useState(false);
 
     useEffect(() => {
-        fetch(`${getApiBaseUrl()}/api/rates/meal-plans?propertyId=1`)
+        const propId = getActivePropertyId();
+        fetch(`${getApiBaseUrl()}/api/rates/meal-plans?propertyId=${propId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && Array.isArray(json.data)) {

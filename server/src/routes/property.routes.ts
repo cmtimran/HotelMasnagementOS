@@ -57,37 +57,29 @@ router.get('/chain/overview', async (req: Request, res: Response) => {
             }
         };
 
-        const totalProperties = (await getSafeCount('SELECT COUNT(*) as c FROM properties')) || 2;
-        const totalRooms = (await getSafeCount('SELECT COUNT(*) as c FROM rooms')) || 34;
-        const totalStaff = (await getSafeCount("SELECT COUNT(*) as c FROM employees WHERE status = 'ACTIVE'")) || 6;
-        const totalReservations = (await getSafeCount('SELECT COUNT(*) as c FROM reservations')) || 7;
-        const totalRevenue = (await getSafeSum('SELECT SUM(total_amount) as s FROM reservations')) || 180600;
+        const totalProperties = await getSafeCount('SELECT COUNT(*) as c FROM properties');
+        const totalRooms = await getSafeCount('SELECT COUNT(*) as c FROM rooms');
+        const totalStaff = await getSafeCount("SELECT COUNT(*) as c FROM employees WHERE status = 'ACTIVE'");
+        const totalReservations = await getSafeCount('SELECT COUNT(*) as c FROM reservations');
+        const totalRevenue = await getSafeSum('SELECT SUM(total_amount) as s FROM reservations');
 
         res.json({
             success: true,
             data: {
-                organization: org || { name: 'Grand Hospitality Group', base_currency: 'BDT' },
+                organization: org || { name: 'Hospitality Enterprise', base_currency: 'USD' },
                 totalProperties,
                 totalRooms,
                 totalStaff,
                 totalReservations,
                 totalRevenue,
-                chainHealth: 'OPTIMAL_99.98%'
+                chainHealth: 'ACTIVE'
             }
         });
     } catch (e: any) {
         console.error('Chain overview route error:', e);
-        res.status(200).json({
-            success: true,
-            data: {
-                organization: { name: 'Grand Hospitality Group', base_currency: 'BDT' },
-                totalProperties: 2,
-                totalRooms: 34,
-                totalStaff: 6,
-                totalReservations: 7,
-                totalRevenue: 180600,
-                chainHealth: 'OPTIMAL_99.98%'
-            }
+        res.status(500).json({
+            success: false,
+            error: 'Failed to calculate chain overview metrics'
         });
     }
 });
@@ -259,7 +251,10 @@ router.put('/:id/settings', async (req: Request, res: Response) => {
 // POST /api/properties/:id/buildings - Create building
 router.post('/:id/buildings', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.params.id) || 1;
+        const propertyId = Number(req.params.id);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Valid property ID is required' });
+        }
         const { code, name, sortOrder, totalFloors, type, description, status, amenityIds } = req.body;
         const bCode = (code || 'BLD').toUpperCase();
         const bName = name || 'New Wing';
@@ -400,7 +395,10 @@ router.delete('/:id/floors/:floorId', async (req: Request, res: Response) => {
 // POST /api/properties/:id/room-types - Create room type
 router.post('/:id/room-types', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.params.id) || 1;
+        const propertyId = Number(req.params.id);
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Valid property ID is required' });
+        }
         const body = req.body || {};
         const { code, name, baseOccupancy, maxOccupancy, baseRate, description } = body;
         const rtCode = (code || body.shortCode || 'RT').toUpperCase();

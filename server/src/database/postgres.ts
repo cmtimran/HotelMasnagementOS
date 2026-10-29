@@ -54,7 +54,7 @@ async function syncAllSequences(client: any): Promise<void> {
         'departments', 'designations', 'employees', 'shifts', 'employee_shift_rosters',
         'attendance_records', 'leave_types', 'leave_requests', 'payroll_runs',
         'payroll_items', 'housekeeping_tasks', 'maintenance_orders', 'connecting_rooms',
-        'rate_plans', 'meal_plans', 'hotel_packages', 'rate_calendar_overrides'
+        'rate_plans', 'meal_plans', 'hotel_packages', 'rate_calendar_overrides', 'users'
     ];
     for (const table of tables) {
         try {
@@ -120,34 +120,46 @@ export async function initPostgres(): Promise<boolean> {
                 console.warn('Rates tables warning in PostgreSQL:', ratesErr?.message);
             }
 
-            // 3. Ensure baseline Organization 1 and Property 1 exist without forcing mock dummy rooms/bookings
+            // 3. Ensure baseline Organization 1 and single Super Admin exist (Zero properties/rooms hardcoded)
             const orgCountRes = await client.query('SELECT COUNT(*) as c FROM organizations WHERE id = 1;');
             if (parseInt(orgCountRes.rows[0]?.c || '0', 10) === 0) {
                 await client.query(`
                     INSERT INTO organizations (id, code, name, tax_number, base_currency, headquarters_address)
-                    VALUES (1, 'GHG', 'Grand Hospitality Group', 'BIN-908123481', 'BDT', 'Level 14, Gulshan Centre Point, Dhaka-1212')
+                    VALUES (1, 'CORP', 'Global Hospitality Group', 'BIN-001002003', 'USD', 'Corporate Headquarters')
                     ON CONFLICT (id) DO NOTHING;
                 `);
             }
 
-            const propCountRes = await client.query('SELECT COUNT(*) as c FROM properties WHERE id = 1;');
-            if (parseInt(propCountRes.rows[0]?.c || '0', 10) === 0) {
-                await client.query(`
-                    INSERT INTO properties (
-                        id, organization_id, code, name, property_type, star_rating, 
-                        address, city, country, phone, email, currency, time_zone, check_in_time, check_out_time, is_active
-                    )
-                    VALUES (
-                        1, 1, 'GPD', 'Grand Palace Hotel & Resort', 'HOTEL', 5,
-                        'Plot 12, Road 45, Gulshan-2, Dhaka', 'Dhaka', 'Bangladesh', '+880 2 9882200', 'dhaka@grandhospitality.com', 'BDT', 'Asia/Dhaka', '14:00', '12:00', true
-                    )
-                    ON CONFLICT (id) DO NOTHING;
-                `);
-            }
+            // Ensure users table and single Super Admin user exist
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS users (
+                    id BIGSERIAL PRIMARY KEY,
+                    organization_id BIGINT REFERENCES organizations(id) ON DELETE CASCADE,
+                    property_id BIGINT REFERENCES properties(id) ON DELETE SET NULL,
+                    name VARCHAR(128) NOT NULL,
+                    email VARCHAR(128) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    role VARCHAR(64) NOT NULL DEFAULT 'super_admin',
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    image TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            `);
 
+            const adminEmail = 'superadmin@hotelmanagement.os';
+            const adminPassHash = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918'; // sha256('admin')
+            await client.query(`
+                INSERT INTO users (organization_id, property_id, name, email, password_hash, role, is_active)
+                VALUES (1, NULL, 'Super Administrator', $1, $2, 'super_admin', true)
+                ON CONFLICT (email) DO NOTHING;
+            `, [adminEmail, adminPassHash]);
+
+            const propCountRes = await client.query('SELECT COUNT(*) as c FROM properties;');
+            const propCount = parseInt(propCountRes.rows[0]?.c || '0', 10);
             const roomCountRes = await client.query('SELECT COUNT(*) as c FROM rooms;');
             const roomCount = parseInt(roomCountRes.rows[0]?.c || '0', 10);
-            console.log(`🏨 [Cloud PostgreSQL] Database active. Property 1 configured. Active rooms: ${roomCount}.`);
+            console.log(`🏨 [Cloud PostgreSQL] Database active. Configured Properties: ${propCount}. Active Rooms: ${roomCount}. Super Admin ready.`);
 
             // 4. Synchronize all table sequence values to prevent duplicate key errors
             await syncAllSequences(client);

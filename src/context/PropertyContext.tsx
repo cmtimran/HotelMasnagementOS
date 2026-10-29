@@ -40,29 +40,10 @@ interface PropertyContextType {
     refreshProperties: () => Promise<void>;
 }
 
-const DEFAULT_PROPERTIES: Property[] = [
-    {
-        id: 1,
-        organization_id: 1,
-        code: 'GPD',
-        name: 'Grand Palace Hotel & Resort',
-        star_rating: 5,
-        address: 'Plot 12, Road 45, Gulshan-2, Dhaka',
-        city: 'Dhaka',
-        country: 'Bangladesh',
-        phone: '+880 2 9882200',
-        email: 'dhaka@grandhospitality.com',
-        currency: 'BDT',
-        total_rooms: 0,
-        total_buildings: 0,
-        total_staff: 0
-    }
-];
-
 const PropertyContext = createContext<PropertyContextType | undefined>(undefined);
 
 export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [properties, setProperties] = useState<Property[]>(DEFAULT_PROPERTIES);
+    const [properties, setProperties] = useState<Property[]>([]);
     const [activePropertyId, setActivePropertyIdState] = useState<number>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('hotel_active_property_id');
@@ -71,7 +52,7 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 if (!isNaN(parsed) && parsed > 0) return parsed;
             }
         }
-        return 1;
+        return 0;
     });
     const [chainOverview, setChainOverview] = useState<ChainOverview | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -84,8 +65,26 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             const baseUrl = getApiBaseUrl();
             const res = await fetch(`${baseUrl}/api/properties`);
             const data = await res.json();
-            if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+            if (data.success && Array.isArray(data.data)) {
                 setProperties(data.data);
+                if (data.data.length > 0) {
+                    setActivePropertyIdState(prev => {
+                        const exists = data.data.some((p: Property) => p.id === prev);
+                        if (!exists || prev === 0) {
+                            const newId = data.data[0].id;
+                            if (typeof window !== 'undefined') {
+                                localStorage.setItem('hotel_active_property_id', String(newId));
+                            }
+                            return newId;
+                        }
+                        return prev;
+                    });
+                } else {
+                    setActivePropertyIdState(0);
+                    if (typeof window !== 'undefined') {
+                        localStorage.removeItem('hotel_active_property_id');
+                    }
+                }
             }
 
             // Fetch chain overview KPIs
@@ -112,21 +111,29 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const setActivePropertyId = useCallback((id: number) => {
         setActivePropertyIdState(id);
         if (typeof window !== 'undefined') {
-            localStorage.setItem('hotel_active_property_id', String(id));
+            if (id > 0) {
+                localStorage.setItem('hotel_active_property_id', String(id));
+            } else {
+                localStorage.removeItem('hotel_active_property_id');
+            }
             const targetProp = properties.find(p => p.id === id);
-            const tenantSlug = targetProp?.code?.toLowerCase() === 'gor' || (targetProp?.name && targetProp.name.toLowerCase().includes('cox'))
-                ? 'cox-bazar-sea-resort'
-                : 'grand-palace';
-            localStorage.setItem('hotel_active_tenant_slug', tenantSlug);
+            const tenantSlug = targetProp?.code ? targetProp.code.toLowerCase() : '';
+            if (tenantSlug) {
+                localStorage.setItem('hotel_active_tenant_slug', tenantSlug);
+            }
+            if (targetProp?.currency) {
+                localStorage.setItem('hotel_active_property_currency', targetProp.currency);
+            }
             window.dispatchEvent(new CustomEvent('hotel_property_switched', { detail: { propertyId: id, tenantSlug } }));
         }
-        // Automatically sync room inventory and room types for the active hotel
-        syncRoomTypesAndRoomsFromDB(id).catch(err => {
-            console.warn('Could not sync rooms for switched property:', err);
-        });
+        if (id > 0) {
+            syncRoomTypesAndRoomsFromDB(id).catch(err => {
+                console.warn('Could not sync rooms for switched property:', err);
+            });
+        }
     }, [properties]);
 
-    const activeProperty = properties.find(p => p.id === activePropertyId) || properties[0] || DEFAULT_PROPERTIES[0];
+    const activeProperty = properties.find(p => p.id === activePropertyId) || properties[0] || null;
 
     return (
         <PropertyContext.Provider

@@ -3,13 +3,18 @@ import type { AuthenticatedRequest, ApiResponse } from '../types/index.js';
 import { reservationReportsService } from '../services/reports/reservationReports.service.js';
 import { financialReportsService } from '../services/reports/financialReports.service.js';
 
+const getReqPropertyId = (req: AuthenticatedRequest): string => {
+  const p = (req.query?.propertyId as string) || (req.headers?.['x-property-id'] as string) || (req.body?.propertyId as string) || req.propertyId;
+  return (!p || p === 'prop_grand_palace' || p === 'all') ? '' : String(p);
+};
+
 export const reportController = {
   /**
    * Executive Reporting Overview KPIs
    */
   getOverviewMetrics: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       
       const metrics = {
         totalReports: 54,
@@ -21,7 +26,7 @@ export const reportController = {
           audit: { count: 5, label: 'Audit & Compliance', status: 'Verified' },
           analytics: { count: 4, label: 'Analytics & Yield BI', status: 'Optimized' },
         },
-        propertyContext: propertyId,
+        propertyContext: propertyId || 'None',
       };
 
       res.json({ success: true, data: metrics });
@@ -36,12 +41,15 @@ export const reportController = {
    */
   getReportBySlug: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const propertyId = req.propertyId || 'prop_grand_palace';
+      const propertyId = getReqPropertyId(req);
       const rawSlug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
       const slug = (rawSlug || '').toLowerCase();
       const query = req.query;
 
       let reportData: any[] = [];
+      if (!propertyId) {
+        return res.json({ success: true, data: [] });
+      }
 
       switch (slug) {
         case 'cancelled-reservation':

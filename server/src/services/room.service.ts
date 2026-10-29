@@ -17,19 +17,22 @@ export interface RoomRecord {
   smokingPolicy?: string;
 }
 
-const resolvePropertyId = (propertyId: string | number | undefined): number => {
+const resolvePropertyId = (propertyId: string | number | undefined): number | null => {
   if (typeof propertyId === 'number') return propertyId;
-  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === '1') return 1;
+  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === 'all') return null;
   const num = Number(propertyId);
-  return isNaN(num) ? 1 : num;
+  return isNaN(num) ? null : num;
 };
 
 export const roomService = {
   /**
-   * Fetch all 34 rooms for property directly from relational Cloud PostgreSQL DB
+   * Fetch rooms for property directly from relational Cloud PostgreSQL DB
    */
   getAllRooms: async (propertyId: string | number, filter?: { hkStatus?: string; foStatus?: string }): Promise<RoomRecord[]> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) {
+      return [];
+    }
 
     const rows = await db.prepare(`
       SELECT 
@@ -140,6 +143,7 @@ export const roomService = {
    */
   updateHousekeepingStatus: async (roomNo: string, propertyId: string | number, status: string): Promise<RoomRecord | null> => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
     const normalized = (status || '').toLowerCase();
 
     let dbHk = 'CLEAN';

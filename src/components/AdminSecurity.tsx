@@ -28,7 +28,7 @@ import {
     Info,
     Calendar
 } from 'lucide-react';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -454,7 +454,8 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({
 
     useEffect(() => {
         const API_BASE = getApiBaseUrl();
-        fetch(`${API_BASE}/api/hrm/employees?propertyId=1`)
+        const propId = getActivePropertyId();
+        fetch(`${API_BASE}/api/hrm/employees?propertyId=${propId}`)
             .then(r => r.json())
             .then(j => {
                 if (j.success && Array.isArray(j.data)) {

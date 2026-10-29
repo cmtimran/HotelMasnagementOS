@@ -45,13 +45,27 @@ export const getApiBaseUrl = (): string => {
 export const API_BASE_URL = getApiBaseUrl();
 
 /**
- * Resolves the currently active tenant slug from localStorage or fallback
+ * Resolves the currently active property ID from localStorage
+ */
+export const getActivePropertyId = (): number => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('hotel_active_property_id');
+    if (saved) {
+      const parsed = Number(saved);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+  }
+  return 0;
+};
+
+/**
+ * Resolves the currently active tenant slug from localStorage
  */
 export const getActiveTenantSlug = (): string => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('hotel_active_tenant_slug') || 'grand-palace';
+    return localStorage.getItem('hotel_active_tenant_slug') || '';
   }
-  return 'grand-palace';
+  return '';
 };
 
 /**
@@ -59,13 +73,17 @@ export const getActiveTenantSlug = (): string => {
  */
 export const getTenantHeaders = (): Record<string, string> => {
   const tenantSlug = getActiveTenantSlug();
-  return tenantSlug ? { 'X-Tenant-Id': tenantSlug } : {};
+  const propId = getActivePropertyId();
+  const headers: Record<string, string> = {};
+  if (tenantSlug) headers['X-Tenant-Id'] = tenantSlug;
+  if (propId > 0) headers['x-property-id'] = String(propId);
+  return headers;
 };
 
 /**
- * Global Automatic Fetch Enhancer for Multi-Tenant Header Injection
- * Injects 'X-Tenant-Id' header for all backend API calls so every component
- * automatically routes to the active property's dedicated database.
+ * Global Automatic Fetch Enhancer for Multi-Tenant & Multi-Property Header Injection
+ * Injects 'X-Tenant-Id' and 'x-property-id' headers for all backend API calls so every component
+ * automatically routes to the active property.
  */
 if (typeof window !== 'undefined' && !(window as any).__hotelTenantFetchInstalled) {
   (window as any).__hotelTenantFetchInstalled = true;
@@ -79,7 +97,8 @@ if (typeof window !== 'undefined' && !(window as any).__hotelTenantFetchInstalle
 
     // Only inject for API routes targeting backend (excluding external CDNs/assets)
     if (urlStr && (urlStr.includes('/api/') || urlStr.startsWith('/api'))) {
-      const tenantSlug = localStorage.getItem('hotel_active_tenant_slug') || 'grand-palace';
+      const tenantSlug = getActiveTenantSlug();
+      const propId = getActivePropertyId();
       const modifiedInit: RequestInit = { ...(init || {}) };
       const headers = new Headers(
         modifiedInit.headers || 
@@ -87,8 +106,11 @@ if (typeof window !== 'undefined' && !(window as any).__hotelTenantFetchInstalle
         {}
       );
 
-      if (!headers.has('X-Tenant-Id')) {
+      if (tenantSlug && !headers.has('X-Tenant-Id')) {
         headers.set('X-Tenant-Id', tenantSlug);
+      }
+      if (propId > 0 && !headers.has('x-property-id')) {
+        headers.set('x-property-id', String(propId));
       }
       modifiedInit.headers = headers;
       return originalFetch.call(this, input, modifiedInit);

@@ -83,7 +83,11 @@ async function syncRoomsConnectingStatus(propertyId: number): Promise<void> {
 // GET /api/connecting-rooms
 router.get('/', async (req: Request, res: Response) => {
     try {
-        const propertyId = Number(req.query.propertyId) || 1;
+        const rawProp = req.query.propertyId || req.headers['x-property-id'];
+        if (!rawProp || rawProp === 'all') {
+            return res.json({ success: true, data: [] });
+        }
+        const propertyId = Number(rawProp);
         const rows = await db.prepare(`
             SELECT * FROM connecting_rooms WHERE property_id = ? ORDER BY id ASC
         `).all(propertyId) as any[];
@@ -108,7 +112,11 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const propertyId = Number(body.propertyId || req.query.propertyId) || 1;
+        const rawProp = body.propertyId || req.query.propertyId || req.headers['x-property-id'];
+        if (!rawProp) {
+            return res.status(400).json({ success: false, error: 'Property ID is required' });
+        }
+        const propertyId = Number(rawProp);
         const name = body.name || 'Connecting Suite';
 
         const result = await db.prepare(`
@@ -142,7 +150,7 @@ router.put('/:id', async (req: Request, res: Response) => {
         const id = Number(req.params.id);
         const body = req.body || {};
         const existing = await db.prepare('SELECT property_id FROM connecting_rooms WHERE id = ?').get(id) as any;
-        const propertyId = Number(body.propertyId || existing?.property_id || 1);
+        const propertyId = Number(body.propertyId || existing?.property_id);
 
         await db.prepare(`
             UPDATE connecting_rooms
@@ -165,7 +173,9 @@ router.put('/:id', async (req: Request, res: Response) => {
         );
 
         // Sync physical rooms
-        await syncRoomsConnectingStatus(propertyId);
+        if (propertyId) {
+            await syncRoomsConnectingStatus(propertyId);
+        }
 
         res.json({ success: true, message: 'Connecting room suite updated' });
     } catch (e: any) {
@@ -178,12 +188,14 @@ router.delete('/:id', async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const existing = await db.prepare('SELECT property_id FROM connecting_rooms WHERE id = ?').get(id) as any;
-        const propertyId = Number(existing?.property_id || 1);
+        const propertyId = Number(existing?.property_id);
 
         await db.prepare('DELETE FROM connecting_rooms WHERE id = ?').run(id);
 
         // Sync physical rooms
-        await syncRoomsConnectingStatus(propertyId);
+        if (propertyId) {
+            await syncRoomsConnectingStatus(propertyId);
+        }
 
         res.json({ success: true, message: 'Connecting room suite deleted' });
     } catch (e: any) {

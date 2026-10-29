@@ -152,7 +152,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     });
 
     useEffect(() => {
-        fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=1`)
+        fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=`)
             .then(res => res.json())
             .then(json => {
                 if (json.success && Array.isArray(json.data) && json.data.length > 0) {

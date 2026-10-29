@@ -13,6 +13,7 @@ import connectingRoutes from './connecting.routes.js';
 import tenantRoutes from './tenant.routes.js';
 import guestRoutes from './guest.routes.js';
 import lostAndFoundRoutes from './lostAndFound.routes.js';
+import authRoutes from './auth.routes.js';
 
 const apiRouter = Router();
 
@@ -37,6 +38,7 @@ apiRouter.get('/health', async (req, res) => {
 });
 
 // Domain Routes
+apiRouter.use('/auth', authRoutes);
 apiRouter.use('/bookings', bookingRoutes);
 apiRouter.use('/rooms', roomRoutes);
 apiRouter.use('/reports', reportRoutes);

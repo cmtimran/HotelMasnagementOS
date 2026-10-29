@@ -1,11 +1,11 @@
 import { db } from '../../database/db.js';
 import type { ReportFilterQuery } from '../../types/index.js';
 
-const resolvePropertyId = (propertyId: string | number | undefined): number => {
+const resolvePropertyId = (propertyId: string | number | undefined): number | null => {
   if (typeof propertyId === 'number') return propertyId;
-  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === '1') return 1;
+  if (!propertyId || propertyId === 'prop_grand_palace' || propertyId === 'all') return null;
   const num = Number(propertyId);
-  return isNaN(num) ? 1 : num;
+  return isNaN(num) ? null : num;
 };
 
 export const reservationReportsService = {
@@ -14,6 +14,7 @@ export const reservationReportsService = {
    */
   getCancelledReservations: async (propertyId: string, _query: ReportFilterQuery) => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return [];
 
     const rows = await db.prepare(`
       SELECT 
@@ -40,37 +41,7 @@ export const reservationReportsService = {
       ORDER BY r.updated_at DESC
     `).all(propId) as any[];
 
-    if (rows && rows.length > 0) {
-      return rows;
-    }
-
-    // Default demonstration records if no cancelled records in DB yet
-    return [
-      {
-        resNo: 'RES-8910',
-        guestName: 'Jonathan Davis',
-        rate: 6500.0,
-        room: '204 - Deluxe Double',
-        arrival: '2026-10-18',
-        departure: '2026-10-22',
-        cancelledDate: '2026-10-17',
-        cancelledBy: 'Front Desk (Alice)',
-        reason: 'Guest Flight Delayed / Cancelled',
-        charge: 1500.0,
-      },
-      {
-        resNo: 'RES-8924',
-        guestName: 'Claire Redfield',
-        rate: 9500.0,
-        room: '301 - Executive Suite',
-        arrival: '2026-10-19',
-        departure: '2026-10-23',
-        cancelledDate: '2026-10-18',
-        cancelledBy: 'OTA Channel (Booking.com)',
-        reason: 'Change of Travel Plans',
-        charge: 0.0,
-      }
-    ];
+    return rows || [];
   },
 
   /**
@@ -78,12 +49,13 @@ export const reservationReportsService = {
    */
   getArrivalList: async (propertyId: string, _query: ReportFilterQuery) => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return [];
 
     const rows = await db.prepare(`
       SELECT 
         r.reservation_number as "resNo",
         g.first_name || ' ' || g.last_name as "guestName",
-        COALESCE(rt.name, 'Standard King') as "roomType",
+        COALESCE(rt.name, 'Room') as "roomType",
         COALESCE(rm.room_number, 'TBD') as "roomNo",
         '14:00' as eta,
         COALESCE(rr.room_rate, r.total_amount) as rate,
@@ -99,22 +71,7 @@ export const reservationReportsService = {
       LIMIT 20
     `).all(propId) as any[];
 
-    if (rows && rows.length > 0) {
-      return rows;
-    }
-
-    return [
-      {
-        resNo: 'RES-9011',
-        guestName: 'Dr. Robert Neville',
-        roomType: 'Deluxe Suite',
-        roomNo: '204',
-        eta: '14:00',
-        rate: 6500.0,
-        balance: 6500.0,
-        vip: 'VIP Gold',
-      }
-    ];
+    return rows || [];
   },
 
   /**
@@ -122,11 +79,12 @@ export const reservationReportsService = {
    */
   getDepartureList: async (propertyId: string, _query: ReportFilterQuery) => {
     const propId = resolvePropertyId(propertyId);
+    if (!propId) return [];
 
     const rows = await db.prepare(`
       SELECT 
         r.reservation_number as "resNo",
-        COALESCE(rm.room_number, '101') as "roomNo",
+        COALESCE(rm.room_number, 'TBD') as "roomNo",
         g.first_name || ' ' || g.last_name as "guestName",
         '12:00 PM' as "checkOutTime",
         r.due_amount as "folioBalance",
@@ -140,19 +98,6 @@ export const reservationReportsService = {
       LIMIT 20
     `).all(propId) as any[];
 
-    if (rows && rows.length > 0) {
-      return rows;
-    }
-
-    return [
-      {
-        resNo: 'RES-8850',
-        roomNo: '102',
-        guestName: 'Arthur Dent',
-        checkOutTime: '11:00 AM',
-        folioBalance: 0.0,
-        status: 'Settled',
-      }
-    ];
+    return rows || [];
   },
 };

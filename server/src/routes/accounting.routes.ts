@@ -210,7 +210,8 @@ router.post('/folios/:id/charges', async (req: Request, res: Response) => {
 router.post('/folios/:id/payments', async (req: Request, res: Response) => {
     try {
         const folioId = Number(req.params.id);
-        const { paymentMethod = 'CASH', amount, referenceCode = 'FRONT_DESK_SETTLE', propertyId = 1 } = req.body;
+        const { paymentMethod = 'CASH', amount, referenceCode = 'FRONT_DESK_SETTLE' } = req.body;
+        const propertyId = Number(req.body.propertyId || req.headers['x-property-id']) || null;
 
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount <= 0) {
@@ -297,7 +298,8 @@ router.get('/journal-entries', async (req: Request, res: Response) => {
 // POST /api/accounting/journal-entries - Post a new balanced double-entry transaction
 router.post('/journal-entries', async (req: Request, res: Response) => {
     try {
-        const { propertyId = 1, description, entryDate, lines = [], createdBy = 'Manual Entry' } = req.body;
+        const propertyId = Number(req.body.propertyId || req.headers['x-property-id']) || null;
+        const { description, entryDate, lines = [], createdBy = 'Manual Entry' } = req.body;
 
         if (!lines || !Array.isArray(lines) || lines.length < 2) {
             return res.status(400).json({ success: false, error: 'A valid journal entry must contain at least 2 lines (debit & credit).' });
@@ -420,8 +422,11 @@ router.get('/trial-balance', async (req: Request, res: Response) => {
 // GET /api/accounting/night-audit/status - Get current business date & night audit readiness
 router.get('/night-audit/status', async (req: Request, res: Response) => {
     try {
-        const rawPropId = req.query.propertyId || req.headers['x-property-id'] || (req as any).propertyId || 1;
-        const propertyId = Number(rawPropId);
+        const rawPropId = req.query.propertyId || req.headers['x-property-id'] || (req as any).propertyId;
+        const propertyId = rawPropId ? Number(rawPropId) : null;
+        if (!propertyId) {
+            return res.json({ success: true, data: { status: 'PENDING', stepsCompleted: 0 } });
+        }
 
         // Count in-house folios
         const inHouseCountRes = await db.prepare(`
@@ -458,8 +463,11 @@ router.get('/night-audit/status', async (req: Request, res: Response) => {
 // POST /api/accounting/night-audit/run - Authoritative Backend Night Audit Engine
 router.post('/night-audit/run', async (req: Request, res: Response) => {
     try {
-        const rawPropId = req.body.propertyId || req.headers['x-property-id'] || (req as any).propertyId || 1;
-        const propertyId = Number(rawPropId);
+        const rawPropId = req.body.propertyId || req.headers['x-property-id'] || (req as any).propertyId;
+        const propertyId = rawPropId ? Number(rawPropId) : null;
+        if (!propertyId) {
+            return res.status(400).json({ success: false, error: 'Property ID required for Night Audit execution' });
+        }
         const currentBusinessDate = req.body.businessDate || new Date().toISOString().slice(0, 10);
 
         const logs: string[] = [];

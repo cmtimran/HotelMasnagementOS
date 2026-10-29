@@ -7,15 +7,16 @@ import {
     ArrowRight,
     Building2,
     Hash,
-    ShieldCheck,
     Globe,
     Loader2,
     AlertCircle,
     Star,
     Shield
 } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 interface User {
+    id?: number;
     name: string;
     role: string;
     property: string;
@@ -29,7 +30,7 @@ interface LoginProps {
 }
 
 const quotes = [
-    { text: "Redefining Luxury Hospitality.", author: "NICE PREMIUM" },
+    { text: "Redefining Luxury Hospitality.", author: "HOTEL OS ENTERPRISE" },
     { text: "Empowering World-Class Service.", author: "Operations Elite" },
     { text: "Your Vision, Our Technology.", author: "Guest Excellence" }
 ];
@@ -38,9 +39,9 @@ const Login = ({ onLogin }: LoginProps) => {
     const [showPassword, setShowPassword] = useState(false);
     const [propertyId, setPropertyId] = useState('HQ-CORP');
     const [email, setEmail] = useState('superadmin@hotelmanagement.os');
-    const [password, setPassword] = useState('admin123');
+    const [password, setPassword] = useState('admin');
     const [isLoading, setIsLoading] = useState(false);
-    const [loginStatus, setLoginStatus] = useState<'success' | 'error' | null>(null);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const [activeQuote, setActiveQuote] = useState(0);
 
@@ -51,81 +52,68 @@ const Login = ({ onLogin }: LoginProps) => {
         return () => clearInterval(interval);
     }, []);
 
-    // Quick helpers to pre-fill demo credentials
+    // Quick helper to fill Super Admin credentials
     const fillSuperAdmin = () => {
         setPropertyId('HQ-CORP');
         setEmail('superadmin@hotelmanagement.os');
-        setPassword('admin123');
+        setPassword('admin');
     };
 
-    const fillDhakaFrontDesk = () => {
-        setPropertyId('GPD-001');
-        setEmail('frontdesk.dhaka@grandhospitality.com');
-        setPassword('staff123');
-    };
-
-    const fillCoxsBazarGM = () => {
-        setPropertyId('GOR-002');
-        setEmail('operations.cox@grandhospitality.com');
-        setPassword('staff123');
-    };
-
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        setLoginStatus(null);
+        setErrorMessage('');
 
-        setTimeout(() => {
-            if (propertyId && email && password) {
-                setLoginStatus('success');
-                setTimeout(() => {
-                    const isSuper = propertyId === 'HQ-CORP' || email.includes('superadmin');
-                    const isCox = propertyId === 'GOR-002' || email.includes('cox');
+        try {
+            const baseUrl = getApiBaseUrl();
+            const res = await fetch(`${baseUrl}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email.trim(), password })
+            });
 
-                    const role = isSuper ? 'super_admin' : isCox ? 'general_manager' : 'front_desk';
-                    const propertyIdNum = isSuper ? 0 : isCox ? 2 : 1;
-                    const propertyName = isSuper
-                        ? 'HotelOS Corporate HQ'
-                        : isCox
-                            ? "Grand Ocean Resort (Cox's Bazar)"
-                            : 'Grand Palace Dhaka';
+            const data = await res.json();
+            if (data.success && data.user) {
+                const user = data.user;
+                const isSuper = user.role === 'super_admin' || user.role === 'admin';
+                const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+                const userName = fullName || (user.email ? user.email.split('@')[0] : 'Super Administrator');
 
-                    const cleanEmailName = email.split('@')[0]
-                        .split(/[._-]/)
-                        .filter(Boolean)
-                        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-                        .join(' ');
+                const userData: User = {
+                    id: user.id,
+                    name: userName,
+                    role: user.role,
+                    property: isSuper ? 'Global Enterprise HQ' : 'Hotel Property',
+                    property_id: user.propertyId || 0,
+                    email: user.email,
+                    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80'
+                };
 
-                    const userName = cleanEmailName || (isSuper ? 'System Administrator' : 'Staff User');
-
-                    const mockUser: User = {
-                        name: userName,
-                        role: role,
-                        property: propertyName,
-                        property_id: propertyIdNum,
-                        email: email,
-                        image: isSuper
-                            ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80'
-                            : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&h=256&q=80'
-                    };
-
-                    if (isSuper) {
-                        localStorage.setItem('hotel_portal_mode', 'super_admin');
-                    } else {
-                        localStorage.setItem('hotel_portal_mode', 'property_pms');
-                        localStorage.setItem('hotel_active_property_id', String(propertyIdNum));
+                if (isSuper) {
+                    localStorage.setItem('hotel_portal_mode', 'super_admin');
+                } else {
+                    localStorage.setItem('hotel_portal_mode', 'property_pms');
+                    if (user.propertyId) {
+                        localStorage.setItem('hotel_active_property_id', String(user.propertyId));
                     }
+                }
+                localStorage.setItem('user_data', JSON.stringify(userData));
+                if (data.token) {
+                    localStorage.setItem('auth_token', data.token);
+                }
 
-                    onLogin(mockUser);
-                }, 800);
+                setTimeout(() => {
+                    onLogin(userData);
+                }, 400);
             } else {
-                setLoginStatus('error');
+                setErrorMessage(data.error || 'Authentication failed. Please verify credentials.');
                 setIsLoading(false);
             }
-        }, 1000);
+        } catch (err: any) {
+            setErrorMessage(err?.message || 'Network error connecting to authentication server.');
+            setIsLoading(false);
+        }
     };
-
-    const accentColor = '#2451d1';
 
     return (
         <div className="h-screen w-full flex bg-white font-sans overflow-hidden login-font-outfit">
@@ -138,260 +126,183 @@ const Login = ({ onLogin }: LoginProps) => {
                     50% { transform: scale(1.1) translate(-1%, -1%); }
                     100% { transform: scale(1.05) translate(0, 0); }
                 }
-                .animate-slow-parallax { animation: slow-parallax 30s ease-in-out infinite; }
-
-                @keyframes shimmer {
-                    100% { transform: translateX(100%); }
-                }
-
-                input::placeholder {
-                    color: #94a3b8;
-                    font-weight: 500;
-                    letter-spacing: -0.01em;
+                .animate-slow-parallax {
+                    animation: slow-parallax 20s ease-in-out infinite;
                 }
             `}</style>
 
-            {/* --- LEFT SIDE: HERO BRANDING --- */}
-            <div className="hidden lg:flex w-7/12 relative overflow-hidden bg-slate-900 border-r border-white/5">
+            {/* Left Panel: High Fashion Hospitality Visual */}
+            <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 overflow-hidden bg-slate-900 border-r border-slate-200/50">
                 <div className="absolute inset-0 z-0">
                     <img
-                        src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=2070&auto=format&fit=crop"
-                        alt="Luxury Hospitality"
-                        className="w-full h-full object-cover animate-slow-parallax opacity-40"
+                        src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=2000&q=80"
+                        alt="Luxury Hotel"
+                        className="w-full h-full object-cover opacity-60 mix-blend-luminosity animate-slow-parallax"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 via-slate-900/40 to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent"></div>
+                    <div className="absolute inset-0 bg-blue-950/20 mix-blend-color"></div>
                 </div>
 
-                <div className="absolute z-10 top-10 left-12">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-center transition-all group-hover:bg-white/20 duration-500">
-                            <Building2 size={24} style={{ color: accentColor }} />
+                {/* Top Logo */}
+                <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-white/10">
+                            <Building2 className="text-[#2050d5]" size={22} strokeWidth={2.5} />
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-2xl font-black tracking-[0.2em] text-white">HOTELOS</span>
-                            <span className="text-[10px] tracking-[0.4em] uppercase" style={{ color: accentColor }}>Enterprise Multi-Property ERP</span>
+                        <div>
+                            <span className="text-xl font-bold tracking-tight text-white block">HotelManagement<span className="text-blue-400">OS</span></span>
+                            <span className="text-[10px] tracking-widest text-slate-300 font-medium uppercase block">Cloud Hospitality Platform</span>
                         </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white/90 text-xs">
+                        <Globe size={14} className="animate-pulse text-blue-400" />
+                        <span>Cloud Architecture</span>
                     </div>
                 </div>
 
-                <div className="relative z-10 px-12 flex flex-col justify-center h-full max-w-3xl">
-                    <div className="space-y-6">
-                        <div className="flex items-center gap-2 mb-[-1rem]">
-                            <Star size={12} fill={accentColor} color={accentColor} />
-                            <span className="text-[10px] tracking-[0.4em] uppercase text-white/60">Enterprise Architecture</span>
-                        </div>
-
-                        <div className="h-48 relative">
-                            {quotes.map((quote, idx) => (
-                                <div key={idx} className={`absolute inset-0 transition-all duration-1000 ${idx === activeQuote ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'}`}>
-                                    <h1 className="text-[3rem] font-extrabold leading-[1.1] text-white tracking-tighter">
-                                        {quote.text.split(' ').map((word, i) => (
-                                            <span key={i} style={{ color: (word === 'Luxury' || word === 'World-Class' || word === 'Vision' ? accentColor : 'white') }} className="block">
-                                                {word}
-                                            </span>
-                                        ))}
-                                    </h1>
-                                </div>
+                {/* Bottom Quote / Social Proof */}
+                <div className="relative z-10 space-y-6">
+                    <div className="space-y-2">
+                        <div className="flex gap-1 text-amber-400">
+                            {[...Array(5)].map((_, i) => (
+                                <Star key={i} size={14} fill="currentColor" />
                             ))}
                         </div>
+                        <h3 className="text-2xl font-light text-white italic tracking-tight">
+                            "{quotes[activeQuote].text}"
+                        </h3>
+                        <p className="text-sm font-semibold tracking-wider text-blue-400 uppercase">
+                            — {quotes[activeQuote].author}
+                        </p>
                     </div>
-                </div>
 
-                <div className="absolute bottom-10 left-12 right-12 flex items-center justify-between text-white/30 border-t border-white/5 pt-8 scale-90 origin-left">
-                    <div className="flex gap-8">
-                        <div className="flex flex-col">
-                            <span className="text-white text-base font-bold">Multi-Property Core</span>
-                            <span className="text-[9px] uppercase tracking-widest">Dhaka & Cox's Bazar</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-white text-base font-bold">54 Rooms</span>
-                            <span className="text-[9px] uppercase tracking-widest">Cloud PostgreSQL 17</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] tracking-widest uppercase">
-                        <Globe size={14} style={{ color: accentColor }} />
-                        Secured TiDB Cluster
+                    <div className="pt-6 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+                        <span>Multi-Tenant Relational PMS</span>
+                        <span>PostgreSQL Relational DB</span>
                     </div>
                 </div>
             </div>
 
-            {/* --- RIGHT SIDE: AUTHENTICATION FORM --- */}
-            <div className="w-full lg:w-5/12 flex items-center justify-center p-6 lg:p-8 bg-white relative overflow-y-auto">
-                <div className="w-full max-w-[420px] transition-all duration-500 py-4">
-                    <div className="mb-8 text-center lg:text-left space-y-1">
-                        <h2 className="text-[26px] font-black text-[#1e4cd3] leading-tight">
-                            Welcome Back
-                        </h2>
-                        <p className="text-[#94a3b8] text-[13px] tracking-tight">
-                            Enter your workspace credentials to access your terminal.
-                        </p>
+            {/* Right Panel: Clean Professional Login Form */}
+            <div className="w-full lg:w-1/2 flex flex-col justify-between p-8 sm:p-12 md:p-16 lg:p-20 overflow-y-auto">
+                {/* Mobile Header */}
+                <div className="flex lg:hidden items-center justify-between pb-8">
+                    <div className="flex items-center gap-2">
+                        <Building2 className="text-[#2050d5]" size={24} strokeWidth={2.5} />
+                        <span className="text-lg font-bold tracking-tight text-slate-900">HotelManagement<span className="text-[#2050d5]">OS</span></span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">v2.5 Enterprise</span>
+                </div>
+
+                <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
+                    <div className="mb-8">
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Sign In</h1>
+                        <p className="text-sm text-slate-500 mt-1">Access your hotel management console</p>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-3.5">
-                        <div className="space-y-3">
-                            {/* Property / Workspace ID */}
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors group-focus-within:text-[#2451d1]">
-                                    <Hash size={15} strokeWidth={2.5} />
-                                </div>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        {errorMessage && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2.5 text-xs text-red-700">
+                                <AlertCircle size={16} className="shrink-0 text-red-500" />
+                                <span>{errorMessage}</span>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Workspace / Domain</label>
+                            <div className="relative">
+                                <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
                                     value={propertyId}
                                     onChange={(e) => setPropertyId(e.target.value.toUpperCase())}
-                                    className="w-full pl-11 pr-20 py-2.5 bg-white border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#2451d1] focus:ring-4 focus:ring-[#2451d1]/5 transition-all font-semibold text-slate-700 text-xs placeholder:text-slate-400 shadow-2xs"
-                                    placeholder="Property / Workspace ID"
-                                    required
+                                    placeholder="HQ-CORP"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#2050d5] focus:ring-2 focus:ring-[#2050d5]/10 transition-all"
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 border border-slate-100 bg-slate-50 px-1.5 py-0.5 rounded uppercase tracking-wider pointer-events-none">
-                                    Required
-                                </span>
                             </div>
+                        </div>
 
-                            {/* Email */}
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors group-focus-within:text-[#2451d1]">
-                                    <Mail size={15} strokeWidth={2.5} />
-                                </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email Address</label>
+                            <div className="relative">
+                                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#2451d1] focus:ring-4 focus:ring-[#2451d1]/5 transition-all font-semibold text-slate-700 text-xs placeholder:text-slate-400 shadow-2xs"
-                                    placeholder="Work Email"
+                                    placeholder="superadmin@hotelmanagement.os"
                                     required
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#2050d5] focus:ring-2 focus:ring-[#2050d5]/10 transition-all"
                                 />
                             </div>
+                        </div>
 
-                            {/* Password */}
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors group-focus-within:text-[#2451d1]">
-                                    <Lock size={15} strokeWidth={2.5} />
-                                </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Password</label>
+                            <div className="relative">
+                                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
-                                    type={showPassword ? "text" : "password"}
+                                    type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-11 pr-12 py-2.5 bg-white border border-slate-200 rounded-[10px] focus:outline-none focus:border-[#2451d1] focus:ring-4 focus:ring-[#2451d1]/5 transition-all font-semibold text-slate-700 text-xs placeholder:text-slate-400 shadow-2xs"
-                                    placeholder="Password"
+                                    placeholder="••••••••"
                                     required
+                                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#2050d5] focus:ring-2 focus:ring-[#2050d5]/10 transition-all"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-[#2451d1] transition-colors cursor-pointer"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                                 >
                                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between px-1 pt-1">
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                                <div className="relative">
-                                    <input type="checkbox" defaultChecked className="peer hidden" id="keep-signed" />
-                                    <div className="w-3.5 h-3.5 border border-slate-300 rounded peer-checked:bg-[#2451d1] peer-checked:border-[#2451d1] transition-all"></div>
-                                    <ShieldCheck size={10} className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
-                                </div>
-                                <span className="text-[11px] font-medium text-slate-500 group-hover:text-slate-900 transition-colors">Remember device</span>
-                            </label>
-                            <span className="text-[11px] text-[#2050d5] hover:underline cursor-pointer">Security Protocol</span>
-                        </div>
-
-                        {loginStatus === 'error' && (
-                            <div className="p-2.5 bg-red-50 rounded-xl flex items-center gap-2.5 text-red-600 animate-shake shadow-xs border border-red-100">
-                                <AlertCircle size={16} />
-                                <span className="text-[11px] italic">Verification failed. Check credentials.</span>
-                            </div>
-                        )}
-
                         <button
                             type="submit"
-                            disabled={isLoading || loginStatus === 'success'}
-                            className="w-full py-3 bg-[#2050d5] hover:bg-[#1a44b8] rounded-[10px] text-white flex items-center justify-center relative overflow-hidden group shadow-md shadow-blue-400/10 active:scale-[0.99] transition-all disabled:opacity-70 cursor-pointer mt-2"
+                            disabled={isLoading}
+                            className="w-full py-2.5 px-4 bg-[#2050d5] hover:bg-[#1a44b8] text-white font-semibold text-sm rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-70 cursor-pointer mt-2"
                         >
-                            <div className="relative z-10 flex items-center gap-2 text-sm font-bold">
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="animate-spin" size={16} />
-                                        <span>AUTHENTICATING CREDENTIALS...</span>
-                                    </>
-                                ) : loginStatus === 'success' ? (
-                                    <span>SESSION INITIALIZED</span>
-                                ) : (
-                                    <>
-                                        <span>Sign In to Terminal</span>
-                                        <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" strokeWidth={2.5} />
-                                    </>
-                                )}
-                            </div>
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+                            {isLoading ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    <span>Verifying...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>Sign In</span>
+                                    <ArrowRight size={16} />
+                                </>
+                            )}
                         </button>
                     </form>
 
-                    {/* DISCRETE 1-CLICK DEMO ACCOUNT SELECTOR */}
-                    <div className="mt-8 pt-5 border-t border-slate-100">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">
-                                Demo Fast-Fill Profiles:
-                            </span>
-                            <span className="text-[9.5px] text-slate-400">Click to load</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
+                    {/* Quick Access Card for Super Admin */}
+                    <div className="mt-8 pt-6 border-t border-slate-100">
+                        <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                                    <Shield size={16} />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-900">Super Admin Master Key</p>
+                                    <p className="text-[11px] text-slate-500 font-mono">superadmin@hotelmanagement.os</p>
+                                </div>
+                            </div>
                             <button
                                 type="button"
                                 onClick={fillSuperAdmin}
-                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${propertyId === 'HQ-CORP'
-                                    ? 'border-indigo-500 bg-indigo-50/70 text-indigo-950 shadow-2xs'
-                                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                                    }`}
-                                title="Load Super Admin (HQ Master Console)"
+                                className="px-2.5 py-1 text-xs font-semibold text-[#2050d5] hover:bg-blue-100/60 rounded-md transition cursor-pointer"
                             >
-                                <div className="flex items-center gap-1">
-                                    <Shield size={11} className="text-indigo-600 flex-shrink-0" />
-                                    <span className="truncate font-semibold">Super Admin</span>
-                                </div>
-                                <p className="text-[9px] text-slate-400 font-normal truncate mt-0.5">Corporate HQ</p>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={fillDhakaFrontDesk}
-                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${propertyId === 'GPD-001'
-                                    ? 'border-emerald-500 bg-emerald-50/70 text-emerald-950 shadow-2xs'
-                                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                                    }`}
-                                title="Load Front Desk Staff (Grand Palace Dhaka PMS)"
-                            >
-                                <div className="flex items-center gap-1">
-                                    <Building2 size={11} className="text-emerald-600 flex-shrink-0" />
-                                    <span className="truncate font-semibold">Front Desk</span>
-                                </div>
-                                <p className="text-[9px] text-slate-400 font-normal truncate mt-0.5">Dhaka PMS</p>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={fillCoxsBazarGM}
-                                className={`p-2 rounded-lg border text-left text-[11px] transition cursor-pointer ${propertyId === 'GOR-002'
-                                    ? 'border-blue-500 bg-blue-50/70 text-blue-950 shadow-2xs'
-                                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                                    }`}
-                                title="Load Resort Operations (Grand Ocean Cox's Bazar PMS)"
-                            >
-                                <div className="flex items-center gap-1">
-                                    <Building2 size={11} className="text-blue-600 flex-shrink-0" />
-                                    <span className="truncate font-semibold">Resort GM</span>
-                                </div>
-                                <p className="text-[9px] text-slate-400 font-normal truncate mt-0.5">Cox's Bazar</p>
+                                Auto-Fill
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    <div className="pt-6 text-center">
-                        <p className="text-[10px] font-semibold text-slate-400 tracking-tight uppercase">
-                            © 2026 HotelOS Enterprise • Property Management System
-                        </p>
-                    </div>
+                <div className="pt-8 text-center text-xs text-slate-400">
+                    HotelManagementOS Enterprise Edition &bull; PostgreSQL Direct Cloud Connection
                 </div>
             </div>
         </div>

@@ -11,7 +11,7 @@ import {
     LogIn, 
     LogOut 
 } from 'lucide-react';
-import { getApiBaseUrl } from '../../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../../utils/apiUrl';
 
 
 interface Employee {
@@ -94,8 +94,10 @@ export const HRMManagementDashboard: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
+            const propId = getActivePropertyId();
+            const todayStr = new Date().toISOString().slice(0, 10);
             // 1. Fetch Employees
-            const empRes = await fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=1`);
+            const empRes = await fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=${propId}`);
             const empData = await empRes.json();
             if (empData.success) {
                 setEmployees(empData.data);
@@ -105,28 +107,28 @@ export const HRMManagementDashboard: React.FC = () => {
             }
 
             // 2. Fetch Shifts
-            const shiftsRes = await fetch(`${getApiBaseUrl()}/api/hrm/shifts?propertyId=1`);
+            const shiftsRes = await fetch(`${getApiBaseUrl()}/api/hrm/shifts?propertyId=${propId}`);
             const shiftsData = await shiftsRes.json();
             if (shiftsData.success) {
                 setShifts(shiftsData.data);
             }
 
             // 3. Fetch Today's Attendance
-            const attRes = await fetch(`${getApiBaseUrl()}/api/hrm/attendance?propertyId=1&date=2026-07-01`);
+            const attRes = await fetch(`${getApiBaseUrl()}/api/hrm/attendance?propertyId=${propId}&date=${todayStr}`);
             const attData = await attRes.json();
             if (attData.success) {
                 setAttendance(attData.data);
             }
 
             // 4. Fetch Payroll Runs
-            const payRes = await fetch(`${getApiBaseUrl()}/api/hrm/payroll?propertyId=1`);
+            const payRes = await fetch(`${getApiBaseUrl()}/api/hrm/payroll?propertyId=${propId}`);
             const payData = await payRes.json();
             if (payData.success) {
                 setPayrollRuns(payData.data);
             }
 
             // 5. Fetch Departments
-            const deptRes = await fetch(`${getApiBaseUrl()}/api/hrm/departments?propertyId=1`);
+            const deptRes = await fetch(`${getApiBaseUrl()}/api/hrm/departments?propertyId=${propId}`);
             const deptData = await deptRes.json();
             if (deptData.success) {
                 setDepartments(deptData.data);
@@ -181,7 +183,7 @@ export const HRMManagementDashboard: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    propertyId: 1,
+                    propertyId: getActivePropertyId(),
                     month: Number(payrollMonth),
                     year: Number(payrollYear)
                 })

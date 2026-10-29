@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import PageHeader from './common/PageHeader';
 import { generateUniqueShortCode } from '../utils/codeGenerator';
-import { getApiBaseUrl } from '../utils/apiUrl';
+import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 
 // ==========================================
 // TYPES & INTERFACES
@@ -163,7 +163,8 @@ export default function UserStaffManagement() {
     const loadStaff = async () => {
         try {
             setIsLoading(true);
-            const res = await fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=1`);
+            const propId = getActivePropertyId();
+            const res = await fetch(`${getApiBaseUrl()}/api/hrm/employees?propertyId=${propId}`);
             const json = await res.json();
             if (json.success && json.data) {
                 const shiftPresets = [
@@ -578,11 +579,12 @@ export default function UserStaffManagement() {
 
                 const newCode = generateUniqueShortCode('EMP', users.map(u => u.code));
 
+                const propId = getActivePropertyId();
                 const resp = await fetch(`${getApiBaseUrl()}/api/hrm/employees`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        propertyId: 1,
+                        propertyId: propId,
                         departmentId,
                         designationId,
                         employeeCode: newCode,
