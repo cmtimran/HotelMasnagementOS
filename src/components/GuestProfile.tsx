@@ -7,7 +7,7 @@ import {
     AlertTriangle, ChevronRight, ChevronLeft,
     Home, Edit3, Receipt,
     GitMerge, CheckSquare, Square, Loader2,
-    Ban, History, FileText
+    Ban, History, FileText, Users, UserPlus
 } from 'lucide-react';
 import { getAllStoredReservations, saveStoredReservations, broadcastPMSEvent, syncReservationsFromDB, subscribeToPMSEvents, type StoredReservation } from '../utils/roomInventoryEngine';
 import { useNavigation } from '../context/NavigationContext';
@@ -1457,17 +1457,24 @@ export const GuestProfile: React.FC = () => {
 
                         {/* Guest Items */}
                         <div className="space-y-1.5">
-                        {filteredGuests.map(g => {
-                            const isSelected = g.id === activeGuest.id;
-                            const isCheckedForMerge = selectedForMerge.includes(g.id);
-                            return (
-                                <div
-                                    key={g.id}
-                                    onClick={() => setSelectedGuestId(g.id)}
-                                    className={`w-full p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col gap-1 relative group ${
-                                        isSelected
-                                            ? 'bg-blue-50/60 border-blue-500 shadow-2xs ring-1 ring-blue-500'
-                                            : isCheckedForMerge
+                        {filteredGuests.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">
+                                <Users size={24} className="mx-auto mb-2 text-gray-300" />
+                                <p className="text-[11px] font-medium text-gray-600">No guests registered yet</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">Click + Add Guest to register a profile</p>
+                            </div>
+                        ) : (
+                            filteredGuests.map(g => {
+                                const isSelected = activeGuest ? g.id === activeGuest.id : false;
+                                const isCheckedForMerge = selectedForMerge.includes(g.id);
+                                return (
+                                    <div
+                                        key={g.id}
+                                        onClick={() => setSelectedGuestId(g.id)}
+                                        className={`w-full p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col gap-1 relative group ${
+                                            isSelected
+                                                ? 'bg-blue-50/60 border-blue-500 shadow-2xs ring-1 ring-blue-500'
+                                                : isCheckedForMerge
                                             ? 'bg-indigo-50/50 border-indigo-300'
                                             : 'bg-white border-gray-200 hover:bg-gray-50'
                                     }`}
@@ -1538,12 +1545,34 @@ export const GuestProfile: React.FC = () => {
                                     )}
                                 </div>
                             );
-                        })}
+                        })
+                        )}
                         </div>
                     </div>
                 </div>
 
                 {/* Right Column: Guest 360 Full Workspace */}
+                {!activeGuest ? (
+                    <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
+                        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-8 max-w-md w-full flex flex-col items-center">
+                            <div className="w-16 h-16 rounded-full bg-blue-50 text-[#1e3a8a] flex items-center justify-center mb-3 shadow-inner">
+                                <UserPlus size={28} />
+                            </div>
+                            <h3 className="text-sm font-bold text-gray-900">No Guest Profiles Found</h3>
+                            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                                Your hotel guest database is currently clean. Guest profiles will be dynamically created whenever reservations or check-ins are made, or you can register a new profile now.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleOpenCreateModal}
+                                className="mt-5 px-4 py-2 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+                            >
+                                <UserPlus size={15} />
+                                <span>Add First Guest Profile</span>
+                            </button>
+                        </div>
+                    </div>
+                ) : (
                 <div className="flex-1 bg-gray-50 flex flex-col overflow-y-auto p-3.5 space-y-3">
                     {/* Top Identity Hero Card - Compact Enterprise Header */}
                     <div className="bg-white rounded-lg border border-gray-200 shadow-2xs p-2.5 flex flex-col gap-1.5 flex-shrink-0">
@@ -2294,6 +2323,7 @@ export const GuestProfile: React.FC = () => {
                         </div>
                     )}
                 </div>
+                )}
             </div>
 
             {/* Add / Edit Guest Modal */}

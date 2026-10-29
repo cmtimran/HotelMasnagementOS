@@ -90,48 +90,7 @@ export const DEFAULT_HOUSEKEEPING_SETTINGS: HousekeepingSettings = {
     statusWorkflow: 'standard'
 };
 
-export const DEFAULT_HOUSEKEEPERS: Housekeeper[] = [
-    {
-        id: 'hk-1',
-        employeeId: 'HK-101',
-        name: 'Fatima Begum',
-        phone: '+880 1711 223344',
-        shift: 'Morning (07:00 - 15:30)',
-        assignedZone: 'Floor 1',
-        status: 'active',
-        maxCredits: 14
-    },
-    {
-        id: 'hk-2',
-        employeeId: 'HK-102',
-        name: 'Rahima Khatun',
-        phone: '+880 1711 223355',
-        shift: 'Morning (07:00 - 15:30)',
-        assignedZone: 'Floor 2',
-        status: 'active',
-        maxCredits: 14
-    },
-    {
-        id: 'hk-3',
-        employeeId: 'HK-103',
-        name: 'Salma Akter',
-        phone: '+880 1711 223366',
-        shift: 'Morning (07:00 - 15:30)',
-        assignedZone: 'Floor 3',
-        status: 'active',
-        maxCredits: 14
-    },
-    {
-        id: 'hk-4',
-        employeeId: 'HK-104',
-        name: 'Akhtar Hossain',
-        phone: '+880 1711 223377',
-        shift: 'Evening (15:00 - 23:30)',
-        assignedZone: 'Floor 4 & 5',
-        status: 'active',
-        maxCredits: 14
-    }
-];
+export const DEFAULT_HOUSEKEEPERS: Housekeeper[] = [];
 
 export const STORAGE_KEY_HK_SETTINGS = 'hotel_housekeeping_settings_v1';
 export const STORAGE_KEY_HOUSEKEEPERS = 'hotel_housekeepers_roster_v1';
@@ -182,7 +141,7 @@ export const saveHousekeepingSettings = (
  */
 export const getHousekeepersList = (propertyId: number = 1): Housekeeper[] => {
     try {
-        if (typeof window === 'undefined') return DEFAULT_HOUSEKEEPERS;
+        if (typeof window === 'undefined') return [];
         const key = `${STORAGE_KEY_HOUSEKEEPERS}_prop_${propertyId}`;
         const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_HOUSEKEEPERS);
         if (raw) {
@@ -192,7 +151,7 @@ export const getHousekeepersList = (propertyId: number = 1): Housekeeper[] => {
     } catch (e) {
         console.warn('Failed to load housekeepers', e);
     }
-    return DEFAULT_HOUSEKEEPERS;
+    return [];
 };
 
 /**

@@ -141,6 +141,36 @@ export interface ConnectingSuite {
 
 export const STORAGE_KEY_CONNECTING_SUITES = 'hotel_connecting_rooms_v1';
 
+// One-time clean baseline purge of legacy mock demo data
+if (typeof window !== 'undefined') {
+    const PURGE_KEY = 'hotel_baseline_purged_v1';
+    if (!localStorage.getItem(PURGE_KEY)) {
+        try {
+            [
+                'hotel_rooms_inventory_v1',
+                'hotel_rooms_prop_1',
+                'hotel_rooms_prop_2',
+                'hotel_room_types_v1',
+                'hotel_room_types_prop_1',
+                'hotel_room_types_prop_2',
+                'hotel_connecting_rooms_v1',
+                'hotel_connecting_rooms_prop_1',
+                'hotel_connecting_rooms_prop_2',
+                'hotel_reservations_v2',
+                'hotel_reservations_v3',
+                'hotel_reservations_prop_1',
+                'hotel_reservations_prop_2',
+                'hotel_guest_profiles_v2',
+                'hotel_maintenance_tasks_v2',
+                'hotel_housekeeping_discrepancies_v1',
+                'hotel_housekeepers_roster_v1',
+                'hotel_lost_and_found_v1'
+            ].forEach(k => localStorage.removeItem(k));
+            localStorage.setItem(PURGE_KEY, 'true');
+        } catch {}
+    }
+}
+
 export const getStoredConnectingSuites = (propertyId: number = 1): ConnectingSuite[] => {
     const propId = propertyId || getActivePropertyId();
     try {
@@ -155,22 +185,7 @@ export const getStoredConnectingSuites = (propertyId: number = 1): ConnectingSui
             }
         }
     } catch {}
-    // Baseline seed for Property 1; other properties start with 0 connecting suites
-    return (propId === 1 || !propId) ? [
-        {
-            id: 1,
-            propertyId: 1,
-            name: 'Interconnecting Suite (101-102)',
-            inventoryLogic: 'Auto-Sync',
-            pricingStrategy: 'Sum of Rates',
-            fixedPrice: 6000,
-            status: 'Active',
-            componentRooms: [
-                { roomTypeId: '1', count: 1, roomNumbers: ['101'] },
-                { roomTypeId: '1', count: 1, roomNumbers: ['102'] }
-            ]
-        }
-    ] : [];
+    return [];
 };
 
 export const saveConnectingSuites = (suites: ConnectingSuite[], propertyId?: number): void => {
@@ -232,13 +247,7 @@ export const getConnectingPartnerMap = (propertyId?: number): Map<string, string
 const STORAGE_KEY_ROOM_TYPES = 'hotel_room_types_v1';
 
 // Dynamic Database Baseline Seeds (synced directly with PostgreSQL room_types table)
-export const DEFAULT_ROOM_TYPES: DynamicRoomType[] = [
-    { id: 1, code: 'DD', name: 'Deluxe Double', baseOccupancy: 2, maxAdults: 2, maxChildren: 1, baseRate: 3000, extraBedRate: 1000, description: 'King bed, city view, high-speed WiFi, work desk' },
-    { id: 2, code: 'SK', name: 'Superior King', baseOccupancy: 2, maxAdults: 2, maxChildren: 1, baseRate: 4500, extraBedRate: 1200, description: 'King bed with panoramic balcony and plush lounge' },
-    { id: 3, code: 'ES', name: 'Executive Suite', baseOccupancy: 3, maxAdults: 3, maxChildren: 2, baseRate: 7500, extraBedRate: 1500, description: 'Separate living room, executive lounge access, bathtub' },
-    { id: 4, code: 'PS', name: 'Presidential Royal Suite', baseOccupancy: 4, maxAdults: 4, maxChildren: 2, baseRate: 18000, extraBedRate: 2500, description: 'Top-tier luxury penthouse with private terrace and jacuzzi' },
-    { id: 5, code: 'SS', name: 'Standard Single', baseOccupancy: 1, maxAdults: 1, maxChildren: 0, baseRate: 2200, extraBedRate: 800, description: 'Cozy single room with premium bed and workspace' }
-];
+export const DEFAULT_ROOM_TYPES: DynamicRoomType[] = [];
 
 // Room Type ID to Name Map (dynamic compatibility helper powered by dynamic DB cache)
 export const getRoomTypeNameById = (id: string | number): string => {
@@ -294,7 +303,7 @@ export const getDynamicRoomTypes = (propertyId?: number): DynamicRoomType[] => {
             }
         }
     } catch {}
-    return (propId === 1 || !propId) ? DEFAULT_ROOM_TYPES : [];
+    return [];
 };
 
 export const saveDynamicRoomTypes = (roomTypes: DynamicRoomType[], propertyId?: number): void => {
@@ -381,7 +390,7 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
  */
 export const getHotelReservationPolicies = (roomNumber?: string, propertyId?: number): string[] => {
     const settings = getHotelGeneralSettings(propertyId);
-    const smoking = getRoomSmokingPolicy(roomNumber || '101', propertyId);
+    const smoking = getRoomSmokingPolicy(roomNumber || '', propertyId);
     const policies: string[] = [
         smoking.guestFacingClause,
         `Standard Hotel Check-In: ${settings.checkInTime} | Check-Out: ${settings.checkOutTime}`,
@@ -720,48 +729,8 @@ export const calculateTariffForRatePlan = (
     return Math.max(0, Math.round(base));
 };
 
-// Canonical Property Inventory (34 Rooms)
-export const DEFAULT_CANONICAL_ROOMS: CanonicalRoom[] = [
-    // Floor 1
-    { id: 1, number: '101', name: 'Garden Deluxe 101', buildingId: '1', floorId: '1', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 2, number: '102', name: 'Garden Deluxe 102', buildingId: '1', floorId: '1', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 3, number: '103', name: 'Superior Bay 103', buildingId: '1', floorId: '1', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 4, number: '104', name: 'Executive Suite 104', buildingId: '1', floorId: '1', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 5, number: '105', name: 'Standard Single 105', buildingId: '1', floorId: '1', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 6, number: '106', name: 'Standard Single 106', buildingId: '1', floorId: '1', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 7, number: '107', name: 'Deluxe Courtyard 107', buildingId: '1', floorId: '1', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 8, number: '108', name: 'Superior King 108', buildingId: '1', floorId: '1', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    // Floor 2
-    { id: 9, number: '201', name: 'Superior Balcony 201', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean', smokingStatus: 'Balcony Smoking Only', smokingAllowed: true },
-    { id: 10, number: '202', name: 'Superior King 202', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 11, number: '203', name: 'Executive Suite 203', buildingId: '1', floorId: '2', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 12, number: '204', name: 'Deluxe King 204', buildingId: '1', floorId: '2', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 13, number: '205', name: 'Standard Single 205', buildingId: '1', floorId: '2', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 14, number: '206', name: 'Deluxe Twin 206', buildingId: '1', floorId: '2', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 15, number: '207', name: 'Deluxe Double 207', buildingId: '1', floorId: '2', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 16, number: '208', name: 'Superior King 208', buildingId: '1', floorId: '2', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    // Floor 3
-    { id: 17, number: '301', name: 'Deluxe Sea View 301', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 18, number: '302', name: 'Standard Single 302', buildingId: '1', floorId: '3', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 19, number: '303', name: 'Executive Suite 303', buildingId: '1', floorId: '3', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 20, number: '304', name: 'Deluxe Double 304', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 21, number: '305', name: 'Deluxe Twin 305', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 22, number: '306', name: 'Superior King 306', buildingId: '1', floorId: '3', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 23, number: '307', name: 'Deluxe Garden 307', buildingId: '1', floorId: '3', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 24, number: '308', name: 'Superior King 308', buildingId: '1', floorId: '3', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    // Floor 4
-    { id: 25, number: '401', name: 'Executive Club 401', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 26, number: '402', name: 'Executive Club 402', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean', smokingStatus: 'Smoking', smokingAllowed: true },
-    { id: 27, number: '403', name: 'Deluxe Panoramic 403', buildingId: '2', floorId: '4', roomTypeId: '1', roomTypeName: 'Deluxe Double', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 28, number: '404', name: 'Superior Sky 404', buildingId: '2', floorId: '4', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 29, number: '405', name: 'Standard Single 405', buildingId: '2', floorId: '4', roomTypeId: '5', roomTypeName: 'Standard Single', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 30, number: '410', name: 'Corner Executive 410', buildingId: '2', floorId: '4', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    // Floor 5 (VIP Suites)
-    { id: 31, number: '501', name: 'Presidential Royal Suite 501', buildingId: '2', floorId: '5', roomTypeId: '4', roomTypeName: 'Presidential Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 32, number: '502', name: 'Executive Diplomatic 502', buildingId: '2', floorId: '5', roomTypeId: '3', roomTypeName: 'Executive Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 33, number: '503', name: 'Presidential Penthouse 503', buildingId: '2', floorId: '5', roomTypeId: '4', roomTypeName: 'Presidential Suite', status: 'Active', housekeepingStatus: 'Clean' },
-    { id: 34, number: '505', name: 'Sky Superior 505', buildingId: '2', floorId: '5', roomTypeId: '2', roomTypeName: 'Superior King', status: 'Active', housekeepingStatus: 'Clean' }
-];
+// Canonical Property Inventory (Dynamic Baseline)
+export const DEFAULT_CANONICAL_ROOMS: CanonicalRoom[] = [];
 
 const STORAGE_KEY_ROOMS = 'hotel_rooms_inventory_v1';
 const STORAGE_KEY_RESERVATIONS = 'hotel_reservations_v2';
@@ -1016,27 +985,9 @@ export const getCanonicalRooms = (propertyId?: number): CanonicalRoom[] => {
             }
         }
 
-        const activeProp = propertyId || getActivePropertyId();
-        if (activeProp === 1) {
-            return DEFAULT_CANONICAL_ROOMS.map(r => {
-                const roomNum = String(r.number).trim();
-                const dynamicPartner = partnerMap.get(roomNum);
-                return {
-                    ...r,
-                    smokingStatus: r.smokingStatus || 'Non-Smoking',
-                    smokingAllowed: Boolean(r.smokingAllowed ?? (r.smokingStatus === 'Smoking')),
-                    smokingPolicy: r.smokingPolicy || r.smokingStatus || 'Non-Smoking',
-                    isConnecting: Boolean(dynamicPartner || r.isConnecting),
-                    connectedTo: dynamicPartner || r.connectedTo || ''
-                };
-            });
-        }
         return [];
     } catch {}
-    // If property 1 (HQ baseline) and not yet synced from DB, return default catalog.
-    // For all other properties (new tenants), start completely clean with 0 rooms!
-    const activeProp = propertyId || getActivePropertyId();
-    return activeProp === 1 ? DEFAULT_CANONICAL_ROOMS : [];
+    return [];
 };
 
 export interface RoomSmokingPolicyInfo {

@@ -3122,8 +3122,8 @@ export const AddReservation: React.FC = () => {
                                                         <div className="relative flex-1">
                                                             <input
                                                                 type="text"
-                                                                name="pms_add_guest_name_query"
-                                                                autoComplete="one-time-code"
+                                                                name="reservation_guest_name_lookup"
+                                                                autoComplete="off"
                                                                 autoCorrect="off"
                                                                 autoCapitalize="off"
                                                                 spellCheck={false}
@@ -3135,6 +3135,14 @@ export const AddReservation: React.FC = () => {
                                                                 data-form-type="other"
                                                                 placeholder="Guest full name..."
                                                                 value={guestName}
+                                                                readOnly
+                                                                onFocus={(e) => {
+                                                                    e.currentTarget.readOnly = false;
+                                                                    setIsGuestSearchOpen(true);
+                                                                }}
+                                                                onPointerDown={(e) => {
+                                                                    e.currentTarget.readOnly = false;
+                                                                }}
                                                                 onChange={e => {
                                                                     setGuestName(e.target.value);
                                                                     setIsGuestSearchOpen(true);
@@ -3142,7 +3150,6 @@ export const AddReservation: React.FC = () => {
                                                                         setSelectedExistingGuest(null);
                                                                     }
                                                                 }}
-                                                                onFocus={() => setIsGuestSearchOpen(true)}
                                                                 onBlur={() => setTimeout(() => setIsGuestSearchOpen(false), 250)}
                                                                 className="w-full h-7 px-2 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-500 font-medium"
                                                             />

@@ -120,16 +120,34 @@ export async function initPostgres(): Promise<boolean> {
                 console.warn('Rates tables warning in PostgreSQL:', ratesErr?.message);
             }
 
-            // 3. Check if data seeded; if empty, automatically seed
-            const countRes = await client.query('SELECT COUNT(*) as c FROM rooms;');
-            const roomCount = parseInt(countRes.rows[0]?.c || '0', 10);
-            if (roomCount < 34) {
-                console.log('🌱 Seeding Cloud PostgreSQL with 34 canonical rooms and hotel data...');
-                const { seedCloudPostgres } = await import('./seed_cloud_pg.js');
-                await seedCloudPostgres(connectionString);
-            } else {
-                console.log(`🏨 [Cloud PostgreSQL] Database active with ${roomCount} canonical rooms and hotel assets.`);
+            // 3. Ensure baseline Organization 1 and Property 1 exist without forcing mock dummy rooms/bookings
+            const orgCountRes = await client.query('SELECT COUNT(*) as c FROM organizations WHERE id = 1;');
+            if (parseInt(orgCountRes.rows[0]?.c || '0', 10) === 0) {
+                await client.query(`
+                    INSERT INTO organizations (id, code, name, tax_number, base_currency, headquarters_address)
+                    VALUES (1, 'GHG', 'Grand Hospitality Group', 'BIN-908123481', 'BDT', 'Level 14, Gulshan Centre Point, Dhaka-1212')
+                    ON CONFLICT (id) DO NOTHING;
+                `);
             }
+
+            const propCountRes = await client.query('SELECT COUNT(*) as c FROM properties WHERE id = 1;');
+            if (parseInt(propCountRes.rows[0]?.c || '0', 10) === 0) {
+                await client.query(`
+                    INSERT INTO properties (
+                        id, organization_id, code, name, property_type, star_rating, 
+                        address, city, country, phone, email, currency, time_zone, check_in_time, check_out_time, is_active
+                    )
+                    VALUES (
+                        1, 1, 'GPD', 'Grand Palace Hotel & Resort', 'HOTEL', 5,
+                        'Plot 12, Road 45, Gulshan-2, Dhaka', 'Dhaka', 'Bangladesh', '+880 2 9882200', 'dhaka@grandhospitality.com', 'BDT', 'Asia/Dhaka', '14:00', '12:00', true
+                    )
+                    ON CONFLICT (id) DO NOTHING;
+                `);
+            }
+
+            const roomCountRes = await client.query('SELECT COUNT(*) as c FROM rooms;');
+            const roomCount = parseInt(roomCountRes.rows[0]?.c || '0', 10);
+            console.log(`🏨 [Cloud PostgreSQL] Database active. Property 1 configured. Active rooms: ${roomCount}.`);
 
             // 4. Synchronize all table sequence values to prevent duplicate key errors
             await syncAllSequences(client);

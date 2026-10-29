@@ -45,7 +45,7 @@ const DEFAULT_PROPERTIES: Property[] = [
         id: 1,
         organization_id: 1,
         code: 'GPD',
-        name: 'Grand Palace Dhaka (Main Tower)',
+        name: 'Grand Palace Hotel & Resort',
         star_rating: 5,
         address: 'Plot 12, Road 45, Gulshan-2, Dhaka',
         city: 'Dhaka',
@@ -53,25 +53,9 @@ const DEFAULT_PROPERTIES: Property[] = [
         phone: '+880 2 9882200',
         email: 'dhaka@grandhospitality.com',
         currency: 'BDT',
-        total_rooms: 34,
-        total_buildings: 2,
-        total_staff: 6
-    },
-    {
-        id: 2,
-        organization_id: 1,
-        code: 'GOR',
-        name: "Grand Ocean Resort (Cox's Bazar)",
-        star_rating: 5,
-        address: 'Marine Drive, Kolatoli Beach, Cox\'s Bazar',
-        city: 'Cox\'s Bazar',
-        country: 'Bangladesh',
-        phone: '+880 341 62100',
-        email: 'coxsbazar@grandhospitality.com',
-        currency: 'BDT',
-        total_rooms: 20,
-        total_buildings: 2,
-        total_staff: 3
+        total_rooms: 0,
+        total_buildings: 0,
+        total_staff: 0
     }
 ];
 

@@ -88,139 +88,26 @@ export interface LostAndFoundItem {
 const STORAGE_KEY = 'hotel_lost_and_found_v1';
 
 // Seed demo items for instant evaluation
-const DEFAULT_SEED_ITEMS: LostAndFoundItem[] = [
-    {
-        id: 'LF-SEED-1',
-        propertyId: 1,
-        referenceNo: 'LF-2026-1001',
-        itemName: 'Apple iPad Pro 11" (Space Gray)',
-        category: 'Electronics & Gadgets',
-        description: 'Black magnetic folio case, minor scratch on top corner, lock screen shows airplane wallpaper.',
-        foundDate: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10),
-        foundTime: '11:45',
-        locationType: 'Guest Room',
-        roomNumber: '304',
-        areaDetails: 'Under the bedside table drawer',
-        foundBy: 'Fatima Begum',
-        finderRole: 'Housekeeper',
-        storageLocation: 'Front Office Safe #A-04',
-        storageBin: 'Bin-E3',
-        isValuable: true,
-        holdingPeriodDays: 180,
-        guestName: 'Dr. Rafiqul Islam',
-        guestPhone: '+880 1711-234567',
-        guestEmail: 'dr.rafiq@example.com',
-        reservationId: 'RES-2026-8812',
-        notifiedStatus: 'contacted',
-        notifiedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-        notifiedNotes: 'Called guest; confirmed left behind. Guest will pick up this Sunday.',
-        status: 'in_custody',
-        createdBy: 'Front Office Supervisor',
-        createdAt: new Date(Date.now() - 2 * 86400000).toISOString()
-    },
-    {
-        id: 'LF-SEED-2',
-        propertyId: 1,
-        referenceNo: 'LF-2026-1002',
-        itemName: 'Leather Bi-Fold Wallet (Montblanc)',
-        category: 'Valuables & Jewellery',
-        description: 'Contains business cards, credit card (ending in 8912), and BDT 3,500 cash. Stored in high-security safe.',
-        foundDate: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10),
-        foundTime: '21:15',
-        locationType: 'Restaurant / Bar',
-        areaDetails: 'Table 6, under the plush seat cushion',
-        foundBy: 'Kamrul Hasan',
-        finderRole: 'F&B Captain',
-        storageLocation: 'Duty Manager Vault Box #02',
-        storageBin: 'Valuable-Vault',
-        isValuable: true,
-        holdingPeriodDays: 180,
-        guestName: 'Tanvir Ahmed',
-        guestPhone: '+880 1819-987654',
-        guestEmail: 't.ahmed@dhakacorp.com',
-        notifiedStatus: 'guest_aware',
-        status: 'in_custody',
-        createdBy: 'Duty Manager',
-        createdAt: new Date(Date.now() - 5 * 86400000).toISOString()
-    },
-    {
-        id: 'LF-SEED-3',
-        propertyId: 1,
-        referenceNo: 'LF-2026-1003',
-        itemName: 'Navy Blue Trench Coat (Zara Man)',
-        category: 'Clothing & Footwear',
-        description: 'Size L, left in closet with wooden hotel hanger. Clean condition.',
-        foundDate: new Date(Date.now() - 8 * 86400000).toISOString().slice(0, 10),
-        foundTime: '12:30',
-        locationType: 'Guest Room',
-        roomNumber: '502',
-        areaDetails: 'Wardrobe cabinet right hanger',
-        foundBy: 'Nasreen Akhtar',
-        finderRole: 'Housekeeper',
-        storageLocation: 'Housekeeping Department Closet B',
-        storageBin: 'Hanger-Rack-12',
-        isValuable: false,
-        holdingPeriodDays: 90,
-        guestName: 'Sarah Jenkins',
-        guestPhone: '+44 7911 123456',
-        guestEmail: 's.jenkins@uktravel.co.uk',
-        reservationId: 'RES-2026-7901',
-        notifiedStatus: 'contacted',
-        notifiedNotes: 'Guest requested shipping via DHL to London. Awaiting shipping payment.',
-        status: 'in_custody',
-        createdBy: 'HK Executive',
-        createdAt: new Date(Date.now() - 8 * 86400000).toISOString()
-    },
-    {
-        id: 'LF-SEED-4',
-        propertyId: 1,
-        referenceNo: 'LF-2026-0988',
-        itemName: 'Samsung Galaxy Watch 5 (44mm)',
-        category: 'Electronics & Gadgets',
-        description: 'Silver aluminum case with white silicone sports band. Discharged battery.',
-        foundDate: new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10),
-        foundTime: '16:00',
-        locationType: 'Pool / Gym',
-        areaDetails: 'Gym locker bench #18',
-        foundBy: 'Anwar Hossain',
-        finderRole: 'Recreation Attendant',
-        storageLocation: 'Front Office Safe #B-01',
-        isValuable: true,
-        holdingPeriodDays: 180,
-        notifiedStatus: 'guest_aware',
-        status: 'claimed',
-        claimedBy: 'Michael Vance',
-        claimantPhone: '+1 415-555-0199',
-        claimantIdType: 'Passport',
-        claimantIdNumber: 'USA-9812401',
-        releasedBy: 'Farhan Kabir (Front Office Mgr)',
-        releasedAt: new Date(Date.now() - 10 * 86400000).toISOString(),
-        releaseNotes: 'Guest verified passcode on device upon powering on. Handover form signed.',
-        createdBy: 'Front Office Supervisor',
-        createdAt: new Date(Date.now() - 14 * 86400000).toISOString()
-    }
-];
+export const DEFAULT_SEED_ITEMS: LostAndFoundItem[] = [];
 
 /**
  * Retrieve all Lost & Found items from localStorage
  */
 export const getStoredLostAndFoundItems = (propertyId: number = 1): LostAndFoundItem[] => {
-    if (typeof window === 'undefined') return DEFAULT_SEED_ITEMS;
+    if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SEED_ITEMS));
-            return DEFAULT_SEED_ITEMS.filter(i => i.propertyId === propertyId);
+            return [];
         }
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed) || parsed.length === 0) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SEED_ITEMS));
-            return DEFAULT_SEED_ITEMS.filter(i => i.propertyId === propertyId);
+        if (!Array.isArray(parsed)) {
+            return [];
         }
         return parsed.filter((i: LostAndFoundItem) => (i.propertyId || 1) === propertyId);
     } catch (e) {
         console.warn('Error reading lost and found storage:', e);
-        return DEFAULT_SEED_ITEMS;
+        return [];
     }
 };
 

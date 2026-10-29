@@ -2084,8 +2084,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </label>
                                         <input
                                             type="text"
-                                            name="pms_guest_search_query"
-                                            autoComplete="one-time-code"
+                                            name="quick_guest_lookup_q"
+                                            autoComplete="off"
                                             autoCorrect="off"
                                             autoCapitalize="off"
                                             spellCheck={false}
@@ -2097,6 +2097,14 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             data-form-type="other"
                                             placeholder="Guest full name..."
                                             value={name}
+                                            readOnly
+                                            onFocus={(e) => {
+                                                e.currentTarget.readOnly = false;
+                                                setIsNameSuggestOpen(true);
+                                            }}
+                                            onPointerDown={(e) => {
+                                                e.currentTarget.readOnly = false;
+                                            }}
                                             onChange={e => {
                                                 setName(e.target.value);
                                                 setIsNameSuggestOpen(true);
@@ -2104,7 +2112,6 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                     setSelectedGuestProfile(null);
                                                 }
                                             }}
-                                            onFocus={() => setIsNameSuggestOpen(true)}
                                             onBlur={() => setTimeout(() => setIsNameSuggestOpen(false), 250)}
                                             className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-medium"
                                         />
@@ -2168,8 +2175,8 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         </label>
                                         <input
                                             type="text"
-                                            name="pms_guest_mobile_query"
-                                            autoComplete="one-time-code"
+                                            name="quick_phone_lookup_q"
+                                            autoComplete="off"
                                             autoCorrect="off"
                                             autoCapitalize="off"
                                             spellCheck={false}
@@ -2181,11 +2188,18 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             data-form-type="other"
                                             placeholder="e.g. 01712-345678"
                                             value={mobile}
+                                            readOnly
+                                            onFocus={(e) => {
+                                                e.currentTarget.readOnly = false;
+                                                setIsMobileSuggestOpen(true);
+                                            }}
+                                            onPointerDown={(e) => {
+                                                e.currentTarget.readOnly = false;
+                                            }}
                                             onChange={e => {
                                                 setMobile(e.target.value);
                                                 setIsMobileSuggestOpen(true);
                                             }}
-                                            onFocus={() => setIsMobileSuggestOpen(true)}
                                             onBlur={() => setTimeout(() => setIsMobileSuggestOpen(false), 250)}
                                             className="w-full h-7.5 px-2.5 border border-slate-200 rounded-md text-[11px] bg-white outline-none focus:border-blue-500 font-mono"
                                         />

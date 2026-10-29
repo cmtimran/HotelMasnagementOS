@@ -35,33 +35,19 @@ export interface RoomDiscrepancy {
 
 const STORAGE_KEY_DISCREPANCIES = 'hotel_housekeeping_discrepancies_v1';
 
-const DEFAULT_DISCREPANCIES: RoomDiscrepancy[] = [
-    {
-        id: 'DISC-01',
-        roomNumber: '205',
-        discrepancyType: 'Sleep Discrepancy',
-        frontDeskStatus: 'Vacant Dirty (Expected Empty)',
-        housekeepingFound: 'Bed slept in, 2 open suitcases and laptop on desk',
-        guestName: 'Unregistered Occupant',
-        reportedBy: 'Fatima Begum (Housekeeper)',
-        reportedAt: new Date(Date.now() - 3 * 3600000).toISOString(),
-        notes: 'Front Desk system showed room checked-out at 11 AM, but room is occupied with personal effects.',
-        status: 'active'
-    }
-];
+export const DEFAULT_DISCREPANCIES: RoomDiscrepancy[] = [];
 
 export const getStoredDiscrepancies = (): RoomDiscrepancy[] => {
-    if (typeof window === 'undefined') return DEFAULT_DISCREPANCIES;
+    if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(STORAGE_KEY_DISCREPANCIES);
         if (!raw) {
-            localStorage.setItem(STORAGE_KEY_DISCREPANCIES, JSON.stringify(DEFAULT_DISCREPANCIES));
-            return DEFAULT_DISCREPANCIES;
+            return [];
         }
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_DISCREPANCIES;
+        return Array.isArray(parsed) ? parsed : [];
     } catch {
-        return DEFAULT_DISCREPANCIES;
+        return [];
     }
 };
 

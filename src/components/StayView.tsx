@@ -492,7 +492,7 @@ export const StayView: React.FC = () => {
         };
     }, []);
 
-    const TREE_COL_WIDTH = 176; // matches w-44 (11rem = 176px)
+    const TREE_COL_WIDTH = 230; // matches w-44 (11rem = 176px)
 
     const colWidth = useMemo(() => {
         if (!containerWidth || containerWidth <= TREE_COL_WIDTH) {
@@ -551,7 +551,7 @@ export const StayView: React.FC = () => {
                     });
                 }
             }
-        } catch {}
+        } catch { }
 
         const buildingMap = new Map<string, Map<string, RoomNode[]>>();
 
@@ -675,8 +675,7 @@ export const StayView: React.FC = () => {
             const isConnSuite = Boolean(
                 res.isConnectingSuite ||
                 (res.roomType && (res.roomType.toLowerCase().includes('connecting') || res.roomType.toLowerCase().includes('interconnecting'))) ||
-                (typeof res.roomNumber === 'string' && res.roomNumber.includes('+')) ||
-                (Array.isArray(res.allocatedRooms) && res.allocatedRooms.length > 1 && (res.allocatedRooms.includes('101') || res.allocatedRooms.includes('102')))
+                (typeof res.roomNumber === 'string' && res.roomNumber.includes('+'))
             );
             const isGroup = !isConnSuite && Boolean(
                 res.isGroup ||
@@ -704,7 +703,7 @@ export const StayView: React.FC = () => {
                         ? res.roomNumber.split('+').map((s: string) => s.trim())
                         : (res.roomsList && res.roomsList.length > 0
                             ? res.roomsList.flatMap((rm: any) => String(rm.roomNumber).split('+').map((s: string) => s.trim()))
-                            : ['101', '102']));
+                            : (res.roomNumber ? [String(res.roomNumber)] : [])));
 
                 connRooms.forEach((rNum: string) => {
                     const rIn = res.checkIn;
@@ -1200,8 +1199,7 @@ export const StayView: React.FC = () => {
             booking.isConnectingSuite ||
             originalRes?.isConnectingSuite ||
             (originalRes?.roomType && (originalRes.roomType.toLowerCase().includes('connecting') || originalRes.roomType.toLowerCase().includes('interconnecting'))) ||
-            (typeof originalRes?.roomNumber === 'string' && originalRes.roomNumber.includes('+')) ||
-            (Array.isArray(originalRes?.allocatedRooms) && originalRes.allocatedRooms.length > 1 && (originalRes.allocatedRooms.includes('101') || originalRes.allocatedRooms.includes('102')))
+            (typeof originalRes?.roomNumber === 'string' && originalRes.roomNumber.includes('+'))
         );
 
         const subBookingNo = isConn
@@ -1256,7 +1254,7 @@ export const StayView: React.FC = () => {
             ? originalRes.allocatedRooms.join(' + ')
             : (isConn && typeof originalRes?.roomNumber === 'string' && originalRes.roomNumber.includes('+')
                 ? originalRes.roomNumber
-                : (isConn ? '101 + 102' : booking.roomNumber));
+                : booking.roomNumber);
 
         return {
             id: booking.id,
@@ -2530,11 +2528,10 @@ export const StayView: React.FC = () => {
                             setSelectedOOORoom(undefined);
                             setIsOOOModalOpen(true);
                         }}
-                        className={`h-7 px-2.5 rounded text-[10px] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ml-1 active:scale-[0.98] ${
-                            overdueOOOCount > 0
-                                ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
-                                : 'bg-slate-700 hover:bg-slate-800 text-white'
-                        }`}
+                        className={`h-7 px-2.5 rounded text-[10px] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ml-1 active:scale-[0.98] ${overdueOOOCount > 0
+                            ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
+                            : 'bg-slate-700 hover:bg-slate-800 text-white'
+                            }`}
                         title="Open Room Out of Order & Out of Service Manager"
                     >
                         <Wrench size={12} />
@@ -2764,17 +2761,16 @@ export const StayView: React.FC = () => {
                                                             >
                                                                 <Wrench size={10} />
                                                             </button>
-                                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                                                room.status === 'out-of-order'
-                                                                    ? 'bg-rose-600 ring-2 ring-rose-200'
-                                                                    : room.status === 'out-of-service'
-                                                                        ? 'bg-amber-600 ring-1 ring-amber-300'
-                                                                        : room.status === 'inspected'
-                                                                            ? 'bg-blue-500'
-                                                                            : room.status === 'dirty'
-                                                                                ? 'bg-yellow-500'
-                                                                                : 'bg-emerald-500'
-                                                            }`} title={`Room ${room.roomNumber} is ${room.status.replace(/-/g, ' ')}`}></span>
+                                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${room.status === 'out-of-order'
+                                                                ? 'bg-rose-600 ring-2 ring-rose-200'
+                                                                : room.status === 'out-of-service'
+                                                                    ? 'bg-amber-600 ring-1 ring-amber-300'
+                                                                    : room.status === 'inspected'
+                                                                        ? 'bg-blue-500'
+                                                                        : room.status === 'dirty'
+                                                                            ? 'bg-yellow-500'
+                                                                            : 'bg-emerald-500'
+                                                                }`} title={`Room ${room.roomNumber} is ${room.status.replace(/-/g, ' ')}`}></span>
                                                         </div>
                                                     </div>
 
@@ -2934,9 +2930,8 @@ export const StayView: React.FC = () => {
                                                                             ? 'repeating-linear-gradient(45deg, #e11d48, #e11d48 8px, #be123c 8px, #be123c 16px)'
                                                                             : 'repeating-linear-gradient(45deg, #d97706, #d97706 8px, #b45309 8px, #b45309 16px)'
                                                                     }}
-                                                                    className={`absolute top-[4px] bottom-[4px] rounded px-1.5 py-0.5 text-[9.5px] text-white flex items-center justify-between shadow-xs z-15 cursor-pointer hover:brightness-110 transition-all ${
-                                                                        isOverdue ? 'ring-2 ring-rose-400 animate-pulse' : ''
-                                                                    }`}
+                                                                    className={`absolute top-[4px] bottom-[4px] rounded px-1.5 py-0.5 text-[9.5px] text-white flex items-center justify-between shadow-xs z-15 cursor-pointer hover:brightness-110 transition-all ${isOverdue ? 'ring-2 ring-rose-400 animate-pulse' : ''
+                                                                        }`}
                                                                     title={`Room ${block.roomNumber} ${block.blockType} (${block.reasonCategory}): ${block.description}\nPeriod: ${block.startDate} to ${block.endDate}${isOverdue ? ' [OVERDUE]' : ''}\nClick to Manage / Extend / Release`}
                                                                 >
                                                                     <div className="flex items-center gap-1 truncate">
@@ -3793,13 +3788,12 @@ export const StayView: React.FC = () => {
                     <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700/80 p-3 text-xs">
                         {/* Header badge & ISO date */}
                         <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                                hoveredDate.day.calendarHoliday 
-                                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40' 
-                                    : hoveredDate.day.isWeekend
-                                        ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
-                                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                            }`}>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${hoveredDate.day.calendarHoliday
+                                ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
+                                : hoveredDate.day.isWeekend
+                                    ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
+                                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                }`}>
                                 {hoveredDate.day.categoryBadge}
                             </span>
                             <span className="text-[10px] text-slate-400 font-mono">

@@ -43,122 +43,25 @@ const STORAGE_KEY_TASKS = 'hotel_maintenance_tasks_v2';
 const STORAGE_KEY_PPM = 'hotel_ppm_programs_v1';
 
 // Initial Seed Tasks
-const DEFAULT_TASKS: MaintenanceTask[] = [
-    { id: 1, title: 'AC Not Working', room: '203', priority: 'urgent', assignedTo: 'Ahmed (HVAC Tech)', description: 'Guest complaint - AC blowing warm air, thermostat error E4', createdAt: '2 hours ago', status: 'in-progress', source: 'housekeeping', reportedBy: 'Fatima Begum (Housekeeper)' },
-    { id: 2, title: 'Leaking Faucet', room: '105', priority: 'medium', description: 'Bathroom sink faucet continuous drip', createdAt: '4 hours ago', status: 'todo', source: 'inspection', reportedBy: 'Supervisor Karim' },
-    { id: 3, title: 'Light Bulb Replacement', room: '301', priority: 'low', assignedTo: 'Karim (Electrician)', description: 'Bedroom left bedside reading lamp burnt out', createdAt: '1 day ago', status: 'todo', source: 'housekeeping' },
-    { id: 4, title: 'Electronic Door Lock Low Battery', room: '208', priority: 'high', assignedTo: 'Ahmed (HVAC Tech)', description: 'Card reader beeping 3 times on badge scan', createdAt: '1 day ago', status: 'completed', completedAt: 'Yesterday 17:30', resolutionNotes: 'Replaced 4x AA lithium batteries. Keycard reader tested OK.' },
-    { id: 5, title: 'TV Remote Not Responding', room: '102', priority: 'low', description: 'Samsung smart TV remote batteries dead', createdAt: '2 days ago', status: 'completed', completedAt: '2 days ago', resolutionNotes: 'Replaced batteries and paired with TV' }
-];
+export const DEFAULT_TASKS: MaintenanceTask[] = [];
 
-// Initial Seed PPM Programs (Enterprise 5-Star Hotel Standard)
-const DEFAULT_PPM: PPMProgram[] = [
-    {
-        id: 'PPM-001',
-        title: 'HVAC Air Filter Cleaning & Gas Pressure Test',
-        category: 'HVAC & Climate',
-        cycleDays: 30,
-        targetRooms: 'All Guest Rooms (Floors 1-5)',
-        description: 'Remove split AC nylon filters, wash with disinfectant, check freon pressure and drain pan flow.',
-        lastCompletedDate: new Date(Date.now() - 25 * 86400000).toISOString().slice(0, 10),
-        nextDueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
-        status: 'scheduled',
-        assignedTechnician: 'Ahmed (HVAC Tech)',
-        checklist: [
-            'Clean primary washable filters with antibacterial solution',
-            'Measure refrigerant suction and discharge pressures',
-            'Inspect condensate drain pipe for water stagnation',
-            'Test wireless remote control receiver and digital display'
-        ]
-    },
-    {
-        id: 'PPM-002',
-        title: 'Geyser & Hot Water Tank Descaling',
-        category: 'Plumbing & Water',
-        cycleDays: 90,
-        targetRooms: 'Floors 1 & 2 Suites',
-        description: 'Flush electric water heaters to remove calcium and mineral sediment, test safety pressure relief valve.',
-        lastCompletedDate: new Date(Date.now() - 95 * 86400000).toISOString().slice(0, 10),
-        nextDueDate: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10),
-        status: 'overdue',
-        assignedTechnician: 'Rashid (Plumber)',
-        checklist: [
-            'Isolate electrical breaker switch and test zero voltage',
-            'Drain heater tank completely through bottom sediment valve',
-            'Inspect sacrificial anode rod for corrosion erosion',
-            'Test Temperature & Pressure (T&P) safety relief valve'
-        ]
-    },
-    {
-        id: 'PPM-003',
-        title: 'Mattress Flip & 180° Rotation',
-        category: 'Carpentry & Furniture',
-        cycleDays: 90,
-        targetRooms: 'All King & Twin Bed Rooms',
-        description: 'Rotate and flip inner-spring mattresses head-to-toe to maintain even spring tension and prevent sagging.',
-        lastCompletedDate: new Date(Date.now() - 40 * 86400000).toISOString().slice(0, 10),
-        nextDueDate: new Date(Date.now() + 50 * 86400000).toISOString().slice(0, 10),
-        status: 'scheduled',
-        assignedTechnician: 'Housekeeping Engineering Team',
-        checklist: [
-            'Inspect mattress protector for stains or structural wear',
-            'Rotate mattress 180 degrees horizontally',
-            'Flip mattress upside down if dual-sided specification',
-            'Inspect bed base wooden slats and headboard fasteners'
-        ]
-    },
-    {
-        id: 'PPM-004',
-        title: 'Fire Smoke Detectors & Emergency Torch Audit',
-        category: 'Safety & Fire',
-        cycleDays: 180,
-        targetRooms: 'All Guest Rooms & Corridors',
-        description: 'Canister aerosol smoke test on optical smoke sensors, verify battery backup and central annunciator panel trip.',
-        lastCompletedDate: new Date(Date.now() - 170 * 86400000).toISOString().slice(0, 10),
-        nextDueDate: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
-        status: 'due',
-        assignedTechnician: 'Safety Officer Kabir',
-        checklist: [
-            'Spray aerosol test smoke into optical sensing chamber',
-            'Verify strobe flasher and 85dB audible sounder trigger',
-            'Confirm corresponding room zone activates on Fire Command Center panel',
-            'Inspect wall-mounted emergency LED torch battery charge'
-        ]
-    },
-    {
-        id: 'PPM-005',
-        title: 'Comprehensive Pest Control & Drain Sanitization',
-        category: 'Deep Clean & Pest',
-        cycleDays: 45,
-        targetRooms: 'Ground Floor & Restaurant Adjacent Rooms',
-        description: 'Gel bait application for crevices, drain enzyme treatment, and exterior window sealant check.',
-        lastCompletedDate: new Date(Date.now() - 44 * 86400000).toISOString().slice(0, 10),
-        nextDueDate: new Date(Date.now() + 1 * 86400000).toISOString().slice(0, 10),
-        status: 'due',
-        assignedTechnician: 'CleanGuard Pest Services (Vendor)',
-        checklist: [
-            'Apply non-toxic pest gel behind wardrobe and luggage racks',
-            'Pour bio-enzymatic cleaner down bathroom floor drains',
-            'Inspect balcony sliding door bottom weatherstrip seal'
-        ]
-    }
-];
+// Initial Seed PPM Programs
+export const DEFAULT_PPM: PPMProgram[] = [];
 
 /**
  * Retrieve all Maintenance Tasks
  */
 export const getMaintenanceTasks = (): MaintenanceTask[] => {
-    if (typeof window === 'undefined') return DEFAULT_TASKS;
+    if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(STORAGE_KEY_TASKS);
         if (!raw) {
-            localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(DEFAULT_TASKS));
-            return DEFAULT_TASKS;
+            return [];
         }
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_TASKS;
+        return Array.isArray(parsed) ? parsed : [];
     } catch {
-        return DEFAULT_TASKS;
+        return [];
     }
 };
 
@@ -235,17 +138,15 @@ export const updateMaintenanceTaskStatus = (
  * Retrieve all PPM Programs
  */
 export const getPPMPrograms = (): PPMProgram[] => {
-    if (typeof window === 'undefined') return DEFAULT_PPM;
+    if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(STORAGE_KEY_PPM);
         if (!raw) {
-            localStorage.setItem(STORAGE_KEY_PPM, JSON.stringify(DEFAULT_PPM));
-            return DEFAULT_PPM;
+            return [];
         }
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed) || parsed.length === 0) {
-            localStorage.setItem(STORAGE_KEY_PPM, JSON.stringify(DEFAULT_PPM));
-            return DEFAULT_PPM;
+            return [];
         }
 
         // Recalculate dynamic status based on current date
@@ -268,7 +169,7 @@ export const getPPMPrograms = (): PPMProgram[] => {
             return { ...p, status };
         });
     } catch {
-        return DEFAULT_PPM;
+        return [];
     }
 };
 
