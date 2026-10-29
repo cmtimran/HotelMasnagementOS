@@ -173,12 +173,17 @@ const deriveUnassignedFromStored = (stored: StoredReservation[]): UnassignedBook
     const list: UnassignedBooking[] = [];
     const purgeTarget = 'RES-202610290007';
     stored.forEach((res: any) => {
+        const guestName = String(res?.guestName || res?.guest?.fullName || '').toLowerCase();
         if (
             res?.reservationNumber === purgeTarget ||
             String(res?.id || '') === purgeTarget ||
             String(res?.reservationNumber || '').includes('202610290007') ||
             String(res?.id || '').includes('202610290007') ||
-            String(res?.reservationNumber || '').startsWith('RES-00929')
+            String(res?.reservationNumber || '').startsWith('RES-0092') ||
+            String(res?.reservationNumber || '').startsWith('RES-0091') ||
+            guestName.includes('robert langdon') ||
+            guestName.includes('naimur') ||
+            guestName.includes('tahmina')
         ) {
             return;
         }
@@ -446,42 +451,37 @@ export const StayView: React.FC = () => {
     // Hydrate Unassigned Bookings dynamically from stored reservations - Zero Mock Fallback
     const [unassignedList, setUnassignedList] = useState<UnassignedBooking[]>(() => {
         const purgeTarget = 'RES-202610290007';
-        const isNotPurgedOrMock = (u: any) =>
-            u?.reservationNumber !== purgeTarget &&
-            String(u?.id || '') !== purgeTarget &&
-            !String(u?.id || '').includes('202610290007') &&
-            !String(u?.reservationNumber || '').includes('202610290007') &&
-            !String(u?.reservationNumber || '').startsWith('RES-00929');
+        const isNotPurgedOrMock = (u: any) => {
+            const guestName = String(u?.guestName || '').toLowerCase();
+            return (
+                u?.reservationNumber !== purgeTarget &&
+                String(u?.id || '') !== purgeTarget &&
+                !String(u?.id || '').includes('202610290007') &&
+                !String(u?.reservationNumber || '').includes('202610290007') &&
+                !String(u?.reservationNumber || '').startsWith('RES-0092') &&
+                !String(u?.reservationNumber || '').startsWith('RES-0091') &&
+                !guestName.includes('robert langdon') &&
+                !guestName.includes('naimur') &&
+                !guestName.includes('tahmina')
+            );
+        };
 
-        const derived = deriveUnassignedFromStored(getAllStoredReservations()).filter(isNotPurgedOrMock);
-        if (derived.length > 0) return derived;
-        const saved = typeof window !== 'undefined' ? localStorage.getItem('hotel_unassigned_v2') : null;
-        if (saved) {
+        if (typeof window !== 'undefined') {
             try {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter(isNotPurgedOrMock);
-                    if (cleaned.length > 0) return cleaned;
-                }
-            } catch {
-                // fall through
-            }
+                localStorage.removeItem('hotel_unassigned_v2');
+                localStorage.removeItem('hotel_unassigned_queue');
+            } catch {}
         }
-        return [];
+
+        return deriveUnassignedFromStored(getAllStoredReservations()).filter(isNotPurgedOrMock);
     });
 
     useEffect(() => {
-        const purgeTarget = 'RES-202610290007';
-        const cleaned = unassignedList.filter(u =>
-            u.reservationNumber !== purgeTarget &&
-            String(u.id || '') !== purgeTarget &&
-            !String(u.id || '').includes('202610290007') &&
-            !String(u.reservationNumber || '').includes('202610290007') &&
-            !String(u.reservationNumber || '').startsWith('RES-00929')
-        );
-        try {
-            localStorage.setItem('hotel_unassigned_v2', JSON.stringify(cleaned));
-        } catch {}
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.removeItem('hotel_unassigned_v2');
+            } catch {}
+        }
     }, [unassignedList]);
 
     // Safety guard to auto-recover if view inadvertently drifted to client machine date

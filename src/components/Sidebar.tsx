@@ -39,7 +39,8 @@ import {
     BarChart3,
     PanelLeftClose,
     PanelLeft,
-    PackageSearch
+    PackageSearch,
+    Receipt
 } from 'lucide-react';
 
 export interface SubMenuItem {
@@ -162,6 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 { id: 'reservations', label: 'Reservations', icon: <ClipboardList size={14} /> },
                 { id: 'room-rack', label: 'Room Rack', icon: <LayoutGrid size={14} /> },
                 { id: 'folio-operations', label: 'Billing & Folios', icon: <Wallet size={14} />, badge: 'Billing', badgeColor: 'bg-blue-100 text-blue-700' },
+                { id: 'folio-hub', label: 'Folio Operations', icon: <Receipt size={14} />, badge: '16 Ops', badgeColor: 'bg-indigo-100 text-indigo-700' },
                 { id: 'floor-plan', label: 'Floor Plan', icon: <Layers size={14} /> },
                 { id: 'occupancy-heatmap', label: 'Occupancy Matrix', icon: <Grid3X3 size={14} /> },
                 { id: 'night-audit', label: 'Night Audit', icon: <Moon size={14} /> },

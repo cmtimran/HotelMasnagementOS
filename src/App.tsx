@@ -38,6 +38,7 @@ import BusinessOriginManagement from './components/BusinessOriginManagement';
 import AdvancedReports from './components/AdvancedReports';
 import AddReservation from './components/AddReservation';
 import FolioOperations from './components/FolioOperations';
+import FolioHub from './components/FolioHub';
 import GuestProfile from './components/GuestProfile';
 import PackageManagement from './components/PackageManagement';
 import ServiceManagement from './components/ServiceManagement';
@@ -530,6 +531,8 @@ function App() {
       case 'folio-operations':
       case 'allowance-checker':
         return <FolioOperations />;
+      case 'folio-hub':
+        return <FolioHub />;
       case 'guest-profile':
         return <GuestProfile />;
       case 'night-audit':

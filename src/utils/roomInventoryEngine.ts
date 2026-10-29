@@ -833,32 +833,25 @@ export const setOperatingSystemDate = (newDateStr: string): void => {
 if (typeof window !== 'undefined' && window.localStorage) {
     try {
         const purgeResNo = 'RES-202610290007';
-        const isMockResNo = (no?: string) => {
-            const s = String(no || '');
+        const isMockResOrGuest = (item: any) => {
+            const no = String(item?.reservationNumber || item?.id || '');
+            const guest = String(item?.guestName || item?.guest?.fullName || '').toLowerCase();
             return (
-                s === purgeResNo ||
-                s.includes('202610290007') ||
-                s.startsWith('RES-00929') ||
-                s.startsWith('RES-00918') ||
-                s.startsWith('RES-8921') ||
-                s.startsWith('HLD-2026-00')
+                no === purgeResNo ||
+                no.includes('202610290007') ||
+                no.startsWith('RES-0092') ||
+                no.startsWith('RES-0091') ||
+                no.startsWith('RES-8921') ||
+                no.startsWith('HLD-2026-00') ||
+                guest.includes('robert langdon') ||
+                guest.includes('naimur') ||
+                guest.includes('tahmina')
             );
         };
 
-        // 1. Purge from hotel_unassigned_v2
-        const unassignedRaw = localStorage.getItem('hotel_unassigned_v2');
-        if (unassignedRaw) {
-            try {
-                const parsed = JSON.parse(unassignedRaw);
-                if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter((item: any) =>
-                        !isMockResNo(item?.reservationNumber) &&
-                        !isMockResNo(item?.id)
-                    );
-                    localStorage.setItem('hotel_unassigned_v2', JSON.stringify(cleaned));
-                }
-            } catch {}
-        }
+        // 1. Completely remove unassigned caches so Stay View only derives from real bookings
+        localStorage.removeItem('hotel_unassigned_v2');
+        localStorage.removeItem('hotel_unassigned_queue');
 
         // 2. Purge from hotel_cancelled_v2
         const cancelledRaw = localStorage.getItem('hotel_cancelled_v2');
@@ -866,7 +859,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
             try {
                 const parsed = JSON.parse(cancelledRaw);
                 if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter((c: any) => !isMockResNo(c?.reservationNumber));
+                    const cleaned = parsed.filter((c: any) => !isMockResOrGuest(c));
                     localStorage.setItem('hotel_cancelled_v2', JSON.stringify(cleaned));
                 }
             } catch {}
@@ -878,7 +871,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
             try {
                 const parsed = JSON.parse(sleepoutsRaw);
                 if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter((s: any) => !isMockResNo(s?.reservationNumber));
+                    const cleaned = parsed.filter((s: any) => !isMockResOrGuest(s));
                     localStorage.setItem('hotel_sleepouts_v2', JSON.stringify(cleaned));
                 }
             } catch {}
@@ -890,7 +883,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
             try {
                 const parsed = JSON.parse(holdsRaw);
                 if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter((h: any) => !isMockResNo(h?.reservationNumber));
+                    const cleaned = parsed.filter((h: any) => !isMockResOrGuest(h));
                     localStorage.setItem('hotel_holds_v2', JSON.stringify(cleaned));
                 }
             } catch {}
@@ -909,18 +902,14 @@ if (typeof window !== 'undefined' && window.localStorage) {
             const raw = localStorage.getItem(k);
             if (raw) {
                 try {
-                    const list = JSON.parse(raw);
-                    if (Array.isArray(list)) {
-                        const cleaned = list.filter((r: any) =>
-                            !isMockResNo(r?.reservationNumber) &&
-                            !isMockResNo(r?.id)
-                        );
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        const cleaned = parsed.filter((item: any) => !isMockResOrGuest(item));
                         localStorage.setItem(k, JSON.stringify(cleaned));
                     }
                 } catch {}
             }
         }
-
         // 6. Reset accidental October operating date to standard application date
         const sysIso = localStorage.getItem('hotel_system_date_iso');
         if (sysIso === '2026-10-29') {
@@ -1263,15 +1252,20 @@ export const getAllStoredReservations = (propertyId?: number): StoredReservation
             if (saved !== null) {
                 const list = JSON.parse(saved);
                 if (Array.isArray(list)) {
-                    return list.filter(r =>
-                        r.reservationNumber !== 'RES-202610290007' &&
-                        String(r.id) !== 'RES-202610290007' &&
-                        !String(r.reservationNumber || '').includes('202610290007') &&
-                        !String(r.id || '').includes('202610290007') &&
-                        !String(r.reservationNumber || '').startsWith('RES-00929') &&
-                        !String(r.reservationNumber || '').startsWith('RES-00918') &&
-                        !String(r.reservationNumber || '').startsWith('RES-8921')
-                    );
+                    return list.filter(r => {
+                        const guest = String(r?.guestName || r?.guest?.fullName || '').toLowerCase();
+                        const no = String(r?.reservationNumber || r?.id || '');
+                        return (
+                            no !== 'RES-202610290007' &&
+                            !no.includes('202610290007') &&
+                            !no.startsWith('RES-0092') &&
+                            !no.startsWith('RES-0091') &&
+                            !no.startsWith('RES-8921') &&
+                            !guest.includes('robert langdon') &&
+                            !guest.includes('naimur') &&
+                            !guest.includes('tahmina')
+                        );
+                    });
                 }
             }
         }
