@@ -33,7 +33,7 @@ export interface BookingRecord {
   nights: number;
   adults: number;
   children: number;
-  status: 'confirmed' | 'arriving' | 'in-house' | 'departing' | 'checked-out' | 'hold' | 'cancelled' | 'voided';
+  status: 'confirmed' | 'arriving' | 'in-house' | 'departing' | 'checked-out' | 'hold' | 'reserved' | 'cancelled' | 'voided';
   propertyId: string | number;
   source: string;
   channel: string;
@@ -41,6 +41,13 @@ export interface BookingRecord {
   isGroup: boolean;
   isConnectingSuite?: boolean;
   specialRequests?: string;
+  holdType?: string;
+  holdStartDate?: string;
+  holdUntil?: string;
+  holdReason?: string;
+  depositRequired?: number;
+  autoRelease?: boolean;
+  isGuaranteed?: boolean;
   roomsList?: any[];
   groupRoomsList?: any[];
   createdAt: string;
@@ -48,6 +55,7 @@ export interface BookingRecord {
 
 const STATUS_DB_TO_UI: Record<string, BookingRecord['status']> = {
   CONFIRMED: 'confirmed',
+  RESERVED: 'reserved',
   IN_HOUSE: 'in-house',
   COMPLETED: 'checked-out',
   HOLD: 'hold',
@@ -58,6 +66,8 @@ const STATUS_DB_TO_UI: Record<string, BookingRecord['status']> = {
 const STATUS_UI_TO_DB: Record<string, string> = {
   confirmed: 'CONFIRMED',
   arriving: 'CONFIRMED',
+  reserved: 'RESERVED',
+  reserve: 'RESERVED',
   'in-house': 'IN_HOUSE',
   arrived: 'IN_HOUSE',
   checked_in: 'IN_HOUSE',
@@ -222,6 +232,13 @@ export const bookingService = {
         r.paid_amount,
         r.due_amount,
         r.special_requests,
+        r.hold_type,
+        r.hold_start_date,
+        r.hold_until,
+        r.hold_reason,
+        r.deposit_required,
+        r.auto_release,
+        r.is_guaranteed,
         r.created_at,
         g.id as guest_id,
         g.salutation,
@@ -384,6 +401,13 @@ export const bookingService = {
         vip: r.vip_status || 'None',
         isGroup: isConnSuite ? false : Boolean(r.is_group || r.group_code),
         specialRequests: r.special_requests || '',
+        holdType: r.hold_type || undefined,
+        holdStartDate: r.hold_start_date ? formatDate(r.hold_start_date) : undefined,
+        holdUntil: r.hold_until ? (typeof r.hold_until === 'string' ? r.hold_until : r.hold_until.toISOString()) : undefined,
+        holdReason: r.hold_reason || undefined,
+        depositRequired: Number(r.deposit_required) || 0,
+        autoRelease: r.auto_release !== false,
+        isGuaranteed: Boolean(r.is_guaranteed || Number(r.paid_amount) > 0),
         roomsList: rooms.map((rm, idx) => {
           const rIn = formatDate(rm.check_in_date);
           const rOut = formatDate(rm.check_out_date);
@@ -600,9 +624,9 @@ export const bookingService = {
       reservationNumber = (payload.reservationNumber && !payload.reservationNumber.includes('NaN')) 
         ? payload.reservationNumber 
         : (payload.resNo || await generateMasterReservationNumber());
-      const statusDb = STATUS_UI_TO_DB[payload.status] || 'CONFIRMED';
       const totalAmount = Number(payload.totalAmount || payload.rateAmount || 0);
       const paidAmount = Number(payload.paidAmount || 0);
+      const statusDb = STATUS_UI_TO_DB[payload.status] || (paidAmount > 0 ? 'CONFIRMED' : 'RESERVED');
       const dueAmount = totalAmount - paidAmount;
       const totalTaxAmount = Number(payload.totalTaxAmount || payload.vatAmount || 0);
       const baseAmount = Number(payload.baseAmount) || Math.max(0, totalAmount - totalTaxAmount);
@@ -615,8 +639,9 @@ export const bookingService = {
         INSERT INTO reservations (
           property_id, reservation_number, group_code, registration_number, registration_date, folio_number,
           booker_guest_id, source, channel, agent,
-          is_group, status, total_amount, paid_amount, due_amount, special_requests
-        ) VALUES ($1, $2, $3, $4, CASE WHEN $4 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          is_group, status, total_amount, paid_amount, due_amount, special_requests,
+          hold_type, hold_start_date, hold_until, hold_reason, deposit_required, auto_release, is_guaranteed
+        ) VALUES ($1, $2, $3, $4, CASE WHEN $4 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
         RETURNING id
       `, [
         propId,
@@ -633,7 +658,14 @@ export const bookingService = {
         totalAmount,
         paidAmount,
         dueAmount,
-        payload.specialRequests || payload.special_requests || null
+        payload.specialRequests || payload.special_requests || null,
+        payload.holdType || 'SIX_PM_RELEASE',
+        payload.holdStartDate || checkIn,
+        payload.holdUntil || null,
+        payload.holdReason || null,
+        Number(payload.depositRequired || payload.depositRequiredBDT) || 0,
+        payload.autoRelease !== false,
+        Boolean(paidAmount > 0 || payload.isGuaranteed)
       ]);
 
       const reservationId = resInsert.rows[0].id;
@@ -1288,7 +1320,71 @@ export const bookingService = {
   /**
    * Hold a reservation with hold period
    */
-  holdReservation: async (id: string | number, propertyId: string | number, payload: { startDate?: string; endDate?: string; reason?: string }): Promise<BookingRecord | null> => {
+  holdReservation: async (id: string | number, propertyId: string | number, payload: { startDate?: string; endDate?: string; holdUntil?: string; holdType?: string; depositRequired?: number; autoRelease?: boolean; reason?: string }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    const holdUntilVal = payload.holdUntil || payload.endDate || null;
+    const holdStartVal = payload.startDate || new Date().toISOString().slice(0, 10);
+
+    await getPool().query(`
+      UPDATE reservations
+      SET status = 'HOLD',
+          hold_type = COALESCE($1, hold_type, 'SIX_PM_RELEASE'),
+          hold_start_date = COALESCE($2::date, hold_start_date, CURRENT_DATE),
+          hold_until = COALESCE($3::timestamptz, hold_until),
+          hold_reason = COALESCE($4, hold_reason),
+          deposit_required = COALESCE($5, deposit_required, 0),
+          auto_release = COALESCE($6, auto_release, TRUE),
+          special_requests = COALESCE(special_requests || ' | ', '') || 'Hold reason: ' || $4,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7
+    `, [
+      payload.holdType || 'SIX_PM_RELEASE',
+      holdStartVal,
+      holdUntilVal,
+      payload.reason || 'Reservation placed on hold',
+      Number(payload.depositRequired) || 0,
+      payload.autoRelease !== false,
+      existing.id
+    ]);
+
+    return bookingService.getBookingById(existing.id, propId);
+  },
+
+  /**
+   * Confirm a Reserve or Hold booking (with optional advance payment)
+   */
+  confirmHoldReservation: async (id: string | number, propertyId: string | number, payload: { advanceDeposit?: number; paymentMethod?: string; notes?: string }): Promise<BookingRecord | null> => {
+    const propId = resolvePropertyId(propertyId);
+    if (!propId) return null;
+    const existing = await bookingService.getBookingById(id, propId);
+    if (!existing) return null;
+
+    const deposit = Number(payload.advanceDeposit) || 0;
+    const newPaid = Number(existing.paidAmount || 0) + deposit;
+    const newDue = Math.max(0, Number(existing.totalAmount || 0) - newPaid);
+
+    await getPool().query(`
+      UPDATE reservations
+      SET status = 'CONFIRMED',
+          paid_amount = $1,
+          due_amount = $2,
+          is_guaranteed = TRUE,
+          special_requests = COALESCE(special_requests || ' | ', '') || $3,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+    `, [newPaid, newDue, payload.notes ? `[Confirmed]: ${payload.notes}` : '[Confirmed]: Advance payment/guarantee received', existing.id]);
+
+    return bookingService.getBookingById(existing.id, propId);
+  },
+
+  /**
+   * Release a Hold reservation and return room to inventory pool
+   */
+  releaseHoldReservation: async (id: string | number, propertyId: string | number, payload: { reason?: string }): Promise<BookingRecord | null> => {
     const propId = resolvePropertyId(propertyId);
     if (!propId) return null;
     const existing = await bookingService.getBookingById(id, propId);
@@ -1296,11 +1392,33 @@ export const bookingService = {
 
     await getPool().query(`
       UPDATE reservations
-      SET status = 'HOLD', special_requests = COALESCE(special_requests || ' | ', '') || 'Hold reason: ' || $1, updated_at = CURRENT_TIMESTAMP
+      SET status = 'CANCELLED',
+          hold_released_at = CURRENT_TIMESTAMP,
+          special_requests = COALESCE(special_requests || ' | ', '') || 'Hold released: ' || $1,
+          updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-    `, [payload.reason || 'Reservation placed on hold', existing.id]);
+    `, [payload.reason || 'Hold deadline expired or released by front desk', existing.id]);
+
+    await getPool().query(`UPDATE reservation_rooms SET status = 'CANCELLED' WHERE reservation_id = $1`, [existing.id]);
 
     return bookingService.getBookingById(existing.id, propId);
+  },
+
+  /**
+   * Check and auto-release expired holds
+   */
+  checkExpiredHolds: async (propertyId: string | number): Promise<{ releasedCount: number }> => {
+    const propId = resolvePropertyId(propertyId);
+    if (!propId) return { releasedCount: 0 };
+    const res = await getPool().query(`
+      SELECT id, reservation_number FROM reservations
+      WHERE property_id = $1 AND status = 'HOLD' AND auto_release = TRUE AND hold_until IS NOT NULL AND hold_until <= CURRENT_TIMESTAMP
+    `, [propId]);
+
+    for (const r of res.rows) {
+      await bookingService.releaseHoldReservation(r.id, propId, { reason: 'Automatic expiry: Cutoff time passed without payment' });
+    }
+    return { releasedCount: res.rows.length };
   },
 
   /**

@@ -20,6 +20,9 @@ router.post('/:id/move', requirePermission('reservation.manage'), bookingControl
 router.post('/:id/payment', requirePermission('reservation.manage'), bookingController.addPayment);
 router.post('/:id/split', requirePermission('reservation.manage'), bookingController.splitBooking);
 router.post('/:id/hold', requirePermission('reservation.manage'), bookingController.holdBooking);
+router.post('/:id/confirm-hold', requirePermission('reservation.manage'), bookingController.confirmHoldBooking);
+router.post('/:id/release-hold', requirePermission('reservation.manage'), bookingController.releaseHoldBooking);
+router.post('/holds/check-expiries', requirePermission('reservation.manage'), bookingController.checkExpiredHolds);
 router.post('/:id/unassign', requirePermission('reservation.manage'), bookingController.unassignRoom);
 router.post('/:id/void', requirePermission('reservation.manage'), bookingController.voidBooking);
 router.post('/:id/ungroup', requirePermission('reservation.manage'), bookingController.ungroupBooking);

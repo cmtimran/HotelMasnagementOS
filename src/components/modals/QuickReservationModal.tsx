@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { formatIdentityDisplay } from '../../utils/identityUtils';
 import { COUNTRIES_DATABASE, getCitiesForCountry, getNationalityForCountry } from '../../utils/geoData';
+import { useProperty } from '../../context/PropertyContext';
+import { getCurrencySymbol } from '../../utils/currencyUtils';
 import { StayPeriodPicker, getSystemDateISO, getNextDayISO } from '../common/StayPeriodPicker';
 import { ChildAgeSelector } from '../common/ChildAgeSelector';
 import { RoomAddonServicesModal, type ServiceTabType } from './RoomAddonServicesModal';
@@ -59,7 +61,9 @@ import {
     generateFolioNumber,
     getRoomSmokingPolicy,
     getHotelReservationPolicies,
-    getOperatingSystemDate
+    getOperatingSystemDate,
+    determineBookingStatusFromPayment,
+    calculateHoldCutoffTimestamp
 } from '../../utils/roomInventoryEngine';
 import {
     calculateReservationTaxes,
@@ -129,6 +133,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     onReserve,
     onReservationCreated
 }) => {
+    const { activeProperty } = useProperty();
+    const currencySymbol = getCurrencySymbol(activeProperty?.currency);
+
     const [activeTab, setActiveTab] = useState<'reservation' | 'payment'>('reservation');
 
     // Options
@@ -1037,10 +1044,18 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
     };
 
     // Submit reservation action
-    const handleCompleteReservation = (status: 'hold' | 'confirmed' | 'stayover' | 'arrived') => {
-        if (status === 'arrived' && checkInDate !== getOperatingSystemDate()) {
+    const handleCompleteReservation = (requestedStatus: 'hold' | 'confirmed' | 'reserved' | 'stayover' | 'arrived') => {
+        if (requestedStatus === 'arrived' && checkInDate !== getOperatingSystemDate()) {
             toast.error(`Check-in is only allowed on the PMS Business Date (${getOperatingSystemDate()}). Arrival date is ${checkInDate}.`);
             return;
+        }
+
+        const isArrived = requestedStatus === 'arrived' || (requestedStatus as string) === 'in-house';
+        const isHold = requestedStatus === 'hold';
+        let status: string = requestedStatus;
+        if (!isArrived && !isHold) {
+            const evaluated = determineBookingStatusFromPayment(totalPaid, finalPayable, netBaseAmount);
+            status = evaluated.status;
         }
 
         if (availableRatePlans.length === 0) {
@@ -1198,6 +1213,10 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             adults: roomsList.reduce((acc, r) => acc + r.adults, 0),
             children: roomsList.reduce((acc, r) => acc + r.children, 0),
             status,
+            isGuaranteed: totalPaid > 0,
+            holdType: status === 'hold' ? 'SIX_PM_RELEASE' : undefined,
+            holdUntil: status === 'hold' ? calculateHoldCutoffTimestamp('SIX_PM_RELEASE', checkInDate) : undefined,
+            holdReason: status === 'hold' ? 'Tentative hold from Quick Reservation' : undefined,
             totalAmount: finalPayable,
             paidAmount: status === 'hold' ? 0 : totalPaid,
             dueAmount: status === 'hold' ? finalPayable : totalDue,
@@ -1376,7 +1395,9 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                 ? `Reservation ${newRecord.reservationNumber} placed on Hold!` 
                 : status === 'arrived' 
                     ? `Guest checked in immediately to Room ${primaryRoom}!` 
-                    : `Reservation ${newRecord.reservationNumber} confirmed successfully!`
+                    : status === 'confirmed'
+                        ? `Reservation ${newRecord.reservationNumber} confirmed successfully (Paid: ${currencySymbol} ${totalPaid.toLocaleString()})!`
+                        : `Reservation ${newRecord.reservationNumber} saved as Reserve (Non-Guaranteed)!`
         );
 
         // Call parent callbacks
@@ -1700,7 +1721,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                                             <span className="truncate">{activeNames.slice(0, 2).join(', ')}{activeNames.length > 2 ? ` +${activeNames.length - 2}` : ''}{scopeLabel}</span>
                                                                         </div>
                                                                         <span className="text-[8.5px] text-blue-700 bg-white/90 px-1 rounded border border-blue-200/60 flex-shrink-0 ml-1">
-                                                                            +৳{addonsCost.toLocaleString()}
+                                                                            +{currencySymbol}{addonsCost.toLocaleString()}
                                                                         </span>
                                                                     </button>
                                                                 );
@@ -1900,7 +1921,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                             />
                                                         </td>
                                                         <td className="py-1.5 px-2 text-right text-slate-800 whitespace-nowrap text-[11px]">
-                                                            <div>৳{lineTotal.toLocaleString()}</div>
+                                                            <div>{currencySymbol}{lineTotal.toLocaleString()}</div>
                                                             {itemAddons > 0 && (
                                                                 <div className="text-[9px] text-slate-400 font-normal">
                                                                     Base: {baseLineTotal.toLocaleString()} + Svc: {itemAddons.toLocaleString()}
@@ -2665,85 +2686,85 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                         <div className="space-y-1 text-[11px]">
                                             <div className="flex justify-between py-1 border-b border-slate-200 text-slate-600">
                                                 <span>Room Base ({nights}N)</span>
-                                                <span className="font-semibold text-slate-900">৳{roomBaseTotal.toLocaleString()}</span>
+                                                <span className="font-semibold text-slate-900">{currencySymbol}{roomBaseTotal.toLocaleString()}</span>
                                             </div>
 
                                             {totalPickupArrivalCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-blue-700">
                                                     <span className="flex items-center gap-1"><Car size={11} /> Airport Pickup (Inbound)</span>
-                                                    <span className="font-mono">+৳{totalPickupArrivalCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+{currencySymbol}{totalPickupArrivalCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalDropDepartureCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-sky-700">
                                                     <span className="flex items-center gap-1"><Plane size={11} /> Airport Drop (Outbound)</span>
-                                                    <span className="font-mono">+৳{totalDropDepartureCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+{currencySymbol}{totalDropDepartureCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalExtraBedCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-indigo-700">
                                                     <span className="flex items-center gap-1"><BedDouble size={11} /> Extra Bed &amp; Cot</span>
-                                                    <span className="font-mono">+৳{totalExtraBedCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+{currencySymbol}{totalExtraBedCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalMealPlanCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-amber-700">
                                                     <span className="flex items-center gap-1"><Utensils size={11} /> Meal Plans</span>
-                                                    <span className="font-mono">+৳{totalMealPlanCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+{currencySymbol}{totalMealPlanCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalCelebrationCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-rose-700">
                                                     <span className="flex items-center gap-1"><Gift size={11} /> Decor &amp; Romance</span>
-                                                    <span className="font-mono">+৳{totalCelebrationCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+{currencySymbol}{totalCelebrationCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalSpaCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-teal-700">
                                                     <span className="flex items-center gap-1"><Sparkles size={11} /> Wellness &amp; Spa</span>
-                                                    <span className="font-mono">+৳{totalSpaCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+{currencySymbol}{totalSpaCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             {totalTimingCharge > 0 && (
                                                 <div className="flex justify-between py-0.5 text-sky-700">
                                                     <span className="flex items-center gap-1"><Clock size={11} /> Time Flex</span>
-                                                    <span className="font-mono">+৳{totalTimingCharge.toLocaleString()}</span>
+                                                    <span className="font-mono">+{currencySymbol}{totalTimingCharge.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             <div className="flex justify-between py-1 border-t border-slate-200 text-slate-700 font-semibold">
                                                 <span>Total Gross (Tariff + Addons)</span>
-                                                <span className="text-slate-900">৳{totalAmount.toLocaleString()}</span>
+                                                <span className="text-slate-900">{currencySymbol}{totalAmount.toLocaleString()}</span>
                                             </div>
 
                                             {discountedAmount > 0 && (
                                                 <div className="flex justify-between py-1 text-slate-600">
                                                     <span>Discount ({discountType === 'Percentage' ? `${discountValue}%` : 'Flat'})</span>
-                                                    <span className="font-semibold text-emerald-700">-৳{discountedAmount.toLocaleString()}</span>
+                                                    <span className="font-semibold text-emerald-700">-{currencySymbol}{discountedAmount.toLocaleString()}</span>
                                                 </div>
                                             )}
 
                                             <div className="flex justify-between py-1 text-slate-800 border-t border-dashed border-slate-200">
                                                 <span>Subtotal (Net Base)</span>
-                                                <span className="text-slate-900">৳{netBaseAmount.toLocaleString()}</span>
+                                                <span className="text-slate-900">{currencySymbol}{netBaseAmount.toLocaleString()}</span>
                                             </div>
 
                                             {taxApplicable && taxCalculation.breakdown.length > 0 && (
                                                 <div className="py-1.5 space-y-1 bg-amber-50/70 p-2 rounded-lg border border-amber-200/80 my-1">
                                                     <div className="flex justify-between items-center text-[10px] text-amber-900 uppercase tracking-wider">
                                                         <span>Taxes, VAT &amp; Surcharge</span>
-                                                        <span className="font-mono text-amber-900">+৳{taxCalculation.totalTaxAmount.toLocaleString()}</span>
+                                                        <span className="font-mono text-amber-900">+{currencySymbol}{taxCalculation.totalTaxAmount.toLocaleString()}</span>
                                                     </div>
                                                     {taxCalculation.breakdown.map((item, idx) => (
                                                         <div key={idx} className="flex justify-between text-[11px] text-slate-600 pl-1">
                                                             <span>{item.name} ({item.rate}%):</span>
-                                                            <span className="font-mono font-medium">+৳{item.amount.toLocaleString()}</span>
+                                                            <span className="font-mono font-medium">+{currencySymbol}{item.amount.toLocaleString()}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -2751,18 +2772,18 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
 
                                             <div className="flex justify-between py-1 text-slate-900 font-extrabold border-t border-slate-300 text-sm">
                                                 <span>Grand Total (Payable)</span>
-                                                <span className="text-blue-900">৳{finalPayable.toLocaleString()}</span>
+                                                <span className="text-blue-900">{currencySymbol}{finalPayable.toLocaleString()}</span>
                                             </div>
 
                                             <div className="flex justify-between py-1 text-slate-600">
                                                 <span>Total Advance Paid</span>
-                                                <span className="text-emerald-700">৳{totalPaid.toLocaleString()}</span>
+                                                <span className="text-emerald-700">{currencySymbol}{totalPaid.toLocaleString()}</span>
                                             </div>
 
                                             <div className="bg-white -mx-3 -mb-3 px-3 py-2.5 flex justify-between text-xs border-t border-slate-200 rounded-b-lg">
                                                 <span className="text-slate-800">Remaining Balance Due:</span>
                                                 <span className={totalDue > 0 ? 'text-amber-700' : 'text-emerald-700'}>
-                                                    ৳{totalDue.toLocaleString()}
+                                                    {currencySymbol}{totalDue.toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
@@ -2814,15 +2835,17 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                     toast.error('Cannot proceed: Selected rooms exceed available inventory!');
                                     return;
                                 }
-                                handleCompleteReservation('confirmed');
+                                handleCompleteReservation(totalPaid > 0 ? 'confirmed' : 'reserved');
                             }}
                             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition-colors ${
                                 hasOverbookingError
                                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-[#1e3a8a] hover:bg-blue-900 text-white cursor-pointer'
+                                    : totalPaid > 0
+                                        ? 'bg-[#1e3a8a] hover:bg-blue-900 text-white cursor-pointer'
+                                        : 'bg-slate-800 hover:bg-slate-900 text-white cursor-pointer'
                             }`}
                         >
-                            Reserve
+                            {totalPaid > 0 ? `Confirm Booking (Paid ${currencySymbol} ${totalPaid.toLocaleString()})` : 'Save as Reserve'}
                         </button>
                         {checkInDate === getOperatingSystemDate() && (
                             <button

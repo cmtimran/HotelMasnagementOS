@@ -360,6 +360,19 @@ export interface HotelGeneralSettings {
     petPolicyText?: string;
     smokingPolicyText?: string;
     noShowPolicy?: string;
+    // Reservation Guarantee & Hold Settings
+    unpaidBookingDefaultStatus?: 'reserved' | 'hold' | 'confirmed';
+    confirmationPaymentRule?: 'any_payment' | 'first_night' | 'percentage' | 'full_payment';
+    confirmationMinPercentage?: number;
+    confirmationMinAmountBDT?: number;
+    defaultHoldType?: 'SIX_PM_RELEASE' | 'COURTESY_HOLD' | 'CORPORATE_OPTION' | 'CUSTOM_DEADLINE';
+    autoReleaseHour?: string;
+    courtesyHoldDurationHours?: number;
+    corporateHoldDaysPrior?: number;
+    autoReleaseExpiredHolds?: boolean;
+    holdReleaseGracePeriodMinutes?: number;
+    requireHoldReason?: boolean;
+    allowCheckInForUnpaid?: boolean;
 }
 
 export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettings => {
@@ -379,7 +392,19 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
                         childStayPolicy: s.childStayPolicy,
                         petPolicyText: s.petPolicyText,
                         smokingPolicyText: s.smokingPolicyText,
-                        noShowPolicy: s.noShowPolicy
+                        noShowPolicy: s.noShowPolicy,
+                        unpaidBookingDefaultStatus: s.unpaidBookingDefaultStatus || 'reserved',
+                        confirmationPaymentRule: s.confirmationPaymentRule || 'any_payment',
+                        confirmationMinPercentage: Number(s.confirmationMinPercentage) || 0,
+                        confirmationMinAmountBDT: Number(s.confirmationMinAmountBDT) || 0,
+                        defaultHoldType: s.defaultHoldType || 'SIX_PM_RELEASE',
+                        autoReleaseHour: s.autoReleaseHour || '18:00',
+                        courtesyHoldDurationHours: Number(s.courtesyHoldDurationHours) || 24,
+                        corporateHoldDaysPrior: Number(s.corporateHoldDaysPrior) || 3,
+                        autoReleaseExpiredHolds: s.autoReleaseExpiredHolds !== false,
+                        holdReleaseGracePeriodMinutes: Number(s.holdReleaseGracePeriodMinutes) || 30,
+                        requireHoldReason: Boolean(s.requireHoldReason),
+                        allowCheckInForUnpaid: Boolean(s.allowCheckInForUnpaid)
                     };
                 }
             }
@@ -394,7 +419,19 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
                     childStayPolicy: parsed.childStayPolicy,
                     petPolicyText: parsed.petPolicyText,
                     smokingPolicyText: parsed.smokingPolicyText,
-                    noShowPolicy: parsed.noShowPolicy
+                    noShowPolicy: parsed.noShowPolicy,
+                    unpaidBookingDefaultStatus: parsed.unpaidBookingDefaultStatus || 'reserved',
+                    confirmationPaymentRule: parsed.confirmationPaymentRule || 'any_payment',
+                    confirmationMinPercentage: Number(parsed.confirmationMinPercentage) || 0,
+                    confirmationMinAmountBDT: Number(parsed.confirmationMinAmountBDT) || 0,
+                    defaultHoldType: parsed.defaultHoldType || 'SIX_PM_RELEASE',
+                    autoReleaseHour: parsed.autoReleaseHour || '18:00',
+                    courtesyHoldDurationHours: Number(parsed.courtesyHoldDurationHours) || 24,
+                    corporateHoldDaysPrior: Number(parsed.corporateHoldDaysPrior) || 3,
+                    autoReleaseExpiredHolds: parsed.autoReleaseExpiredHolds !== false,
+                    holdReleaseGracePeriodMinutes: Number(parsed.holdReleaseGracePeriodMinutes) || 30,
+                    requireHoldReason: Boolean(parsed.requireHoldReason),
+                    allowCheckInForUnpaid: Boolean(parsed.allowCheckInForUnpaid)
                 };
             }
         }
@@ -403,8 +440,101 @@ export const getHotelGeneralSettings = (propertyId?: number): HotelGeneralSettin
         checkInTime: '',
         checkOutTime: '',
         visitorIdentityRule: '',
-        cancellationText: ''
+        cancellationText: '',
+        unpaidBookingDefaultStatus: 'reserved',
+        confirmationPaymentRule: 'any_payment',
+        confirmationMinPercentage: 0,
+        confirmationMinAmountBDT: 0,
+        defaultHoldType: 'SIX_PM_RELEASE',
+        autoReleaseHour: '18:00',
+        courtesyHoldDurationHours: 24,
+        corporateHoldDaysPrior: 3,
+        autoReleaseExpiredHolds: true,
+        holdReleaseGracePeriodMinutes: 30,
+        requireHoldReason: false,
+        allowCheckInForUnpaid: false
     };
+};
+
+/**
+ * Determines whether a booking is Confirmed, Reserved, or Hold based on financial payment and General Settings
+ */
+export const determineBookingStatusFromPayment = (
+    paidAmount: number,
+    totalAmount: number,
+    firstNightRate: number = 0,
+    isExplicitHold: boolean = false,
+    propertyId?: number
+): { status: 'confirmed' | 'reserved' | 'hold'; isGuaranteed: boolean } => {
+    if (isExplicitHold) {
+        return { status: 'hold', isGuaranteed: false };
+    }
+
+    const settings = getHotelGeneralSettings(propertyId);
+    const rule = settings.confirmationPaymentRule || 'any_payment';
+    const paid = Number(paidAmount) || 0;
+    const total = Number(totalAmount) || 0;
+
+    let isMet = false;
+    if (rule === 'any_payment') {
+        isMet = paid > 0;
+    } else if (rule === 'first_night') {
+        const threshold = firstNightRate > 0 ? firstNightRate : total;
+        isMet = paid >= threshold;
+    } else if (rule === 'percentage') {
+        const pct = settings.confirmationMinPercentage || 20;
+        const required = (total * pct) / 100;
+        isMet = paid >= required && paid > 0;
+    } else if (rule === 'full_payment') {
+        isMet = paid >= total && total > 0;
+    }
+
+    if (isMet) {
+        return { status: 'confirmed', isGuaranteed: true };
+    }
+
+    const fallbackStatus = settings.unpaidBookingDefaultStatus || 'reserved';
+    return {
+        status: fallbackStatus === 'hold' ? 'hold' : fallbackStatus === 'confirmed' ? 'confirmed' : 'reserved',
+        isGuaranteed: false
+    };
+};
+
+/**
+ * Calculates default Hold cut-off expiration timestamp based on hold type and PMS settings
+ */
+export const calculateHoldCutoffTimestamp = (
+    holdType?: string,
+    checkInDate?: string,
+    propertyId?: number
+): string => {
+    const settings = getHotelGeneralSettings(propertyId);
+    const effectiveType = holdType || settings.defaultHoldType || 'SIX_PM_RELEASE';
+    const cutoffTime = settings.autoReleaseHour || '18:00';
+    const checkIn = checkInDate || getOperatingSystemDate();
+
+    if (effectiveType === 'SIX_PM_RELEASE') {
+        return `${checkIn}T${cutoffTime}:00`;
+    }
+
+    if (effectiveType === 'COURTESY_HOLD') {
+        const hours = settings.courtesyHoldDurationHours || 24;
+        const target = new Date(Date.now() + hours * 3600000);
+        return target.toISOString().slice(0, 19);
+    }
+
+    if (effectiveType === 'CORPORATE_OPTION') {
+        const daysPrior = settings.corporateHoldDaysPrior || 3;
+        const arrivalMs = new Date(checkIn).getTime();
+        const cutoffMs = arrivalMs - daysPrior * 86400000;
+        const d = new Date(cutoffMs);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}T${cutoffTime}:00`;
+    }
+
+    return `${checkIn}T${cutoffTime}:00`;
 };
 
 /**
@@ -1666,7 +1796,9 @@ export const updateReservationStatusInDB = async (
             ? 'checked-out'
             : (rawLower === 'hold' || rawLower === 'tentative')
                 ? 'hold'
-                : 'confirmed';
+                : (rawLower === 'reserved' || rawLower === 'reserve')
+                    ? 'reserved'
+                    : 'confirmed';
 
     const dbStatus = normalizedUIStatus === 'in-house'
         ? 'IN_HOUSE'
@@ -1674,7 +1806,9 @@ export const updateReservationStatusInDB = async (
             ? 'COMPLETED'
             : normalizedUIStatus === 'hold'
                 ? 'HOLD'
-                : 'CONFIRMED';
+                : normalizedUIStatus === 'reserved'
+                    ? 'RESERVED'
+                    : 'CONFIRMED';
 
     // 0. Strict PMS Check-in Guard: Block Check-In if room is unassigned
     const isCheckIn = normalizedUIStatus === 'in-house';
@@ -1954,14 +2088,15 @@ export const holdReservationInDB = async (
     reservationIdOrNo: string | number,
     startDate?: string,
     endDate?: string,
-    reason?: string
+    reason?: string,
+    extraHoldParams?: { holdUntil?: string; holdType?: string; depositRequired?: number; autoRelease?: boolean }
 ): Promise<StoredReservation | null> => {
     try {
         const API_BASE = getApiBaseUrl();
         const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/hold`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate, endDate, reason })
+            body: JSON.stringify({ startDate, endDate, reason, ...extraHoldParams })
         });
         const data = await res.json();
         if (data.success && data.data) {
@@ -1980,6 +2115,78 @@ export const holdReservationInDB = async (
         }
     } catch (err) {
         console.warn('Failed to hold reservation in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Confirm a Reserve or Hold Reservation in Database (with optional deposit payment)
+ */
+export const confirmHoldReservationInDB = async (
+    reservationIdOrNo: string | number,
+    advanceDeposit: number = 0,
+    paymentMethod: string = 'Cash',
+    notes?: string
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/confirm-hold`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ advanceDeposit, paymentMethod, notes })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec, status: 'confirmed' } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            saveStoredReservations(newList);
+            broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId: reservationIdOrNo });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to confirm hold in DB:', err);
+    }
+    return null;
+};
+
+/**
+ * Release a Hold Reservation in Database and free inventory
+ */
+export const releaseHoldReservationInDB = async (
+    reservationIdOrNo: string | number,
+    reason: string = 'Released by front desk'
+): Promise<StoredReservation | null> => {
+    try {
+        const API_BASE = getApiBaseUrl();
+        const res = await fetch(`${API_BASE}/api/bookings/${reservationIdOrNo}/release-hold`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+            const updatedRec: StoredReservation = data.data;
+            const existing = getAllStoredReservations();
+            const idx = existing.findIndex(r => String(r.id) === String(reservationIdOrNo) || r.reservationNumber === String(reservationIdOrNo));
+            let newList: StoredReservation[];
+            if (idx !== -1) {
+                newList = existing.map((r, i) => i === idx ? { ...r, ...updatedRec, status: 'cancelled' } : r);
+            } else {
+                newList = [updatedRec, ...existing];
+            }
+            saveStoredReservations(newList);
+            broadcastPMSEvent({ type: 'RESERVATION_UPDATED', reservationId: reservationIdOrNo });
+            return updatedRec;
+        }
+    } catch (err) {
+        console.warn('Failed to release hold in DB:', err);
     }
     return null;
 };

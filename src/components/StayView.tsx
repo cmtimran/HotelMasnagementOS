@@ -22,7 +22,8 @@ import {
     Cigarette,
     CigaretteOff,
     Search,
-    ArrowRight
+    ArrowRight,
+    Clock
 } from 'lucide-react';
 import { useProperty } from '../context/PropertyContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -104,7 +105,7 @@ interface TimelineBooking {
     checkInDate?: string;        // Exact ISO check-in
     checkOutDate?: string;       // Exact ISO check-out
     nights?: number;             // Exact stay nights
-    status: 'arrived' | 'stayover' | 'confirmed' | 'hold' | 'due-out' | 'checked-out' | 'day-use' | 'out-of-order';
+    status: 'arrived' | 'stayover' | 'confirmed' | 'reserved' | 'hold' | 'due-out' | 'checked-out' | 'day-use' | 'out-of-order';
     // 4 Key Indicators requested by User:
     isGroupOwner?: boolean;      // 1. Group Owner (👑)
     isGroupBooking?: boolean;    // 2. Group Booking (👥)
@@ -736,7 +737,7 @@ export const StayView: React.FC = () => {
     // Single source of truth: Sync stored reservations to timeline bookings dynamically by date
     const syncStoredReservations = React.useCallback(() => {
         const stored = getAllStoredReservations();
-        const baseDate = new Date(days[0]?.date || '2026-06-28');
+        const baseDate = new Date(days[0]?.date || calculateStayViewStartDate(operatingDateStr));
         const syncedList: TimelineBooking[] = [];
 
         for (const res of stored) {
@@ -765,7 +766,8 @@ export const StayView: React.FC = () => {
             const isPastBooking = Boolean(res.isPast || rawStatus === 'completed' || rawStatus === 'checked-out');
             const isInHouse = rawStatus === 'in-house' || rawStatus === 'arrived' || rawStatus === 'checked-in';
             const isHold = rawStatus === 'hold' || rawStatus === 'tentative';
-            const timelineStatus: TimelineBooking['status'] = isPastBooking ? 'checked-out' : isInHouse ? 'arrived' : isHold ? 'hold' : 'confirmed';
+            const isReserved = rawStatus === 'reserved' || rawStatus === 'reserve';
+            const timelineStatus: TimelineBooking['status'] = isPastBooking ? 'checked-out' : isInHouse ? 'arrived' : isHold ? 'hold' : isReserved ? 'reserved' : 'confirmed';
             const regNo = res.registrationNumber || (isInHouse ? `REG-${res.reservationNumber.replace(/^RES-/, '')}` : undefined);
             const folioNo = res.folioNumber || `FOL-${res.reservationNumber.replace(/^RES-/, '')}-1`;
 
@@ -1682,7 +1684,7 @@ export const StayView: React.FC = () => {
             ? operatingDateStr
             : newFromDate;
 
-        const baseDate = new Date(days[0]?.date || '2026-06-28');
+        const baseDate = new Date(days[0]?.date || calculateStayViewStartDate(operatingDateStr));
         const fromIdx = days.findIndex(d => d.date === validatedFromDate);
         const startCol = fromIdx >= 0 ? fromIdx : Math.round((new Date(validatedFromDate).getTime() - baseDate.getTime()) / 86400000);
         const stayNights = Math.max(1, Math.round((new Date(newToDate).getTime() - new Date(validatedFromDate).getTime()) / 86400000) || (targetB.endIndex - targetB.startIndex + 1));
@@ -1814,7 +1816,7 @@ export const StayView: React.FC = () => {
         const nights1 = Math.max(1, Math.round((new Date(effectiveSplitDate).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24)));
         const nights2 = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(effectiveSplitDate).getTime()) / (1000 * 60 * 60 * 24)));
 
-        const baseDate = new Date(days[0]?.date || '2026-06-28');
+        const baseDate = new Date(days[0]?.date || calculateStayViewStartDate(operatingDateStr));
         const splitIdx = days.findIndex(d => d.date === effectiveSplitDate);
         const startCol2 = splitIdx >= 0 ? splitIdx : Math.round((new Date(effectiveSplitDate).getTime() - baseDate.getTime()) / 86400000);
         const endCol2 = startCol2 + nights2 - 1;
@@ -2383,6 +2385,15 @@ export const StayView: React.FC = () => {
         };
     }, [dragState, extendDrag, moveDrag, days, colWidth, daysWindow, bookingsByRoom, findRoomConflict]);
 
+    const minStayViewDate = useMemo(() => calculateStayViewStartDate(operatingDateStr), [operatingDateStr]);
+
+    // Ensure StayView always stays anchored at least 3 days prior to the PMS business date
+    useEffect(() => {
+        if (startDate < minStayViewDate) {
+            setStartDate(minStayViewDate);
+        }
+    }, [minStayViewDate, startDate]);
+
     const handleDateJump = (direction: 'prev' | 'next' | 'today') => {
         if (direction === 'today') {
             const sysIso = getOperatingSystemDate();
@@ -2391,24 +2402,32 @@ export const StayView: React.FC = () => {
             return;
         }
         const parts = startDate.split('-').map(Number);
-        const shift = direction === 'next' ? 7 : -7;
+        const shift = direction === 'next' ? 1 : -1;
         const cur = new Date(parts[0], parts[1] - 1, parts[2] + shift, 12, 0, 0);
         const y = cur.getFullYear();
         const m = String(cur.getMonth() + 1).padStart(2, '0');
         const day = String(cur.getDate()).padStart(2, '0');
-        setStartDate(`${y}-${m}-${day}`);
+        const targetDate = `${y}-${m}-${day}`;
+
+        // Never navigate before 3 days prior to PMS Business Date
+        if (direction === 'prev' && targetDate < minStayViewDate) {
+            setStartDate(minStayViewDate);
+            return;
+        }
+        setStartDate(targetDate);
     };
 
     // Standard PMS status colors: Blue for Confirmed/Reserved, Emerald for Arrived/In-House
     const getStatusBadgeColor = (status: TimelineBooking['status']) => {
         switch (status) {
             case 'confirmed': return 'bg-blue-600 text-white';
+            case 'reserved': return 'bg-slate-700 text-white border border-slate-500';
             case 'arrived': return 'bg-emerald-600 text-white';
             case 'stayover': return 'bg-teal-600 text-white';
             case 'due-out': return 'bg-orange-500 text-white';
             case 'checked-out': return 'bg-slate-600 text-white';
-            case 'hold': return 'bg-purple-600 text-white';
-            case 'day-use': return 'bg-amber-600 text-white';
+            case 'hold': return 'bg-amber-600 text-white border border-amber-500';
+            case 'day-use': return 'bg-indigo-600 text-white';
             case 'out-of-order': return 'bg-red-600 text-white';
             default: return 'bg-blue-600 text-white';
         }
@@ -2447,16 +2466,22 @@ export const StayView: React.FC = () => {
                     <div className="flex items-center bg-gray-50 border border-gray-200 rounded p-0.5 text-xs h-7">
                         <button
                             type="button"
+                            disabled={startDate <= minStayViewDate}
                             onClick={() => handleDateJump('prev')}
-                            className="px-1.5 py-0.5 hover:bg-white hover:shadow-2xs rounded text-gray-600 transition-colors cursor-pointer"
-                            title="Previous 7 Days"
+                            className={`px-1.5 py-0.5 rounded text-gray-600 transition-colors ${
+                                startDate <= minStayViewDate
+                                    ? 'opacity-30 cursor-not-allowed text-gray-400'
+                                    : 'hover:bg-white hover:shadow-2xs cursor-pointer'
+                            }`}
+                            title={startDate <= minStayViewDate ? 'At historical limit (3 days prior to PMS Business Date)' : 'Previous Day'}
                         >
                             <ChevronLeft size={13} />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleDateJump('today')}
-                            className="px-2 py-0.5 text-[10px] text-[#1e3a8a] hover:bg-white hover:shadow-2xs rounded transition-colors cursor-pointer"
+                            className="px-2 py-0.5 text-[10px] font-semibold text-[#1e3a8a] hover:bg-white hover:shadow-2xs rounded transition-colors cursor-pointer"
+                            title="Reset to 3 days prior to PMS Business Date"
                         >
                             Today
                         </button>
@@ -2464,7 +2489,7 @@ export const StayView: React.FC = () => {
                             type="button"
                             onClick={() => handleDateJump('next')}
                             className="px-1.5 py-0.5 hover:bg-white hover:shadow-2xs rounded text-gray-600 transition-colors cursor-pointer"
-                            title="Next 7 Days"
+                            title="Next Day"
                         >
                             <ChevronRight size={13} />
                         </button>
@@ -2476,7 +2501,16 @@ export const StayView: React.FC = () => {
                         <input
                             type="date"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
+                            min={minStayViewDate}
+                            onChange={(e) => {
+                                const picked = e.target.value;
+                                if (picked && picked < minStayViewDate) {
+                                    setStartDate(minStayViewDate);
+                                    toast.info(`Stay View displays data from 3 days prior to PMS Business Date (${minStayViewDate}) onwards.`);
+                                } else if (picked) {
+                                    setStartDate(picked);
+                                }
+                            }}
                             className="border-none p-0 text-[10px] font-semibold text-gray-800 outline-none cursor-pointer bg-transparent"
                         />
                     </div>
@@ -3205,6 +3239,22 @@ export const StayView: React.FC = () => {
                                                                                         </span>
                                                                                     )}
                                                                                 </>
+                                                                            )}
+                                                                            {booking.status === 'hold' && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-amber-500 text-white border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0"
+                                                                                    title="Tentative Hold Booking"
+                                                                                >
+                                                                                    <Clock size={9} className="stroke-[2.5]" />
+                                                                                </span>
+                                                                            )}
+                                                                            {booking.status === 'reserved' && (
+                                                                                <span
+                                                                                    className="w-4 h-4 rounded-full bg-slate-800 text-amber-300 border-[1.5px] border-white flex items-center justify-center shadow-xs flex-shrink-0 text-[8px] font-bold"
+                                                                                    title="Reserve (Unpaid Non-Guaranteed Booking)"
+                                                                                >
+                                                                                    R
+                                                                                </span>
                                                                             )}
                                                                             {booking.isPaymentDue && (
                                                                                 <span

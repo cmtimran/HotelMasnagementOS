@@ -4,14 +4,27 @@ import {
     ArrowRight, Check, RefreshCw
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
+import { useProperty } from '../../context/PropertyContext';
+import { getCurrencySymbol } from '../../utils/currencyUtils';
 import PageHeader from '../common/PageHeader';
+import {
+    getAllStoredReservations,
+    getOperatingSystemDate,
+    confirmHoldReservationInDB,
+    releaseHoldReservationInDB,
+    getDynamicRoomTypes,
+    getAvailableRoomsForStay,
+    validateAndCommitReservation,
+    generateMasterReservationNumber,
+    generateFolioNumber
+} from '../../utils/roomInventoryEngine';
 
 export interface HoldItem {
-    id: number;
+    id: number | string;
     reservationNumber: string;
     guestName: string;
     contact?: string;
-    status: 'Hold' | 'Confirmed' | 'Expired';
+    status: 'Hold' | 'Reserved' | 'Confirmed' | 'Expired';
     holdStartDate: string;
     holdEndDate: string;
     reason: string;
@@ -19,133 +32,235 @@ export interface HoldItem {
     checkInDate: string;
     checkOutDate: string;
     roomType: string;
+    roomNumber?: string;
     estimatedAmount: number;
     depositRequiredBDT?: number;
+    paidAmount?: number;
 }
 
 export const ReservationHold: React.FC = () => {
     const { setActivePage } = useNavigation();
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'Hold' | 'Confirmed' | 'Expired'>('all');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'Hold' | 'Reserved' | 'Confirmed' | 'Expired'>('all');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [confirmModalItem, setConfirmModalItem] = useState<HoldItem | null>(null);
+    const [confirmDeposit, setConfirmDeposit] = useState<number>(0);
+    const [confirmMethod, setConfirmMethod] = useState<string>('Cash');
+    const [confirmNotes, setConfirmNotes] = useState<string>('');
+    const { activeProperty } = useProperty();
+    const currencyCode = activeProperty?.currency || 'BDT';
+    const currencySymbol = getCurrencySymbol(currencyCode);
+
+    const operatingDate = getOperatingSystemDate();
+    const dynamicRoomTypes = useMemo(() => getDynamicRoomTypes(), []);
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
         setTimeout(() => setToastMessage(null), 3500);
     };
 
-    // Hydrate state - Zero Mock Fallback
-    const [holds, setHolds] = useState<HoldItem[]>(() => {
+    // Hydrate state from real stored reservations
+    const [reservationsVersion, setReservationsVersion] = useState(0);
+
+    const holds = useMemo<HoldItem[]>(() => {
+        const stored = getAllStoredReservations();
+        const items: HoldItem[] = [];
+
+        // 1. Process active reservations from system
+        stored.forEach((r: any) => {
+            const rawStatus = String(r.status || '').toLowerCase();
+            const isHold = rawStatus === 'hold' || rawStatus === 'tentative';
+            const isReserved = rawStatus === 'reserved' || rawStatus === 'reserve';
+            const isConfirmed = rawStatus === 'confirmed';
+
+            if (isHold || isReserved || (r.holdUntil && isConfirmed)) {
+                const checkIn = r.checkIn || r.checkInDate || operatingDate;
+                const checkOut = r.checkOut || r.checkOutDate || operatingDate;
+                const holdDeadline = r.holdUntil ? r.holdUntil.slice(0, 10) : checkIn;
+                const isExpired = isHold && holdDeadline < operatingDate;
+
+                items.push({
+                    id: r.id || r.reservationNumber,
+                    reservationNumber: r.reservationNumber,
+                    guestName: r.guestName || 'Valued Guest',
+                    contact: r.phone || r.mobile || '',
+                    status: isExpired ? 'Expired' : isHold ? 'Hold' : isReserved ? 'Reserved' : 'Confirmed',
+                    holdStartDate: r.holdStartDate || r.createdAt?.slice(0, 10) || checkIn,
+                    holdEndDate: holdDeadline,
+                    reason: r.holdReason || r.specialRequests || (isReserved ? 'Unpaid reservation awaiting guarantee' : 'Tentative hold block'),
+                    reservationDate: r.createdAt ? r.createdAt.slice(0, 10) : operatingDate,
+                    checkInDate: checkIn,
+                    checkOutDate: checkOut,
+                    roomType: r.roomType || 'Standard Room',
+                    roomNumber: r.roomNumber,
+                    estimatedAmount: Number(r.totalAmount || r.rateAmount || 0),
+                    depositRequiredBDT: Number(r.depositRequired || r.depositRequiredBDT || 0),
+                    paidAmount: Number(r.paidAmount || 0)
+                });
+            }
+        });
+
+        // 2. Also read any legacy hotel_holds_v2
         try {
-            const saved = localStorage.getItem('hotel_holds_v2');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    const cleaned = parsed.filter((h: any) => !String(h.reservationNumber || '').startsWith('HLD-2026-00'));
-                    if (cleaned.length > 0) return cleaned;
+            const rawSaved = localStorage.getItem('hotel_holds_v2');
+            if (rawSaved) {
+                const parsed = JSON.parse(rawSaved);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach((h: any) => {
+                        if (!items.some(it => it.reservationNumber === h.reservationNumber)) {
+                            items.push(h);
+                        }
+                    });
                 }
             }
-        } catch (e) {
-            console.error(e);
-        }
-        return [];
-    });
+        } catch {}
 
-    useEffect(() => {
-        try {
-            const cleaned = holds.filter((h: any) => !String(h.reservationNumber || '').startsWith('HLD-2026-00'));
-            localStorage.setItem('hotel_holds_v2', JSON.stringify(cleaned));
-        } catch (e) {
-            console.error(e);
-        }
-    }, [holds]);
+        return items;
+    }, [reservationsVersion, operatingDate]);
 
     // Modal Form State
     const [form, setForm] = useState({
-        reservationNumber: `HLD-2026-00${holds.length + 1}`,
         guestName: '',
         contact: '',
-        holdStartDate: '2026-07-01',
-        holdEndDate: '2026-07-03',
-        checkInDate: '2026-07-08',
-        checkOutDate: '2026-07-11',
-        roomType: 'Deluxe Double',
+        holdStartDate: operatingDate,
+        holdEndDate: operatingDate,
+        checkInDate: operatingDate,
+        checkOutDate: new Date(new Date(operatingDate).getTime() + 86400000 * 2).toISOString().slice(0, 10),
+        roomType: dynamicRoomTypes[0]?.name || 'Deluxe Double',
         estimatedAmount: 9000,
         depositRequiredBDT: 3000,
         reason: 'Awaiting formal corporate confirmation & advance payment.'
     });
 
+    useEffect(() => {
+        if (dynamicRoomTypes.length > 0 && !form.roomType) {
+            setForm(prev => ({ ...prev, roomType: dynamicRoomTypes[0].name }));
+        }
+    }, [dynamicRoomTypes]);
+
     const handleCreateHold = (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.guestName || !form.reason) return;
 
-        const newItem: HoldItem = {
+        const resNo = generateMasterReservationNumber();
+        const folioNo = generateFolioNumber(resNo);
+
+        // Find available room
+        const report = getAvailableRoomsForStay(form.checkInDate, form.checkOutDate, form.roomType);
+        const assignedRoom = report.availableRooms[0]?.number || 'Unassigned';
+
+        const newHoldRes = {
             id: Date.now(),
-            reservationNumber: `HLD-2026-${String(Math.floor(100 + Math.random() * 900))}`,
+            reservationNumber: resNo,
             guestName: form.guestName,
-            contact: form.contact || '+880 1711-000000',
-            status: 'Hold',
-            holdStartDate: form.holdStartDate,
-            holdEndDate: form.holdEndDate,
-            reason: form.reason,
-            reservationDate: new Date().toISOString().split('T')[0],
-            checkInDate: form.checkInDate,
-            checkOutDate: form.checkOutDate,
+            phone: form.contact || '+880 1711-000000',
+            email: 'guest@hospitality.com',
+            roomNumber: assignedRoom,
             roomType: form.roomType,
-            estimatedAmount: form.estimatedAmount,
-            depositRequiredBDT: form.depositRequiredBDT
+            checkIn: form.checkInDate,
+            checkOut: form.checkOutDate,
+            nights: Math.max(1, Math.round((new Date(form.checkOutDate).getTime() - new Date(form.checkInDate).getTime()) / 86400000)),
+            adults: 2,
+            children: 0,
+            status: 'hold',
+            totalAmount: form.estimatedAmount,
+            paidAmount: 0,
+            dueAmount: form.estimatedAmount,
+            folioNumber: folioNo,
+            holdType: 'SIX_PM_RELEASE',
+            holdStartDate: form.holdStartDate,
+            holdUntil: `${form.holdEndDate}T18:00:00`,
+            holdReason: form.reason,
+            depositRequired: form.depositRequiredBDT,
+            autoRelease: true,
+            isGuaranteed: false,
+            createdAt: new Date().toISOString()
         };
 
-        setHolds(prev => [newItem, ...prev]);
-        showToast(`Hold reservation ${newItem.reservationNumber} created for ${newItem.guestName}`);
+        const commit = validateAndCommitReservation(newHoldRes);
+        if (!commit.success) {
+            showToast(`Error: ${commit.errorMessage || 'Room not available for selected dates!'}`);
+            return;
+        }
+
+        // Persist to local storage holds list
+        try {
+            const rawSaved = localStorage.getItem('hotel_holds_v2');
+            const parsed = rawSaved ? JSON.parse(rawSaved) : [];
+            parsed.unshift({
+                id: Date.now(),
+                reservationNumber: resNo,
+                guestName: form.guestName,
+                contact: form.contact,
+                status: 'Hold',
+                holdStartDate: form.holdStartDate,
+                holdEndDate: form.holdEndDate,
+                reason: form.reason,
+                reservationDate: operatingDate,
+                checkInDate: form.checkInDate,
+                checkOutDate: form.checkOutDate,
+                roomType: form.roomType,
+                estimatedAmount: form.estimatedAmount,
+                depositRequiredBDT: form.depositRequiredBDT
+            });
+            localStorage.setItem('hotel_holds_v2', JSON.stringify(parsed));
+        } catch {}
+
+        setReservationsVersion(v => v + 1);
+        showToast(`Hold block ${resNo} created successfully! Room ${assignedRoom} held until ${form.holdEndDate}.`);
         setIsModalOpen(false);
     };
 
-    const handleConfirmBooking = (item: HoldItem) => {
-        // Convert hold to confirmed reservation
-        setHolds(prev =>
-            prev.map(h => h.id === item.id ? { ...h, status: 'Confirmed' } : h)
-        );
-
-        // Also push into active reservations in hotel_reservations_v2
-        try {
-            const existingResStr = localStorage.getItem('hotel_reservations_v2');
-            const existingRes = existingResStr ? JSON.parse(existingResStr) : [];
-            const newRes = {
-                id: Date.now(),
-                reservationNumber: `RES-${String(Math.floor(100000 + Math.random() * 900000))}`,
-                guestName: item.guestName,
-                phone: item.contact || '+880 1711-000000',
-                roomNumber: '102',
-                roomType: item.roomType,
-                roomStatus: 'clean',
-                checkIn: item.checkInDate,
-                checkOut: item.checkOutDate,
-                nights: 3,
-                adults: 2,
-                children: 0,
-                totalAmount: item.estimatedAmount,
-                paidAmount: item.depositRequiredBDT || 0,
-                dueAmount: Math.max(0, item.estimatedAmount - (item.depositRequiredBDT || 0)),
-                status: 'arriving',
-                source: 'Confirmed from Hold',
-                vip: 'VIP',
-                specialRequests: `Converted from Hold ${item.reservationNumber}`
-            };
-            existingRes.unshift(newRes);
-            localStorage.setItem('hotel_reservations_v2', JSON.stringify(existingRes));
-        } catch (e) {
-            console.error('Failed to convert hold to reservation', e);
-        }
-
-        showToast(`Hold ${item.reservationNumber} converted to active Confirmed Reservation!`);
+    const handleConfirmBooking = async (item: HoldItem) => {
+        setConfirmModalItem(item);
+        setConfirmDeposit(item.depositRequiredBDT || 0);
+        setConfirmMethod('Cash');
+        setConfirmNotes('');
     };
 
-    const handleReleaseHold = (id: number) => {
-        if (window.confirm('Release and cancel this hold booking? Room inventory will be freed for public sale.')) {
-            setHolds(prev => prev.filter(h => h.id !== id));
-            showToast('Hold reservation released. Room inventory unlocked.');
+    const handleExecuteConfirm = async () => {
+        if (!confirmModalItem) return;
+
+        await confirmHoldReservationInDB(
+            confirmModalItem.reservationNumber,
+            confirmDeposit,
+            confirmMethod,
+            confirmNotes || 'Confirmed from Hold Management queue'
+        );
+
+        // Update local holds list if present
+        try {
+            const rawSaved = localStorage.getItem('hotel_holds_v2');
+            if (rawSaved) {
+                const parsed = JSON.parse(rawSaved);
+                const updated = parsed.map((h: any) =>
+                    h.reservationNumber === confirmModalItem.reservationNumber ? { ...h, status: 'Confirmed' } : h
+                );
+                localStorage.setItem('hotel_holds_v2', JSON.stringify(updated));
+            }
+        } catch {}
+
+        setReservationsVersion(v => v + 1);
+        showToast(`Reservation ${confirmModalItem.reservationNumber} upgraded to CONFIRMED!`);
+        setConfirmModalItem(null);
+    };
+
+    const handleReleaseHold = async (item: HoldItem) => {
+        if (window.confirm(`Release hold for ${item.reservationNumber}? Room inventory will immediately unlock for public sale.`)) {
+            await releaseHoldReservationInDB(item.reservationNumber, 'Released from Hold Manager queue');
+
+            try {
+                const rawSaved = localStorage.getItem('hotel_holds_v2');
+                if (rawSaved) {
+                    const parsed = JSON.parse(rawSaved);
+                    const updated = parsed.filter((h: any) => h.reservationNumber !== item.reservationNumber);
+                    localStorage.setItem('hotel_holds_v2', JSON.stringify(updated));
+                }
+            } catch {}
+
+            setReservationsVersion(v => v + 1);
+            showToast(`Hold ${item.reservationNumber} released. Room inventory unlocked.`);
         }
     };
 
@@ -164,8 +279,8 @@ export const ReservationHold: React.FC = () => {
     }, [holds, searchQuery, filterStatus]);
 
     const activeHolds = useMemo(() => holds.filter(h => h.status === 'Hold'), [holds]);
-    const expiringTodayCount = useMemo(() => holds.filter(h => h.status === 'Hold' && h.holdEndDate <= '2026-07-01').length, [holds]);
-    const totalPotentialRevenue = useMemo(() => holds.reduce((acc, h) => acc + (Number(h.estimatedAmount) || 0), 0), [holds]);
+    const expiringTodayCount = useMemo(() => holds.filter(h => h.status === 'Hold' && h.holdEndDate <= operatingDate).length, [holds, operatingDate]);
+    const totalPotentialRevenue = useMemo(() => activeHolds.reduce((acc, h) => acc + (Number(h.estimatedAmount) || 0), 0), [activeHolds]);
 
     return (
         <div className="p-3 sm:p-4 max-w-[1400px] mx-auto space-y-3 font-sans select-none animate-in fade-in duration-150">
@@ -233,7 +348,7 @@ export const ReservationHold: React.FC = () => {
                 </div>
 
                 <div className="card-container p-4">
-                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Potential Revenue</span>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Held Potential Revenue</span>
                     <div className="text-2xl font-black text-slate-900 font-mono mt-1">BDT {totalPotentialRevenue.toLocaleString()}</div>
                     <p className="text-[11px] text-slate-500 mt-1 font-medium">Held inventory value</p>
                 </div>
@@ -260,8 +375,9 @@ export const ReservationHold: React.FC = () => {
                             onChange={e => setFilterStatus(e.target.value as any)}
                             className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:border-blue-500"
                         >
-                            <option value="all">All Holds</option>
+                            <option value="all">All Records</option>
                             <option value="Hold">Active Hold</option>
+                            <option value="Reserved">Reserve (Unpaid)</option>
                             <option value="Confirmed">Confirmed Bookings</option>
                             <option value="Expired">Expired</option>
                         </select>
@@ -272,6 +388,7 @@ export const ReservationHold: React.FC = () => {
                         onClick={() => {
                             setSearchQuery('');
                             setFilterStatus('all');
+                            setReservationsVersion(v => v + 1);
                         }}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                         title="Reset Filters"
@@ -291,7 +408,7 @@ export const ReservationHold: React.FC = () => {
                                 <th className="py-2.5 px-3 w-40">Room Category</th>
                                 <th className="py-2.5 px-3 w-40">Intended Stay</th>
                                 <th className="py-2.5 px-3 w-48">Hold Expiry Deadline</th>
-                                <th className="py-2.5 px-3 min-w-[180px]">Hold Reason</th>
+                                <th className="py-2.5 px-3 min-w-[180px]">Hold Reason / Status</th>
                                 <th className="py-2.5 px-3 w-36 text-right">Tariff Value</th>
                                 <th className="py-2.5 px-3.5 w-44 text-right pr-4">Actions</th>
                             </tr>
@@ -300,18 +417,23 @@ export const ReservationHold: React.FC = () => {
                             {filtered.length > 0 ? (
                                 filtered.map(h => {
                                     const isHold = h.status === 'Hold';
-                                    const isExpiring = isHold && h.holdEndDate <= '2026-07-01';
+                                    const isReserved = h.status === 'Reserved';
+                                    const isExpiring = isHold && h.holdEndDate <= operatingDate;
 
                                     return (
                                         <tr key={h.id} className="hover:bg-amber-50/15 transition-colors">
                                             {/* Guest & Reference */}
                                             <td className="py-2.5 px-3.5">
                                                 <div className="flex items-center gap-2.5">
-                                                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center text-xs flex-shrink-0">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs flex-shrink-0 font-bold ${
+                                                        isHold ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                                                        isReserved ? 'bg-slate-100 text-slate-800 border border-slate-300' :
+                                                        'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                    }`}>
                                                         {h.guestName.charAt(0)}
                                                     </div>
                                                     <div>
-                                                        <div className="text-slate-900">{h.guestName}</div>
+                                                        <div className="text-slate-900 font-semibold">{h.guestName}</div>
                                                         <div className="text-[10.5px] text-slate-500 mt-0.5 flex items-center gap-1.5">
                                                             <span className="font-mono text-blue-700 font-semibold">{h.reservationNumber}</span>
                                                             {h.contact && (
@@ -327,8 +449,10 @@ export const ReservationHold: React.FC = () => {
 
                                             {/* Category */}
                                             <td className="py-2.5 px-3">
-                                                <span className="text-slate-800">{h.roomType}</span>
-                                                <span className="text-[10px] text-slate-400 block mt-0.5">Tentative Lock</span>
+                                                <span className="text-slate-800 font-medium">{h.roomType}</span>
+                                                <span className="text-[10px] text-slate-400 block mt-0.5">
+                                                    {h.roomNumber ? `Room ${h.roomNumber}` : 'Unassigned'}
+                                                </span>
                                             </td>
 
                                             {/* Stay Dates */}
@@ -340,15 +464,29 @@ export const ReservationHold: React.FC = () => {
 
                                             {/* Hold Deadline */}
                                             <td className="py-2.5 px-3">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-amber-900 text-xs">{h.holdEndDate}</span>
-                                                    {isExpiring && (
-                                                        <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 text-[9px] animate-pulse">
-                                                            Expires Today!
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <span className="text-[10px] text-slate-400 block mt-0.5">Auto-release at 18:00</span>
+                                                {isHold ? (
+                                                    <>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-amber-900 font-semibold text-xs">{h.holdEndDate}</span>
+                                                            {isExpiring && (
+                                                                <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 text-[9px] animate-pulse font-bold">
+                                                                    Expires Today!
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-[10px] text-slate-400 block mt-0.5">Auto-release at 18:00</span>
+                                                    </>
+                                                ) : isReserved ? (
+                                                    <div>
+                                                        <span className="text-slate-700 font-medium text-xs">Non-Guaranteed</span>
+                                                        <span className="text-[10px] text-amber-600 block mt-0.5">Pending Advance Payment</span>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <span className="text-emerald-700 font-medium text-xs">Guaranteed</span>
+                                                        <span className="text-[10px] text-slate-400 block mt-0.5">Payment Verified</span>
+                                                    </div>
+                                                )}
                                             </td>
 
                                             {/* Reason */}
@@ -360,24 +498,24 @@ export const ReservationHold: React.FC = () => {
 
                                             {/* Tariff */}
                                             <td className="py-2.5 px-3 text-right">
-                                                <div className="font-mono text-slate-900 text-xs">
-                                                    ৳{h.estimatedAmount.toLocaleString()}
+                                                <div className="font-mono text-slate-900 text-xs font-bold">
+                                                    {currencySymbol}{h.estimatedAmount.toLocaleString()}
                                                 </div>
                                                 <span className="text-[9.5px] text-slate-400 block mt-0.5">
-                                                    Dep: ৳{(h.depositRequiredBDT || 0).toLocaleString()}
+                                                    Dep: {currencySymbol}{(h.depositRequiredBDT || 0).toLocaleString()} | Paid: {currencySymbol}{(h.paidAmount || 0).toLocaleString()}
                                                 </span>
                                             </td>
 
                                             {/* Actions */}
                                             <td className="py-2.5 px-3.5 text-right pr-4">
                                                 <div className="flex items-center justify-end gap-1.5">
-                                                    {isHold ? (
+                                                    {isHold || isReserved ? (
                                                         <>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleConfirmBooking(h)}
-                                                                className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                                                title="Convert Hold into Confirmed Active Booking"
+                                                                className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs font-semibold"
+                                                                title="Convert to Confirmed Active Booking"
                                                             >
                                                                 <Check size={11} className="stroke-[3]" />
                                                                 <span>Confirm</span>
@@ -385,7 +523,7 @@ export const ReservationHold: React.FC = () => {
 
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleReleaseHold(h.id)}
+                                                                onClick={() => handleReleaseHold(h)}
                                                                 className="h-7 px-2 border border-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold rounded-lg text-[10.5px] cursor-pointer transition-colors"
                                                                 title="Release Room back to General Sale"
                                                             >
@@ -393,7 +531,7 @@ export const ReservationHold: React.FC = () => {
                                                             </button>
                                                         </>
                                                     ) : (
-                                                        <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                        <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
                                                             {h.status}
                                                         </span>
                                                     )}
@@ -417,6 +555,113 @@ export const ReservationHold: React.FC = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Confirm & Record Deposit Modal */}
+            {confirmModalItem && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-w-[480px] w-full overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/70">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm">
+                                    <Check size={18} className="stroke-[3]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900">Confirm Reservation</h3>
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">Upgrade {confirmModalItem.reservationNumber} to Confirmed</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setConfirmModalItem(null)}
+                                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-xs">
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Guest:</span>
+                                    <span className="font-semibold text-slate-800">{confirmModalItem.guestName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Room / Category:</span>
+                                    <span className="font-semibold text-slate-800">{confirmModalItem.roomType}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Stay Total:</span>
+                                    <span className="font-bold text-slate-900 font-mono">{currencySymbol}{confirmModalItem.estimatedAmount.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        Advance Deposit ({currencyCode})
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={confirmDeposit}
+                                        onChange={e => setConfirmDeposit(Number(e.target.value))}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-xs outline-none focus:border-blue-500 shadow-2xs font-semibold"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                        Payment Method
+                                    </label>
+                                    <select
+                                        value={confirmMethod}
+                                        onChange={e => setConfirmMethod(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+                                    >
+                                        <option value="Cash">Cash</option>
+                                        <option value="Credit Card">Credit Card</option>
+                                        <option value="bKash">bKash</option>
+                                        <option value="Nagad">Nagad</option>
+                                        <option value="Bank Wire">Bank Wire</option>
+                                        <option value="City Ledger">City Ledger / Corporate</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                                    Confirmation Note / Trx ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={confirmNotes}
+                                    onChange={e => setConfirmNotes(e.target.value)}
+                                    placeholder="e.g. Deposit cleared, Trx # BK-992144"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 shadow-2xs"
+                                />
+                            </div>
+
+                            <div className="pt-3 -mx-6 -mb-6 px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmModalItem(null)}
+                                    className="h-9 px-4 border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleExecuteConfirm}
+                                    className="h-9 px-4.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+                                >
+                                    <Check size={14} className="stroke-[3]" />
+                                    <span>Confirm Reservation</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Create Hold Modal */}
             {isModalOpen && (
@@ -474,10 +719,9 @@ export const ReservationHold: React.FC = () => {
                                         onChange={e => setForm({ ...form, roomType: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                                     >
-                                        <option value="Deluxe Double">Deluxe Double</option>
-                                        <option value="Superior King">Superior King</option>
-                                        <option value="Executive Suite">Executive Suite</option>
-                                        <option value="Standard Single">Standard Single</option>
+                                        {dynamicRoomTypes.map(rt => (
+                                            <option key={rt.code} value={rt.name}>{rt.name}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>

@@ -68,11 +68,14 @@ import {
     getRoomSmokingPolicy,
     getHotelReservationPolicies,
     getOperatingSystemDate,
+    determineBookingStatusFromPayment,
+    calculateHoldCutoffTimestamp,
     type StoredReservation,
     type ConnectingSuite
 } from '../utils/roomInventoryEngine';
 import { toast } from '../context/ToastContext';
 import { useProperty } from '../context/PropertyContext';
+import { getCurrencySymbol } from '../utils/currencyUtils';
 import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
 import {
     calculateReservationTaxes,
@@ -112,6 +115,7 @@ export const AddReservation: React.FC = () => {
     const { setActivePage } = useNavigation();
     const { activeProperty } = useProperty();
     const currencyCode = activeProperty?.currency || 'BDT';
+    const currencySymbol = getCurrencySymbol(currencyCode);
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     // ==========================================
@@ -1530,7 +1534,12 @@ export const AddReservation: React.FC = () => {
 
         const reservationNumber = editingReservation?.reservationNumber || `RES-${String(Math.floor(100000 + Math.random() * 900000))}`;
         const reservationId = editingReservation?.id || Date.now();
-        const statusVal = actionType === 'checkin' ? 'in-house' : actionType === 'hold' ? 'hold' : (editingReservation?.status || 'confirmed');
+        const paymentEval = determineBookingStatusFromPayment(totalPaid, finalPayable, netBaseAmount);
+        const statusVal = actionType === 'checkin' 
+            ? 'in-house' 
+            : actionType === 'hold' 
+                ? 'hold' 
+                : (editingReservation ? (totalPaid > 0 ? 'confirmed' : editingReservation.status) : paymentEval.status);
 
         // Allocate physical rooms strictly from genuinely available rooms across ALL rows and their quantities
         const usedRoomsAcrossBooking = new Set<string>();
@@ -1630,6 +1639,10 @@ export const AddReservation: React.FC = () => {
             adults: mainRoom.adults,
             children: mainRoom.children,
             status: statusVal,
+            isGuaranteed: totalPaid > 0,
+            holdType: statusVal === 'hold' ? 'SIX_PM_RELEASE' : undefined,
+            holdUntil: statusVal === 'hold' ? calculateHoldCutoffTimestamp('SIX_PM_RELEASE', checkIn) : undefined,
+            holdReason: statusVal === 'hold' ? (remarksMap['Guest'] || 'Tentative hold from Add Reservation') : undefined,
             totalAmount: finalPayable,
             paidAmount: actionType === 'hold' ? 0 : totalPaid,
             dueAmount: actionType === 'hold' ? finalPayable : totalDue,
@@ -1907,7 +1920,17 @@ export const AddReservation: React.FC = () => {
             console.error('Error synchronizing guest profile:', e);
         }
 
-        toast.success(`Reservation ${reservationNumber} confirmed successfully!`);
+        toast.success(
+            editingReservation 
+                ? `Reservation ${reservationNumber} updated successfully!` 
+                : statusVal === 'hold' 
+                    ? `Reservation ${reservationNumber} placed on Hold!` 
+                    : statusVal === 'in-house'
+                        ? `Reservation ${reservationNumber} checked in successfully!`
+                        : statusVal === 'confirmed'
+                            ? `Reservation ${reservationNumber} confirmed successfully (Paid: ${currencySymbol} ${totalPaid.toLocaleString()})!`
+                            : `Reservation ${reservationNumber} saved as Reserve (Non-Guaranteed)!`
+        );
         setCreatedReservation(newReservation);
     };
 
@@ -2406,7 +2429,7 @@ export const AddReservation: React.FC = () => {
                                                                         <span className="truncate">{activeNames.slice(0, 2).join(', ')}{activeNames.length > 2 ? ` +${activeNames.length - 2}` : ''}{scopeLabel}</span>
                                                                     </div>
                                                                     <span className="text-[9px] text-blue-700 bg-white/90 px-1 rounded border border-blue-200/60 flex-shrink-0 ml-1">
-                                                                        +৳{addonsCost.toLocaleString()}
+                                                                        +{currencySymbol}{addonsCost.toLocaleString()}
                                                                     </span>
                                                                 </button>
                                                             );
@@ -2706,11 +2729,11 @@ export const AddReservation: React.FC = () => {
                                                         return (
                                                             <td className="p-1.5 text-gray-900 text-right whitespace-nowrap">
                                                                 <div className="font-bold text-slate-900 font-mono text-xs">
-                                                                    ৳{rowTotal.toLocaleString()}
+                                                                    {currencySymbol}{rowTotal.toLocaleString()}
                                                                 </div>
                                                                 {rowAddons > 0 ? (
-                                                                    <div className="text-[9px] text-slate-500 font-mono" title={`Base Tariff: ৳${rowBase.toLocaleString()} + Services: ৳${rowAddons.toLocaleString()}`}>
-                                                                        +৳{rowAddons.toLocaleString()} svc
+                                                                    <div className="text-[9px] text-slate-500 font-mono" title={`Base Tariff: ${currencySymbol}${rowBase.toLocaleString()} + Services: ${currencySymbol}${rowAddons.toLocaleString()}`}>
+                                                                        +{currencySymbol}{rowAddons.toLocaleString()} svc
                                                                     </div>
                                                                 ) : isCustomRN ? (
                                                                     <div className="text-[8.5px] font-mono text-blue-700 font-semibold" title={`${totalRN} total room-nights across this row`}>
@@ -4024,7 +4047,7 @@ export const AddReservation: React.FC = () => {
                                         <span>Settlement Summary</span>
                                         {totalAllAddonsCharges > 0 && (
                                             <span className="text-[9.5px] text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
-                                                Addons: +৳{totalAllAddonsCharges.toFixed(0)}
+                                                Addons: +{currencySymbol}{totalAllAddonsCharges.toFixed(0)}
                                             </span>
                                         )}
                                     </h3>
@@ -4032,7 +4055,7 @@ export const AddReservation: React.FC = () => {
                                     <div className="space-y-1 text-[11px]">
                                         <div className="flex items-center justify-between py-0.5 text-gray-600">
                                             <span>Room Base Tariff:</span>
-                                            <span className="text-gray-900 font-mono">৳ {roomBaseTotal.toFixed(2)}</span>
+                                            <span className="text-gray-900 font-mono">{currencySymbol} {roomBaseTotal.toFixed(2)}</span>
                                         </div>
 
                                         {totalPickupArrivalCharge > 0 && (
@@ -4041,7 +4064,7 @@ export const AddReservation: React.FC = () => {
                                                     <Car size={11} />
                                                     <span>Airport Pickup (Inbound):</span>
                                                 </span>
-                                                <span className="font-mono">+৳ {totalPickupArrivalCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalPickupArrivalCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
@@ -4051,7 +4074,7 @@ export const AddReservation: React.FC = () => {
                                                     <Plane size={11} />
                                                     <span>Airport Drop (Outbound):</span>
                                                 </span>
-                                                <span className="font-mono">+৳ {totalDropDepartureCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalDropDepartureCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
@@ -4061,7 +4084,7 @@ export const AddReservation: React.FC = () => {
                                                     <BedDouble size={11} />
                                                     <span>Extra Bed / Cot Surcharge:</span>
                                                 </span>
-                                                <span className="font-mono">+৳ {totalExtraBedCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalExtraBedCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
@@ -4071,7 +4094,7 @@ export const AddReservation: React.FC = () => {
                                                     <Utensils size={11} />
                                                     <span>Meal Plans &amp; Dining:</span>
                                                 </span>
-                                                <span className="font-mono">+৳ {totalMealPlanCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalMealPlanCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
@@ -4081,7 +4104,7 @@ export const AddReservation: React.FC = () => {
                                                     <Gift size={11} />
                                                     <span>Celebration &amp; Room Decor:</span>
                                                 </span>
-                                                <span className="font-mono">+৳ {totalCelebrationCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalCelebrationCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
@@ -4091,7 +4114,7 @@ export const AddReservation: React.FC = () => {
                                                     <Sparkles size={11} />
                                                     <span>Wellness &amp; Spa Treatments:</span>
                                                 </span>
-                                                <span className="font-mono">+৳ {totalSpaCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalSpaCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
@@ -4101,28 +4124,28 @@ export const AddReservation: React.FC = () => {
                                                     <Clock size={11} />
                                                     <span>Early / Late Check-In Flex:</span>
                                                 </span>
-                                                <span className="font-mono">+৳ {totalTimingCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalTimingCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
                                         {totalCustomCharge > 0 && (
                                             <div className="flex items-center justify-between py-0.5 text-purple-700">
                                                 <span>Custom Ancillary Add-Ons:</span>
-                                                <span className="font-mono">+৳ {totalCustomCharge.toFixed(2)}</span>
+                                                <span className="font-mono">+{currencySymbol} {totalCustomCharge.toFixed(2)}</span>
                                             </div>
                                         )}
 
                                         <div className="flex items-center justify-between py-0.5 text-gray-700 border-t border-gray-100 pt-1 font-semibold">
                                             <span>Gross Total:</span>
-                                            <span className="text-gray-900 font-mono">৳ {grossTotal.toFixed(2)}</span>
+                                            <span className="text-gray-900 font-mono">{currencySymbol} {grossTotal.toFixed(2)}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-0.5 text-gray-600">
                                             <span>Discounted Amount:</span>
-                                            <span className="text-emerald-600 font-mono">-৳ {discountedAmount.toFixed(2)}</span>
+                                            <span className="text-emerald-600 font-mono">-{currencySymbol} {discountedAmount.toFixed(2)}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-0.5 text-gray-700 text-[10.5px]">
                                             <span>Net Base (Taxable):</span>
-                                            <span className="font-semibold font-mono text-gray-900">৳ {netBaseAmount.toFixed(2)}</span>
+                                            <span className="font-semibold font-mono text-gray-900">{currencySymbol} {netBaseAmount.toFixed(2)}</span>
                                         </div>
 
                                         {/* Statutory Taxes & VAT itemized breakdown from /taxes-vat */}
@@ -4130,7 +4153,7 @@ export const AddReservation: React.FC = () => {
                                             <div className="my-1 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
                                                 <div className="flex items-center justify-between text-[9.5px] text-slate-500 uppercase tracking-wider pb-0.5 border-b border-slate-200">
                                                     <span>{taxCalculation.configCode} Tax Rules</span>
-                                                    <span className="text-blue-700 font-mono">+৳ {taxCalculation.totalTaxAmount.toFixed(2)}</span>
+                                                    <span className="text-blue-700 font-mono">+{currencySymbol} {taxCalculation.totalTaxAmount.toFixed(2)}</span>
                                                 </div>
                                                 {taxCalculation.breakdown.map((item, idx) => (
                                                     <div key={idx} className="flex justify-between text-[10.5px] text-slate-600">
@@ -4138,7 +4161,7 @@ export const AddReservation: React.FC = () => {
                                                             {item.name} ({item.rate}%):
                                                         </span>
                                                         <span className="font-mono text-slate-800 font-semibold">
-                                                            +৳ {item.amount.toFixed(2)}
+                                                            +{currencySymbol} {item.amount.toFixed(2)}
                                                         </span>
                                                     </div>
                                                 ))}
@@ -4146,21 +4169,21 @@ export const AddReservation: React.FC = () => {
                                         ) : (
                                             <div className="my-1 py-1 px-2 bg-amber-50 border border-amber-200 rounded text-[10.5px] text-amber-800 font-medium flex justify-between">
                                                 <span>Tax Exemption</span>
-                                                <span className="font-mono">৳ 0.00 (Exempt)</span>
+                                                <span className="font-mono">{currencySymbol} 0.00 (Exempt)</span>
                                             </div>
                                         )}
 
                                         <div className="flex items-center justify-between py-1 px-1.5 bg-blue-50/80 border border-blue-100 rounded text-blue-900 font-bold">
                                             <span>Grand Total (Payable):</span>
-                                            <span className="font-mono text-xs font-extrabold">৳ {finalPayable.toFixed(2)}</span>
+                                            <span className="font-mono text-xs font-extrabold">{currencySymbol} {finalPayable.toFixed(2)}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-0.5 text-gray-600">
                                             <span>Total Paid:</span>
-                                            <span className="text-blue-700 font-mono">৳ {totalPaid.toFixed(2)}</span>
+                                            <span className="text-blue-700 font-mono">{currencySymbol} {totalPaid.toFixed(2)}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-1 px-2 bg-rose-50 border border-rose-200 rounded text-rose-800 font-bold">
                                             <span>Total Due Balance:</span>
-                                            <span className="font-mono text-xs">৳ {totalDue.toFixed(2)}</span>
+                                            <span className="font-mono text-xs">{currencySymbol} {totalDue.toFixed(2)}</span>
                                         </div>
                                     </div>
 
@@ -4237,14 +4260,14 @@ export const AddReservation: React.FC = () => {
                                         Total Estimated: <strong className="text-blue-900 font-mono text-xs font-bold ml-1">{finalPayable.toFixed(2)}</strong> <span className="ml-0.5">{currencyCode}</span>
                                         {taxCalculation.totalTaxAmount > 0 && (
                                             <span className="ml-1 text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 font-normal">
-                                                (incl. VAT & Tax ৳{taxCalculation.totalTaxAmount.toFixed(2)})
+                                                (incl. VAT & Tax {currencySymbol}{taxCalculation.totalTaxAmount.toFixed(2)})
                                             </span>
                                         )}
                                     </span>
                                 </span>
                             )}
                             {step === 2 && `Guest: ${guestName || 'Not entered'} | Phone: ${mobile || 'N/A'}`}
-                            {step === 3 && `Payable: ৳${finalPayable.toFixed(2)} | Paid: ৳${totalPaid.toFixed(2)} | Due: ৳${totalDue.toFixed(2)}`}
+                            {step === 3 && `Payable: ${currencySymbol}${finalPayable.toFixed(2)} | Paid: ${currencySymbol}${totalPaid.toFixed(2)} | Due: ${currencySymbol}${totalDue.toFixed(2)}`}
                         </div>
                     </div>
 
@@ -4330,9 +4353,9 @@ export const AddReservation: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => handleFinalizeBooking('reserve')}
-                                            className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] cursor-pointer transition-colors shadow-2xs"
+                                            className="h-7 px-4 bg-[#1e3a8a] hover:bg-blue-900 text-white rounded text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs"
                                         >
-                                            Confirm Reserve
+                                            {totalPaid > 0 ? `Confirm Booking (Paid ${currencySymbol} ${totalPaid.toLocaleString()})` : 'Save as Reserve'}
                                         </button>
                                     </>
                                 )}
@@ -4373,16 +4396,16 @@ export const AddReservation: React.FC = () => {
                             {createdReservation.taxApplicable && (createdReservation.totalTaxAmount > 0) && (
                                 <div className="flex justify-between text-gray-600">
                                     <span>Taxes &amp; VAT ({createdReservation.taxConfigCode}):</span>
-                                    <strong className="text-blue-700 font-mono">+৳{(createdReservation.totalTaxAmount || 0).toFixed(2)}</strong>
+                                    <strong className="text-blue-700 font-mono">+{currencySymbol}{(createdReservation.totalTaxAmount || 0).toFixed(2)}</strong>
                                 </div>
                             )}
                             <div className="flex justify-between text-gray-800 font-semibold border-t border-gray-200 pt-1">
                                 <span>Grand Total (Payable):</span>
-                                <strong className="text-gray-900 font-mono">৳{createdReservation.totalAmount.toFixed(2)}</strong>
+                                <strong className="text-gray-900 font-mono">{currencySymbol}{createdReservation.totalAmount.toFixed(2)}</strong>
                             </div>
                             <div className="flex justify-between text-rose-700 font-semibold">
                                 <span>Due Balance:</span>
-                                <strong className="font-mono">৳{(createdReservation.dueAmount || 0).toFixed(2)}</strong>
+                                <strong className="font-mono">{currencySymbol}{(createdReservation.dueAmount || 0).toFixed(2)}</strong>
                             </div>
                             <div className="flex justify-between text-gray-600">
                                 <span>Status:</span>

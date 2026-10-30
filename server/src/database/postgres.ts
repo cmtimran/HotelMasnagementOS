@@ -94,6 +94,16 @@ export async function initPostgres(): Promise<boolean> {
                 await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS registration_number VARCHAR(64);');
                 await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS registration_date TIMESTAMP;');
                 await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS folio_number VARCHAR(64);');
+                await client.query('ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_status_check;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_type VARCHAR(50) DEFAULT \'SIX_PM_RELEASE\';');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_start_date DATE;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_until TIMESTAMPTZ;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_reason TEXT;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS deposit_required NUMERIC(14,2) DEFAULT 0.00;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS auto_release BOOLEAN DEFAULT TRUE;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS is_guaranteed BOOLEAN DEFAULT FALSE;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_released_at TIMESTAMPTZ;');
+                await client.query('ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_released_by BIGINT;');
 
                 await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS sub_booking_number VARCHAR(64);');
                 await client.query('ALTER TABLE reservation_rooms ADD COLUMN IF NOT EXISTS registration_number VARCHAR(64);');

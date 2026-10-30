@@ -286,6 +286,88 @@ export const bookingController = {
     }
   },
 
+  confirmHoldBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = getReqPropertyId(req);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.confirmHoldReservation(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_UPDATED',
+          reservationId: id,
+          status: 'confirmed',
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast confirm hold', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Reservation confirmed successfully' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  releaseHoldBooking: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = getReqPropertyId(req);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const updated = await bookingService.releaseHoldReservation(id, propertyId, req.body);
+      if (!updated) {
+        res.status(404).json({ success: false, error: 'Booking not found' });
+        return;
+      }
+
+      try {
+        broadcastServerEvent({
+          type: 'RESERVATION_UPDATED',
+          reservationId: id,
+          status: 'cancelled',
+          propertyId
+        });
+        broadcastServerEvent({
+          type: 'INVENTORY_REFRESH',
+          propertyId
+        });
+      } catch (err) {
+        console.warn('Failed to broadcast release hold', err);
+      }
+
+      res.json({ success: true, data: updated, message: 'Hold released successfully and inventory unlocked' });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
+  checkExpiredHolds: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const propertyId = getReqPropertyId(req);
+      const result = await bookingService.checkExpiredHolds(propertyId);
+      if (result.releasedCount > 0) {
+        try {
+          broadcastServerEvent({
+            type: 'INVENTORY_REFRESH',
+            propertyId
+          });
+        } catch (err) {
+          console.warn('Failed to broadcast expired holds refresh', err);
+        }
+      }
+      res.json({ success: true, data: result, message: `${result.releasedCount} expired hold(s) auto-released` });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  },
+
   voidBooking: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const propertyId = getReqPropertyId(req);

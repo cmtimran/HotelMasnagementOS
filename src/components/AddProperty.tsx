@@ -118,6 +118,17 @@ export const getDefaultUnifiedSettings = (targetProperty?: any) => ({
     allowGracePeriod: true,
     gracePeriodHours: 2,
     requireBookingGuarantee: true,
+    unpaidBookingDefaultStatus: 'reserved',
+    confirmationPaymentRule: 'any_payment',
+    confirmationMinPercentage: 20,
+    confirmationMinAmountBDT: 2000,
+    defaultHoldType: 'SIX_PM_RELEASE',
+    courtesyHoldDurationHours: 24,
+    corporateHoldDaysPrior: 3,
+    autoReleaseExpiredHolds: true,
+    holdReleaseGracePeriodMinutes: 30,
+    requireHoldReason: false,
+    allowCheckInForUnpaid: false,
     autoChargeNoShow: true,
     cityLedgerLimitBDT: 500000,
     agencyCommissionPct: 10,
@@ -1529,6 +1540,181 @@ const AddProperty: React.FC<AddPropertyProps> = ({
                                                         setSettings({
                                                             ...settings,
                                                             autoChargeNoShow: !settings.autoChargeNoShow
+                                                        })
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* 2. Reservation Guarantee & Hold Management */}
+                                        <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200/80 space-y-4">
+                                            <div className="flex items-center justify-between pb-1 border-b border-amber-200/60">
+                                                <div className="flex items-center gap-2">
+                                                    <Clock size={15} className="text-amber-700" />
+                                                    <h4 className="text-xs font-bold text-amber-900 uppercase tracking-tight">
+                                                        Hold &amp; Payment-Driven Confirmation Rules
+                                                    </h4>
+                                                </div>
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                                    PMS Guarantee Policy
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                                <FormField
+                                                    label="Unpaid Booking Default Status"
+                                                    hint="Initial status when 0 payment or deposit is received"
+                                                >
+                                                    <Select
+                                                        value={settings.unpaidBookingDefaultStatus || 'reserved'}
+                                                        onChange={(e: any) =>
+                                                            setSettings({ ...settings, unpaidBookingDefaultStatus: e.target.value })
+                                                        }
+                                                    >
+                                                        <option value="reserved">Reserve (Non-Guaranteed Booking)</option>
+                                                        <option value="hold">Automatic Hold (With Expiry Cutoff)</option>
+                                                        <option value="confirmed">Always Confirmed (No Guarantee Required)</option>
+                                                    </Select>
+                                                </FormField>
+
+                                                <FormField
+                                                    label="Payment Confirmation Rule"
+                                                    hint="Threshold that automatically promotes booking to Confirmed"
+                                                >
+                                                    <Select
+                                                        value={settings.confirmationPaymentRule || 'any_payment'}
+                                                        onChange={(e: any) =>
+                                                            setSettings({ ...settings, confirmationPaymentRule: e.target.value })
+                                                        }
+                                                    >
+                                                        <option value="any_payment">Any Advance Payment (&gt; ৳ 0)</option>
+                                                        <option value="first_night">100% of First Night Room Tariff</option>
+                                                        <option value="percentage">Fixed Percentage of Stay Total (%)</option>
+                                                        <option value="full_payment">100% Full Payment of Stay Total</option>
+                                                    </Select>
+                                                </FormField>
+
+                                                {settings.confirmationPaymentRule === 'percentage' && (
+                                                    <FormField
+                                                        label="Required Confirmation Deposit (%)"
+                                                        hint="Minimum percentage needed to mark as Confirmed"
+                                                    >
+                                                        <Input
+                                                            type="number"
+                                                            min={1}
+                                                            max={100}
+                                                            value={settings.confirmationMinPercentage || 20}
+                                                            onChange={(e: any) =>
+                                                                setSettings({ ...settings, confirmationMinPercentage: Number(e.target.value) })
+                                                            }
+                                                        />
+                                                    </FormField>
+                                                )}
+
+                                                <FormField
+                                                    label="Default Hold Release Policy"
+                                                    hint="Standard expiration rule for tentative holds"
+                                                >
+                                                    <Select
+                                                        value={settings.defaultHoldType || 'SIX_PM_RELEASE'}
+                                                        onChange={(e: any) =>
+                                                            setSettings({ ...settings, defaultHoldType: e.target.value })
+                                                        }
+                                                    >
+                                                        <option value="SIX_PM_RELEASE">6:00 PM Release on Check-In Day (Standard)</option>
+                                                        <option value="COURTESY_HOLD">Fixed Hours Courtesy Hold (e.g., 24 Hours)</option>
+                                                        <option value="CORPORATE_OPTION">Days Prior to Arrival (e.g., 3 Days Before)</option>
+                                                    </Select>
+                                                </FormField>
+
+                                                <FormField
+                                                    label="Hold Daily Cut-Off Time"
+                                                    hint="Daily time of day when tentative holds expire"
+                                                >
+                                                    <Input
+                                                        type="time"
+                                                        value={settings.autoReleaseHour || '18:00'}
+                                                        onChange={(e: any) =>
+                                                            setSettings({ ...settings, autoReleaseHour: e.target.value })
+                                                        }
+                                                    />
+                                                </FormField>
+
+                                                {settings.defaultHoldType === 'COURTESY_HOLD' && (
+                                                    <FormField
+                                                        label="Courtesy Hold Duration (Hours)"
+                                                        hint="Hours before release from reservation time"
+                                                    >
+                                                        <Input
+                                                            type="number"
+                                                            value={settings.courtesyHoldDurationHours || 24}
+                                                            onChange={(e: any) =>
+                                                                setSettings({ ...settings, courtesyHoldDurationHours: Number(e.target.value) })
+                                                            }
+                                                        />
+                                                    </FormField>
+                                                )}
+
+                                                {settings.defaultHoldType === 'CORPORATE_OPTION' && (
+                                                    <FormField
+                                                        label="Corporate Option Cut-off (Days Prior)"
+                                                        hint="Days before check-in date when hold expires"
+                                                    >
+                                                        <Input
+                                                            type="number"
+                                                            value={settings.corporateHoldDaysPrior || 3}
+                                                            onChange={(e: any) =>
+                                                                setSettings({ ...settings, corporateHoldDaysPrior: Number(e.target.value) })
+                                                            }
+                                                        />
+                                                    </FormField>
+                                                )}
+
+                                                <FormField
+                                                    label="Auto-Release Grace Buffer (Minutes)"
+                                                    hint="Buffer time before system frees room inventory"
+                                                >
+                                                    <Input
+                                                        type="number"
+                                                        value={settings.holdReleaseGracePeriodMinutes || 30}
+                                                        onChange={(e: any) =>
+                                                            setSettings({ ...settings, holdReleaseGracePeriodMinutes: Number(e.target.value) })
+                                                        }
+                                                    />
+                                                </FormField>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                                                <Checkbox
+                                                    label="Auto-Release Expired Holds"
+                                                    sub="Automatically cancel unconfirmed holds and unlock room inventory"
+                                                    checked={settings.autoReleaseExpiredHolds !== false}
+                                                    onChange={() =>
+                                                        setSettings({
+                                                            ...settings,
+                                                            autoReleaseExpiredHolds: !settings.autoReleaseExpiredHolds
+                                                        })
+                                                    }
+                                                />
+                                                <Checkbox
+                                                    label="Require Mandatory Hold Reason"
+                                                    sub="Prompt staff to enter justification when placing room on hold"
+                                                    checked={settings.requireHoldReason}
+                                                    onChange={() =>
+                                                        setSettings({
+                                                            ...settings,
+                                                            requireHoldReason: !settings.requireHoldReason
+                                                        })
+                                                    }
+                                                />
+                                                <Checkbox
+                                                    label="Strict Front Desk Check-In Policy"
+                                                    sub="Block check-in for unpaid / hold reservations unless payment is cleared"
+                                                    checked={settings.allowCheckInForUnpaid === false}
+                                                    onChange={() =>
+                                                        setSettings({
+                                                            ...settings,
+                                                            allowCheckInForUnpaid: !settings.allowCheckInForUnpaid
                                                         })
                                                     }
                                                 />
