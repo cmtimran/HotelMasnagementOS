@@ -448,6 +448,85 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
         );
     }, [booking]);
 
+    // Dynamic Room Types available for selection
+    const dynamicRoomTypes = useMemo(() => {
+        const listFromRooms = Array.from(new Set(allRooms.map(r => r.type).filter(Boolean)));
+        const listFromEngine = getDynamicRoomTypes().map(t => t.name).filter(Boolean);
+        const combined = Array.from(new Set([...listFromRooms, ...listFromEngine]));
+        return combined.length > 0 ? combined : ['Deluxe Suite', 'Deluxe Double', 'Superior King', 'Executive Suite'];
+    }, [allRooms]);
+
+    // Dynamic Rate Plans and Packages available for selection
+    const dynamicRatePlansAndPackages = useMemo(() => {
+        const plans = getDynamicRatePlans();
+        const pkgs = getDynamicPackages();
+        const result: Array<{ label: string; value: string; isPackage?: boolean }> = [];
+
+        if (booking?.ratePlan && !plans.some(p => p.name === booking.ratePlan || p.code === booking.ratePlan)) {
+            result.push({ label: `🏷️ ${booking.ratePlan}`, value: booking.ratePlan });
+        }
+        plans.forEach(p => {
+            result.push({ label: `🏷️ ${p.name || p.code}`, value: p.name || p.code });
+        });
+        pkgs.forEach(pkg => {
+            result.push({ label: `🎁 ${pkg.name || pkg.code}`, value: pkg.name || pkg.code, isPackage: true });
+        });
+        if (result.length === 0) {
+            result.push({ label: '🏷️ Direct BAR', value: 'Direct' });
+        }
+        return result;
+    }, [booking?.ratePlan]);
+
+    // Comprehensive Room Move & Upgrade Analysis Engine
+    const roomMoveAnalysis = useMemo(() => {
+        if (!booking) return null;
+        const currentRoomObj = allRooms.find(r => String(r.roomNumber) === String(booking.roomNumber));
+        const currentRoomType = booking.roomType || currentRoomObj?.type || 'Standard';
+        const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(moveSelectedRoom));
+        const targetRoomType = targetRoomObj?.type || (moveRoomType !== 'All' ? moveRoomType : currentRoomType);
+
+        const currentDailyRate = getStandardDailyRateForRoom(booking.roomNumber, currentRoomType);
+        const targetDailyRate = getStandardDailyRateForRoom(moveSelectedRoom, targetRoomType);
+        const dailyDiff = targetDailyRate - currentDailyRate;
+
+        const stayNights = Math.max(1, Math.round((new Date(moveToDate).getTime() - new Date(moveFromDate).getTime()) / 86400000) || (booking.nights || 1));
+        const totalDiff = dailyDiff * stayNights;
+
+        const isDifferentRoom = String(moveSelectedRoom) !== String(booking.roomNumber);
+        const isDifferentCategory = targetRoomType !== currentRoomType;
+
+        // Smart Category Hierarchy Check (Suite > Executive > Deluxe > Superior > Standard)
+        const isHigherCategory = (() => {
+            if (dailyDiff > 0) return true;
+            const normTarget = targetRoomType.toLowerCase();
+            const normCurrent = currentRoomType.toLowerCase();
+            if (normTarget.includes('suite') && !normCurrent.includes('suite')) return true;
+            if (normTarget.includes('executive') && !normCurrent.includes('executive')) return true;
+            if (normTarget.includes('deluxe') && (normCurrent.includes('standard') || normCurrent.includes('single'))) return true;
+            return false;
+        })();
+
+        const isUpgrade = isDifferentRoom && (isHigherCategory || (isDifferentCategory && dailyDiff >= 0));
+        const isDowngrade = isDifferentRoom && isDifferentCategory && !isHigherCategory && dailyDiff < 0;
+        const isSameCategory = isDifferentRoom && !isDifferentCategory;
+
+        return {
+            currentRoomType,
+            targetRoomType,
+            currentDailyRate,
+            targetDailyRate,
+            dailyDiff: Math.abs(dailyDiff),
+            totalDiff: Math.abs(totalDiff),
+            rawDailyDiff: dailyDiff,
+            rawTotalDiff: totalDiff,
+            stayNights,
+            isDifferentRoom,
+            isUpgrade,
+            isDowngrade,
+            isSameCategory,
+        };
+    }, [booking, allRooms, moveSelectedRoom, moveRoomType, moveToDate, moveFromDate]);
+
     if (!isOpen || !booking || !activeRoom) return null;
 
     const activeRoomNum = String(activeRoom.roomNumber || booking.roomNumber);
@@ -586,85 +665,6 @@ export const ReservationActionDrawer: React.FC<ReservationActionDrawerProps> = (
             rooms: roomRows
         };
     })();
-
-    // Dynamic Room Types available for selection
-    const dynamicRoomTypes = useMemo(() => {
-        const listFromRooms = Array.from(new Set(allRooms.map(r => r.type).filter(Boolean)));
-        const listFromEngine = getDynamicRoomTypes().map(t => t.name).filter(Boolean);
-        const combined = Array.from(new Set([...listFromRooms, ...listFromEngine]));
-        return combined.length > 0 ? combined : ['Deluxe Suite', 'Deluxe Double', 'Superior King', 'Executive Suite'];
-    }, [allRooms]);
-
-    // Dynamic Rate Plans and Packages available for selection
-    const dynamicRatePlansAndPackages = useMemo(() => {
-        const plans = getDynamicRatePlans();
-        const pkgs = getDynamicPackages();
-        const result: Array<{ label: string; value: string; isPackage?: boolean }> = [];
-
-        if (booking?.ratePlan && !plans.some(p => p.name === booking.ratePlan || p.code === booking.ratePlan)) {
-            result.push({ label: `🏷️ ${booking.ratePlan}`, value: booking.ratePlan });
-        }
-        plans.forEach(p => {
-            result.push({ label: `🏷️ ${p.name || p.code}`, value: p.name || p.code });
-        });
-        pkgs.forEach(pkg => {
-            result.push({ label: `🎁 ${pkg.name || pkg.code}`, value: pkg.name || pkg.code, isPackage: true });
-        });
-        if (result.length === 0) {
-            result.push({ label: '🏷️ Direct BAR', value: 'Direct' });
-        }
-        return result;
-    }, [booking?.ratePlan]);
-
-    // Comprehensive Room Move & Upgrade Analysis Engine
-    const roomMoveAnalysis = useMemo(() => {
-        if (!booking) return null;
-        const currentRoomObj = allRooms.find(r => String(r.roomNumber) === String(booking.roomNumber));
-        const currentRoomType = booking.roomType || currentRoomObj?.type || 'Standard';
-        const targetRoomObj = allRooms.find(r => String(r.roomNumber) === String(moveSelectedRoom));
-        const targetRoomType = targetRoomObj?.type || (moveRoomType !== 'All' ? moveRoomType : currentRoomType);
-
-        const currentDailyRate = getStandardDailyRateForRoom(booking.roomNumber, currentRoomType);
-        const targetDailyRate = getStandardDailyRateForRoom(moveSelectedRoom, targetRoomType);
-        const dailyDiff = targetDailyRate - currentDailyRate;
-
-        const stayNights = Math.max(1, Math.round((new Date(moveToDate).getTime() - new Date(moveFromDate).getTime()) / 86400000) || (booking.nights || 1));
-        const totalDiff = dailyDiff * stayNights;
-
-        const isDifferentRoom = String(moveSelectedRoom) !== String(booking.roomNumber);
-        const isDifferentCategory = targetRoomType !== currentRoomType;
-
-        // Smart Category Hierarchy Check (Suite > Executive > Deluxe > Superior > Standard)
-        const isHigherCategory = (() => {
-            if (dailyDiff > 0) return true;
-            const normTarget = targetRoomType.toLowerCase();
-            const normCurrent = currentRoomType.toLowerCase();
-            if (normTarget.includes('suite') && !normCurrent.includes('suite')) return true;
-            if (normTarget.includes('executive') && !normCurrent.includes('executive')) return true;
-            if (normTarget.includes('deluxe') && (normCurrent.includes('standard') || normCurrent.includes('single'))) return true;
-            return false;
-        })();
-
-        const isUpgrade = isDifferentRoom && (isHigherCategory || (isDifferentCategory && dailyDiff >= 0));
-        const isDowngrade = isDifferentRoom && isDifferentCategory && !isHigherCategory && dailyDiff < 0;
-        const isSameCategory = isDifferentRoom && !isDifferentCategory;
-
-        return {
-            currentRoomType,
-            targetRoomType,
-            currentDailyRate,
-            targetDailyRate,
-            dailyDiff: Math.abs(dailyDiff),
-            totalDiff: Math.abs(totalDiff),
-            rawDailyDiff: dailyDiff,
-            rawTotalDiff: totalDiff,
-            stayNights,
-            isDifferentRoom,
-            isUpgrade,
-            isDowngrade,
-            isSameCategory,
-        };
-    }, [booking, allRooms, moveSelectedRoom, moveRoomType, moveToDate, moveFromDate]);
 
     // Handle departure change in amend mode (with overbooking collision guard)
     const handleDepartureChange = (newDep: string) => {
