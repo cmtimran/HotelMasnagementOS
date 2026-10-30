@@ -309,6 +309,71 @@ export const useReservationBookingEngine = () => {
         };
     }, []);
 
+    // Helper: Determine the unified offer dropdown value ('pkg:<id>' or 'plan:<name>')
+    const getOfferValue = useCallback((item: { ratePlan?: string; packageId?: number | string }): string => {
+        if (item.packageId && item.packageId !== 'none' && item.packageId !== 0) return `pkg:${item.packageId}`;
+        if (item.ratePlan) return item.ratePlan.startsWith('plan:') ? item.ratePlan : `plan:${item.ratePlan}`;
+        const defPlan = availableRatePlans[0]?.name || '';
+        return defPlan ? `plan:${defPlan}` : '';
+    }, [availableRatePlans]);
+
+    // Helper: Resolve offer selection from unified dropdown
+    const resolveOfferSelection = useCallback((params: {
+        offerKey: string;
+        roomType: string;
+        adults: number;
+        children: number;
+        baseRate?: number;
+        nights?: number;
+    }) => {
+        const { offerKey, roomType, adults, children, baseRate, nights } = params;
+        const canonicalRate = baseRate !== undefined && baseRate > 0
+            ? baseRate
+            : getStandardDailyRateForRoom(undefined, roomType);
+
+        if (offerKey.startsWith('pkg:')) {
+            const pkgId = offerKey.replace(/^pkg:/, '');
+            const pkg = getPackageById(pkgId);
+            const defaultBasePlan = availableRatePlans[0]?.name || 'Standard Rate';
+            const rate = calculateRoomRate({
+                roomType,
+                ratePlan: defaultBasePlan,
+                packageId: pkgId,
+                adults,
+                children,
+                baseRate: canonicalRate,
+                nights
+            });
+            return {
+                offerKey: `pkg:${pkgId}`,
+                offerType: 'package' as const,
+                ratePlan: pkg?.name || defaultBasePlan,
+                packageId: pkg?.id || pkgId,
+                packageName: pkg?.name,
+                rate
+            };
+        } else {
+            const planName = offerKey.startsWith('plan:') ? offerKey.replace(/^plan:/, '') : offerKey;
+            const rate = calculateRoomRate({
+                roomType,
+                ratePlan: planName,
+                packageId: undefined,
+                adults,
+                children,
+                baseRate: canonicalRate,
+                nights
+            });
+            return {
+                offerKey: `plan:${planName}`,
+                offerType: 'rate_plan' as const,
+                ratePlan: planName,
+                packageId: undefined,
+                packageName: undefined,
+                rate
+            };
+        }
+    }, [availableRatePlans, getPackageById, calculateRoomRate]);
+
     return {
         availableRatePlans,
         availablePackages,
@@ -320,6 +385,8 @@ export const useReservationBookingEngine = () => {
         checkRatePlanRestrictions,
         validatePackageRestrictions,
         validateAllRoomRestrictions,
-        calculateBookingTotals
+        calculateBookingTotals,
+        getOfferValue,
+        resolveOfferSelection
     };
 };

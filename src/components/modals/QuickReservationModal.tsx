@@ -154,7 +154,10 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
         calculateRoomRate,
         getPackageById,
         getApplicablePackagesForRoomType,
-        validateAllRoomRestrictions
+        validateAllRoomRestrictions,
+        getOfferValue,
+        resolveOfferSelection,
+        validatePackageRestrictions
     } = useReservationBookingEngine();
 
     // Reservation Details
@@ -791,6 +794,46 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
             setPaymentRows([{ id: 1, method: 'Cash', amount: finalPayable }]);
         }
     }, [finalPayable]);
+
+    // Unified Rate / Package Offer Change Handler
+    const handleUnifiedOfferChange = (rowId: number, offerKey: string) => {
+        setRoomsList(roomsList.map(r => {
+            if (r.id !== rowId) return r;
+            const canonicalRoom = getCanonicalRooms().find(cr => cr.number === r.roomNumber);
+            const dynamicTypes = getDynamicRoomTypes();
+            const matchedType = dynamicTypes.find(t => t.name === r.roomType);
+            const canonicalRate = canonicalRoom?.baseRate || matchedType?.baseRate || r.rate || 3000;
+
+            const resolved = resolveOfferSelection({
+                offerKey,
+                roomType: r.roomType,
+                adults: r.adults,
+                children: r.children,
+                baseRate: canonicalRate,
+                nights
+            });
+
+            if (resolved.offerType === 'rate_plan') {
+                const restriction = validateRatePlanRestrictions(resolved.ratePlan, nights, checkInDate, availableRatePlans);
+                if (!restriction.allowed) {
+                    toast.warning(restriction.reason || 'Selected rate plan has stay duration restrictions.');
+                }
+            } else if (resolved.packageId) {
+                const pkgCheck = validatePackageRestrictions(resolved.packageId, nights);
+                if (!pkgCheck.isValid) {
+                    toast.warning(pkgCheck.error || 'Selected package has stay duration restrictions.');
+                }
+            }
+
+            return {
+                ...r,
+                ratePlan: resolved.ratePlan,
+                packageId: resolved.packageId,
+                packageName: resolved.packageName,
+                rate: resolved.rate
+            };
+        }));
+    };
 
     // Room handlers
     const handleAddRoom = () => {
@@ -1699,8 +1742,7 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                                 <th className="py-2 px-2.5 min-w-[120px]">Room Type</th>
                                                 <th className="py-2 px-1 text-center w-11">Qty</th>
-                                                <th className="py-2 px-2 min-w-[110px]">Rate Plan</th>
-                                                <th className="py-2 px-1.5 min-w-[110px]">Package</th>
+                                                <th className="py-2 px-2 min-w-[145px] max-w-[185px]">Rate / Package Offer</th>
                                                 <th className="py-2 px-1 text-center w-16">Room No.</th>
                                                 <th className="py-2 px-1 text-center w-11">Adult</th>
                                                 <th className="py-2 px-1 text-center w-22">Child</th>
@@ -1809,42 +1851,42 @@ export const QuickReservationModal: React.FC<QuickReservationModalProps> = ({
                                                             })()}
                                                         </td>
                                                         <td className="py-1.5 px-2">
-                                                            <select
-                                                                value={item.ratePlan}
-                                                                onChange={e => handleRoomFieldChange(item.id, 'ratePlan', e.target.value)}
-                                                                className="w-full min-w-[110px] max-w-[135px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                            >
-                                                                {availableRatePlans.length === 0 ? (
-                                                                    <option value="" disabled>No rate plans configured</option>
-                                                                ) : (
-                                                                    availableRatePlans.map(p => {
-                                                                        const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
-                                                                        const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
-                                                                        return (
-                                                                            <option key={p.id} value={p.name} disabled={isPlanDisabled}>
-                                                                                {p.name}{badge}
-                                                                            </option>
-                                                                        );
-                                                                    })
-                                                                )}
-                                                            </select>
-                                                        </td>
-                                                        <td className="py-1.5 px-1.5">
                                                             {(() => {
                                                                 const applicablePkgs = getApplicablePackagesForRoomType(item.roomType);
+                                                                const currentOfferVal = getOfferValue(item);
+
                                                                 return (
                                                                     <select
-                                                                        value={item.packageId || ''}
-                                                                        onChange={e => handleRoomFieldChange(item.id, 'packageId', e.target.value)}
-                                                                        className="w-full min-w-[105px] max-w-[130px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                                        title={item.packageName || 'Select Package'}
+                                                                        value={currentOfferVal}
+                                                                        onChange={e => handleUnifiedOfferChange(item.id, e.target.value)}
+                                                                        className="w-full min-w-[145px] max-w-[185px] h-7 px-1.5 border border-slate-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium text-slate-800"
+                                                                        title="Select Rate Plan or Bundled Stay Package"
                                                                     >
-                                                                        <option value="">No Package (Standard)</option>
-                                                                        {applicablePkgs.map(p => (
-                                                                            <option key={p.id} value={p.id}>
-                                                                                {p.name}{p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : ''}
-                                                                            </option>
-                                                                        ))}
+                                                                        <optgroup label="── 🏷️ Rate Plans ──">
+                                                                            {availableRatePlans.length === 0 ? (
+                                                                                <option value="" disabled>No rate plans configured</option>
+                                                                            ) : (
+                                                                                availableRatePlans.map(p => {
+                                                                                    const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
+                                                                                    const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
+                                                                                    return (
+                                                                                        <option key={`plan:${p.name}`} value={`plan:${p.name}`} disabled={isPlanDisabled}>
+                                                                                            🏷️ {p.name}{badge}
+                                                                                        </option>
+                                                                                    );
+                                                                                })
+                                                                            )}
+                                                                        </optgroup>
+
+                                                                        {applicablePkgs.length > 0 && (
+                                                                            <optgroup label="── 🎁 Bundled Packages ──">
+                                                                                {applicablePkgs.map(p => (
+                                                                                    <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
+                                                                                        🎁 {p.name}{p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : ''}
+                                                                                    </option>
+                                                                                ))}
+                                                                            </optgroup>
+                                                                        )}
                                                                     </select>
                                                                 );
                                                             })()}

@@ -78,7 +78,8 @@ import {
 import { toast } from '../context/ToastContext';
 import { useProperty } from '../context/PropertyContext';
 import { getCurrencySymbol } from '../utils/currencyUtils';
-import { getApiBaseUrl, getActivePropertyId } from '../utils/apiUrl';
+import { useReservationBookingEngine } from '../hooks/useReservationBookingEngine';
+import { getActivePropertyId } from '../utils/apiUrl';
 import {
     calculateReservationTaxes,
     getActiveTaxConfiguration,
@@ -92,6 +93,8 @@ interface RoomRow {
     roomType: string;
     roomsCount: number;
     ratePlan: string;
+    packageId?: number | string;
+    packageName?: string;
     roomNumber: string;
     assignedRooms?: string[];
     adults: number;
@@ -848,35 +851,15 @@ export const AddReservation: React.FC = () => {
 
     const [pmsSyncVersion, setPmsSyncVersion] = useState(0);
 
-    const [dbRatePlans, setDbRatePlans] = useState<any[]>(() => {
-        try {
-            const saved = localStorage.getItem('hotel_rate_plans_v1');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed;
-                }
-            }
-        } catch { }
-        return [];
-    });
-
-    useEffect(() => {
-        const propId = getActivePropertyId();
-        if (propId > 0) {
-            fetch(`${getApiBaseUrl()}/api/rates/plans?propertyId=${propId}`)
-                .then(res => res.json())
-                .then(json => {
-                    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-                        setDbRatePlans(json.data);
-                        localStorage.setItem('hotel_rate_plans_v1', JSON.stringify(json.data));
-                    }
-                })
-                .catch(() => { });
-        }
-    }, [pmsSyncVersion]);
-
-    const availableRatePlans = dbRatePlans;
+    const {
+        availableRatePlans,
+        calculateRoomRate,
+        getApplicablePackagesForRoomType,
+        validateAllRoomRestrictions,
+        getOfferValue,
+        resolveOfferSelection,
+        validatePackageRestrictions
+    } = useReservationBookingEngine();
 
     // Connecting Suites from connecting_rooms table and localStorage
     const [connectingSuites, setConnectingSuites] = useState<ConnectingSuite[]>(() => getStoredConnectingSuites(getActivePropertyId()));
@@ -1140,6 +1123,43 @@ export const AddReservation: React.FC = () => {
         toast.success(`Split into ${count} individual room rows (${assigned.join(', ')})!`);
     };
 
+    // Unified Rate / Package Offer Change Handler
+    const handleUnifiedOfferChange = (rowId: number, offerKey: string) => {
+        setRoomsList(prev => prev.map(r => {
+            if (r.id !== rowId) return r;
+            const standardRate = getStandardDailyRateForRoom(r.roomNumber, r.roomType);
+
+            const resolved = resolveOfferSelection({
+                offerKey,
+                roomType: r.roomType,
+                adults: r.adults,
+                children: r.children,
+                baseRate: standardRate,
+                nights
+            });
+
+            if (resolved.offerType === 'rate_plan') {
+                const restriction = validateRatePlanRestrictions(resolved.ratePlan, nights, checkIn, availableRatePlans);
+                if (!restriction.allowed) {
+                    toast.warning(restriction.reason || 'Selected rate plan has stay duration restrictions.');
+                }
+            } else if (resolved.packageId) {
+                const pkgCheck = validatePackageRestrictions(resolved.packageId, nights);
+                if (!pkgCheck.isValid) {
+                    toast.warning(pkgCheck.error || 'Selected package has stay duration restrictions.');
+                }
+            }
+
+            return {
+                ...r,
+                ratePlan: resolved.ratePlan,
+                packageId: resolved.packageId,
+                packageName: resolved.packageName,
+                rate: resolved.rate
+            };
+        }));
+    };
+
     // Handlers
     const handleAddRoomRow = () => {
         if (remainingOverallFreeRooms <= 0) {
@@ -1166,7 +1186,14 @@ export const AddReservation: React.FC = () => {
         const nextRoom = freeRoom.number;
 
         const defPlan = availableRatePlans[0]?.name || '';
-        const defRate = calculateTariffForRatePlan(defPlan, freeRoom.roomTypeName, freeRoom.baseRate || 3000, 1, 0, availableRatePlans);
+        const defRate = calculateRoomRate({
+            roomType: freeRoom.roomTypeName,
+            ratePlan: defPlan,
+            adults: 1,
+            children: 0,
+            baseRate: freeRoom.baseRate || 3000,
+            nights
+        });
 
         setRoomsList([
             ...roomsList,
@@ -1218,7 +1245,15 @@ export const AddReservation: React.FC = () => {
         const safeAdults = Math.max(1, Math.min(row.adults, capacity.maxAdults));
         const safeChildren = Math.min(row.children, capacity.maxChildren);
         const standardRate = getStandardDailyRateForRoom(nextRoom, copiedType);
-        const resolvedRate = calculateTariffForRatePlan(row.ratePlan, copiedType, standardRate, safeAdults, safeChildren, availableRatePlans);
+        const resolvedRate = calculateRoomRate({
+            roomType: copiedType,
+            ratePlan: row.ratePlan,
+            packageId: row.packageId,
+            adults: safeAdults,
+            children: safeChildren,
+            baseRate: standardRate,
+            nights
+        });
 
         setRoomsList([
             ...roomsList,
@@ -1269,7 +1304,15 @@ export const AddReservation: React.FC = () => {
                         toast.warning(`Capacity Limit: Maximum ${capacity.maxAdults} adult(s) permitted for ${r.roomType}!`);
                     }
                     const standardRate = getStandardDailyRateForRoom(r.roomNumber, r.roomType);
-                    const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, standardRate, newAdults, r.children, availableRatePlans);
+                    const newRate = calculateRoomRate({
+                        roomType: r.roomType,
+                        ratePlan: r.ratePlan,
+                        packageId: r.packageId,
+                        adults: newAdults,
+                        children: r.children,
+                        baseRate: standardRate,
+                        nights
+                    });
                     return {
                         ...r,
                         adults: newAdults,
@@ -1284,7 +1327,15 @@ export const AddReservation: React.FC = () => {
                         toast.warning(`Capacity Limit: Maximum ${capacity.maxChildren} child(ren) permitted for ${r.roomType}!`);
                     }
                     const standardRate = getStandardDailyRateForRoom(r.roomNumber, r.roomType);
-                    const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, standardRate, r.adults, newChildren, availableRatePlans);
+                    const newRate = calculateRoomRate({
+                        roomType: r.roomType,
+                        ratePlan: r.ratePlan,
+                        packageId: r.packageId,
+                        adults: r.adults,
+                        children: newChildren,
+                        baseRate: standardRate,
+                        nights
+                    });
                     return {
                         ...r,
                         children: newChildren,
@@ -1378,7 +1429,15 @@ export const AddReservation: React.FC = () => {
                         toast.info(`Occupancy adjusted to fit ${value} limits (Max Adults: ${newCapacity.maxAdults}, Max Child: ${newCapacity.maxChildren}).`);
                     }
 
-                    const resolvedRate = calculateTariffForRatePlan(r.ratePlan, value, standardRate, clampedAdults, clampedChildren, availableRatePlans);
+                    const resolvedRate = calculateRoomRate({
+                        roomType: value,
+                        ratePlan: r.ratePlan,
+                        packageId: r.packageId,
+                        adults: clampedAdults,
+                        children: clampedChildren,
+                        baseRate: standardRate,
+                        nights
+                    });
                     return {
                         ...r,
                         roomType: value,
@@ -1394,7 +1453,15 @@ export const AddReservation: React.FC = () => {
                 if (field === 'roomNumber') {
                     const selectedRoomNum = String(value);
                     const standardRate = getStandardDailyRateForRoom(selectedRoomNum, r.roomType);
-                    const newRate = calculateTariffForRatePlan(r.ratePlan, r.roomType, standardRate, r.adults, r.children, availableRatePlans);
+                    const newRate = calculateRoomRate({
+                        roomType: r.roomType,
+                        ratePlan: r.ratePlan,
+                        packageId: r.packageId,
+                        adults: r.adults,
+                        children: r.children,
+                        baseRate: standardRate,
+                        nights
+                    });
                     return {
                         ...r,
                         roomNumber: selectedRoomNum,
@@ -1515,13 +1582,11 @@ export const AddReservation: React.FC = () => {
             return;
         }
 
-        // Validate Rate Plan restrictions for all requested rooms
-        for (const r of roomsList) {
-            const planCheck = validateRatePlanRestrictions(r.ratePlan, nights, checkIn, availableRatePlans);
-            if (!planCheck.allowed) {
-                toast.error(planCheck.reason || `Rate plan restrictions violated for ${r.roomType}.`);
-                return;
-            }
+        // Validate Rate Plan & Package restrictions via Unified Booking Engine
+        const restrictionCheck = validateAllRoomRestrictions(roomsList, nights, checkIn);
+        if (!restrictionCheck.isValid) {
+            toast.error(restrictionCheck.error || 'Stay parameters violate commercial policy.');
+            return;
         }
 
         if (hasOverbookingError) {
@@ -1649,6 +1714,8 @@ export const AddReservation: React.FC = () => {
             guestName: `${salutation} ${guestName.trim()}`,
             phone: mobile || phone,
             email: email,
+            packageId: mainRoom.packageId,
+            packageName: mainRoom.packageName,
             roomNumber: primaryRoomNumber,
             roomType: mainRoom.roomType,
             smokingPolicy: getRoomSmokingPolicy(allocatedRoomNumbers[0] || mainRoom.roomNumber).smokingStatus,
@@ -2375,7 +2442,7 @@ export const AddReservation: React.FC = () => {
                                             <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider">
                                                 <th className="py-2 px-2 pl-3 w-[18%]">Room Type</th>
                                                 <th className="py-2 px-1 w-[7%] text-center" title="Rooms count (checks live inventory availability)">Rooms</th>
-                                                <th className="py-2 px-1.5 w-[17%]">Rate Plan</th>
+                                                <th className="py-2 px-1.5 w-[18%]">Rate / Package Offer</th>
                                                 <th className="py-2 px-1.5 w-[14%] text-center">Room</th>
                                                 <th className="py-2 px-1 w-[6%] text-center" title="Adult capacity per room">Adult</th>
                                                 <th className="py-2 px-1.5 w-[10%] text-center">Child</th>
@@ -2517,25 +2584,45 @@ export const AddReservation: React.FC = () => {
                                                         })()}
                                                     </td>
                                                     <td className="p-1.5">
-                                                        <select
-                                                            value={row.ratePlan}
-                                                            onChange={e => updateRoomRow(row.id, 'ratePlan', e.target.value)}
-                                                            className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer"
-                                                        >
-                                                            {availableRatePlans.length === 0 ? (
-                                                                <option value="" disabled>No rate plans configured</option>
-                                                            ) : (
-                                                                availableRatePlans.map(p => {
-                                                                    const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
-                                                                    const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
-                                                                    return (
-                                                                        <option key={p.id} value={p.name} disabled={isPlanDisabled}>
-                                                                            {p.name}{badge}
-                                                                        </option>
-                                                                    );
-                                                                })
-                                                            )}
-                                                        </select>
+                                                        {(() => {
+                                                            const applicablePkgs = getApplicablePackagesForRoomType(row.roomType);
+                                                            const currentOfferVal = getOfferValue(row);
+
+                                                            return (
+                                                                <select
+                                                                    value={currentOfferVal}
+                                                                    onChange={e => handleUnifiedOfferChange(row.id, e.target.value)}
+                                                                    className="w-full h-7 px-1.5 border border-gray-200 rounded text-[11px] bg-white outline-none cursor-pointer font-medium text-slate-800"
+                                                                    title="Select Rate Plan or Bundled Stay Package"
+                                                                >
+                                                                    <optgroup label="── 🏷️ Rate Plans ──">
+                                                                        {availableRatePlans.length === 0 ? (
+                                                                            <option value="" disabled>No rate plans configured</option>
+                                                                        ) : (
+                                                                            availableRatePlans.map(p => {
+                                                                                const isPlanDisabled = p.status === 'Inactive' || p.stopSell;
+                                                                                const badge = p.status === 'Inactive' ? ' (Inactive)' : p.stopSell ? ' (Stop Sell)' : '';
+                                                                                return (
+                                                                                    <option key={`plan:${p.name}`} value={`plan:${p.name}`} disabled={isPlanDisabled}>
+                                                                                        🏷️ {p.name}{badge}
+                                                                                    </option>
+                                                                                );
+                                                                            })
+                                                                        )}
+                                                                    </optgroup>
+
+                                                                    {applicablePkgs.length > 0 && (
+                                                                        <optgroup label="── 🎁 Bundled Packages ──">
+                                                                            {applicablePkgs.map(p => (
+                                                                                <option key={`pkg:${p.id}`} value={`pkg:${p.id}`}>
+                                                                                    🎁 {p.name}{p.finance?.baseSurcharge ? ` (+${currencySymbol}${p.finance.baseSurcharge})` : ''}
+                                                                                </option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                    )}
+                                                                </select>
+                                                            );
+                                                        })()}
                                                     </td>
                                                     <td className="p-1.5 text-center">
                                                         {(() => {
@@ -2735,7 +2822,15 @@ export const AddReservation: React.FC = () => {
                                                                         compact
                                                                         onChange={(count, ages) => {
                                                                             const standardRate = getStandardDailyRateForRoom(row.roomNumber, row.roomType);
-                                                                            const newRate = calculateTariffForRatePlan(row.ratePlan, row.roomType, standardRate, row.adults, count, availableRatePlans);
+                                                                            const newRate = calculateRoomRate({
+                                                                                roomType: row.roomType,
+                                                                                ratePlan: row.ratePlan,
+                                                                                packageId: row.packageId,
+                                                                                adults: row.adults,
+                                                                                children: count,
+                                                                                baseRate: standardRate,
+                                                                                nights
+                                                                            });
                                                                             setRoomsList(prev => prev.map(r => r.id === row.id ? { ...r, children: count, childrenAges: ages, rate: newRate } : r));
                                                                         }}
                                                                     />
